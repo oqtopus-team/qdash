@@ -33,6 +33,7 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
+import { ViewSwitch } from "@/components/ui/ViewSwitch";
 import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { ChipPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useProject } from "@/contexts/ProjectContext";
@@ -487,29 +488,16 @@ export function ChipPageContent() {
             className="mb-0"
           />
 
-          {/* View Mode Tabs */}
-          <div className="tabs tabs-boxed bg-base-200 w-fit">
-            <button
-              className={`tab ${viewMode === "1q" ? "tab-active" : ""}`}
-              onClick={() => setViewMode("1q")}
-            >
-              Qubit
-            </button>
-            <button
-              className={`tab ${viewMode === "2q" ? "tab-active" : ""}`}
-              onClick={() => setViewMode("2q")}
-            >
-              Coupling
-            </button>
-            {hasMux && (
-              <button
-                className={`tab ${viewMode === "mux" ? "tab-active" : ""}`}
-                onClick={() => setViewMode("mux")}
-              >
-                MUX View
-              </button>
-            )}
-          </div>
+          <ViewSwitch
+            ariaLabel="Chip view"
+            value={viewMode}
+            onValueChange={setViewMode}
+            items={[
+              { value: "1q", label: "Qubit" },
+              { value: "2q", label: "Coupling" },
+              ...(hasMux ? [{ value: "mux" as const, label: "MUX View" }] : []),
+            ]}
+          />
 
           {/* Selection Controls */}
           <div

@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 
-import { Bot, ChevronRight, ExternalLink, Target } from "lucide-react";
+import { Bot, ChevronRight, ExternalLink } from "lucide-react";
 
 import type { ExecutionGroupItem, ExecutionResponseSummary } from "@/schemas";
 
 import { sessionStatusLabel } from "@/components/features/agent-session/interventionLabels";
-import { calibrationSessionHref } from "@/lib/chatCalibrationSession";
+import { type SessionReturnContext, calibrationSessionDetailHref } from "@/lib/executionArea";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 import {
@@ -32,6 +32,8 @@ interface AgentSessionGroupRowProps {
   hasDayFilter: boolean;
   /** Set when the row is nested in its calibration session's row, which already links it. */
   hideCalibrationLink?: boolean;
+  /** The list a calibration session page opened from this row links back to. */
+  sessionReturn?: SessionReturnContext;
 }
 
 /**
@@ -50,6 +52,7 @@ export function AgentSessionGroupRow({
   registerCard,
   hasDayFilter,
   hideCalibrationLink = false,
+  sessionReturn,
 }: AgentSessionGroupRowProps) {
   const summary = item.agent_session;
   if (!summary) return null;
@@ -112,15 +115,15 @@ export function AgentSessionGroupRow({
         <div className="flex shrink-0 flex-wrap gap-1">
           {summary.calibration_session && !hideCalibrationLink ? (
             <Link
-              href={calibrationSessionHref(
+              href={calibrationSessionDetailHref(
                 summary.calibration_session.calibration_session_id,
                 projectId,
+                sessionReturn,
               )}
               className="btn btn-ghost btn-sm max-w-64"
               title={`Calibration session: ${summary.calibration_session.objective}`}
               aria-label={`Calibration session: ${summary.calibration_session.objective}`}
             >
-              <Target data-icon="inline-start" aria-hidden="true" />
               <span className="truncate">{summary.calibration_session.objective}</span>
             </Link>
           ) : null}

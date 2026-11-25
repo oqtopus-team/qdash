@@ -6,11 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
 
 import { AgentSessionPageContent } from "../AgentSessionPageContent";
-import {
-  auditKindLabel,
-  auditProvenanceLabel,
-  gateOutcomeLabel,
-} from "../AgentSessionAuditTimeline";
 
 const PROJECTS = [{ project_id: "lab-a" }, { project_id: "lab-b" }];
 let project: { projectId: string | null; projects: { project_id: string }[]; loading: boolean };
@@ -205,12 +200,13 @@ describe("AgentSessionAuditTimeline", () => {
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
     expect(await screen.findByText("R2 0.98 passes the criterion.")).toBeTruthy();
     expect(screen.getByText("Agent statement")).toBeTruthy();
-    // Each event names the model its own record reported, and who reported it.
-    const model = screen.getByText("model vllm/qwen3:32b");
+    // Each event names the model its own record reported, and who reported it, in its details.
+    const model = screen.getByText("vllm/qwen3:32b");
     expect(model.getAttribute("title")).toBe(
       "Reported by qdash-web-agent; QDash does not verify it",
     );
-    expect(screen.getAllByText(/^model /)).toHaveLength(1);
+    expect(model.closest("details")).toBeTruthy();
+    expect(screen.getAllByText(/qwen3:32b$/)).toHaveLength(1);
     expect(screen.getByText(/Showing 3 of 3 events/)).toBeTruthy();
     expect(screen.getByText("End of the timeline")).toBeTruthy();
     expect(audits[audits.length - 1]).toEqual({ cursor: "snap-1:2", project: "lab-a" });
@@ -295,26 +291,5 @@ describe("AgentSessionAuditTimeline", () => {
     setup();
     expect(await screen.findByText(/which your account cannot\s+open/)).toBeTruthy();
     expect(audits).toEqual([]);
-  });
-
-  it("names kinds and sources in plain words", () => {
-    expect(auditKindLabel("intervention_response")).toBe("Expert answered");
-    expect(auditProvenanceLabel("server_record")).toBe("QDash record");
-    expect(auditKindLabel("future_kind")).toBe("future_kind");
-  });
-
-  it("tells an out-of-scope output apart from a failed gate", () => {
-    expect(gateOutcomeLabel({ accepted: true, rejection: null })).toBe("accepted");
-    expect(gateOutcomeLabel({ accepted: false, rejection: "not_in_scope" })).toBe(
-      "not in session scope (reference only)",
-    );
-    expect(gateOutcomeLabel({ accepted: false, rejection: "outside_bounds" })).toBe(
-      "rejected: outside bounds",
-    );
-    expect(gateOutcomeLabel({ accepted: false, rejection: "quality_gate" })).toBe(
-      "rejected: quality gate",
-    );
-    // An audit recorded before the code existed keeps its plain wording.
-    expect(gateOutcomeLabel({ accepted: false })).toBe("rejected");
   });
 });

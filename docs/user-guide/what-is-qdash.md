@@ -1,55 +1,34 @@
----
-layout: doc
----
-
 # What is QDash?
 
-QDash keeps calibration execution, results, and operator context together for each quantum chip.
+QDash runs quantum-chip calibrations and keeps their results, parameters, and discussions together.
 
 ## What QDash Manages
 
-QDash records calibration inputs, artifacts, status, history, and discussion in a project-scoped
-workspace.
-
-| Concept | Meaning in QDash |
+| Term | Meaning |
 | --- | --- |
-| Project | The access and storage boundary shared by a team. |
-| Chip | The device whose calibration state is being maintained. |
-| Workflow | A reusable graph of calibration tasks that can be run or scheduled. |
-| Task | One calibration operation that measures or checks selected targets. |
-| Execution | One run, including status, logs, task results, and artifacts. |
-| Calibration state | The accepted parameters available to later calibration work. |
+| Project | A team's shared data and access boundary |
+| Chip | The device being calibrated |
+| Task | One measurement or calibration operation |
+| Workflow | A reusable sequence of tasks |
+| Execution | One run and its results |
+| Calibration state | Accepted values used by later tasks |
 
-Select the active project and chip before starting work. Two projects can use the same chip ID
-without sharing calibration state. [Projects and Data Sharing](./projects-and-data-sharing.md)
-explains this boundary.
+Select the project and chip before working. Chips with the same ID in different projects do
+not share calibration state.
 
 ## Typical Calibration Loop
 
-1. Select the project and chip that own the calibration state.
-2. Run a reusable workflow or one task from the workbench.
-3. Monitor the execution and inspect its task results and artifacts.
-4. Compare the result with metric history and parameter provenance.
-5. Record notes or open a forum thread when the result needs context or follow-up.
-6. Use the resulting state as input to later calibration work.
-
-[Running Calibrations](./running-calibrations.md) covers steps 1–3.
-[Calibration Data and Provenance](./data-and-provenance.md) covers step 4, and
-[Reviewing and Sharing Results](./reviewing-results.md) covers step 5.
+1. [Run a workflow or task](./running-calibrations.md).
+2. [Inspect the results](./reviewing-results.md) and [parameter history](./data-and-provenance.md).
+3. Record findings and decide which values later tasks should use.
 
 ## Ways to Work
 
-Use the web application for interactive operation and investigation. The generated Python and
-TypeScript clients provide the same API for scripts, notebooks, and integrations. Agent can
-help explore project data, but the operator remains responsible for checking evidence and making
-hardware decisions.
+Use the web application for interactive work, the [clients](../reference/index.md) for scripts,
+or the [Agent](./ai-chat.md) for assistance. Check AI findings against the recorded evidence.
 
 ## Demo
 
-Watch the demo introducing QDash.
-
 <video controls playsinline preload="metadata" src="/videos/qdash-demo.mp4" style="width: 100%; border-radius: 8px;"></video>
 
-Continue with the [Application Tour](./application-tour.md) to find each feature, or
-[set up QDash](./setup.md) for a lab. Developers can start with the
-[system architecture](../developer-guide/architecture.md).
+Continue with [Setup](./setup.md) or [Run Your First Calibration](./first-calibration.md).

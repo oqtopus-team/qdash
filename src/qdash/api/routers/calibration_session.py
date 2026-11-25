@@ -14,6 +14,7 @@ from qdash.api.lib.project import (
 )
 from qdash.api.schemas.calibration_session import (
     CalibrationDecisionResponse,
+    CalibrationRunStateResponse,
     CalibrationSessionAuditResponse,
     CalibrationSessionDetailResponse,
     CalibrationSessionResponse,
@@ -26,7 +27,7 @@ from qdash.api.schemas.calibration_session import (
 from qdash.api.services.audit_timeline import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from qdash.api.services.calibration_session_audit import CalibrationSessionAuditService
 from qdash.api.services.calibration_session_service import CalibrationSessionService
-from qdash.datamodel.calibration_session import CalibrationSessionStatus
+from qdash.datamodel.calibration_session import CalibrationSessionOrigin, CalibrationSessionStatus
 
 router = APIRouter(prefix="/calibration-sessions")
 
@@ -45,7 +46,8 @@ def create_calibration_session(
 ) -> CalibrationSessionResponse:
     """Record one calibration objective on a chip.
 
-    Pipeline runs and agent sessions started with its ID are grouped under it. It grants no
+    Runs (saved workflows, pipelines, tasks) and agent sessions started with its ID are grouped
+    under it. A run started without one gets an automatic session instead. It grants no
     operation: each run is still approved, gated, and locked on its own.
     """
     return service.create(project_id=ctx.project_id, username=ctx.user.username, body=body)
@@ -65,6 +67,15 @@ def list_calibration_sessions(
         list[CalibrationSessionStatus] | None,
         Query(alias="status", description="Only sessions in these statuses"),
     ] = None,
+    origin: Annotated[
+        list[CalibrationSessionOrigin] | None,
+        Query(
+            description=(
+                "Only sessions of these origins: manual (created for an objective) or "
+                "automatic (created by QDash for a run started without a session ID)"
+            )
+        ),
+    ] = None,
     mine: Annotated[bool, Query(description="Only sessions the signed-in user created")] = False,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     skip: Annotated[int, Query(ge=0, le=10_000)] = 0,
@@ -75,6 +86,7 @@ def list_calibration_sessions(
         chip_id=chip_id,
         created_by=ctx.user.username if mine else None,
         statuses=status_filter,
+        origins=origin,
         limit=limit,
         skip=skip,
     )
@@ -94,6 +106,30 @@ def get_calibration_session(
     """The session, its pipeline runs with every step execution, and its agent sessions with
     the executions their actions dispatched."""
     return service.get(project_id=ctx.project_id, calibration_session_id=calibration_session_id)
+
+
+@router.get(
+    "/{calibration_session_id}/runs/{run_id}",
+    response_model=CalibrationRunStateResponse,
+    summary="Get one run of a calibration session with its flow run state",
+    operation_id="getCalibrationSessionRun",
+)
+def get_calibration_session_run(
+    calibration_session_id: str,
+    run_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[CalibrationSessionService, Depends(get_calibration_session_service)],
+) -> CalibrationRunStateResponse:
+    """The run with every step execution, found by its ID however many runs the session has.
+
+    ``flow_status`` is the whole flow run's state, read from Prefect in this request; a step
+    execution that completed never makes it completed. Prefect being unreadable is
+    ``unavailable`` and a flow run Prefect does not report is ``unknown``, never running or
+    ended. The read changes nothing: no session is checked or closed.
+    """
+    return service.get_run(
+        project_id=ctx.project_id, calibration_session_id=calibration_session_id, run_id=run_id
+    )
 
 
 @router.post(

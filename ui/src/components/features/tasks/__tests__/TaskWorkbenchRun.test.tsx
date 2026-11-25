@@ -131,6 +131,34 @@ describe("TaskWorkbench run availability", () => {
     expect(screen.getByRole("textbox", { name: "normalization_reference" })).toBeTruthy();
   });
 
+  it("reveals and names an invalid value inside a collapsed input group", async () => {
+    renderWorkbench(
+      {
+        input_parameters: {
+          qubit_frequency: { value_type: "float" },
+          normalization_reference: {
+            value_type: "float",
+            ui_group: "Normalization context",
+            ui_group_collapsed: true,
+          },
+        },
+      },
+      "?chip=chip-1&target=0",
+    );
+    const field = screen.getByRole("textbox", { name: "normalization_reference" });
+    fireEvent.change(field, { target: { value: "abc" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run task" }));
+
+    await waitFor(() =>
+      expect(mocks.toast.error).toHaveBeenCalledWith("Fix normalization_reference before running"),
+    );
+    expect(screen.getByText("Normalization context").closest("details")).toHaveAttribute("open");
+    expect(field).toHaveAttribute("aria-invalid", "true");
+    expect(field).toHaveFocus();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(mocks.post).not.toHaveBeenCalled();
+  });
+
   it("prefills the current form and submits all entered values through the catalog API", async () => {
     renderWorkbench(
       {
@@ -300,12 +328,46 @@ describe("TaskWorkbench run availability", () => {
     });
     expect(screen.getByText("Enter numbers that produce a sweep.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Run task" }));
-    await waitFor(() =>
-      expect(mocks.toast.error).toHaveBeenCalledWith(
-        "Enter numbers that produce a range sweep for time_range",
-      ),
+    const field = screen.getByRole("textbox", { name: "time_range step" });
+    await waitFor(() => expect(field).toHaveAttribute("aria-invalid", "true"));
+    expect(document.getElementById(field.getAttribute("aria-describedby")!)).toHaveTextContent(
+      "Enter numbers that produce a range sweep for time_range",
     );
+    expect(field).toHaveClass("input-error");
+    expect(screen.queryByText("Enter numbers that produce a sweep.")).toBeNull();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Enter numbers that produce a range sweep for time_range",
+    );
+    expect(mocks.toast.error).toHaveBeenCalledWith("Fix time_range before running");
     expect(mocks.post).not.toHaveBeenCalled();
+
+    fireEvent.change(field, { target: { value: "8" } });
+    await waitFor(() => expect(field).not.toHaveAttribute("aria-invalid", "true"));
+    expect(field).not.toHaveAttribute("aria-describedby");
+  });
+
+  it("does not turn restored explicit points into arguments of another form", async () => {
+    renderWorkbench(
+      {
+        run_parameters: {
+          time_range: { value: [0, 401, 8], value_type: "range", unit: "ns" },
+        },
+      },
+      undefined,
+      {
+        ...source,
+        run_parameters: {
+          time_range: { value: [1, 2, 4], value_type: "list", unit: "ns" },
+        },
+      },
+    );
+    fireEvent.change(screen.getByRole("combobox", { name: "time_range type" }), {
+      target: { value: "range" },
+    });
+    expect(screen.getByRole("textbox", { name: "time_range start" })).toHaveValue("");
+    fireEvent.click(screen.getByRole("button", { name: "Run task" }));
+    await waitFor(() => expect(mocks.post).toHaveBeenCalled());
+    expect(mocks.post.mock.calls[0][1].run_parameter_overrides).toEqual({});
   });
 
   it("restores the sweep form of a source result", () => {
@@ -387,7 +449,13 @@ describe("TaskWorkbench run availability", () => {
       target: { value: "1.5" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Run task" }));
-    await waitFor(() => expect(mocks.toast.error).toHaveBeenCalled());
+    const field = screen.getByRole("textbox", { name: "shots" });
+    await waitFor(() => expect(field).toHaveAttribute("aria-invalid", "true"));
+    expect(document.getElementById(field.getAttribute("aria-describedby")!)).toHaveTextContent(
+      'Expected an integer, got "1.5"',
+    );
+    expect(field).toHaveFocus();
+    expect(mocks.toast.error).toHaveBeenCalledWith("Fix shots before running");
     expect(mocks.post).not.toHaveBeenCalled();
   });
 
@@ -748,7 +816,26 @@ describe("TaskWorkbench run availability", () => {
     renderWorkbench();
     fireEvent.click(screen.getByRole("button", { name: "Run task" }));
     expect(screen.getByRole("button", { name: "Starting…" })).toBeDisabled();
+    await waitFor(() => expect(mocks.post).toHaveBeenCalled());
+    expect(screen.getByRole("button", { name: "Starting…" })).toBeDisabled();
     await act(async () => resolve({ data: { execution_id: "execution-1" } }));
+  });
+
+  it("starts one execution when Run is clicked twice", async () => {
+    let resolve!: (value: unknown) => void;
+    mocks.post.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    renderWorkbench();
+    const button = screen.getByRole("button", { name: "Run task" });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    await waitFor(() => expect(mocks.post).toHaveBeenCalledTimes(1));
+    await act(async () => resolve({ data: { execution_id: "execution-1" } }));
+    expect(mocks.post).toHaveBeenCalledTimes(1);
   });
 
   it.each([

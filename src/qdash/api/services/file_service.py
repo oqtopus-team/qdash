@@ -21,6 +21,7 @@ from fastapi.responses import FileResponse
 from git import Repo
 from git.exc import GitCommandError
 
+from qdash.api.lib.errors import OperationFailedError
 from qdash.api.lib.file_utils import validate_relative_path
 from qdash.api.schemas.file import FileTreeNode
 from qdash.common.config.path_resolver import (
@@ -35,6 +36,10 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
 logger = logging.getLogger(__name__)
+
+# Codes of unexpected workspace file failures; the handler logs the cause under an error ID.
+FILE_READ_FAILED = "file_read_failed"
+FILE_SAVE_FAILED = "file_save_failed"
 
 
 class FileService:
@@ -321,10 +326,11 @@ class FileService:
                 ).isoformat(),
             }
         except UnicodeDecodeError:
-            raise HTTPException(status_code=400, detail="File is not a text file")
+            raise HTTPException(status_code=400, detail="File is not a text file") from None
         except Exception as e:
-            logger.error(f"Error reading file {file_path}: {e}")
-            raise HTTPException(status_code=500, detail=f"Error reading file: {e!s}")
+            raise OperationFailedError(
+                code=FILE_READ_FAILED, message="Failed to read the file"
+            ) from e
 
     # Raster formats only: an SVG can carry script when opened directly.
     IMAGE_MEDIA_TYPES: ClassVar[dict[str, str]] = {
@@ -384,8 +390,9 @@ class FileService:
             self._match_owner(file_path)
             logger.info(f"File saved successfully: {file_path}")
         except Exception as e:
-            logger.error(f"Error saving file {file_path}: {e}")
-            raise HTTPException(status_code=500, detail=f"Error saving file: {e!s}")
+            raise OperationFailedError(
+                code=FILE_SAVE_FAILED, message="Failed to save the file"
+            ) from e
         self._run_hook(self._after_save, "save")
         return {
             "message": "File saved successfully",

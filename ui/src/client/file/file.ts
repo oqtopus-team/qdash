@@ -25,6 +25,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  Detail,
   DownloadFileParams,
   DownloadZipFileParams,
   FileTreeNode,
@@ -36,6 +37,7 @@ import type {
   GitPushConfig200,
   GitPushRequest,
   HTTPValidationError,
+  OperationErrorDetail,
   SaveFileContent200,
   SaveFileRequest,
   ValidateFileContent200,
@@ -390,7 +392,7 @@ export const getGetFileContentQueryKey = (params?: GetFileContentParams,) => {
     }
 
 
-export const getGetFileContentQueryOptions = <TData = Awaited<ReturnType<typeof getFileContent>>, TError = HTTPValidationError>(params: GetFileContentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetFileContentQueryOptions = <TData = Awaited<ReturnType<typeof getFileContent>>, TError = Detail | HTTPValidationError | OperationErrorDetail>(params: GetFileContentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -409,10 +411,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetFileContentQueryResult = NonNullable<Awaited<ReturnType<typeof getFileContent>>>
-export type GetFileContentQueryError = HTTPValidationError
+export type GetFileContentQueryError = Detail | HTTPValidationError | OperationErrorDetail
 
 
-export function useGetFileContent<TData = Awaited<ReturnType<typeof getFileContent>>, TError = HTTPValidationError>(
+export function useGetFileContent<TData = Awaited<ReturnType<typeof getFileContent>>, TError = Detail | HTTPValidationError | OperationErrorDetail>(
  params: GetFileContentParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getFileContent>>,
@@ -422,7 +424,7 @@ export function useGetFileContent<TData = Awaited<ReturnType<typeof getFileConte
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetFileContent<TData = Awaited<ReturnType<typeof getFileContent>>, TError = HTTPValidationError>(
+export function useGetFileContent<TData = Awaited<ReturnType<typeof getFileContent>>, TError = Detail | HTTPValidationError | OperationErrorDetail>(
  params: GetFileContentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getFileContent>>,
@@ -432,7 +434,7 @@ export function useGetFileContent<TData = Awaited<ReturnType<typeof getFileConte
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetFileContent<TData = Awaited<ReturnType<typeof getFileContent>>, TError = HTTPValidationError>(
+export function useGetFileContent<TData = Awaited<ReturnType<typeof getFileContent>>, TError = Detail | HTTPValidationError | OperationErrorDetail>(
  params: GetFileContentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -440,7 +442,7 @@ export function useGetFileContent<TData = Awaited<ReturnType<typeof getFileConte
  * @summary Get config file content for editing
  */
 
-export function useGetFileContent<TData = Awaited<ReturnType<typeof getFileContent>>, TError = HTTPValidationError>(
+export function useGetFileContent<TData = Awaited<ReturnType<typeof getFileContent>>, TError = Detail | HTTPValidationError | OperationErrorDetail>(
  params: GetFileContentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -477,7 +479,7 @@ export const saveFileContent = (
 
 
 
-export const getSaveFileContentMutationOptions = <TError = HTTPValidationError,
+export const getSaveFileContentMutationOptions = <TError = Detail | HTTPValidationError | OperationErrorDetail,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveFileContent>>, TError,{data: SaveFileRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof saveFileContent>>, TError,{data: SaveFileRequest}, TContext> => {
 
@@ -506,12 +508,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type SaveFileContentMutationResult = NonNullable<Awaited<ReturnType<typeof saveFileContent>>>
     export type SaveFileContentMutationBody = SaveFileRequest
-    export type SaveFileContentMutationError = HTTPValidationError
+    export type SaveFileContentMutationError = Detail | HTTPValidationError | OperationErrorDetail
 
     /**
  * @summary Save config file content
  */
-export const useSaveFileContent = <TError = HTTPValidationError,
+export const useSaveFileContent = <TError = Detail | HTTPValidationError | OperationErrorDetail,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveFileContent>>, TError,{data: SaveFileRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof saveFileContent>>,

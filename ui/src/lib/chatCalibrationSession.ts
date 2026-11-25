@@ -16,6 +16,7 @@
  */
 
 import { CREATE_CALIBRATION_SESSION_TOOL } from "@/lib/agentChatStream";
+import { calibrationSessionDetailHref } from "@/lib/executionArea";
 import type { ChatMessage, AgentBlocksResult, TraceStep } from "@/types/agentChat";
 
 /** Tools whose `calibrationSessionId` argument names one calibration session. */
@@ -79,23 +80,41 @@ export function linkedCalibrationSessions(
 
 /** Calibration session page, pinned to the project it belongs to when known. */
 export function calibrationSessionHref(calibrationSessionId: string, projectId?: string | null) {
-  const path = `/calibration-sessions/${encodeURIComponent(calibrationSessionId)}`;
-  return projectId ? `${path}?project=${encodeURIComponent(projectId)}` : path;
+  return calibrationSessionDetailHref(calibrationSessionId, projectId);
 }
 
-/** The calibration session list, optionally for one chip, pinned to a project when known. */
-export function calibrationSessionsHref({
-  chipId,
-  projectId,
-}: { chipId?: string | null; projectId?: string | null } = {}) {
-  const params = new URLSearchParams();
-  if (chipId) params.set("chip", chipId);
-  if (projectId) params.set("project", projectId);
-  const query = params.toString();
-  return query ? `/calibration-sessions?${query}` : "/calibration-sessions";
+/** What a run of a calibration session launched, in words. */
+const RUN_KIND: Record<string, string> = {
+  workflow: "Workflow",
+  pipeline: "Pipeline",
+  task: "Task",
+  agent_action: "Agent action",
+};
+
+export function runKindLabel(kind: string | undefined): string {
+  return RUN_KIND[kind ?? "pipeline"] ?? kind ?? "Run";
 }
 
-/** Launch states of a pipeline run, in words, with the badge color each takes. */
+/**
+ * Who started a run, in words, or null for a run a signed-in request started (the usual case,
+ * which needs no badge). A run the worker recorded was started by Prefect, not through QDash.
+ */
+export function runTriggerLabel(trigger: string | undefined): string | null {
+  if (trigger === "schedule") return "Scheduled";
+  if (trigger === "worker") return "Started outside QDash";
+  return null;
+}
+
+/** The name a run is shown with: what it launched, or its kind when it names nothing. */
+export function runDisplayName(run: {
+  run_name?: string;
+  pipeline_name?: string;
+  run_kind?: string;
+}): string {
+  return run.run_name || run.pipeline_name || `${runKindLabel(run.run_kind)} run`;
+}
+
+/** Launch states of a run, in words, with the badge color each takes. */
 const DISPATCH_STATUS: Record<string, { label: string; badge: string }> = {
   dispatching: { label: "Starting", badge: "badge-info" },
   dispatched: { label: "Started", badge: "badge-ghost" },

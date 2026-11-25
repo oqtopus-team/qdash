@@ -1,24 +1,15 @@
-"""Target classes for calibration workflows.
+"""Runtime target classes: the worker's resolution of targets to qubits and couplings.
 
-This module defines the target abstraction for specifying which qubits,
-MUXes, or coupling pairs to calibrate.
+Write targets with :mod:`qdash.calibration` (``QubitTargets``, ``MuxTargets``,
+``CouplingTargets``); the worker converts them into the classes here. The runtime
+classes remain for saved flows that build them directly, and ``AllMuxTargets`` and
+``AllQubitTargets`` (whole-chip selections) exist only here, on the worker-only path.
 
 Example:
-    from qdash.workflow.service import CalibService
-    from qdash.workflow.service.targets import MuxTargets, QubitTargets
+    from qdash.workflow.service.targets import AllQubitTargets
 
-    # Target by MUX IDs
-    targets = MuxTargets([0, 1, 2, 3])
-
-    # Target every qubit of the chip, multiplexed or standalone
-    targets = AllQubitTargets()
-
-    # Target specific qubits
-    targets = QubitTargets(["0", "1", "4", "5"])
-
-    # Use in calibration
-    service = CalibService(username, chip_id)
-    service.run(targets, steps=[...])
+    # Every qubit of the chip, multiplexed or standalone (worker only)
+    session.run(targets=AllQubitTargets(), steps=[...])
 """
 
 from __future__ import annotations

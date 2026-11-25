@@ -24,17 +24,19 @@ from __future__ import annotations
 import copy
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
     SerializerFunctionWrapHandler,
+    StringConstraints,
     field_validator,
     model_serializer,
     model_validator,
 )
+from pydantic.json_schema import SkipJsonSchema  # noqa: TC002 - pydantic resolves it at runtime
 
 from qdash.common.manual_rounds import (
     PairRounds,
@@ -47,6 +49,7 @@ from qdash.common.manual_rounds import (
 # and the migration names the accepted modes.
 from qdash.datamodel.one_qubit_execution_mode import (
     ONE_QUBIT_STEP_EXECUTION_MODES,
+    OneQubitExecutionMode,
     OneQubitStepExecutionMode,
 )
 from qdash.datamodel.task_call import (
@@ -62,6 +65,9 @@ from qdash.datamodel.two_qubit_execution_mode import (
     DEFAULT_MAX_PARALLEL_OPS,
     TwoQubitExecutionMode,
 )
+
+if TYPE_CHECKING:
+    from pydantic.config import JsonDict
 
 SPEC_VERSION = 2
 
@@ -188,11 +194,13 @@ def calls_with_configure(
 # Targets
 # ---------------------------------------------------------------------------
 
+QubitIdPair = Annotated[list[str], Field(min_length=2, max_length=2)]
+
 
 class PipelineTargets(BaseModel):
-    """Which qubits the pipeline starts from: explicit qids or whole MUXes.
+    """Which qubits or couplings the pipeline starts from.
 
-    Set exactly one of qids and mux_ids to a nonempty list without duplicates.
+    Set exactly one of qids, mux_ids and pairs to a nonempty list without duplicates.
     exclude_qids may be nonempty only with mux_ids.
     """
 
@@ -201,39 +209,59 @@ class PipelineTargets(BaseModel):
     qids: list[str] | None = Field(
         default=None,
         description=(
-            'Qubit ids as QDash lists them, e.g. ["0", "1"]. Set exactly one of qids and '
-            "mux_ids, as a nonempty list without duplicates."
+            'Qubit ids as QDash lists them, e.g. ["0", "1"]. Set exactly one of qids, '
+            "mux_ids and pairs, as a nonempty list without duplicates."
         ),
     )
     mux_ids: list[int] | None = Field(
         default=None,
         description=(
-            "MUX ids; every qubit of each MUX is a target. Set exactly one of qids and "
-            "mux_ids, as a nonempty list without duplicates."
+            "MUX ids; every qubit of each MUX is a target. Set exactly one of qids, "
+            "mux_ids and pairs, as a nonempty list without duplicates."
+        ),
+    )
+    # Omitted from dumps when unset so specs without it keep their plan digest.
+    pairs: list[QubitIdPair] | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description=(
+            'Directed coupling pairs [control, target], e.g. [["0", "1"], ["4", "5"]]; '
+            "the candidate qubits are their qubits and the candidate couplings the pairs, "
+            "in that direction. Set exactly one of qids, mux_ids and pairs."
         ),
     )
     # A plain default, unlike default_factory, appears in the JSON schema, so generated
     # clients treat the field as optional rather than nullable.
     exclude_qids: list[str] = Field(
         default=[],
-        description="Qubits to leave out of the MUX targets. Must be empty with qids.",
+        description="Qubits to leave out of the MUX targets. Must be empty with qids or pairs.",
     )
 
     @model_validator(mode="after")
     def _exactly_one_kind(self) -> PipelineTargets:
-        has_qids = bool(self.qids)
-        has_mux = bool(self.mux_ids)
-        if has_qids == has_mux:
+        kinds = [bool(self.qids), bool(self.mux_ids), bool(self.pairs)]
+        if kinds.count(True) != 1:
             raise ValueError(
-                "targets need exactly one of qids or mux_ids, and it must not be empty"
+                "targets need exactly one of qids, mux_ids or pairs, and it must not be empty"
             )
-        if has_qids and self.exclude_qids:
+        if not self.mux_ids and self.exclude_qids:
             raise ValueError("exclude_qids only applies to mux_ids targets")
         if self.qids is not None and len(set(self.qids)) != len(self.qids):
             raise ValueError("qids contains duplicates")
         if self.mux_ids is not None and len(set(self.mux_ids)) != len(self.mux_ids):
             raise ValueError("mux_ids contains duplicates")
+        if self.pairs is not None:
+            directed = [(control, target) for control, target in self.pairs]
+            if len(set(directed)) != len(directed):
+                raise ValueError("pairs contains duplicates")
+            for control, target in directed:
+                if control == target:
+                    raise ValueError(f"pair [{control!r}, {target!r}] couples a qubit with itself")
         return self
+
+    def pair_qids(self) -> list[str]:
+        """The qubits of ``pairs``, sorted as ``CouplingTargets`` sorts them; empty without pairs."""
+        return sorted({qid for pair in self.pairs or [] for qid in pair})
 
 
 # ---------------------------------------------------------------------------
@@ -286,8 +314,6 @@ _MAX_PARALLEL_OPS_DESCRIPTION = (
     f"Pairs per automatically generated CR group; omitted or null uses "
     f"{DEFAULT_MAX_PARALLEL_OPS}. Rejected with execution_mode manual unless omitted or null."
 )
-
-QubitIdPair = Annotated[list[str], Field(min_length=2, max_length=2)]
 
 
 def _check_qubit_rounds(step: Any) -> Any:
@@ -361,6 +387,18 @@ class BringUpStep(_StepBase):
     )
     tasks: list[TaskCall] | None = Field(
         default=None, description=_TASKS_DESCRIPTION + " Defaults to BRINGUP_TASKS."
+    )
+    # Omitted from dumps at its default so existing specs keep their plan digest.
+    execution_mode: OneQubitExecutionMode = Field(
+        default="parallel_by_mux",
+        exclude_if=lambda value: value == "parallel_by_mux",
+        description=(
+            "How MUX targets run; explicit qubit targets run directly in parallel. "
+            "parallel_by_mux (default): MUXes run in parallel and the qubits of one MUX run one "
+            "after another. parallel_by_round: rounds of qubits from different MUXes. "
+            "sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: "
+            "experimental batch spectroscopy. Bring-up has no manual rounds."
+        ),
     )
 
     _normalize_tasks = field_validator("tasks", mode="before")(_calls_or_none)
@@ -786,6 +824,14 @@ def step_continue_on_failure(step: PipelineStep) -> bool:
 # ---------------------------------------------------------------------------
 
 
+_RUN_NAME_PATTERN = r"^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+
+
+def _without_default(schema: JsonDict) -> None:
+    """Leave the ``None`` default of an optional field out of its JSON schema."""
+    schema.pop("default", None)
+
+
 class CalibrationPipelineSpec(BaseModel):
     """A complete, runnable calibration pipeline."""
 
@@ -794,10 +840,19 @@ class CalibrationPipelineSpec(BaseModel):
     spec_version: Literal[2] = Field(
         description="Spec format version. Convert a version 1 spec with migrate_pipeline_spec.",
     )
-    name: str = Field(
-        default="pipeline",
-        pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,63}$",
-        description="Display name of the execution.",
+    # Optional and omitted from dumps when unset: an unnamed run names each step's
+    # execution after the step alone, while a given name prefixes them. The schema
+    # shows an optional string, not a nullable one with a default.
+    name: Annotated[str, StringConstraints(pattern=_RUN_NAME_PATTERN)] | SkipJsonSchema[None] = (
+        Field(
+            default=None,
+            exclude_if=lambda value: value is None,
+            description=(
+                "Optional display name of the run. Each step's execution is named "
+                "<name>_<step name> when given, and after the step alone when omitted."
+            ),
+            json_schema_extra=_without_default,
+        )
     )
     targets: PipelineTargets
     steps: list[PipelineStep] = Field(min_length=1, max_length=32)

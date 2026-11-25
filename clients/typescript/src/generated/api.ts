@@ -35,6 +35,7 @@ import type {
   CalibrationGitHubSync,
   CalibrationNoteResponse,
   CalibrationParameterDeleteResponse,
+  CalibrationRunStateResponse,
   CalibrationSessionAuditResponse,
   CalibrationSessionDetailResponse,
   CalibrationSessionResponse,
@@ -1955,9 +1956,10 @@ const validateCalibrationPipeline = (
  * deployment. A spec with problems is rejected with 422 and the same problem
  * list that /validate returns.
  *
- * With ``calibration_session_id`` the run is recorded in that calibration
- * session before it is launched, and ``idempotency_key`` makes a retry return
- * the recorded run instead of starting another.
+ * The run is recorded before it is launched. It joins ``calibration_session_id``
+ * when given; otherwise an automatic calibration session created for it.
+ * ``idempotency_key`` makes a retry return the
+ * recorded run instead of starting another.
  * @summary Validate and run a calibration pipeline spec
  */
 const executeCalibrationPipeline = (
@@ -1974,7 +1976,8 @@ const executeCalibrationPipeline = (
 /**
  * Record one calibration objective on a chip.
  *
- * Pipeline runs and agent sessions started with its ID are grouped under it. It grants no
+ * Runs (saved workflows, pipelines, tasks) and agent sessions started with its ID are grouped
+ * under it. A run started without one gets an automatic session instead. It grants no
  * operation: each run is still approved, gated, and locked on its own.
  * @summary Create a calibration session
  */
@@ -2013,6 +2016,25 @@ const getCalibrationSession = (
  options?: SecondParameter<typeof qdashRequest<CalibrationSessionDetailResponse>>,) => {
       return qdashRequest<CalibrationSessionDetailResponse>(
       {url: `/calibration-sessions/${calibrationSessionId}`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * The run with every step execution, found by its ID however many runs the session has.
+ *
+ * ``flow_status`` is the whole flow run's state, read from Prefect in this request; a step
+ * execution that completed never makes it completed. Prefect being unreadable is
+ * ``unavailable`` and a flow run Prefect does not report is ``unknown``, never running or
+ * ended. The read changes nothing: no session is checked or closed.
+ * @summary Get one run of a calibration session with its flow run state
+ */
+const getCalibrationSessionRun = (
+    calibrationSessionId: string,
+    runId: string,
+ options?: SecondParameter<typeof qdashRequest<CalibrationRunStateResponse>>,) => {
+      return qdashRequest<CalibrationRunStateResponse>(
+      {url: `/calibration-sessions/${calibrationSessionId}/runs/${runId}`, method: 'GET'
     },
       options);
     }
@@ -2892,6 +2914,9 @@ const listTasks = (
 
 /**
  * Execute one task without requiring a previous execution snapshot.
+ *
+ * The run is recorded before it is launched. It joins ``calibration_session_id`` when given;
+ * otherwise an automatic calibration session created for it.
  * @summary Execute a single task from the task catalog
  */
 const quickRunTask = (
@@ -4191,7 +4216,13 @@ const getFlowExecutionPlan = (
     }
 
 /**
- * Execute a Flow via Prefect deployment.
+ * Execute a Flow via Prefect deployment, as one run of a calibration session.
+ *
+ * The run is recorded before it is launched. It joins ``calibration_session_id`` when given
+ * (refused before launch if that session cannot take it); otherwise an automatic session
+ * created for it. Every step execution of the run
+ * carries the run ID, and the session ID when it has one. ``idempotency_key`` makes a retry
+ * return the recorded run instead of starting another.
  * @summary Execute a flow
  */
 const executeFlow = (
@@ -5718,7 +5749,7 @@ const listUserAvatars = (
       options);
     }
 
-return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,listExecutionGroups,getAgentSessionGraph,getExecutionActivity,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,listAgentSessions,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,stopAgentSession,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,createAgentIntervention,listAgentInterventions,getAgentIntervention,respondAgentIntervention,claimAgentInterventionResume,recordAgentResumeOutcome,retryAgentInterventionNotification,recordAgentDecision,listAgentDecisions,getAgentSessionAudit,exportAgentSessionAudit,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,createCalibrationSession,listCalibrationSessions,getCalibrationSession,closeCalibrationSession,recordCalibrationDecision,listCalibrationDecisions,getCalibrationSessionAudit,exportCalibrationSessionAudit,getAgentConfig,listAgentChatSessions,createAgentChatSession,getAgentChatSession,updateAgentChatSession,deleteAgentChatSession,branchAgentChatSession,listAgentSourceRoots,searchAgentSource,getAgentSourceFile,getAgentPreferences,updateAgentPreferences,getAgentSystemPrompt,listAgentSkills,getSettings,listChips,createChip,listChipConfigSources,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,formatFlowSource,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,getFlowExecutionPlan,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listDashboards,createDashboard,listDashboardTemplates,previewDashboardTemplate,getDashboard,updateDashboard,deleteDashboard,duplicateDashboard,listMetricScripts,createMetricScript,listMetricScriptTemplates,getMetricScriptCatalog,validateMetricScript,formatMetricScriptSource,evaluateMetricScriptDraft,getMetricScript,updateMetricScript,deleteMetricScript,copyMetricScript,evaluateMetricScript,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations,getCurrentUserAvatar,updateCurrentUserAvatar,listUserAvatars}};
+return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,listExecutionGroups,getAgentSessionGraph,getExecutionActivity,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,listAgentSessions,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,stopAgentSession,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,createAgentIntervention,listAgentInterventions,getAgentIntervention,respondAgentIntervention,claimAgentInterventionResume,recordAgentResumeOutcome,retryAgentInterventionNotification,recordAgentDecision,listAgentDecisions,getAgentSessionAudit,exportAgentSessionAudit,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,createCalibrationSession,listCalibrationSessions,getCalibrationSession,getCalibrationSessionRun,closeCalibrationSession,recordCalibrationDecision,listCalibrationDecisions,getCalibrationSessionAudit,exportCalibrationSessionAudit,getAgentConfig,listAgentChatSessions,createAgentChatSession,getAgentChatSession,updateAgentChatSession,deleteAgentChatSession,branchAgentChatSession,listAgentSourceRoots,searchAgentSource,getAgentSourceFile,getAgentPreferences,updateAgentPreferences,getAgentSystemPrompt,listAgentSkills,getSettings,listChips,createChip,listChipConfigSources,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,formatFlowSource,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,getFlowExecutionPlan,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listDashboards,createDashboard,listDashboardTemplates,previewDashboardTemplate,getDashboard,updateDashboard,deleteDashboard,duplicateDashboard,listMetricScripts,createMetricScript,listMetricScriptTemplates,getMetricScriptCatalog,validateMetricScript,formatMetricScriptSource,evaluateMetricScriptDraft,getMetricScript,updateMetricScript,deleteMetricScript,copyMetricScript,evaluateMetricScript,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations,getCurrentUserAvatar,updateCurrentUserAvatar,listUserAvatars}};
 export type LoginResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['login']>>>
 export type RegisterUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['registerUser']>>>
 export type GetCurrentUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCurrentUser']>>>
@@ -5810,6 +5841,7 @@ export type ExecuteCalibrationPipelineResult = NonNullable<Awaited<ReturnType<Re
 export type CreateCalibrationSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createCalibrationSession']>>>
 export type ListCalibrationSessionsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listCalibrationSessions']>>>
 export type GetCalibrationSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCalibrationSession']>>>
+export type GetCalibrationSessionRunResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCalibrationSessionRun']>>>
 export type CloseCalibrationSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['closeCalibrationSession']>>>
 export type RecordCalibrationDecisionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['recordCalibrationDecision']>>>
 export type ListCalibrationDecisionsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listCalibrationDecisions']>>>

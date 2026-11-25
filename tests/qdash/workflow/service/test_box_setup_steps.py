@@ -10,7 +10,7 @@ from qdash.workflow.service.steps.pipeline import StepContext
 from qdash.workflow.service.targets import MuxTargets
 
 if TYPE_CHECKING:
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
 
 
 class CancelledRun(Exception):
@@ -26,7 +26,7 @@ def test_configure_all_leaves_closing_the_execution_to_the_pipeline(monkeypatch,
 
     with pytest.raises(type(exc)) as raised:
         ConfigureAll(mux_ids=[1]).execute(
-            cast("CalibSession", session), MuxTargets([1]), StepContext()
+            cast("ExecutionRuntime", session), MuxTargets([1]), StepContext()
         )
 
     assert raised.value is exc
@@ -53,7 +53,7 @@ def test_configure_all_call_settings_reach_the_task_with_resolved_mux_ids(monkey
         call=TaskCall(name="ConfigureAll", run={"configuration_mode": "ge-ef-cr"}),
     )
     assert [call.resolved_call_id for call in step.calls()] == ["ConfigureAll"]
-    step.execute(cast("CalibSession", session), MuxTargets([2, 3]), StepContext())
+    step.execute(cast("ExecutionRuntime", session), MuxTargets([2, 3]), StepContext())
 
     _, kwargs = session.execute_task.call_args
     assert kwargs["parameters"] == {

@@ -1,71 +1,41 @@
 # User Guide
 
-Set up QDash, run calibrations, and review results. Start with
-[What is QDash?](./what-is-qdash.md) for the calibration model and a demo.
+Use QDash to run calibrations and review their results.
 
-## Set Up and Operate QDash
+## Start Here
 
-1. [Setup](./setup.md): choose a backend, configure `.env`, start QDash, and sign in. The
-   [Fake backend](./setup/fake-backend.md) evaluates QDash without hardware; the
-   [Qubex backend](./setup/qubex-backend.md) connects a supported control system.
-2. [Run Your First Calibration](./first-calibration.md): create a chip, run a workflow, and
-   inspect its first result with the guide on **Home**.
+1. [Set up QDash](./setup.md), or sign in to your team's deployment.
+2. [Run your first calibration](./first-calibration.md).
+3. [Review the result](./reviewing-results.md).
 
-[AI Setup](./setup/ai.md) connects the model endpoints for AI chat and evaluations; QDash runs
-calibrations without it.
+Running calibrations needs Editor or Owner access. If you are a Viewer, start with
+[reviewing existing results](./reviewing-results.md); ask your project owner for access changes.
 
-After setup, use [Operations](./operations.md) to control and troubleshoot services and
-[System Updates](./system-updates.md) to deploy another stable release.
+For an introduction and demo, see [What is QDash?](./what-is-qdash.md).
+The [application tour](./application-tour.md) maps sidebar pages to common tasks.
 
-## Find Your Way Around
-
+<a id="set-up-and-operate-qdash"></a>
+<a id="find-your-way-around"></a>
 <a id="learn-the-application"></a>
-
-Find pages and their guides in the [Application Tour](./application-tour.md).
-
-## Run Calibrations
-
+<a id="run-calibrations"></a>
 <a id="complete-calibration-work"></a>
-
-| Goal | Guide |
-| --- | --- |
-| Run a workflow or one task | [Running Calibrations](./running-calibrations.md) |
-| Create or change a workflow | [Creating Workflows](./creating-workflows.md) |
-| Control inputs and saved outputs | [Task Parameters](./task-parameters.md) |
-| Track cryostats, cool-downs, and wiring | [Cryostats and Cool-downs](./cryostats-and-cool-downs.md) |
-
-## Review Results
-
-| Goal | Guide |
-| --- | --- |
-| Scan chip health | [Overview](./overview.md) |
-| Arrange and share your own maps, tables, and notes | [Dashboards](./dashboards.md) |
-| Compute your own per-qubit or per-coupling metric, such as a median over a period | [Metric Scripts](./metric-scripts.md) |
-| Investigate state, history, or provenance | [Calibration Data and Provenance](./data-and-provenance.md) |
-| Review, discuss, or hand off a result | [Reviewing and Sharing Results](./reviewing-results.md) |
-
-## Collaborate and Manage Access
-
+<a id="review-results"></a>
+<a id="collaborate-and-manage-access"></a>
 <a id="manage-access"></a>
+<a id="use-ai-assistance"></a>
+<a id="automate-qdash"></a>
 
-Use [Projects and Data Sharing](./projects-and-data-sharing.md) for membership, roles, and project
-boundaries, and [Authentication and Users](./authentication-and-users.md) for accounts and
-passwords.
+## Find a Task
 
-## Use AI Assistance
-
-| Goal | Guide |
+| I want to… | Guide |
 | --- | --- |
-| Ask questions about project data, or investigate a failure | [Agent](./ai-chat.md) |
-| Judge task-result figures and compare evaluation settings | [AI Evaluations](./ai-evaluations.md) |
-| Have the agent calibrate named qubits step by step in a session you approve, with an expert asked when it gets stuck (experimental) | [Agent Calibration](./agent-calibration.md) |
-
-AI output is supporting evidence; confirm it against the underlying results before changing
-calibration state.
-
-## Automate QDash
-
-Scripts and integrations use the [Python client](../reference/clients/python.md) or the
-[TypeScript client](../reference/clients/typescript.md). Calibration procedures themselves are
-Python workflows that you write in **Workflow**, as [Creating Workflows](./creating-workflows.md)
-describes.
+| Run a saved workflow or one task | [Running calibrations](./running-calibrations.md) |
+| Write a calibration procedure | [Creating workflows](./creating-workflows.md) |
+| Control inputs and saved outputs | [Task parameters](./task-parameters.md) |
+| Record a hardware cycle | [Cryostats and cool-downs](./cryostats-and-cool-downs.md) |
+| Check chip health or parameter history | [Overview](./overview.md), [data and provenance](./data-and-provenance.md) |
+| Build a shared view or custom metric | [Dashboards](./dashboards.md), [metric scripts](./metric-scripts.md) |
+| Manage accounts and access | [Users](./authentication-and-users.md), [projects](./projects-and-data-sharing.md) |
+| Use AI assistance | [Agent](./ai-chat.md), [evaluations](./ai-evaluations.md), [agent calibration](./agent-calibration.md) |
+| Maintain the deployment | [Operations](./operations.md), [updates](./system-updates.md) |
+| Automate through the API | [Python client](../reference/clients/python.md), [TypeScript client](../reference/clients/typescript.md) |

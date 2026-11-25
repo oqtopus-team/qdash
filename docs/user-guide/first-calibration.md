@@ -1,153 +1,86 @@
 # Run Your First Calibration
 
-Use the guide on **Home** to create a chip, run a calibration, and inspect its result on a Fake
-deployment without hardware. For hardware-specific steps, see
-[On a Qubex Deployment](#on-a-qubex-deployment).
+Use the guide on **Home** to create a chip, run a workflow, and inspect a result.
 
 ## Before You Start
 
-- QDash is running and you have signed in, as described in [Setup](./setup.md). On a fresh
-  deployment, sign in as the initial administrator, who owns the default project that QDash
-  creates for that account.
-- You are an Editor or Owner of the active project; see
-  [Choose a Project Role](./projects-and-data-sharing.md#choose-a-project-role).
-- The deployment can store chip configuration. On a Fake deployment set up from the example
-  `.env`, this is already in place; the **Create Chip** dialog blocks creation when it is not, as
-  [Fake backend](./setup/fake-backend.md#create-a-chip) describes. On a Qubex deployment, place
-  the configuration tree as described in [Qubex backend](./setup/qubex-backend.md).
+Sign in to a deployment set up with the [Fake backend](./setup/fake-backend.md), with Editor or
+Owner access to the project. Hardware deployments need the additional checks below.
 
 ## Start the Guide
 
-1. Select **Home** in the sidebar.
-2. Start the guide:
-   - When the project has no chips, select **Create a chip** under **First calibration**.
-   - Otherwise, select **First calibration guide** in the Home header, choose an existing chip or
-     **Create a new chip**, and select **Start**.
+On **Home**, select **Create a chip** under **First calibration**. If the project already has
+chips, select **First calibration guide**, choose a chip or **Create a new chip**, then **Start**.
 
-![Starting the guide from the First calibration guide button on Home: Create a new chip is chosen under Chip to calibrate, Start shows the First calibration card, and Continue opens the Create New Chip dialog on Chip](/images/guides/first-calibration-start.gif)
-
-If the guide cannot load the deployment or its chips, select **Try again**. Fake deployments offer
-only chips matching the 64-qubit virtual device. If that device is unavailable, ask an administrator
-to check the API configuration.
+![Starting the first-calibration guide](/images/guides/first-calibration-start.gif)
 
 ## Follow the Guide
 
-Follow each callout to perform an action, or select **Next** to continue an explanation. You can
-still use the rest of the page. The guide never saves a flow or starts a run without your action.
-
 ### Prepare a Chip
 
-If you chose an existing chip, continue to [Review and Run](#review-and-run).
-
-1. In the **Create Chip** dialog, enter a **Chip ID**.
-2. Select **Create Chip**.
-
-QDash creates the [virtual chip configuration](./setup/fake-backend.md#create-a-chip) and opens
-**New Flow** with the **Fake Backend Calibration** template and the new chip selected.
-
-![Entering demo-64q as the Chip ID in the Create New Chip dialog and selecting Create Chip; QDash confirms the new virtual chip and opens New Flow with the template code](/images/guides/first-calibration-create-chip.gif)
+Enter a **Chip ID** and select **Create Chip**. QDash opens **New Flow** with the
+**Fake Backend Calibration** template. Skip this step if you chose an existing chip.
 
 ### Review and Run
 
-1. Next to the code editor, read **What this flow runs**: the tasks in run order and the MUX
-   targets that the code declares. A first run can use the template unchanged.
+1. Read **What this flow runs** beside the editor. The Fake template can run unchanged.
+2. Enter a unique flow name using letters, digits, and underscores.
+3. Select **Save Flow**.
+4. Select **Execute**, check the chip in the confirmation, then select **Execute** again.
 
-   ![The Review the calibration callout next to What this flow runs, which lists the tasks in order and the targets MUX 0-3 of demo-64q](/images/guides/first-calibration-review-flow.gif)
+![Reviewing the flow and its targets, MUX 0-3 of the chip](/images/guides/first-calibration-review-flow.gif)
 
-2. Keep the suggested flow name, or enter another with letters, digits, and underscores.
-
-   ![The Name the flow callout pointing at the Flow Name field, which holds the suggested name first_calibration](/images/guides/first-calibration-name-flow.gif)
-
-3. Select **Save Flow**. The saved flow opens in the flow editor. **New Flow** never replaces an
-   existing flow; if the name was taken in the meantime, enter another one and save again.
-
-   ![Selecting Save Flow at the Save the flow callout; the saved flow opens in the flow editor, where the Run the calibration callout points at Execute](/images/guides/first-calibration-save-flow.gif)
-
-4. Select **Execute** once it is highlighted, check the chip ID in the confirmation, and select
-   **Execute** to start the run.
-
-   ![Selecting Execute at the Run the calibration callout; the Execute Flow dialog shows chip demo-64q and the targets MUX 0-3, and selecting Execute opens the run on Execution with the Calibration running callout](/images/guides/first-calibration-execute.gif)
-
-A failed save or a run that does not start leaves you in the editor with your changes.
+![Executing the saved flow on the chip and MUX 0-3](/images/guides/first-calibration-execute.gif)
 
 ### Follow Progress
 
-The run opens on **Execution**. The callout shows the completed task count while you wait.
+The guide opens **Execution** and shows progress. If the run fails or is cancelled, select
+**Open the run** to inspect the message before **Run again**. See [Operations](./operations.md)
+if the services are unavailable.
 
-![A running first calibration on Execution: FakeBringUp nodes turn from running to completed and the next tasks start, while the Calibration running callout counts the completed tasks](/images/guides/first-calibration-follow-progress.gif)
-
-When the run fails or is cancelled, the guide stays on this step and offers **Open the run** and
-**Run again**. Open the run, or filter **Task Results** by status as described in
-[Find a Result](./reviewing-results.md#find-a-result), to read the failed task's message. If the
-services themselves stop responding, see [Operations](./operations.md#resolve-common-failures).
+![Following the run on Execution while tasks complete](/images/guides/first-calibration-follow-progress.gif)
 
 ### Inspect a Result
 
-When the run finishes, the callout points at a completed result, such as the **CheckT1** node of
-the execution flow. Select it to open its preview, or open a result from the guide or from **Task
-Results**.
+When the run finishes, open the highlighted completed task.
 
-![Selecting the CheckT1 node of qubit 8 at the Open a result callout; the result preview opens with its graph](/images/guides/first-calibration-open-result.gif)
+![Opening the CheckT1 result from the execution flow](/images/guides/first-calibration-open-result.gif)
 
-The callouts then explain the result's graph and its **Output Parameters**.
+Review its figure and **Output Parameters**.
 
-![The Read the graph callout on the CheckT1 graph, then the Check the fitted values callout on Output Parameters, which lists t1](/images/guides/first-calibration-read-result.gif)
+![Reading the CheckT1 figure and its output parameters](/images/guides/first-calibration-read-result.gif)
 
 Close the preview to continue.
 
-![Closing the result preview at the Close the preview callout; the See the whole chip callout points at Open the chip overview](/images/guides/first-calibration-close-preview.gif)
+![Closing the result preview](/images/guides/first-calibration-close-preview.gif)
 
 ### Open the Chip Overview
 
-Open the chip on **Chip**. Each tile shows the latest result of the selected task for one qubit;
-choose another task to compare.
+Open the chip on **Chip**. Each tile shows the latest result of the selected task.
 
-![Selecting Open the chip overview; Chip opens demo-64q, and the Calibrated values on the chip callout explains the tiles until Done is selected](/images/guides/first-calibration-chip-overview.gif)
+![Opening the chip overview on Chip](/images/guides/first-calibration-chip-overview.gif)
 
-Opening the overview finishes the guide, and Home shows **First calibration complete** with links
-to the result and the overview.
+This completes the guide; Home keeps links to the result and overview.
 
-![Opening Home from Chip after the guide is complete; Home shows First calibration complete with Open CheckT1 result and Chip overview](/images/guides/first-calibration-complete.gif)
+![Home after the guide, with links to the result and the chip overview](/images/guides/first-calibration-complete.gif)
 
 ## On a Qubex Deployment
 
-The guide follows the same five steps on a Qubex deployment, with these differences:
+Prepare the [Qubex configuration](./setup/qubex-backend.md) first. A chip created from a template
+still needs its real wiring, boxes, and device settings filled in on **Config**.
 
-- **Create Chip** also offers **Qubex configuration** options when a configuration tree is
-  mounted: copy the wiring from an existing system, or start from a backend template. A new
-  template has empty wiring and box entries; complete its hardware settings on **Config** before
-  you run, as
-  [Create the Configuration of a New Chip](./setup/qubex-backend.md#create-the-configuration-of-a-new-chip)
-  describes. If you use a configuration repository, publish the completed files through **Config**;
-  deployments without a repository use the local configuration.
-- After you choose or create the chip, the guide stays on Home under **Hardware readiness**. It
-  shows whether QDash found the configuration directory and the chip's wiring file, and asks you
-  to confirm that the wiring and device parameters match the connected hardware. QDash cannot
-  check the instruments themselves. The guide links to **New Flow** and to the run only after you
-  confirm.
-- In **New Flow**, choose the template for the chip under **TEMPLATE** before reviewing it.
+At **Hardware readiness**, confirm that the configuration matches the connected hardware;
+QDash checks files, not instruments. In **New Flow**, choose the appropriate hardware template
+before reviewing and running it.
 
 ## Pause and Resume the Guide
 
-The strip under the top bar shows the current step. Select **Exit guide** or close a callout to
-pause.
+Select **Exit guide** or close a callout to pause. On **Home**, select **Resume** to continue or
+**Start over** to reset the guide. Progress is saved in this browser for your account and project.
 
-![Closing the Review the calibration callout in New Flow; the callout and the guide strip disappear](/images/guides/first-calibration-pause.gif)
+<a id="continue-after-the-first-run"></a>
 
-On **Home**, select:
+## Continue After the Guide
 
-- **Resume** to continue from the recorded step.
-- **Start over** to discard the guide.
-
-![Home shows the First calibration card as Paused at Review and run; selecting Resume: Review the calibration reopens the flow with the Review the calibration callout](/images/guides/first-calibration-resume.gif)
-
-The guide is saved in this browser for your account and project. Work that finishes after you
-switch project, pause, or restart is not added. Deleting a recorded chip, flow, or run returns
-the guide to the step that needs it.
-
-## Continue After the First Run
-
-[Running Calibrations](./running-calibrations.md) covers running saved workflows and single tasks
-on other targets. [What the Fake Backend Runs](./setup/fake-backend.md#what-the-fake-backend-runs)
-lists the tasks the template runs and how to change its targets. Use the
-[Application Tour](./application-tour.md) to find the other pages of QDash.
+[Run another calibration](./running-calibrations.md), [create a workflow](./creating-workflows.md),
+or [review and share results](./reviewing-results.md).

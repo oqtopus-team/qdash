@@ -5,12 +5,19 @@
  * `{ detail: [{ msg: "...", ... }] }` for 422 validation errors; some endpoints send
  * `{ detail: { message: "...", ... } }` (metric script runs, for example). These shapes
  * are normalized here; otherwise the error's own message or the fallback is used.
+ *
+ * An unexpected server failure also carries `error_id`, the ID under which the server
+ * logged its cause; it is appended so users can quote it when reporting the problem.
  */
 export function getApiErrorMessage(error: unknown, fallback: string): string {
-  const detail = (error as { response?: { data?: { detail?: unknown } } } | null)?.response?.data
-    ?.detail;
+  const data = (error as { response?: { data?: { detail?: unknown; error_id?: unknown } } } | null)
+    ?.response?.data;
+  const detail = data?.detail;
 
-  if (typeof detail === "string" && detail) return detail;
+  if (typeof detail === "string" && detail) {
+    const errorId = data?.error_id;
+    return typeof errorId === "string" && errorId ? `${detail} (Error ID: ${errorId})` : detail;
+  }
 
   if (Array.isArray(detail)) {
     const messages = detail

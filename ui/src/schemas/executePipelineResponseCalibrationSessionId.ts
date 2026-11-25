@@ -7,6 +7,6 @@
  */
 
 /**
- * The calibration session the run is recorded in, if any
+ * The calibration session the run joined: the one the request named, or an automatic one; null when the run joined none
  */
 export type ExecutePipelineResponseCalibrationSessionId = string | null;

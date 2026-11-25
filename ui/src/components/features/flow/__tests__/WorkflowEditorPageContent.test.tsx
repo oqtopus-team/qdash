@@ -202,6 +202,13 @@ vi.mock("@/client/flow/flow", () => ({
     Promise.resolve(mocks.formatSource(body)).then((data) => ({ data })),
 }));
 
+// An Axios error carrying an API error body, as the client rejects with.
+function serverError(data: unknown) {
+  return Object.assign(new Error("Request failed with status code 500"), {
+    response: { status: 500, data },
+  });
+}
+
 function renderEditor() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -261,6 +268,8 @@ describe("WorkflowEditorPageContent run callbacks", () => {
       "first_calibration",
       expect.objectContaining({
         parameters: expect.objectContaining({ chip_id: "chip-a" }),
+        // A run on a known chip is recorded under a key, so a resent request replays it.
+        idempotency_key: expect.any(String),
       }),
     );
     expect(storedJourney("project-1").executionId).toBe("20261105-001");
@@ -268,6 +277,24 @@ describe("WorkflowEditorPageContent run callbacks", () => {
     // The guide's run opens on its execution page, once, without a banner click.
     expect(mocks.push).toHaveBeenCalledTimes(1);
     expect(mocks.push).toHaveBeenCalledWith("/execution/chip-a/20261105-001");
+  });
+
+  it("sends no key for a run without a chip, which QDash cannot record before launch", async () => {
+    FLOW_CHIPS.first_calibration = "";
+    try {
+      mocks.executeFlow.mockResolvedValue({
+        data: { execution_id: "20261105-009", flow_run_id: "run-9" },
+      });
+      renderEditor();
+
+      await confirmExecute();
+
+      await waitFor(() => expect(mocks.executeFlow).toHaveBeenCalledTimes(1));
+      const [, body] = mocks.executeFlow.mock.calls[0];
+      expect(body).not.toHaveProperty("idempotency_key");
+    } finally {
+      FLOW_CHIPS.first_calibration = "chip-a";
+    }
   });
 
   it("marks Execute ready for the guide only while it can start a run", async () => {
@@ -820,6 +847,43 @@ describe("WorkflowEditorPageContent properties", () => {
       await screen.findByText("Failed to save first_calibration: disk full"),
     ).toBeInTheDocument();
     expect(screen.queryByText("Please enter a username")).toBeNull();
+  });
+
+  it("shows the public message and error ID of an unexpected save failure", async () => {
+    vi.mocked(saveFlow).mockRejectedValue(
+      serverError({
+        detail: "Failed to save the flow file",
+        code: "flow_source_write_failed",
+        error_id: "5c0ffee5c0ffee5c0ffee5c0ffee5c0f",
+      }),
+    );
+    renderEditor();
+    await unlockEditor();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByText(
+        "Failed to save first_calibration: Failed to save the flow file (Error ID: 5c0ffee5c0ffee5c0ffee5c0ffee5c0f)",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/status code 500/)).toBeNull();
+  });
+
+  it("shows the public message and error ID when the flow cannot be read", async () => {
+    mocks.getFlow.mockRejectedValueOnce(
+      serverError({
+        detail: "Failed to read the flow file",
+        code: "flow_source_read_failed",
+        error_id: "0123456789abcdef0123456789abcdef",
+      }),
+    );
+    renderEditor();
+
+    expect(await screen.findByText("Failed to load flow")).toBeInTheDocument();
+    expect(
+      screen.getByText("Failed to read the flow file (Error ID: 0123456789abcdef0123456789abcdef)"),
+    ).toBeInTheDocument();
   });
 });
 

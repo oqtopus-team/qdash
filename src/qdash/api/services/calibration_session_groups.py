@@ -3,8 +3,11 @@
 The grouped Execution list shows a calibration session as the display parent of the work
 started in it. Membership comes only from the explicit records the links module reads:
 
-- a ``CalibrationPipelineRunDocument`` of the session, on the chip, whose flow run is an
-  execution's ``note.flow_run_id``; a flow run that more than one run claims groups nothing;
+- a ``CalibrationPipelineRunDocument`` of the session, on the chip, whose ``run_id`` is an
+  execution's ``note.calibration_run_id`` (stamped by the worker), or, for a run recorded
+  before that note existed, whose flow run is the execution's ``note.flow_run_id``; a flow run
+  that more than one run claims groups nothing. An agent action's run is left to its agent
+  session, which holds the execution;
 - an agent session admitted to the session (``calibration_admission`` ``admitted``) on the
   same chip. The agent session stays a group of its own executions, nested in the row.
 
@@ -23,6 +26,7 @@ from typing import TYPE_CHECKING, Any
 
 from qdash.api.services.agent_execution_links import utc
 from qdash.api.services.calibration_session_links import admitted_parent
+from qdash.datamodel.calibration_session import CalibrationRunKind
 from qdash.dbmodel.calibration_session import (
     CalibrationPipelineRunDocument,
     CalibrationSessionDocument,
@@ -68,6 +72,9 @@ _RUN_FIELDS = {
     "flow_run_id": 1,
     "status": 1,
     "pipeline_name": 1,
+    "run_kind": 1,
+    "run_name": 1,
+    "trigger": 1,
     "requested_by": 1,
     "requested_at": 1,
     "updated_at": 1,
@@ -90,6 +97,7 @@ def resolve_chip_calibration_groups(
             "chip_id": 1,
             "objective": 1,
             "status": 1,
+            "origin": 1,
             "created_by": 1,
             "created_at": 1,
             "closed_at": 1,
@@ -111,6 +119,7 @@ def resolve_chip_calibration_groups(
                 "project_id": project_id,
                 "chip_id": chip_id,
                 "calibration_session_id": {"$in": sorted(groups.sessions)},
+                "run_kind": {"$ne": CalibrationRunKind.AGENT_ACTION.value},
             },
             _RUN_FIELDS,
         )
@@ -118,22 +127,28 @@ def resolve_chip_calibration_groups(
     runs.sort(key=lambda run: (utc(run.get("requested_at")) or datetime.min, run["run_id"]))
     claims = Counter(str(run["flow_run_id"]) for run in runs if run.get("flow_run_id"))
     by_flow: dict[str, dict[str, Any]] = {}
+    by_id: dict[str, dict[str, Any]] = {}
     for run in runs:
         groups.runs.setdefault(str(run["calibration_session_id"]), []).append(run)
+        by_id[str(run["run_id"])] = run
         flow_run_id = run.get("flow_run_id")
         # A flow run two records claim belongs to neither: shown as ordinary executions.
         if flow_run_id and claims[str(flow_run_id)] == 1:
             by_flow[str(flow_run_id)] = run
-    if not by_flow:
+    if not by_id:
         return groups
 
+    clauses: list[dict[str, Any]] = [{"note.calibration_run_id": {"$in": sorted(by_id)}}]
+    if by_flow:
+        clauses.append(
+            {
+                "note.flow_run_id": {"$in": sorted(by_flow)},
+                "note.calibration_run_id": {"$exists": False},
+            }
+        )
     found: dict[str, list[RunExecution]] = defaultdict(list)
     for doc in ExecutionHistoryDocument.get_motor_collection().find(
-        {
-            "project_id": project_id,
-            "chip_id": chip_id,
-            "note.flow_run_id": {"$in": sorted(by_flow)},
-        },
+        {"project_id": project_id, "chip_id": chip_id, "$or": clauses},
         {
             "_id": 0,
             "execution_id": 1,
@@ -141,13 +156,19 @@ def resolve_chip_calibration_groups(
             "start_at": 1,
             "end_at": 1,
             "note.flow_run_id": 1,
+            "note.calibration_run_id": 1,
         },
     ):
         execution_id = str(doc["execution_id"])
         if execution_id in links.by_execution:
             # Held by an agent session's action: it stays in that group.
             continue
-        run = by_flow[str(doc["note"]["flow_run_id"])]
+        note = doc.get("note") or {}
+        # The stamp names the run; only an execution without one is found by its flow run.
+        stamp = note.get("calibration_run_id")
+        run = by_id.get(str(stamp)) if stamp else by_flow.get(str(note.get("flow_run_id") or ""))
+        if run is None:
+            continue
         found[str(run["run_id"])].append(
             RunExecution(
                 execution_id=execution_id,

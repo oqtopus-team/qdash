@@ -1,35 +1,28 @@
 # Developer Guide
 
-Use this guide to understand, change, test, and contribute to QDash. Procedures for operating the
-product are in the [User Guide](../user-guide/index.md).
+Start with [Setup](./setup.md), make a change, then follow [Development Flow](./development-flow.md)
+to test it and open a pull request. For product operation, use the [User Guide](../user-guide/index.md).
 
-## Make Your First Change
+## Make a First Change
 
-1. Read [Architecture](./architecture.md) to see the UI, API, and workflow boundaries.
-2. Follow [Development Setup](./setup.md) to start a local environment.
-3. Use [Codebase](./codebase.md) to find the owning package and generated files.
-4. Choose commands from [Command Reference](./commands.md).
-5. Run the checks selected by [Testing](./testing.md).
-6. Follow [Development Flow](./development-flow.md) when preparing the pull request.
+1. Complete [Setup](./setup.md), then create a [work branch](./development-flow.md#branch-strategy).
+2. Choose a change below and follow its component guide.
+3. Run the component's focused test, then the [pre-push check](./development-flow.md#before-pushing).
+4. Open a pull request against `develop` and describe the behavior and verification.
 
-## Choose a Component
+## Find the Right Area
 
-| Area | Owns | Start here |
-| --- | --- | --- |
-| API | Authentication, project access, persistence, and HTTP contracts | [API Design Guidelines](./api/design.md) |
-| UI | Routes, interaction, server state, and presentation | [UI Architecture](./ui/architecture.md) |
-| Workflow | Calibration execution, scheduling, parameters, and Prefect integration | [Workflow Engine Architecture](./workflow/engine-architecture.md) |
-| Agent | Chat, evaluation, agent execution, and the workspace | [Agent Architecture](./agent/architecture.md) |
-| Cross-component design | Data flow, schedulers, topology, notes, and provenance | [Architecture](./architecture.md) |
+| Change | Start here |
+| --- | --- |
+| Understand the system | [Architecture](./architecture.md) and [Codebase](./codebase.md) |
+| API or stored data | [API design](./api/design.md) |
+| Pages and interactions | [UI architecture](./ui/architecture.md) |
+| Calibration execution | [Workflow engine](./workflow/engine-architecture.md) |
+| Chat and AI evaluation | [Agent architecture](./agent/architecture.md) |
+| Documentation | [Writing guidelines](./docs-guidelines.md) |
 
-Use the component groups in the sidebar to open implementation rules and focused test guides. Use
-[Reference](../reference/index.md) when you need an exact schema, index, generated API, or client
-contract.
+Use [Commands](./commands.md) for task names, [Testing](./testing.md) to choose checks,
+and [Reference](../reference/index.md) for APIs and data models.
 
-## Apply Repository-Wide Conventions
-
-The conventions for [datetime handling](./conventions/datetime.md),
-[logging](./conventions/logging.md), and
-[credential scanning](./conventions/credential-scan.md) apply across component boundaries.
-
-Use [Documentation Guidelines](./docs-guidelines.md) for any page under `docs/`.
+Shared code follows the [datetime](./conventions/datetime.md),
+[logging](./conventions/logging.md), and [credential scanning](./conventions/credential-scan.md) rules.

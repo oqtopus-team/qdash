@@ -1100,6 +1100,20 @@ class BodyLogin(BaseModel):
     password: Annotated[str, Field(title="Password")]
 
 
+class CalibrationSessionId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Calibration Session Id")]
+    """
+    Add the run to this calibration session (open, on the task's chip, created by the signed-in user); otherwise the request is refused before anything starts. Without it, the run joins an automatic session created for it.
+    """
+
+
+class IdempotencyKey(RootModel[str]):
+    root: Annotated[str, Field(max_length=128, min_length=1, title="Idempotency Key")]
+    """
+    A retry with the same key and request returns the recorded run instead of starting another. Without a key, every request starts a new run.
+    """
+
+
 class BodyReExecuteTaskResult(BaseModel):
     parameter_overrides: Annotated[
         dict[str, dict[str, Any]] | None, Field(title="Parameter Overrides")
@@ -1114,6 +1128,16 @@ class BodyReExecuteTaskResult(BaseModel):
     reconfigure: Annotated[bool, Field(title="Reconfigure")] = False
     """
     Run Configure (system_manager load + push) before executing the task
+    """
+    calibration_session_id: Annotated[
+        CalibrationSessionId | None, Field(title="Calibration Session Id")
+    ] = None
+    """
+    Add the run to this calibration session (open, on the task's chip, created by the signed-in user); otherwise the request is refused before anything starts. Without it, the run joins an automatic session created for it.
+    """
+    idempotency_key: Annotated[IdempotencyKey | None, Field(title="Idempotency Key")] = None
+    """
+    A retry with the same key and request returns the recorded run instead of starting another. Without a key, every request starts a new run.
     """
 
 
@@ -1358,13 +1382,13 @@ class CalibrationParameterDeleteResponse(BaseModel):
 
 class CalibrationPipelineRunStatus(StrEnum):
     """
-    Dispatch state of one pipeline run requested in a calibration session.
+    Dispatch state of one run, whatever its kind.
 
     ``dispatching``: the request was recorded and its launch has not reported back.
-    ``dispatched``: QDash created the pipeline's flow run; its executions carry its
-    ``flow_run_id``.
+    ``dispatched``: QDash created the run's flow run; its executions carry its ``run_id``.
     ``rejected``: QDash refused the launch before any flow run was created (the hardware was
-    busy or the worker deployment was missing); a retry with the same key may launch it.
+    busy, the worker deployment was missing, or the attempt was never admitted); a retry with
+    the same key may launch it.
     ``unknown``: the launch failed in a way that may have created a flow run anyway, or it
     stayed ``dispatching`` past the time a launch takes. A retry with the same key never
     launches it again.
@@ -1387,12 +1411,71 @@ class CalibrationRecommendationRef(BaseModel):
     recorded_at: Annotated[AwareDatetime, Field(title="Recorded At")]
 
 
+class CalibrationRunKind(StrEnum):
+    """
+    What one run launched.
+
+    ``pipeline``: a calibration pipeline spec (every run recorded before other kinds existed).
+    ``workflow``: a saved workflow (flow). ``task``: one catalog task, from the Task Workbench
+    or a re-execution. ``agent_action``: the task an agent session's action ran.
+    """
+
+    pipeline = "pipeline"
+    workflow = "workflow"
+    task = "task"
+    agent_action = "agent_action"
+
+
+class CalibrationRunTrigger(StrEnum):
+    """
+    Who started a run, as QDash recorded it.
+
+    ``api``: a signed-in request to QDash recorded the run before launching it. ``schedule``:
+    Prefect's scheduler started the flow run from a cron schedule; the worker recorded it when
+    the flow started. ``worker``: the worker found a flow run QDash had not recorded (a
+    one-time schedule, or a run started in Prefect directly) and recorded it when it started.
+    """
+
+    api = "api"
+    schedule = "schedule"
+    worker = "worker"
+
+
+class CalibrationSessionCloseOrigin(StrEnum):
+    """
+    Who closed a calibration session.
+
+    ``manual``: the person who created it closed it (every session closed before this was
+    recorded). ``automatic``: QDash closed an automatic session once every run and agent
+    session in it had ended and nothing was being started, dispatched, or settled in it. An
+    automatic close only stops new runs from joining; it cancels nothing and judges nothing.
+    """
+
+    manual = "manual"
+    automatic = "automatic"
+
+
+class CalibrationSessionOrigin(StrEnum):
+    """
+    How a calibration session came to exist.
+
+    ``manual``: a person or agent created it for an objective (every session recorded before
+    automatic sessions existed). ``automatic``: QDash created it for a run started without a
+    session ID; it is an ordinary session that a later run may name to add to it.
+    """
+
+    manual = "manual"
+    automatic = "automatic"
+
+
 class CalibrationSessionStatus(StrEnum):
     """
     Whether a calibration session accepts new runs.
 
-    ``closed`` is a person's statement that work on the objective has ended. It says nothing
-    about whether the objective was met and is refused while a child still runs or waits.
+    ``closed`` says that work on the objective has ended: a person's statement, or, for an
+    automatic session, QDash's record that everything started in it ended (see
+    ``CalibrationSessionCloseOrigin``). It says nothing about whether the objective was met or
+    how the runs ended, and is refused while a child still runs or waits.
     """
 
     open = "open"
@@ -1774,10 +1857,10 @@ class PreviousInterventionId(RootModel[str]):
     root: Annotated[str, Field(max_length=200, min_length=1, title="Previous Intervention Id")]
 
 
-class CalibrationSessionId(RootModel[str]):
+class CalibrationSessionId1(RootModel[str]):
     root: Annotated[str, Field(max_length=200, min_length=1, title="Calibration Session Id")]
     """
-    Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy.
+    Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy. Without it, the session joins an automatic calibration session created for it.
     """
 
 
@@ -2286,6 +2369,21 @@ class EvaluatorModel(BaseModel):
     """
 
 
+class ExcludedTarget(BaseModel):
+    """
+    A candidate a filter left out, and why.
+    """
+
+    target: Annotated[str, Field(title="Target")]
+    """
+    Qubit ID the filter removed from the candidates
+    """
+    reason: Annotated[str, Field(title="Reason")]
+    """
+    Why it did not pass, read from the source result
+    """
+
+
 class SourceExecutionId1(RootModel[str]):
     root: Annotated[str, Field(max_length=200, min_length=1, title="Source Execution Id")]
     """
@@ -2309,6 +2407,20 @@ class ExecuteAgentActionRequest(BaseModel):
     autonomous: Annotated[bool, Field(title="Autonomous")] = False
     """
     The dispatch is an autonomous step. QDash then also requires that the signed-in user created the session, that its autonomy is auto, and that no other measurement of the session is being dispatched or running.
+    """
+
+
+class CalibrationSessionId2(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Calibration Session Id")]
+    """
+    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
+    """
+
+
+class IdempotencyKey1(RootModel[str]):
+    root: Annotated[str, Field(max_length=128, min_length=1, title="Idempotency Key")]
+    """
+    A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run.
     """
 
 
@@ -2337,19 +2449,17 @@ class ExecuteFlowResponse(BaseModel):
     """
     Success message
     """
-
-
-class CalibrationSessionId1(RootModel[str]):
-    root: Annotated[str, Field(max_length=200, min_length=1, title="Calibration Session Id")]
+    calibration_session_id: Annotated[str | None, Field(title="Calibration Session Id")] = None
     """
-    Record the run in this calibration session, which must be open, on this chip, and created by the signed-in user. It groups the run with the session's other work and grants nothing: the run is the request approved here. Requires idempotency_key.
+    The calibration session the run joined: the one the request named, or an automatic one; null when the run joined none
     """
-
-
-class IdempotencyKey(RootModel[str]):
-    root: Annotated[str, Field(max_length=128, min_length=1, title="Idempotency Key")]
+    calibration_run_id: Annotated[str | None, Field(title="Calibration Run Id")] = None
     """
-    With calibration_session_id: a retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it.
+    The run QDash recorded for the launch; every step execution carries it. Null only for a run the worker records when it starts (a saved flow with no chip)
+    """
+    replayed: Annotated[bool, Field(title="Replayed")] = False
+    """
+    True when a retry returned the run an earlier request with its key started
     """
 
 
@@ -2605,7 +2715,7 @@ class Schedule(StrEnum):
 
 class ExecutionPlanStep(BaseModel):
     """
-    One step of a CalibService run, as stated in the saved source.
+    One step of a CalibrationSession.run call, as the saved source states it.
     """
 
     index: Annotated[int, Field(title="Index")]
@@ -4432,6 +4542,26 @@ class NumericBounds(BaseModel):
     maximum: Annotated[float | None, Field(title="Maximum")] = None
 
 
+class OperationErrorDetail(BaseModel):
+    """
+    Error body of a failed operation.
+
+    ``detail`` is a message safe to show users. An unexpected failure also carries ``code``,
+    naming the failed operation, and ``error_id``, the ID under which the server logged the
+    cause; endpoints that do not report one yet return ``detail`` alone.
+    """
+
+    detail: Annotated[str, Field(title="Detail")]
+    code: Annotated[str | None, Field(title="Code")] = None
+    """
+    Stable code of the failed operation, e.g. file_read_failed
+    """
+    error_id: Annotated[str | None, Field(title="Error Id")] = None
+    """
+    Opaque ID of the server log entry recording the cause
+    """
+
+
 class PanelLayoutModel(BaseModel):
     """
     Position and size of a panel on the 12-column grid.
@@ -4678,42 +4808,6 @@ class PipelineProblem(BaseModel):
     message: Annotated[str, Field(title="Message")]
 
 
-class PipelineStepProgress(BaseModel):
-    """
-    One planned step of a pipeline run and how far its execution got.
-    """
-
-    index: Annotated[int, Field(title="Index")]
-    """
-    1-based position in the pipeline spec
-    """
-    name: Annotated[str, Field(title="Name")]
-    step_id: Annotated[str | None, Field(title="Step Id")] = None
-    """
-    Plan-scoped step id; null for transforms and older runs
-    """
-    type: Annotated[str, Field(title="Type")] = ""
-    kind: Annotated[str, Field(title="Kind")] = "calibration"
-    """
-    "calibration" or "transform"
-    """
-    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
-    """
-    The step's own execution, once it has started
-    """
-    status: Annotated[str, Field(title="Status")]
-    """
-    The execution status, "skipped" for transforms, or "pending" before it starts
-    """
-    task_total: Annotated[int, Field(title="Task Total")] = 0
-    task_finished: Annotated[int, Field(title="Task Finished")] = 0
-    task_failed: Annotated[int, Field(title="Task Failed")] = 0
-    figure_paths: Annotated[list[str] | None, Field(title="Figure Paths")] = None
-    """
-    Figures of the step's finished tasks, in task order
-    """
-
-
 class Position(BaseModel):
     """
     Position of the qubit on the device.
@@ -4923,6 +5017,16 @@ class QuickRunTaskRequest(BaseModel):
     Replace the current calibration values with the task's validated outputs. When false, the run still saves its task history, figures and raw data.
     """
     update_params: Annotated[bool, Field(title="Update Params")] = False
+    calibration_session_id: Annotated[
+        CalibrationSessionId2 | None, Field(title="Calibration Session Id")
+    ] = None
+    """
+    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
+    """
+    idempotency_key: Annotated[IdempotencyKey1 | None, Field(title="Idempotency Key")] = None
+    """
+    A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run.
+    """
     persist_output_parameters: Annotated[
         bool | None, Field(deprecated=True, title="Persist Output Parameters")
     ] = None
@@ -5371,10 +5475,14 @@ class ResolvedPipelineTargets(BaseModel):
 
     qids: Annotated[list[str], Field(title="Qids")]
     """
-    Explicit qids, or empty when targeting MUXes.
+    Explicit qids, the qubits of the pairs, or empty when targeting MUXes.
     """
     mux_ids: Annotated[list[int] | None, Field(title="Mux Ids")] = None
     exclude_qids: Annotated[list[str] | None, Field(title="Exclude Qids")] = None
+    pairs: Annotated[list[list[str]] | None, Field(title="Pairs")] = None
+    """
+    Directed [control, target] coupling pairs, or empty without pair targets.
+    """
 
 
 class ResolvedTaskCall(BaseModel):
@@ -5423,6 +5531,48 @@ class RespondAgentInterventionRequest(BaseModel):
     """
     Plan node to continue from; defaults to the node where the plan stopped
     """
+
+
+class RunFlowEndState(StrEnum):
+    """
+    How the whole flow run that carried out a run ended, as Prefect reported it.
+
+    Recorded once QDash reads a terminal Prefect state for the run's flow run: the flow as a
+    whole, after its retries, never one step of it. A state Prefect may still leave (scheduled,
+    awaiting retry, pending, running, paused, cancelling) is never recorded. ``completed``,
+    ``failed``, ``cancelled``, and ``crashed`` are Prefect's own terminal state types; they say
+    how the flow run ended, not whether its calibration results are good.
+    """
+
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+    crashed = "crashed"
+
+
+class RunFlowStatus(StrEnum):
+    """
+    The state of a run's whole flow run, as one read of the run found it.
+
+    Never stored: each read decides it from the run's record and, for a launched run, from
+    Prefect at that moment. ``dispatching``: the launch has not reported back.
+    ``not_launched``: QDash refused the launch; no flow run was created. ``running``: Prefect
+    reports a state the flow run may still leave (scheduled, awaiting retry, late, pending,
+    running, paused, or cancelling). ``completed``, ``failed``, ``cancelled``, and ``crashed``:
+    Prefect reports that terminal state now. ``unknown``: the launch outcome is unknown, no flow
+    run was recorded, or Prefect does not report the flow run. ``unavailable``: Prefect could
+    not be read. A step execution's status never decides it.
+    """
+
+    dispatching = "dispatching"
+    not_launched = "not_launched"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+    crashed = "crashed"
+    unknown = "unknown"
+    unavailable = "unavailable"
 
 
 class SaveFileRequest(BaseModel):
@@ -6470,6 +6620,90 @@ class TokenResponse(BaseModel):
     must_change_password: Annotated[bool, Field(title="Must Change Password")] = False
 
 
+class Kind6(StrEnum):
+    """
+    "filter", "cr_schedule", or "transform" for a custom transform step
+    """
+
+    filter = "filter"
+    cr_schedule = "cr_schedule"
+    transform = "transform"
+
+
+class TransformStepRecord(BaseModel):
+    """
+    The outcome of one transform step, copied when the step ended.
+
+    Lists are snapshots: later steps never change a recorded outcome. Fields that do not
+    apply to a kind stay at their defaults (``None`` or empty).
+    """
+
+    kind: Annotated[Kind6, Field(title="Kind")]
+    """
+    "filter", "cr_schedule", or "transform" for a custom transform step
+    """
+    input_qids: Annotated[list[str] | None, Field(title="Input Qids")] = None
+    """
+    Candidates before the step
+    """
+    output_qids: Annotated[list[str] | None, Field(title="Output Qids")] = None
+    """
+    Candidates after the step
+    """
+    input_couplings: Annotated[list[str] | None, Field(title="Input Couplings")] = None
+    """
+    Candidate couplings before the step
+    """
+    output_couplings: Annotated[list[str] | None, Field(title="Output Couplings")] = None
+    """
+    Candidate couplings after the step
+    """
+    excluded: Annotated[list[ExcludedTarget] | None, Field(title="Excluded")] = None
+    """
+    Filters: each removed candidate with its reason
+    """
+    criteria: Annotated[str | None, Field(title="Criteria")] = None
+    """
+    Filters: the condition applied
+    """
+    source_step: Annotated[str | None, Field(title="Source Step")] = None
+    """
+    Filters: step_id read; null for the latest one-qubit result
+    """
+    source_call_id: Annotated[str | None, Field(title="Source Call Id")] = None
+    """
+    Filters: call_id read
+    """
+    metric: Annotated[str | None, Field(title="Metric")] = None
+    """
+    FilterByMetric: the metric compared
+    """
+    threshold: Annotated[float | None, Field(title="Threshold")] = None
+    """
+    FilterByMetric: minimum kept
+    """
+    source_found: Annotated[bool | None, Field(title="Source Found")] = None
+    """
+    Filters: false when no one-qubit result existed, so every candidate was kept unfiltered
+    """
+    groups: Annotated[list[list[str]] | None, Field(title="Groups")] = None
+    """
+    cr_schedule: parallel groups of control-target couplings, in order
+    """
+    max_parallel_ops: Annotated[int | None, Field(title="Max Parallel Ops")] = None
+    """
+    cr_schedule: group cap
+    """
+    direction: Annotated[str | None, Field(title="Direction")] = None
+    """
+    cr_schedule: "forward", "reverse" or "as listed"
+    """
+    message: Annotated[str | None, Field(title="Message")] = None
+    """
+    Why the step produced nothing, when it did not
+    """
+
+
 class UITaskFilesSettings(BaseModel):
     """
     Task files editor settings.
@@ -6792,6 +7026,17 @@ class StepId(RootModel[str]):
     """
 
 
+class ExecutionMode(StrEnum):
+    """
+    How MUX targets run; explicit qubit targets run directly in parallel. parallel_by_mux (default): MUXes run in parallel and the qubits of one MUX run one after another. parallel_by_round: rounds of qubits from different MUXes. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. Bring-up has no manual rounds.
+    """
+
+    parallel_by_round = "parallel_by_round"
+    parallel_by_mux = "parallel_by_mux"
+    simultaneous_spectroscopy = "simultaneous_spectroscopy"
+    sequential = "sequential"
+
+
 class BringUpStep(BaseModel):
     """
     Initial characterization: resonator and qubit spectroscopy, chevron.
@@ -6808,6 +7053,12 @@ class BringUpStep(BaseModel):
     tasks: Annotated[list[TaskCall] | None, Field(title="Tasks")] = None
     """
     Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to BRINGUP_TASKS.
+    """
+    execution_mode: Annotated[ExecutionMode, Field(title="Execution Mode")] = (
+        ExecutionMode.parallel_by_mux
+    )
+    """
+    How MUX targets run; explicit qubit targets run directly in parallel. parallel_by_mux (default): MUXes run in parallel and the qubits of one MUX run one after another. parallel_by_round: rounds of qubits from different MUXes. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. Bring-up has no manual rounds.
     """
 
 
@@ -6835,7 +7086,7 @@ class ConfigureAllStep(BaseModel):
     """
 
 
-class ExecutionMode(StrEnum):
+class ExecutionMode1(StrEnum):
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
     """
@@ -6866,8 +7117,8 @@ class CustomOneQubitStep(BaseModel):
     """
     Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id.
     """
-    execution_mode: Annotated[ExecutionMode, Field(title="Execution Mode")] = (
-        ExecutionMode.parallel_by_round
+    execution_mode: Annotated[ExecutionMode1, Field(title="Execution Mode")] = (
+        ExecutionMode1.parallel_by_round
     )
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
@@ -6882,7 +7133,7 @@ class CustomOneQubitStep(BaseModel):
     """
 
 
-class ExecutionMode1(StrEnum):
+class ExecutionMode2(StrEnum):
     """
     automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
     """
@@ -6921,8 +7172,8 @@ class CustomTwoQubitStep(BaseModel):
     """
     Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id.
     """
-    execution_mode: Annotated[ExecutionMode1, Field(title="Execution Mode")] = (
-        ExecutionMode1.automatic
+    execution_mode: Annotated[ExecutionMode2, Field(title="Execution Mode")] = (
+        ExecutionMode2.automatic
     )
     """
     automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
@@ -7089,7 +7340,7 @@ class StepId2(RootModel[str]):
     """
 
 
-class ExecutionMode2(StrEnum):
+class ExecutionMode3(StrEnum):
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
     """
@@ -7114,8 +7365,8 @@ class OneQubitCheckStep(BaseModel):
     """
     Identifier of this step, unique within the pipeline; filters reference it. Defaults to the step's name. Set it when a pipeline runs the same step type twice.
     """
-    execution_mode: Annotated[ExecutionMode2, Field(title="Execution Mode")] = (
-        ExecutionMode2.parallel_by_round
+    execution_mode: Annotated[ExecutionMode3, Field(title="Execution Mode")] = (
+        ExecutionMode3.parallel_by_round
     )
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
@@ -7147,8 +7398,8 @@ class OneQubitFineTuneStep(BaseModel):
     """
     Identifier of this step, unique within the pipeline; filters reference it. Defaults to the step's name. Set it when a pipeline runs the same step type twice.
     """
-    execution_mode: Annotated[ExecutionMode2, Field(title="Execution Mode")] = (
-        ExecutionMode2.parallel_by_round
+    execution_mode: Annotated[ExecutionMode3, Field(title="Execution Mode")] = (
+        ExecutionMode3.parallel_by_round
     )
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
@@ -7167,11 +7418,15 @@ class OneQubitFineTuneStep(BaseModel):
     """
 
 
+class Pair(RootModel[list[str]]):
+    root: Annotated[list[str], Field(max_length=2, min_length=2)]
+
+
 class PipelineTargets(BaseModel):
     """
-    Which qubits the pipeline starts from: explicit qids or whole MUXes.
+    Which qubits or couplings the pipeline starts from.
 
-    Set exactly one of qids and mux_ids to a nonempty list without duplicates.
+    Set exactly one of qids, mux_ids and pairs to a nonempty list without duplicates.
     exclude_qids may be nonempty only with mux_ids.
     """
 
@@ -7180,15 +7435,19 @@ class PipelineTargets(BaseModel):
     )
     qids: Annotated[list[str] | None, Field(title="Qids")] = None
     """
-    Qubit ids as QDash lists them, e.g. ["0", "1"]. Set exactly one of qids and mux_ids, as a nonempty list without duplicates.
+    Qubit ids as QDash lists them, e.g. ["0", "1"]. Set exactly one of qids, mux_ids and pairs, as a nonempty list without duplicates.
     """
     mux_ids: Annotated[list[int] | None, Field(title="Mux Ids")] = None
     """
-    MUX ids; every qubit of each MUX is a target. Set exactly one of qids and mux_ids, as a nonempty list without duplicates.
+    MUX ids; every qubit of each MUX is a target. Set exactly one of qids, mux_ids and pairs, as a nonempty list without duplicates.
+    """
+    pairs: Annotated[list[Pair] | None, Field(title="Pairs")] = None
+    """
+    Directed coupling pairs [control, target], e.g. [["0", "1"], ["4", "5"]]; the candidate qubits are their qubits and the candidate couplings the pairs, in that direction. Set exactly one of qids, mux_ids and pairs.
     """
     exclude_qids: Annotated[list[str], Field(title="Exclude Qids")] = []
     """
-    Qubits to leave out of the MUX targets. Must be empty with qids.
+    Qubits to leave out of the MUX targets. Must be empty with qids or pairs.
     """
 
 
@@ -7220,7 +7479,7 @@ class TaskSettings(BaseModel):
     """
 
 
-class ExecutionMode4(StrEnum):
+class ExecutionMode5(StrEnum):
     """
     automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
     """
@@ -7246,8 +7505,8 @@ class TwoQubitCalibrationStep(BaseModel):
     """
     Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to FULL_2Q_TASKS.
     """
-    execution_mode: Annotated[ExecutionMode4, Field(title="Execution Mode")] = (
-        ExecutionMode4.automatic
+    execution_mode: Annotated[ExecutionMode5, Field(title="Execution Mode")] = (
+        ExecutionMode5.automatic
     )
     """
     automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
@@ -7958,6 +8217,10 @@ class CalibrationSessionGroupSummary(BaseModel):
     chip_id: Annotated[str, Field(title="Chip Id")]
     objective: Annotated[str, Field(title="Objective")]
     status: CalibrationSessionStatus
+    origin: CalibrationSessionOrigin = CalibrationSessionOrigin.manual
+    """
+    automatic when QDash created it for a run started without a session ID
+    """
     created_by: Annotated[str, Field(title="Created By")]
     created_at: Annotated[AwareDatetime, Field(title="Created At")]
     closed_at: Annotated[AwareDatetime | None, Field(title="Closed At")] = None
@@ -8002,10 +8265,21 @@ class CalibrationSessionResponse(BaseModel):
     The signed-in user who created it
     """
     status: CalibrationSessionStatus
+    origin: CalibrationSessionOrigin = CalibrationSessionOrigin.manual
+    """
+    manual when a person or agent created it for an objective; automatic when QDash created it for a run started without a session ID (a later run may name it)
+    """
     created_at: Annotated[AwareDatetime, Field(title="Created At")]
     updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
     closed_at: Annotated[AwareDatetime | None, Field(title="Closed At")] = None
     closed_by: Annotated[str | None, Field(title="Closed By")] = None
+    """
+    The user who closed it, or system:auto-close when QDash closed it automatically
+    """
+    close_origin: CalibrationSessionCloseOrigin | None = None
+    """
+    manual when the creator closed it; automatic when QDash closed an automatic session because every run and agent session in it ended. Null while open, and for a session closed before this was recorded (closed by its creator). Closing says nothing about how the runs ended.
+    """
     closing_note: Annotated[str, Field(title="Closing Note")] = ""
     closed_with_unknown_runs: Annotated[
         list[str] | None, Field(title="Closed With Unknown Runs")
@@ -8215,10 +8489,10 @@ class CreateAgentSessionRequest(BaseModel):
     The provider and model the client host reports it ran the agent with, read from the host's own runtime, never from the agent's tool arguments. Recorded as reported; QDash does not verify it, and it changes no scope or approval. Omitted when the host does not know it.
     """
     calibration_session_id: Annotated[
-        CalibrationSessionId | None, Field(title="Calibration Session Id")
+        CalibrationSessionId1 | None, Field(title="Calibration Session Id")
     ] = None
     """
-    Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy.
+    Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy. Without it, the session joins an automatic calibration session created for it.
     """
 
 
@@ -8686,11 +8960,21 @@ class ExecuteFlowRequest(BaseModel):
 
     target_override: FlowTargetOverride | None = None
     """
-    Targets for this run, overriding direct CalibService and pipeline targets
+    Targets for this run, overriding the initial targets of every CalibrationSession.run (or legacy CalibService.run) and pipeline
     """
     parameters: Annotated[dict[str, Any] | None, Field(title="Parameters")] = None
     """
     Execution parameters (overrides default_parameters)
+    """
+    calibration_session_id: Annotated[
+        CalibrationSessionId2 | None, Field(title="Calibration Session Id")
+    ] = None
+    """
+    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
+    """
+    idempotency_key: Annotated[IdempotencyKey1 | None, Field(title="Idempotency Key")] = None
+    """
+    A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run.
     """
 
 
@@ -8709,14 +8993,14 @@ class ExecutePipelineRequest(BaseModel):
     Defaults to the configured backend.
     """
     calibration_session_id: Annotated[
-        CalibrationSessionId1 | None, Field(title="Calibration Session Id")
+        CalibrationSessionId2 | None, Field(title="Calibration Session Id")
     ] = None
     """
-    Record the run in this calibration session, which must be open, on this chip, and created by the signed-in user. It groups the run with the session's other work and grants nothing: the run is the request approved here. Requires idempotency_key.
+    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
     """
-    idempotency_key: Annotated[IdempotencyKey | None, Field(title="Idempotency Key")] = None
+    idempotency_key: Annotated[IdempotencyKey1 | None, Field(title="Idempotency Key")] = None
     """
-    With calibration_session_id: a retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it.
+    A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run.
     """
     decision_id: Annotated[DecisionId1 | None, Field(title="Decision Id")] = None
     """
@@ -8758,7 +9042,7 @@ class ExecutionComparisonResponse(BaseModel):
 
 class ExecutionPlanRun(BaseModel):
     """
-    One CalibService.run call of the entrypoint.
+    One CalibrationSession.run (or legacy CalibService.run) call of the entrypoint.
     """
 
     targets: FlowTargetOverride | None = None
@@ -9611,22 +9895,50 @@ class ParameterHistoryResponse(BaseModel):
     total_versions: Annotated[int, Field(title="Total Versions")]
 
 
-class PipelineProgress(BaseModel):
+class PipelineStepProgress(BaseModel):
     """
-    A pipeline run as a whole: one execution per calibration step, same flow run.
+    One planned step of a pipeline run and how far its execution got.
 
-    ``status`` is the whole run's: running while any step runs or the run holds
-    the project lock between steps, otherwise the outcome of the last step.
+    Every step the run reaches, calibration or transform, has its own execution.
     """
 
+    index: Annotated[int, Field(title="Index")]
+    """
+    1-based position in the pipeline spec
+    """
     name: Annotated[str, Field(title="Name")]
-    flow_run_id: Annotated[str, Field(title="Flow Run Id")]
-    root_execution_id: Annotated[str, Field(title="Root Execution Id")]
+    step_id: Annotated[str | None, Field(title="Step Id")] = None
     """
-    The first step's execution, as returned at dispatch
+    Plan-scoped step id; null for transforms and older runs
+    """
+    key: Annotated[str, Field(title="Key")] = ""
+    """
+    Identifier of this step occurrence in the plan: the step_id of a calibration step; a transform's name, suffixed with its index when the name repeats
+    """
+    type: Annotated[str, Field(title="Type")] = ""
+    kind: Annotated[str, Field(title="Kind")] = "calibration"
+    """
+    "calibration" or "transform"
+    """
+    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
+    """
+    The step's own execution, once it has started
     """
     status: Annotated[str, Field(title="Status")]
-    steps: Annotated[list[PipelineStepProgress], Field(title="Steps")]
+    """
+    The execution status; "pending" before the step starts while the run may still reach it; "skipped" when the run ended without reaching it; "not_recorded" for a transform of a run recorded before transform steps had executions
+    """
+    transform: TransformStepRecord | None = None
+    """
+    A transform step's recorded outcome: candidates kept and excluded with reasons, or the CR groups planned; null for calibration steps and unfinished transforms
+    """
+    task_total: Annotated[int, Field(title="Task Total")] = 0
+    task_finished: Annotated[int, Field(title="Task Finished")] = 0
+    task_failed: Annotated[int, Field(title="Task Failed")] = 0
+    figure_paths: Annotated[list[str] | None, Field(title="Figure Paths")] = None
+    """
+    Figures of the step's finished tasks, in task order
+    """
 
 
 class PipelineStepTypeInfo(BaseModel):
@@ -10118,9 +10430,9 @@ class CalibrationPipelineSpec(BaseModel):
     """
     Spec format version. Convert a version 1 spec with migrate_pipeline_spec.
     """
-    name: Annotated[str, Field(pattern="^[A-Za-z][A-Za-z0-9_-]{0,63}$", title="Name")] = "pipeline"
+    name: Annotated[str | None, Field(pattern="^[A-Za-z][A-Za-z0-9_-]{0,63}$", title="Name")] = None
     """
-    Display name of the execution.
+    Optional display name of the run. Each step's execution is named <name>_<step name> when given, and after the step alone when omitted.
     """
     targets: PipelineTargets
     steps: Annotated[
@@ -10463,10 +10775,16 @@ class CalibrationGroupAgentSession(BaseModel):
 
 class CalibrationGroupPipelineRun(BaseModel):
     """
-    One pipeline run of a calibration session row, with its step executions.
+    One run of a calibration session row, whatever it launched, with its step executions.
     """
 
     run_id: Annotated[str, Field(title="Run Id")]
+    run_kind: CalibrationRunKind = CalibrationRunKind.pipeline
+    run_name: Annotated[str, Field(title="Run Name")] = ""
+    """
+    The workflow, pipeline, or task it launched
+    """
+    trigger: CalibrationRunTrigger = CalibrationRunTrigger.api
     pipeline_name: Annotated[str, Field(title="Pipeline Name")] = ""
     dispatch_status: Annotated[str, Field(title="Dispatch Status")]
     requested_by: Annotated[str, Field(title="Requested By")]
@@ -10479,133 +10797,6 @@ class CalibrationGroupPipelineRun(BaseModel):
     executions: Annotated[list[ExecutionResponseSummary] | None, Field(title="Executions")] = None
     executions_total: Annotated[int, Field(title="Executions Total")] = 0
     executions_in_filter: Annotated[int, Field(title="Executions In Filter")] = 0
-
-
-class CalibrationPipelineRunResponse(BaseModel):
-    """
-    One pipeline run requested in a calibration session, with its step executions.
-    """
-
-    run_id: Annotated[str, Field(title="Run Id")]
-    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
-    chip_id: Annotated[str, Field(title="Chip Id")]
-    idempotency_key: Annotated[str, Field(title="Idempotency Key")]
-    requested_by: Annotated[str, Field(title="Requested By")]
-    reported_origin: ReportedLaunchOrigin | None = None
-    """
-    How the caller said it started the run (client reported, not verified); null when nothing was reported, as for a run requested directly
-    """
-    dispatch_status: CalibrationPipelineRunStatus
-    """
-    Whether QDash launched the run: dispatching, dispatched, rejected (nothing was started), or unknown (it may have started; check the Execution list)
-    """
-    attempts: Annotated[int, Field(title="Attempts")]
-    pipeline_name: Annotated[str, Field(title="Pipeline Name")]
-    backend_name: Annotated[str, Field(title="Backend Name")]
-    flow_run_id: Annotated[str | None, Field(title="Flow Run Id")] = None
-    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
-    """
-    The first step's execution, as returned at dispatch
-    """
-    error: Annotated[str, Field(title="Error")] = ""
-    requested_at: Annotated[AwareDatetime, Field(title="Requested At")]
-    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
-    pipeline: PipelineProgress | None = None
-    """
-    The run as a whole, from its step executions; null until its first execution exists
-    """
-    executions: Annotated[list[ExecutionResponseSummary] | None, Field(title="Executions")] = None
-    """
-    Every execution of the run's flow run on the chip, oldest first
-    """
-
-
-class CalibrationSessionDetailResponse(BaseModel):
-    """
-    A calibration session with every run started in it.
-    """
-
-    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
-    project_id: Annotated[str, Field(title="Project Id")]
-    chip_id: Annotated[str, Field(title="Chip Id")]
-    objective: Annotated[str, Field(title="Objective")]
-    created_by: Annotated[str, Field(title="Created By")]
-    """
-    The signed-in user who created it
-    """
-    status: CalibrationSessionStatus
-    created_at: Annotated[AwareDatetime, Field(title="Created At")]
-    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
-    closed_at: Annotated[AwareDatetime | None, Field(title="Closed At")] = None
-    closed_by: Annotated[str | None, Field(title="Closed By")] = None
-    closing_note: Annotated[str, Field(title="Closing Note")] = ""
-    closed_with_unknown_runs: Annotated[
-        list[str] | None, Field(title="Closed With Unknown Runs")
-    ] = None
-    """
-    Pipeline runs whose dispatch outcome was unknown when it was closed
-    """
-    closed_with_unknown_starts: Annotated[
-        list[CalibrationChildReservation] | None,
-        Field(title="Closed With Unknown Starts"),
-    ] = None
-    """
-    Agent session starts reserved long ago and never recorded when it was closed. One recorded later is rejected (calibration_admission: rejected) and never operates.
-    """
-    pipeline_runs: Annotated[
-        list[CalibrationPipelineRunResponse] | None, Field(title="Pipeline Runs")
-    ] = None
-    """
-    The most recent pipeline runs (at most 100), oldest first
-    """
-    pipeline_run_total: Annotated[int, Field(title="Pipeline Run Total")] = 0
-    """
-    Every pipeline run requested in it; more than listed when the list is cut
-    """
-    agent_sessions: Annotated[
-        list[CalibrationAgentSessionChild] | None, Field(title="Agent Sessions")
-    ] = None
-    """
-    The most recent agent sessions (at most 100), oldest first
-    """
-    agent_session_total: Annotated[int, Field(title="Agent Session Total")] = 0
-    """
-    Every agent session created in it; more than listed when the list is cut
-    """
-    close_blockers: Annotated[list[str] | None, Field(title="Close Blockers")] = None
-    """
-    Why it cannot be closed now, read from every child (not only the listed ones): runs and agent sessions that still run or wait, operations an ended agent session has not settled, and children being started. Empty when closing is allowed.
-    """
-    unknown_runs: Annotated[list[str] | None, Field(title="Unknown Runs")] = None
-    """
-    Pipeline runs whose dispatch outcome is unknown. Each was admitted, so it may be running or may still start, even after the session is closed
-    """
-    unknown_starts: Annotated[
-        list[CalibrationChildReservation] | None, Field(title="Unknown Starts")
-    ] = None
-    """
-    Agent session starts reserved long ago whose session was never recorded; the request may have stopped or may still record it. One recorded after a close is rejected and never operates
-    """
-    experiments: Annotated[list[CalibrationExperimentRow] | None, Field(title="Experiments")] = None
-    """
-    Experiments of the search, oldest first, from decisions that proposed one and the runs that named them (latest 200 decisions)
-    """
-    decisions: Annotated[list[CalibrationDecisionResponse] | None, Field(title="Decisions")] = None
-    """
-    The most recent decisions (at most 200), oldest first
-    """
-    decision_total: Annotated[int, Field(title="Decision Total")] = 0
-    """
-    Every decision recorded in it
-    """
-    recommendation: CalibrationDecisionResponse | None = None
-    """
-    The latest decision with a conclusion that no later decision supersedes; null when none was recorded. Closing records none
-    """
-    latest_requested_run: CalibrationLatestRequestedRun | None = None
-    """
-    The most recently requested pipeline run and its recorded execution outcome; null without a run. Not the current or last written hardware state
-    """
 
 
 class CreateEvaluationRunResponse(BaseModel):
@@ -10686,23 +10877,27 @@ class ExecutePipelineResponse(BaseModel):
     """
     Success message
     """
-    steps: Annotated[list[ResolvedPipelineStep] | None, Field(title="Steps")] = None
-    targets: ResolvedPipelineTargets | None = None
     calibration_session_id: Annotated[str | None, Field(title="Calibration Session Id")] = None
     """
-    The calibration session the run is recorded in, if any
+    The calibration session the run joined: the one the request named, or an automatic one; null when the run joined none
     """
-    pipeline_run_id: Annotated[str | None, Field(title="Pipeline Run Id")] = None
+    calibration_run_id: Annotated[str | None, Field(title="Calibration Run Id")] = None
     """
-    The run's record in that calibration session
-    """
-    decision_id: Annotated[str | None, Field(title="Decision Id")] = None
-    """
-    The decision the recorded run carries out, as QDash linked it; null when the request named none. A client that sent a decision checks it is echoed here
+    The run QDash recorded for the launch; every step execution carries it. Null only for a run the worker records when it starts (a saved flow with no chip)
     """
     replayed: Annotated[bool, Field(title="Replayed")] = False
     """
     True when a retry returned the run an earlier request with its key started
+    """
+    steps: Annotated[list[ResolvedPipelineStep] | None, Field(title="Steps")] = None
+    targets: ResolvedPipelineTargets | None = None
+    pipeline_run_id: Annotated[str | None, Field(title="Pipeline Run Id")] = None
+    """
+    The run QDash recorded for the launch (calibration_run_id)
+    """
+    decision_id: Annotated[str | None, Field(title="Decision Id")] = None
+    """
+    The decision the recorded run carries out, as QDash linked it; null when the request named none. A client that sent a decision checks it is echoed here
     """
 
 
@@ -10762,56 +10957,6 @@ class ExecutionGroupItem(BaseModel):
     The row's latest admitted agent sessions (at most 20), oldest first
     """
     nested_agent_sessions_omitted: Annotated[int, Field(title="Nested Agent Sessions Omitted")] = 0
-
-
-class ExecutionResponseDetail(BaseModel):
-    """
-    ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.
-
-    Attributes
-    ----------
-        name (str): The name of the execution.
-        status (str): The current status of the execution.
-        start_at (datetime | None): The start time of the execution.
-        end_at (datetime | None): The end time of the execution.
-        elapsed_time (timedelta | None): The total elapsed time of the execution.
-        user_id (str | None): Internal ID of the user who started the execution.
-        username (str): Username snapshot of the user who started the execution.
-        task (list[Task]): List of tasks in the execution.
-        note (dict): Notes for the execution.
-        tags (list[str]): Tags associated with the execution.
-        chip_id (str): The chip ID for the execution.
-    """
-
-    name: Annotated[str, Field(title="Name")]
-    status: Annotated[str, Field(title="Status")]
-    message: Annotated[str, Field(title="Message")] = ""
-    flow_name: Annotated[str, Field(title="Flow Name")] = ""
-    user_id: Annotated[str | None, Field(title="User Id")] = None
-    username: Annotated[str, Field(title="Username")] = ""
-    start_at: Annotated[AwareDatetime | None, Field(title="Start At")] = None
-    end_at: Annotated[AwareDatetime | None, Field(title="End At")] = None
-    elapsed_time: Annotated[timedelta | None, Field(title="Elapsed Time")] = None
-    task: Annotated[list[Task], Field(title="Task")]
-    note: Annotated[dict[str, Any], Field(title="Note")]
-    tags: Annotated[list[str], Field(title="Tags")] = []
-    chip_id: Annotated[str, Field(title="Chip Id")] = ""
-    pipeline: PipelineProgress | None = None
-    """
-    Set when this execution belongs to a pipeline run; covers every step of it
-    """
-    agent_session: ExecutionAgentSessionLink | None = None
-    """
-    The agent session whose action dispatched this execution, or the session only its tag names (linked false); null for an execution outside agent sessions
-    """
-    calibration_session: ExecutionCalibrationSessionLink | None = None
-    """
-    The calibration session this execution belongs to, from QDash's own records: a pipeline run recorded in it, or an action of an agent session admitted to it. Null when no record relates it, or when records disagree on the session
-    """
-    reported_origin: ReportedLaunchOrigin | None = None
-    """
-    How the caller that launched this execution's pipeline said it was started, such as an agent tool. Client reported, not verified by QDash; null when nothing was reported. The recorded user is still the one whose sign-in started it
-    """
 
 
 class ImpactResponse(BaseModel):
@@ -10975,6 +11120,24 @@ class PipelineCatalogResponse(BaseModel):
     example: Annotated[dict[str, Any] | None, Field(title="Example")] = None
 
 
+class PipelineProgress(BaseModel):
+    """
+    A pipeline run as a whole: one execution per step it reached, same flow run.
+
+    ``status`` is the whole run's: running while any step runs or the run holds
+    the project lock between steps, otherwise the outcome of the last step.
+    """
+
+    name: Annotated[str, Field(title="Name")]
+    flow_run_id: Annotated[str, Field(title="Flow Run Id")]
+    root_execution_id: Annotated[str, Field(title="Root Execution Id")]
+    """
+    The first step's execution, as returned at dispatch
+    """
+    status: Annotated[str, Field(title="Status")]
+    steps: Annotated[list[PipelineStepProgress], Field(title="Steps")]
+
+
 class AgentSessionGraphResponse(BaseModel):
     """
     One agent session as an experiment graph over its real executions.
@@ -10995,6 +11158,300 @@ class AgentSessionGraphResponse(BaseModel):
     """
     complete: Annotated[bool, Field(title="Complete")]
     notes: Annotated[list[str], Field(title="Notes")]
+
+
+class CalibrationPipelineRunResponse(BaseModel):
+    """
+    One run requested in a calibration session, with its step executions.
+    """
+
+    run_id: Annotated[str, Field(title="Run Id")]
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    run_kind: CalibrationRunKind = CalibrationRunKind.pipeline
+    """
+    What the run launched: a pipeline, a saved workflow, a task, or an agent action
+    """
+    trigger: CalibrationRunTrigger = CalibrationRunTrigger.api
+    """
+    api when a signed-in request recorded it before launch; schedule or worker when the worker recorded a flow run QDash had not launched (a schedule) as it started
+    """
+    run_name: Annotated[str, Field(title="Run Name")] = ""
+    """
+    The workflow or pipeline name, or the task the run launched
+    """
+    agent_session_id: Annotated[str | None, Field(title="Agent Session Id")] = None
+    """
+    For an agent action's run, the agent session that ran it
+    """
+    action_id: Annotated[str | None, Field(title="Action Id")] = None
+    """
+    For an agent action's run, the action that dispatched it
+    """
+    idempotency_key: Annotated[str, Field(title="Idempotency Key")]
+    requested_by: Annotated[str, Field(title="Requested By")]
+    reported_origin: ReportedLaunchOrigin | None = None
+    """
+    How the caller said it started the run (client reported, not verified); null when nothing was reported, as for a run requested directly
+    """
+    dispatch_status: CalibrationPipelineRunStatus
+    """
+    Whether QDash launched the run: dispatching, dispatched, rejected (nothing was started), or unknown (it may have started; check the Execution list)
+    """
+    attempts: Annotated[int, Field(title="Attempts")]
+    pipeline_name: Annotated[str, Field(title="Pipeline Name")]
+    backend_name: Annotated[str, Field(title="Backend Name")]
+    flow_run_id: Annotated[str | None, Field(title="Flow Run Id")] = None
+    flow_end_state: RunFlowEndState | None = None
+    """
+    How the run's whole flow run ended, as Prefect reported it once it was terminal (completed, failed, cancelled, or crashed); null while it may still run or was not observed
+    """
+    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
+    """
+    The first step's execution, as returned at dispatch
+    """
+    error: Annotated[str, Field(title="Error")] = ""
+    requested_at: Annotated[AwareDatetime, Field(title="Requested At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    pipeline: PipelineProgress | None = None
+    """
+    The run as a whole, from its step executions; null until its first execution exists
+    """
+    executions: Annotated[list[ExecutionResponseSummary] | None, Field(title="Executions")] = None
+    """
+    Every step execution of the run on the chip, oldest first: those the worker stamped with the run, or, for older runs, those of its flow run
+    """
+
+
+class CalibrationRunStateResponse(BaseModel):
+    """
+    One run of a calibration session, with its whole flow run's state read now.
+
+    ``flow_end_state`` is the terminal state Prefect reports in this read, and null otherwise,
+    whatever an earlier read recorded.
+    """
+
+    run_id: Annotated[str, Field(title="Run Id")]
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    run_kind: CalibrationRunKind = CalibrationRunKind.pipeline
+    """
+    What the run launched: a pipeline, a saved workflow, a task, or an agent action
+    """
+    trigger: CalibrationRunTrigger = CalibrationRunTrigger.api
+    """
+    api when a signed-in request recorded it before launch; schedule or worker when the worker recorded a flow run QDash had not launched (a schedule) as it started
+    """
+    run_name: Annotated[str, Field(title="Run Name")] = ""
+    """
+    The workflow or pipeline name, or the task the run launched
+    """
+    agent_session_id: Annotated[str | None, Field(title="Agent Session Id")] = None
+    """
+    For an agent action's run, the agent session that ran it
+    """
+    action_id: Annotated[str | None, Field(title="Action Id")] = None
+    """
+    For an agent action's run, the action that dispatched it
+    """
+    idempotency_key: Annotated[str, Field(title="Idempotency Key")]
+    requested_by: Annotated[str, Field(title="Requested By")]
+    reported_origin: ReportedLaunchOrigin | None = None
+    """
+    How the caller said it started the run (client reported, not verified); null when nothing was reported, as for a run requested directly
+    """
+    dispatch_status: CalibrationPipelineRunStatus
+    """
+    Whether QDash launched the run: dispatching, dispatched, rejected (nothing was started), or unknown (it may have started; check the Execution list)
+    """
+    attempts: Annotated[int, Field(title="Attempts")]
+    pipeline_name: Annotated[str, Field(title="Pipeline Name")]
+    backend_name: Annotated[str, Field(title="Backend Name")]
+    flow_run_id: Annotated[str | None, Field(title="Flow Run Id")] = None
+    flow_end_state: RunFlowEndState | None = None
+    """
+    How the run's whole flow run ended, as Prefect reported it once it was terminal (completed, failed, cancelled, or crashed); null while it may still run or was not observed
+    """
+    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
+    """
+    The first step's execution, as returned at dispatch
+    """
+    error: Annotated[str, Field(title="Error")] = ""
+    requested_at: Annotated[AwareDatetime, Field(title="Requested At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    pipeline: PipelineProgress | None = None
+    """
+    The run as a whole, from its step executions; null until its first execution exists
+    """
+    executions: Annotated[list[ExecutionResponseSummary] | None, Field(title="Executions")] = None
+    """
+    Every step execution of the run on the chip, oldest first: those the worker stamped with the run, or, for older runs, those of its flow run
+    """
+    flow_status: RunFlowStatus
+    """
+    The whole flow run's state in this read: dispatching, not_launched, running (Prefect reports a state it may still leave), completed, failed, cancelled, crashed, unknown (no flow run recorded, an unknown launch outcome, or Prefect does not report it), or unavailable (Prefect could not be read). Never derived from step executions
+    """
+    prefect_state: Annotated[str | None, Field(title="Prefect State")] = None
+    """
+    Prefect's state type for the flow run in this read, such as RUNNING or SCHEDULED; null when Prefect was not read or did not report it
+    """
+    flow_status_reason: Annotated[str, Field(title="Flow Status Reason")] = ""
+    """
+    Why the state is what it is, for display
+    """
+    observed_at: Annotated[AwareDatetime, Field(title="Observed At")]
+    """
+    When this read decided flow_status
+    """
+
+
+class CalibrationSessionDetailResponse(BaseModel):
+    """
+    A calibration session with every run started in it.
+    """
+
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    objective: Annotated[str, Field(title="Objective")]
+    created_by: Annotated[str, Field(title="Created By")]
+    """
+    The signed-in user who created it
+    """
+    status: CalibrationSessionStatus
+    origin: CalibrationSessionOrigin = CalibrationSessionOrigin.manual
+    """
+    manual when a person or agent created it for an objective; automatic when QDash created it for a run started without a session ID (a later run may name it)
+    """
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    closed_at: Annotated[AwareDatetime | None, Field(title="Closed At")] = None
+    closed_by: Annotated[str | None, Field(title="Closed By")] = None
+    """
+    The user who closed it, or system:auto-close when QDash closed it automatically
+    """
+    close_origin: CalibrationSessionCloseOrigin | None = None
+    """
+    manual when the creator closed it; automatic when QDash closed an automatic session because every run and agent session in it ended. Null while open, and for a session closed before this was recorded (closed by its creator). Closing says nothing about how the runs ended.
+    """
+    closing_note: Annotated[str, Field(title="Closing Note")] = ""
+    closed_with_unknown_runs: Annotated[
+        list[str] | None, Field(title="Closed With Unknown Runs")
+    ] = None
+    """
+    Pipeline runs whose dispatch outcome was unknown when it was closed
+    """
+    closed_with_unknown_starts: Annotated[
+        list[CalibrationChildReservation] | None,
+        Field(title="Closed With Unknown Starts"),
+    ] = None
+    """
+    Agent session starts reserved long ago and never recorded when it was closed. One recorded later is rejected (calibration_admission: rejected) and never operates.
+    """
+    pipeline_runs: Annotated[
+        list[CalibrationPipelineRunResponse] | None, Field(title="Pipeline Runs")
+    ] = None
+    """
+    The most recent pipeline runs (at most 100), oldest first
+    """
+    pipeline_run_total: Annotated[int, Field(title="Pipeline Run Total")] = 0
+    """
+    Every pipeline run requested in it; more than listed when the list is cut
+    """
+    agent_sessions: Annotated[
+        list[CalibrationAgentSessionChild] | None, Field(title="Agent Sessions")
+    ] = None
+    """
+    The most recent agent sessions (at most 100), oldest first
+    """
+    agent_session_total: Annotated[int, Field(title="Agent Session Total")] = 0
+    """
+    Every agent session created in it; more than listed when the list is cut
+    """
+    close_blockers: Annotated[list[str] | None, Field(title="Close Blockers")] = None
+    """
+    Why it cannot be closed now, read from every child (not only the listed ones): runs and agent sessions that still run or wait, operations an ended agent session has not settled, and children being started. Empty when closing is allowed.
+    """
+    unknown_runs: Annotated[list[str] | None, Field(title="Unknown Runs")] = None
+    """
+    Pipeline runs whose dispatch outcome is unknown. Each was admitted, so it may be running or may still start, even after the session is closed
+    """
+    unknown_starts: Annotated[
+        list[CalibrationChildReservation] | None, Field(title="Unknown Starts")
+    ] = None
+    """
+    Agent session starts reserved long ago whose session was never recorded; the request may have stopped or may still record it. One recorded after a close is rejected and never operates
+    """
+    experiments: Annotated[list[CalibrationExperimentRow] | None, Field(title="Experiments")] = None
+    """
+    Experiments of the search, oldest first, from decisions that proposed one and the runs that named them (latest 200 decisions)
+    """
+    decisions: Annotated[list[CalibrationDecisionResponse] | None, Field(title="Decisions")] = None
+    """
+    The most recent decisions (at most 200), oldest first
+    """
+    decision_total: Annotated[int, Field(title="Decision Total")] = 0
+    """
+    Every decision recorded in it
+    """
+    recommendation: CalibrationDecisionResponse | None = None
+    """
+    The latest decision with a conclusion that no later decision supersedes; null when none was recorded. Closing records none
+    """
+    latest_requested_run: CalibrationLatestRequestedRun | None = None
+    """
+    The most recently requested pipeline run and its recorded execution outcome; null without a run. Not the current or last written hardware state
+    """
+
+
+class ExecutionResponseDetail(BaseModel):
+    """
+    ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.
+
+    Attributes
+    ----------
+        name (str): The name of the execution.
+        status (str): The current status of the execution.
+        start_at (datetime | None): The start time of the execution.
+        end_at (datetime | None): The end time of the execution.
+        elapsed_time (timedelta | None): The total elapsed time of the execution.
+        user_id (str | None): Internal ID of the user who started the execution.
+        username (str): Username snapshot of the user who started the execution.
+        task (list[Task]): List of tasks in the execution.
+        note (dict): Notes for the execution.
+        tags (list[str]): Tags associated with the execution.
+        chip_id (str): The chip ID for the execution.
+    """
+
+    name: Annotated[str, Field(title="Name")]
+    status: Annotated[str, Field(title="Status")]
+    message: Annotated[str, Field(title="Message")] = ""
+    flow_name: Annotated[str, Field(title="Flow Name")] = ""
+    user_id: Annotated[str | None, Field(title="User Id")] = None
+    username: Annotated[str, Field(title="Username")] = ""
+    start_at: Annotated[AwareDatetime | None, Field(title="Start At")] = None
+    end_at: Annotated[AwareDatetime | None, Field(title="End At")] = None
+    elapsed_time: Annotated[timedelta | None, Field(title="Elapsed Time")] = None
+    task: Annotated[list[Task], Field(title="Task")]
+    note: Annotated[dict[str, Any], Field(title="Note")]
+    tags: Annotated[list[str], Field(title="Tags")] = []
+    chip_id: Annotated[str, Field(title="Chip Id")] = ""
+    pipeline: PipelineProgress | None = None
+    """
+    Set when this execution belongs to a pipeline run; covers every step of it
+    """
+    agent_session: ExecutionAgentSessionLink | None = None
+    """
+    The agent session whose action dispatched this execution, or the session only its tag names (linked false); null for an execution outside agent sessions
+    """
+    calibration_session: ExecutionCalibrationSessionLink | None = None
+    """
+    The calibration session this execution belongs to, from QDash's own records: a pipeline run recorded in it, or an action of an agent session admitted to it. Null when no record relates it, or when records disagree on the session
+    """
+    reported_origin: ReportedLaunchOrigin | None = None
+    """
+    How the caller that launched this execution's pipeline said it was started, such as an agent tool. Client reported, not verified by QDash; null when nothing was reported. The recorded user is still the one whose sign-in started it
+    """
 
 
 FileTreeNode.model_rebuild()

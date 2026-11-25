@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildChatModelOptions,
   buildEvaluationModelOptions,
+  hasNoChatModel,
   resolveChatModelOption,
 } from "../agentModels";
 
@@ -23,6 +24,17 @@ describe("buildChatModelOptions", () => {
     expect(buildChatModelOptions(null)).toEqual([
       expect.objectContaining({ key: "default", label: "Configured default", model: null }),
     ]);
+  });
+
+  it("tells a config without any available chat model from one still loading", () => {
+    const none = buildChatModelOptions({ chat_models: [], model: null });
+    expect(none).toEqual([
+      expect.objectContaining({ key: "default", label: "No chat model available", model: null }),
+    ]);
+    expect(hasNoChatModel(none)).toBe(true);
+    expect(hasNoChatModel(buildChatModelOptions({ chat_models: [qwen] }))).toBe(false);
+    // A config without chat_models still offers its model.
+    expect(hasNoChatModel(buildChatModelOptions({ model: qwen }))).toBe(false);
   });
 
   it("resolves a removed choice to the default", () => {

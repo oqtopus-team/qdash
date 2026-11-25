@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib
-from typing import Any
 
 import pytest
 
@@ -14,22 +13,20 @@ from qdash.workflow.service.steps import (
     OneQubitFineTune,
     TwoQubitCalibration,
 )
+from tests.qdash.workflow.calibration_session_fake import (
+    fake_session_class,
+    install_fake_session,
+)
 from tests.qdash.workflow.task_call_helpers import names, settings
 
 full_module = importlib.import_module("qdash.workflow.templates.full_calibration")
 
 
-class FakeCalibService:
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.args = args
-        self.kwargs = kwargs
-
-    def run(self, targets: Any, *, steps: list[Any]) -> dict[str, Any]:
-        return {"targets": targets, "steps": steps, "service_kwargs": self.kwargs}
+FakeCalibService = fake_session_class()
 
 
 def test_full_calibration_passes_template_task_lists(monkeypatch) -> None:
-    monkeypatch.setattr(full_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, full_module, FakeCalibService)
 
     result = full_module.full_calibration(username="alice", chip_id="64Q", mux_ids=[0])
 
@@ -49,7 +46,7 @@ def test_full_calibration_passes_template_task_lists(monkeypatch) -> None:
 
 
 def test_full_calibration_requires_explicit_mux_ids(monkeypatch) -> None:
-    monkeypatch.setattr(full_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, full_module, FakeCalibService)
 
     with pytest.raises(ValueError, match="mux_ids is required"):
         full_module.full_calibration(username="alice", chip_id="64Q")
@@ -64,12 +61,12 @@ PULSE_DURATIONS = {
 
 
 def test_full_calibration_sets_durations_on_every_pulse_call(monkeypatch) -> None:
-    monkeypatch.setattr(full_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, full_module, FakeCalibService)
 
     result = full_module.full_calibration(username="alice", chip_id="64Q", mux_ids=[0])
 
-    assert "task_parameters" not in result["service_kwargs"]
-    assert result["service_kwargs"]["default_run_parameters"] == {
+    assert "task_parameters" not in result["kwargs"]
+    assert result["kwargs"]["default_run_parameters"] == {
         "readout_duration": 1024,
         "interval": 150 * 1024,
     }

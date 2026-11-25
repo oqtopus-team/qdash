@@ -47,7 +47,7 @@ function CalibrationSessionRow({ calibrationSessionId }: { calibrationSessionId:
       <span className="min-w-0 truncate font-medium text-base-content/80">{data.objective}</span>
       <span className="shrink-0 text-base-content/60">
         {isOpen ? "" : "Closed · "}
-        {runs} pipeline run{runs === 1 ? "" : "s"} · {agents} agent session
+        {runs} run{runs === 1 ? "" : "s"} · {agents} agent session
         {agents === 1 ? "" : "s"}
         {active > 0 ? ` · ${active} running or waiting` : ""}
       </span>
@@ -63,7 +63,7 @@ function CalibrationSessionRow({ calibrationSessionId }: { calibrationSessionId:
 
 /**
  * The calibration sessions this chat's tool calls named, each read from QDash under the
- * project open now: the objective, how many pipeline runs and agent sessions it groups, and
+ * project open now: the objective, how many runs and agent sessions it groups, and
  * how many still run or wait. The chat is an entry point; QDash's records decide what belongs
  * to each session.
  */

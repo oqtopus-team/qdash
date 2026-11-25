@@ -43,6 +43,11 @@ from qdash.api.services.calibration_session_links import (
 )
 from qdash.common.utils.datetime import now, parse_elapsed_time
 from qdash.datamodel.execution import ExecutionStatusModel
+from qdash.datamodel.step_record import (
+    PLAN_RECORDS_TRANSFORMS,
+    read_transform_record,
+    step_keys,
+)
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.repository.execution_finalizer import (
     finalize_executions_by_flow_run_id,
@@ -479,6 +484,19 @@ class ExecutionService:
             if isinstance(index, int) and index not in by_index:
                 by_index[index] = doc
 
+        entries = [entry for entry in planned if isinstance(entry, dict)]
+        keys = step_keys(
+            [
+                (
+                    str(entry.get("name") or ""),
+                    entry.get("step_id") if isinstance(entry.get("step_id"), str) else None,
+                )
+                for entry in entries
+            ]
+        )
+        # Runs recorded before transform steps had executions mark none in their plan.
+        records_transforms = plan.get(PLAN_RECORDS_TRANSFORMS) is True
+
         steps: list[PipelineStepProgress] = []
         open_statuses = {
             ExecutionStatusModel.RUNNING.value,
@@ -487,34 +505,37 @@ class ExecutionService:
         }
         any_open = False
         last_terminal: str | None = None
-        for entry in planned:
-            if not isinstance(entry, dict):
-                continue
+        for entry, key in zip(entries, keys, strict=True):
             index = int(entry.get("index", 0))
             kind = str(entry.get("kind") or "calibration")
             started = by_index.get(index)
-            if kind == "transform":
-                steps.append(
-                    PipelineStepProgress(
-                        index=index,
-                        name=str(entry.get("name") or ""),
-                        type=str(entry.get("type") or ""),
-                        kind=kind,
-                        status="skipped",
-                    )
-                )
-                continue
+            base = PipelineStepProgress(
+                index=index,
+                name=str(entry.get("name") or ""),
+                step_id=entry.get("step_id") if isinstance(entry.get("step_id"), str) else None,
+                key=key,
+                type=str(entry.get("type") or ""),
+                kind=kind,
+                status="pending",
+            )
             if started is None:
+                if kind == "transform" and not records_transforms:
+                    base.status = "not_recorded"
+                steps.append(base)
+                continue
+            if started.status in open_statuses:
+                any_open = True
+            else:
+                last_terminal = started.status
+            if kind == "transform":
+                # No tasks: the execution's status and recorded outcome are the step's result.
                 steps.append(
-                    PipelineStepProgress(
-                        index=index,
-                        name=str(entry.get("name") or ""),
-                        step_id=(
-                            entry.get("step_id") if isinstance(entry.get("step_id"), str) else None
-                        ),
-                        type=str(entry.get("type") or ""),
-                        kind=kind,
-                        status="pending",
+                    base.model_copy(
+                        update={
+                            "execution_id": started.execution_id,
+                            "status": started.status,
+                            "transform": read_transform_record(started.note),
+                        }
                     )
                 )
                 continue
@@ -523,23 +544,16 @@ class ExecutionService:
             figures = [
                 path for t in finished for path in (t.figure_path or []) if isinstance(path, str)
             ]
-            if started.status in open_statuses:
-                any_open = True
-            else:
-                last_terminal = started.status
             steps.append(
-                PipelineStepProgress(
-                    index=index,
-                    name=str(entry.get("name") or ""),
-                    step_id=entry.get("step_id") if isinstance(entry.get("step_id"), str) else None,
-                    type=str(entry.get("type") or ""),
-                    kind=kind,
-                    execution_id=started.execution_id,
-                    status=started.status,
-                    task_total=len(tasks),
-                    task_finished=len(finished),
-                    task_failed=sum(1 for t in finished if t.status == "failed"),
-                    figure_paths=figures,
+                base.model_copy(
+                    update={
+                        "execution_id": started.execution_id,
+                        "status": started.status,
+                        "task_total": len(tasks),
+                        "task_finished": len(finished),
+                        "task_failed": sum(1 for t in finished if t.status == "failed"),
+                        "figure_paths": figures,
+                    }
                 )
             )
 
@@ -567,6 +581,11 @@ class ExecutionService:
             )
         else:
             status = last_terminal or ExecutionStatusModel.COMPLETED.value
+        if status != ExecutionStatusModel.RUNNING.value:
+            # The run ended: a step it never reached was skipped, and has no execution.
+            for step in steps:
+                if step.status == "pending":
+                    step.status = "skipped"
 
         return PipelineProgress(
             name=str(plan.get("name") or execution.name),

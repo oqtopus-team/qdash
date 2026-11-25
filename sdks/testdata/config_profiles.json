@@ -1,0 +1,91 @@
+{
+  "description": "Config file cases both SDKs must read identically (each profile is a top-level [<name>] table): tests/config.test.ts (TypeScript) and tests/test_sdk_config_shared.py (Python). 'expected' lists every config field in snake_case after defaults; 'error' is a regular expression the error message matches. 'env' is the whole environment the file is read with.",
+  "defaults": {
+    "base_url": null,
+    "api_token": null,
+    "username": null,
+    "password_env": null,
+    "project_id": null,
+    "cf_access_client_id": null,
+    "cf_access_client_secret": null,
+    "timeout_sec": 30,
+    "verify_tls": true,
+    "proxy": null,
+    "user_agent": null,
+    "read_attempts": 3
+  },
+  "valid": [
+    {
+      "name": "default_profile selects the profile; values keep their TOML types",
+      "toml": "default_profile = \"lab\"\n\n[default]\nbase_url = \"http://default.local\"\napi_token = \"default-token\"\n\n[lab]\nbase_url = \"http://lab.local/\"\napi_token = \"lab-token\"\nproject_id = \"lab\"\ntimeout_sec = 9\nverify_tls = false\nread_attempts = 2\nproxy = \"http://proxy.local:3128\"\n",
+      "expected": {"base_url": "http://lab.local", "api_token": "lab-token", "project_id": "lab", "timeout_sec": 9, "verify_tls": false, "read_attempts": 2, "proxy": "http://proxy.local:3128"}
+    },
+    {
+      "name": "an explicit profile wins over default_profile",
+      "toml": "default_profile = \"lab\"\n[default]\nbase_url = \"http://default.local\"\napi_token = \"d\"\n[lab]\nbase_url = \"http://lab.local\"\napi_token = \"l\"\n",
+      "profile": "default",
+      "expected": {"base_url": "http://default.local", "api_token": "d"}
+    },
+    {
+      "name": "without default_profile the profile is 'default'",
+      "toml": "[default]\nbase_url = \"http://d.local\"\nusername = \"alice\"\npassword_env = \"QDASH_PW\"\ntimeout_sec = 2.5\n",
+      "expected": {"base_url": "http://d.local", "username": "alice", "password_env": "QDASH_PW", "timeout_sec": 2.5}
+    },
+    {
+      "name": "api_token_env reads the selected profile's variable only",
+      "toml": "default_profile = \"lab\"\n[lab]\nbase_url = \"http://lab.local\"\napi_token_env = \"LAB_TOKEN\"\n[other]\nbase_url = \"http://other.local\"\napi_token_env = \"UNSET_TOKEN\"\n",
+      "env": {"LAB_TOKEN": "from-env"},
+      "expected": {"base_url": "http://lab.local", "api_token": "from-env"}
+    },
+    {
+      "name": "empty strings mean unset",
+      "toml": "[default]\nbase_url = \"http://d.local\"\napi_token = \"t\"\nproject_id = \"\"\nproxy = \"\"\ncf_access_client_id = \"cid\"\ncf_access_client_secret = \"csecret\"\nuser_agent = \"probe/1\"\n",
+      "expected": {"base_url": "http://d.local", "api_token": "t", "cf_access_client_id": "cid", "cf_access_client_secret": "csecret", "user_agent": "probe/1"}
+    },
+    {
+      "name": "a quoted profile name may hold dots, spaces and quotes",
+      "toml": "default_profile = \"lab.dev \\\"x\\\"\"\n[\"lab.dev \\\"x\\\"\"]\nbase_url = \"http://dev.local\"\n[lab]\nbase_url = \"http://lab.local\"\n",
+      "expected": {"base_url": "http://dev.local"}
+    },
+    {
+      "name": "the base URL is not parsed",
+      "toml": "[default]\nbase_url = \"x\"\n",
+      "expected": {"base_url": "x"}
+    }
+  ],
+  "invalid": [
+    {"name": "top-level profile keys", "toml": "base_url = \"http://x\"\n", "error": "Unknown top-level keys .*: base_url"},
+    {"name": "default_profile not a string", "toml": "default_profile = 1\n", "error": "default_profile .* must be a non-empty string"},
+    {"name": "default_profile empty", "toml": "default_profile = \"\"\n", "error": "default_profile .* must be a non-empty string"},
+    {"name": "a root value beside the profiles", "toml": "lab = 1\n[local]\nbase_url = 'x'\n", "error": "Unknown top-level keys .*: lab\\. Put profile settings under a \\[<name>\\] table"},
+    {"name": "the removed [profiles.<name>] layout", "toml": "default_profile = \"lab\"\n[profiles.lab]\nbase_url = \"http://lab.local\"\n", "error": "uses the removed \\[profiles\\.<name>\\] layout: move each .* to a top-level \\[<name>\\] table"},
+    {"name": "a root profiles value", "toml": "profiles = \"lab\"\n", "error": "uses the removed \\[profiles\\.<name>\\] layout"},
+    {"name": "default_profile names a reserved key", "toml": "default_profile = \"default_profile\"\n", "error": "Config profile name 'default_profile' is reserved"},
+    {"name": "an explicit reserved profile", "toml": "[local]\nbase_url = 'x'\n", "profile": "profiles", "error": "Config profile name 'profiles' is reserved"},
+    {"name": "an empty profile name", "toml": "[\"\"]\nbase_url = 'x'\n", "error": "A profile in config file .* has an empty name"},
+    {"name": "a dotted header nests a table in the profile", "toml": "[lab.dev]\nbase_url = 'x'\n", "profile": "lab", "error": "Unknown keys in profile 'lab': dev"},
+    {"name": "missing default_profile", "toml": "default_profile = \"missing\"\n[lab]\nbase_url = \"x\"\n", "error": "Config profile not found: missing"},
+    {"name": "missing explicit profile", "toml": "[default]\nbase_url = \"x\"\n", "profile": "lab", "error": "Config profile not found: lab"},
+    {"name": "no base_url", "toml": "[default]\nproject_id = 'p'\n", "error": "'base_url' is required"},
+    {"name": "INI-only key", "toml": "[default]\nbase_url = 'x'\ntimeout_seconds = 3\n", "error": "Unknown keys in profile 'default': timeout_seconds"},
+    {"name": "verify_tls string", "toml": "[default]\nbase_url = 'x'\nverify_tls = 'false'\n", "error": "'verify_tls' in profile 'default' must be a boolean"},
+    {"name": "timeout_sec string", "toml": "[default]\nbase_url = 'x'\ntimeout_sec = '3'\n", "error": "'timeout_sec' in profile 'default' must be a number"},
+    {"name": "timeout_sec boolean", "toml": "[default]\nbase_url = 'x'\ntimeout_sec = true\n", "error": "'timeout_sec' in profile 'default' must be a number"},
+    {"name": "timeout_sec zero", "toml": "[default]\nbase_url = 'x'\ntimeout_sec = 0\n", "error": "Invalid config values in profile 'default': timeout_sec"},
+    {"name": "read_attempts float", "toml": "[default]\nbase_url = 'x'\nread_attempts = 1.5\n", "error": "'read_attempts' in profile 'default' must be an integer"},
+    {"name": "read_attempts float with integer value", "toml": "[default]\nbase_url = 'x'\nread_attempts = 3.0\n", "error": "'read_attempts' in profile 'default' must be an integer"},
+    {"name": "read_attempts zero", "toml": "[default]\nbase_url = 'x'\nread_attempts = 0\n", "error": "Invalid config values in profile 'default': read_attempts"},
+    {"name": "base_url not a string", "toml": "[default]\nbase_url = 1\n", "error": "'base_url' in profile 'default' must be a string"},
+    {"name": "a date where a string belongs", "toml": "[default]\nbase_url = 'x'\nproject_id = 2026-11-24\n", "error": "'project_id' in profile 'default' must be a string"},
+    {"name": "api_token_env empty", "toml": "[default]\nbase_url = 'x'\napi_token_env = \"\"\n", "error": "must name an environment variable"},
+    {"name": "api_token_env not a string", "toml": "[default]\nbase_url = 'x'\napi_token_env = 1\n", "error": "'api_token_env' in profile 'default' must be a string"},
+    {"name": "api_token and api_token_env", "toml": "[default]\nbase_url = 'x'\napi_token = \"s3cret-token-value\"\napi_token_env = \"X\"\n", "env": {"X": "s3cret-token-value"}, "error": "sets both 'api_token' and 'api_token_env'"},
+    {"name": "api_token_env unset", "toml": "[default]\nbase_url = 'x'\napi_token_env = \"UNSET_TOKEN\"\n", "error": "Environment variable UNSET_TOKEN named by 'api_token_env' in profile 'default' is not set or empty"},
+    {"name": "api_token_env empty value", "toml": "[default]\nbase_url = 'x'\napi_token_env = \"EMPTY_TOKEN\"\n", "env": {"EMPTY_TOKEN": ""}, "error": "Environment variable EMPTY_TOKEN named by 'api_token_env'"},
+    {"name": "malformed TOML", "toml": "[default\n", "error": "Invalid TOML in config file"},
+    {"name": "a wrongly typed secret is not echoed", "toml": "[default]\nbase_url = 'x'\napi_token = 1\ncf_access_client_secret = 2\nusername = 's3cret-token-value'\nread_attempts = 0\n", "error": "'api_token' in profile 'default' must be a string"},
+    {"name": "an invalid value next to a secret is not echoed", "toml": "[default]\nbase_url = 'x'\napi_token = 's3cret-token-value'\nread_attempts = 0\n", "error": "Invalid config values in profile 'default': read_attempts"},
+    {"name": "a malformed line holding a secret is not echoed", "toml": "[default]\nbase_url = 'x'\napi_token = 's3cret-token-value\n", "error": "Invalid TOML in config file"}
+  ],
+  "secret": "s3cret-token-value"
+}

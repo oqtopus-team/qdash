@@ -4,8 +4,10 @@
  */
 import { isDeepStrictEqual } from "node:util";
 
-import { QDashApiError, QDashValidationError, type QDashClient } from "@oqtopus-team/qdash-client";
-import type { TaskResultListItem, TaskResultResponse } from "@oqtopus-team/qdash-client/models";
+import { read, type Context } from "./_http.js";
+import { QDashApiError, QDashValidationError } from "./errors.js";
+import type { TaskResultListItem, TaskResultListResponse, TaskResultResponse } from "./types.js";
+import { readTaskResultEvidence, type TaskResultEvidence, type TaskResultEvidenceOptions } from "./evidence.js";
 
 /** List rows `compareLatest` reads when `limit` is omitted. */
 export const COMPARE_LATEST_DEFAULT_ROWS = 20;
@@ -77,7 +79,7 @@ function checkCompareLatestOptions(options: CompareLatestOptions): number {
     problems.push(`${unknown.join(", ")} ${unknown.length === 1 ? "is not an option" : "are not options"} of compareLatest`);
   }
   if (problems.length > 0) {
-    throw new QDashValidationError(`${problems.join("; ")}.`, { payload: { problems } });
+    throw new QDashValidationError(`${problems.join("; ")}.`, { body: { problems } });
   }
   return limit as number;
 }
@@ -136,7 +138,7 @@ async function mapConcurrently<T, R>(items: readonly T[], limit: number, map: (i
 
 /** Task results read through a session; `qdash.taskResults`. */
 export class TaskResults {
-  constructor(private readonly client: QDashClient) {}
+  constructor(private readonly context: Context) {}
 
   /**
    * Compare the latest two results of each task name for one qubit or coupling.
@@ -157,13 +159,13 @@ export class TaskResults {
   async compareLatest(options: CompareLatestOptions): Promise<TaskResultComparison> {
     const limit = checkCompareLatestOptions(options);
     const { chipId, qid } = options;
-    const page = await this.client.listTaskResults({ chipId, qid, limit });
+    const page = await this.listPage(chipId, qid, limit);
     const groups = new Map<string, TaskResultListItem[]>();
     for (const row of page.items) {
       const task: unknown = row.task_name;
       if (typeof task !== "string" || task === "") {
         throw new QDashApiError(`Unexpected GET /task-results response: row ${row.task_id} has no task_name`, {
-          payload: row,
+          body: row,
         });
       }
       groups.set(task, [...(groups.get(task) ?? []), row]);
@@ -191,9 +193,51 @@ export class TaskResults {
     return { chipId, qid, rows: { read: page.items.length, total: page.total }, compared, insufficient };
   }
 
+  /**
+   * Read one task result with the context to interpret it.
+   *
+   * Reads `GET /tasks/{task_id}/result`, then the execution it names (with this
+   * result's entry in it), the current state of its qubit or coupling with the
+   * stored values of the parameters it outputs, and the cooldown named by
+   * `cooldownId`, checked against the result's chip and start time. QDash's
+   * task result does not record its cooldown, so without `cooldownId` the
+   * cooldown part is `not_associated`; none is inferred.
+   *
+   * Every context part reports `ok`, `failed`, `not_applicable` or
+   * `not_associated` (`TaskResultContext`); a failed part is never filled from
+   * other data. Invalid arguments throw `QDashValidationError` before any
+   * request; a failed result read rejects the call, and a result that is not an
+   * object or names another task ID throws `QDashApiError`.
+   */
+  evidence(taskId: string, options: TaskResultEvidenceOptions = {}): Promise<TaskResultEvidence> {
+    return readTaskResultEvidence(this.context, taskId, options);
+  }
+
+  /** One page of `GET /task-results`, or an error naming what is missing; never an empty page in place of a malformed one. */
+  private async listPage(chipId: string, qid: string, limit: number): Promise<TaskResultListResponse> {
+    const payload: unknown = await read(this.context.reads, (requestOptions) =>
+      this.context.api.taskResult.listTaskResults({ chip_id: chipId, qid, limit }, requestOptions),
+    );
+    const page = payload as Partial<TaskResultListResponse> | null;
+    const problems: string[] = [];
+    if (!isRecord(page)) problems.push("the body is not an object");
+    else {
+      if (!Array.isArray(page.items)) problems.push("items is not an array");
+      else if (page.items.some((item) => !isRecord(item) || typeof item.task_id !== "string")) problems.push("an item has no task_id");
+      if (!Number.isInteger(page.total)) problems.push("total is not an integer");
+    }
+    if (problems.length > 0) {
+      throw new QDashApiError(`Unexpected GET /task-results response: ${problems.join("; ")}`, { body: payload });
+    }
+    return page as TaskResultListResponse;
+  }
+
   private async parameters(row: TaskResultListItem): Promise<Record<string, unknown> | string> {
     try {
-      return detailParameters(await this.client.getTaskResult(row.task_id), row);
+      const detail = await read(this.context.reads, (requestOptions) =>
+        this.context.api.task.getTaskResult({ task_id: row.task_id }, requestOptions),
+      );
+      return detailParameters(detail, row);
     } catch (error) {
       return `reading the result of ${row.task_id} failed: ${error instanceof Error ? error.message : String(error)}`;
     }

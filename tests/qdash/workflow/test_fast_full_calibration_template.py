@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -18,22 +17,20 @@ from qdash.workflow.service.steps import (
     TwoQubitCalibration,
 )
 from qdash.workflow.service.targets import MuxTargets
+from tests.qdash.workflow.calibration_session_fake import (
+    fake_session_class,
+    install_fake_session,
+)
 from tests.qdash.workflow.task_call_helpers import names, settings
 
 fast_full_module = importlib.import_module("qdash.workflow.templates.fast_full_calibration")
 
 
-class FakeCalibService:
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.args = args
-        self.kwargs = kwargs
-
-    def run(self, targets: Any, *, steps: list[Any]) -> dict[str, Any]:
-        return {"targets": targets, "steps": steps, "service_kwargs": self.kwargs}
+FakeCalibService = fake_session_class()
 
 
 def test_fast_full_calibration_uses_shortened_one_qubit_steps(monkeypatch) -> None:
-    monkeypatch.setattr(fast_full_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, fast_full_module, FakeCalibService)
 
     result = fast_full_module.fast_full_calibration(
         username="alice",
@@ -78,7 +75,7 @@ def test_fast_full_calibration_uses_shortened_one_qubit_steps(monkeypatch) -> No
 
 
 def test_fast_full_calibration_reconfigures_before_fine_tune(monkeypatch) -> None:
-    monkeypatch.setattr(fast_full_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, fast_full_module, FakeCalibService)
 
     steps = fast_full_module.fast_full_calibration(username="alice", chip_id="64Q", mux_ids=[0, 1])[
         "steps"
@@ -97,7 +94,7 @@ def test_fast_full_calibration_reconfigures_before_fine_tune(monkeypatch) -> Non
 
 
 def test_fast_full_calibration_second_configure_keeps_filtered_candidates(monkeypatch) -> None:
-    monkeypatch.setattr(fast_full_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, fast_full_module, FakeCalibService)
     monkeypatch.setattr("qdash.workflow.service.steps.box_setup.get_run_logger", MagicMock)
 
     result = fast_full_module.fast_full_calibration(username="alice", chip_id="64Q", mux_ids=[0, 1])
@@ -116,7 +113,7 @@ def test_fast_full_calibration_second_configure_keeps_filtered_candidates(monkey
 
 
 def test_fast_full_calibration_requires_explicit_mux_ids(monkeypatch) -> None:
-    monkeypatch.setattr(fast_full_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, fast_full_module, FakeCalibService)
 
     with pytest.raises(ValueError, match="mux_ids is required"):
         fast_full_module.fast_full_calibration(username="alice", chip_id="64Q")
@@ -131,12 +128,12 @@ PULSE_DURATIONS = {
 
 
 def test_fast_full_calibration_sets_durations_on_every_pulse_call(monkeypatch) -> None:
-    monkeypatch.setattr(fast_full_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, fast_full_module, FakeCalibService)
 
     result = fast_full_module.fast_full_calibration(username="alice", chip_id="64Q", mux_ids=[0])
 
-    assert "task_parameters" not in result["service_kwargs"]
-    assert result["service_kwargs"]["default_run_parameters"] == {
+    assert "task_parameters" not in result["kwargs"]
+    assert result["kwargs"]["default_run_parameters"] == {
         "readout_duration": 1024,
         "interval": 150 * 1024,
     }

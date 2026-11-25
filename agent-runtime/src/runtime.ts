@@ -97,7 +97,7 @@ import { logDurableReport } from "./durable-report.ts";
 import { examplesOf, fetchKnowledgeDraft, fetchTaskKnowledgeResponse, renderReference } from "./knowledge-context.ts";
 import type { TaskKnowledgeLike } from "./knowledge-context.ts";
 import { resolveAgentConfigPaths, resolveAgentModelFiles } from "./agent-profile.ts";
-import { chatCompactionOverrides, missingCredentialMessage, NATIVE_API_KEY_ENV, PROVIDER_ALIASES, supportedThinkingLevel, writeModelsConfig } from "./models-config.ts";
+import { chatCompactionOverrides, chatModelAvailability, missingCredentialMessage, NATIVE_API_KEY_ENV, PROVIDER_ALIASES, supportedThinkingLevel, writeModelsConfig, type ChatModelAvailability } from "./models-config.ts";
 import type { PageContext } from "./page-context.ts";
 import { buildSystemPrompt, buildUserInstructionsSection } from "./prompt.ts";
 import {
@@ -107,7 +107,7 @@ import {
   type SkillCommand,
   type SkillSummary,
 } from "./skill-tool.ts";
-import { extractToolGuide, TOOL_GUIDE_SKILL, toolGuideNames } from "./tool-guide.ts";
+import { buildIntentGuide, extractToolGuide, TOOL_GUIDE_SKILL, toolGuideNames } from "./tool-guide.ts";
 
 const AGENT_DIR = process.env.PI_CODING_AGENT_DIR ?? "/app/.pi-agent";
 const WORK_DIR = process.env.AGENT_WORK_DIR ?? "/app/workspace";
@@ -259,7 +259,18 @@ export class SharedRuntime {
     private readonly modelCompactionOverrides: Readonly<Record<string, CompactionBudget>> = {},
     /** The skills `read_skill` offers, which the user may also invoke as `/skill:name`. */
     private readonly skills: readonly SkillSummary[] = [],
+    /** The chat.yaml the models were built from, for the chat model menus. */
+    private readonly chatYaml: string = "",
   ) {}
+
+  /** chat.yaml's chat models in order, each marked by whether its credential is set. */
+  async chatModels(): Promise<ChatModelAvailability[]> {
+    const available = await this.modelRuntime.getAvailable();
+    return chatModelAvailability(
+      this.chatYaml,
+      new Set(available.map((model) => `${model.provider}/${model.id}`)),
+    );
+  }
 
   /** The skills the chat composer offers after `/`, with their descriptions. */
   chatSkills(): SkillCommand[] {
@@ -351,6 +362,7 @@ export class SharedRuntime {
       ? extractToolGuide(readFileSync(guideSkill.filePath, "utf8"), qdashToolNames, deferredToolNames)
       : null;
     if (!toolGuide) console.warn("[agent-runtime] no tool guide: qdash skill not found");
+    const intentGuide = buildIntentGuide(qdashToolNames, deferredToolNames);
     const localToolGuide = buildLocalToolGuide(extensions, EXTENSION_PATHS, new Set(localTools));
 
     const classifiers = configureClassifierModels(
@@ -376,7 +388,11 @@ export class SharedRuntime {
       classify ? CLASSIFY_GUIDELINE : null,
       {
         codemode: CODEMODE_GUIDELINE,
-        deferredTools: deferredToolsGuideline(deferredToolNames, toolGuideNames(toolGuide)),
+        deferredTools: deferredToolsGuideline(
+          deferredToolNames,
+          new Set([...toolGuideNames(toolGuide), ...toolGuideNames(intentGuide)]),
+        ),
+        intentGuide,
       },
     );
     const agentExtension = buildAgentExtension(systemPrompt, [
@@ -435,6 +451,7 @@ export class SharedRuntime {
       systemPrompt,
       modelCompactionOverrides,
       skills,
+      modelYaml.chatYaml,
     );
   }
 

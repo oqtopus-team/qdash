@@ -7,6 +7,18 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from qdash.datamodel.flow_targets import FlowTargetOverride, TargetMode
 
+CALIBRATION_SESSION_FIELD = (
+    "Add the run to this calibration session, which must exist, be open, be on the run's chip, "
+    "and be created by the signed-in user; otherwise the request is refused before anything "
+    "starts. It groups the run with the session's other work and grants nothing. Without it, "
+    "the run joins an automatic session created for it."
+)
+IDEMPOTENCY_KEY_FIELD = (
+    "A retry with the same key and request returns the recorded run instead of starting "
+    "another, and a run whose launch outcome is unknown is never launched again with it. "
+    "Without a key, every request starts a new run."
+)
+
 
 class SaveFlowRequest(BaseModel):
     """Request to save a Flow."""
@@ -152,7 +164,7 @@ class ExecutionPlanRound(BaseModel):
 
 
 class ExecutionPlanStep(BaseModel):
-    """One step of a CalibService run, as stated in the saved source."""
+    """One step of a CalibrationSession.run call, as the saved source states it."""
 
     index: int = Field(..., description="1-based position within its run")
     type: str = Field(..., description="Step class, e.g. CustomOneQubit")
@@ -182,7 +194,7 @@ class ExecutionPlanStep(BaseModel):
 
 
 class ExecutionPlanRun(BaseModel):
-    """One CalibService.run call of the entrypoint."""
+    """One CalibrationSession.run (or legacy CalibService.run) call of the entrypoint."""
 
     targets: FlowTargetOverride | None = Field(
         None, description="Literal targets of the call; null when computed at run time"
@@ -240,10 +252,22 @@ class ExecuteFlowRequest(BaseModel):
 
     target_override: FlowTargetOverride | None = Field(
         None,
-        description="Targets for this run, overriding direct CalibService and pipeline targets",
+        description=(
+            "Targets for this run, overriding the initial targets of every CalibrationSession.run "
+            "(or legacy CalibService.run) and pipeline"
+        ),
     )
     parameters: dict[str, Any] = Field(
         default_factory=dict, description="Execution parameters (overrides default_parameters)"
+    )
+    calibration_session_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description=CALIBRATION_SESSION_FIELD,
+    )
+    idempotency_key: str | None = Field(
+        default=None, min_length=1, max_length=128, description=IDEMPOTENCY_KEY_FIELD
     )
 
     model_config = ConfigDict(
@@ -267,6 +291,24 @@ class ExecuteFlowResponse(BaseModel):
     flow_run_url: str = Field(..., description="Prefect flow run URL")
     qdash_ui_url: str = Field(..., description="QDash UI URL for execution")
     message: str = Field(..., description="Success message")
+    calibration_session_id: str | None = Field(
+        default=None,
+        description=(
+            "The calibration session the run joined: the one the request named, or an "
+            "automatic one; null when the run joined none"
+        ),
+    )
+    calibration_run_id: str | None = Field(
+        default=None,
+        description=(
+            "The run QDash recorded for the launch; every step execution carries it. Null only "
+            "for a run the worker records when it starts (a saved flow with no chip)"
+        ),
+    )
+    replayed: bool = Field(
+        default=False,
+        description="True when a retry returned the run an earlier request with its key started",
+    )
 
 
 class ScheduleFlowRequest(BaseModel):

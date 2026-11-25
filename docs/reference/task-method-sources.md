@@ -1,20 +1,8 @@
 # Task Method Sources
 
-This table lists the published sources used as background reading when the task explanations
-(`description`, `when_to_use`, and `prerequisites` in each task's `TaskDocumentation`) were
-written, grouped by measurement method. It is documentation only: QDash does not store or
-publish these sources with task metadata, and the API and Agent do not return them.
-
-The sources describe the original general method, not the QDash implementation. The task
-source and the Qubex functions it calls define what a task actually does, including sweeps,
-fits, and stored values, and that implementation can differ from the protocol in a paper; see
-[Document a calibration task](../developer-guide/workflow/engine-architecture.md#document-a-calibration-task).
-
-Configuration and software utility tasks (`Configure`, `ConfigureEF`, `ConfigureAll`,
-`CorrectCaptureDelay`, `CheckWaveform`, and the fake backend's `FakeBringUp`) have no listed
-sources. Some measurement tasks have none because the procedure is Qubex-specific:
-`CheckCoarseReadoutParams`, the `Check*Pulse` repetition checks, the EF pulse calibrations,
-`EFReadoutClassification`, `CheckZX90`, and `CheckBellState`.
+These papers explain the measurement methods behind QDash tasks. They do not specify the exact
+QDash implementation; task source and Qubex calls define sweeps, fits, and saved values.
+Sources are documentation only and are not returned by the API or Agent.
 
 | Method | Tasks | Sources |
 | --- | --- | --- |

@@ -5,20 +5,35 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { CalibrationPipelineRunResponseActionId } from './calibrationPipelineRunResponseActionId';
+import type { CalibrationPipelineRunResponseAgentSessionId } from './calibrationPipelineRunResponseAgentSessionId';
 import type { CalibrationPipelineRunResponseExecutionId } from './calibrationPipelineRunResponseExecutionId';
+import type { CalibrationPipelineRunResponseFlowEndState } from './calibrationPipelineRunResponseFlowEndState';
 import type { CalibrationPipelineRunResponseFlowRunId } from './calibrationPipelineRunResponseFlowRunId';
 import type { CalibrationPipelineRunResponsePipeline } from './calibrationPipelineRunResponsePipeline';
 import type { CalibrationPipelineRunResponseReportedOrigin } from './calibrationPipelineRunResponseReportedOrigin';
 import type { CalibrationPipelineRunStatus } from './calibrationPipelineRunStatus';
+import type { CalibrationRunKind } from './calibrationRunKind';
+import type { CalibrationRunTrigger } from './calibrationRunTrigger';
 import type { ExecutionResponseSummary } from './executionResponseSummary';
 
 /**
- * One pipeline run requested in a calibration session, with its step executions.
+ * One run requested in a calibration session, with its step executions.
  */
 export interface CalibrationPipelineRunResponse {
   run_id: string;
   calibration_session_id: string;
   chip_id: string;
+  /** What the run launched: a pipeline, a saved workflow, a task, or an agent action */
+  run_kind?: CalibrationRunKind;
+  /** api when a signed-in request recorded it before launch; schedule or worker when the worker recorded a flow run QDash had not launched (a schedule) as it started */
+  trigger?: CalibrationRunTrigger;
+  /** The workflow or pipeline name, or the task the run launched */
+  run_name?: string;
+  /** For an agent action's run, the agent session that ran it */
+  agent_session_id?: CalibrationPipelineRunResponseAgentSessionId;
+  /** For an agent action's run, the action that dispatched it */
+  action_id?: CalibrationPipelineRunResponseActionId;
   idempotency_key: string;
   requested_by: string;
   /** How the caller said it started the run (client reported, not verified); null when nothing was reported, as for a run requested directly */
@@ -29,6 +44,8 @@ export interface CalibrationPipelineRunResponse {
   pipeline_name: string;
   backend_name: string;
   flow_run_id?: CalibrationPipelineRunResponseFlowRunId;
+  /** How the run's whole flow run ended, as Prefect reported it once it was terminal (completed, failed, cancelled, or crashed); null while it may still run or was not observed */
+  flow_end_state?: CalibrationPipelineRunResponseFlowEndState;
   /** The first step's execution, as returned at dispatch */
   execution_id?: CalibrationPipelineRunResponseExecutionId;
   error?: string;
@@ -36,6 +53,6 @@ export interface CalibrationPipelineRunResponse {
   updated_at: string;
   /** The run as a whole, from its step executions; null until its first execution exists */
   pipeline?: CalibrationPipelineRunResponsePipeline;
-  /** Every execution of the run's flow run on the chip, oldest first */
+  /** Every step execution of the run on the chip, oldest first: those the worker stamped with the run, or, for older runs, those of its flow run */
   executions?: ExecutionResponseSummary[];
 }

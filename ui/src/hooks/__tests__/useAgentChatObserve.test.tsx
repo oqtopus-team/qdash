@@ -154,6 +154,24 @@ async function openSecondWindow() {
   return { hook, events };
 }
 
+/**
+ * Wait until this window follows the turn: its stream is open and the chat renders the
+ * live turn. The stream request goes out before React renders what the follow set, so
+ * the request alone does not mean the rendered chat shows the followed turn yet.
+ */
+async function followed(
+  hook: Awaited<ReturnType<typeof openSecondWindow>>["hook"],
+  timeout?: number,
+) {
+  await waitFor(
+    () => {
+      expect(streams).toHaveLength(1);
+      expect(hook.result.current.chat.isStreaming).toBe(true);
+    },
+    { timeout },
+  );
+}
+
 const streamCalls = () => calls.filter((c) => c.url.endsWith("/stream"));
 const activeCalls = () => calls.filter((c) => c.url.endsWith("/agent/chat/active"));
 const patches = () => calls.filter((c) => c.method === "PATCH");
@@ -167,7 +185,7 @@ const result = (text: string, entry = "9") =>
 describe("a turn another window started", () => {
   it("is found when the chat opens late, shows what it waits for, and ends here without saving", async () => {
     const { hook, events } = await openSecondWindow();
-    await waitFor(() => expect(streams).toHaveLength(1));
+    await followed(hook);
     // Looked up for the open project, then followed by reattaching: nothing is submitted.
     expect(activeCalls()[0]).toMatchObject({ body: { session_id: "s1" }, project: "p1" });
     expect(streamCalls()[0].body).toMatchObject({
@@ -207,7 +225,7 @@ describe("a turn another window started", () => {
 
   it("takes the run the server saved as soon as the followed turn ends", async () => {
     const { hook } = await openSecondWindow();
-    await waitFor(() => expect(streams).toHaveLength(1));
+    await followed(hook);
     streams[0].push(result("Folded here."));
     // The server recorded the turn, whether or not the starting window is still open.
     streams[0].push(
@@ -228,7 +246,7 @@ describe("a turn another window started", () => {
 
   it("takes the saved transcript after the turn ended when the stream did not report it", async () => {
     const { hook } = await openSecondWindow();
-    await waitFor(() => expect(streams).toHaveLength(1));
+    await followed(hook);
     streams[0].push(result("Folded here."));
     streams[0].close();
     await waitFor(() => expect(hook.result.current.chat.isStreaming).toBe(false));
@@ -246,7 +264,7 @@ describe("a turn another window started", () => {
 
   it("clears the live state when the turn fails or is stopped", async () => {
     const { hook } = await openSecondWindow();
-    await waitFor(() => expect(streams).toHaveLength(1));
+    await followed(hook);
     streams[0].push(waitStart);
     await waitFor(() => expect(hook.result.current.status?.kind).toBe("waiting_expert"));
     streams[0].push(sse("error", { detail: "conversation was not answered: aborted" }));
@@ -396,7 +414,7 @@ describe("a turn another window started", () => {
 
     // The save lands; the next lookup, shortly after, follows the turn under its own message.
     saved.s1 = [...older, question];
-    await waitFor(() => expect(streams).toHaveLength(1), { timeout: 3_000 });
+    await followed(hook, 3_000);
     expect(streamCalls()[0].body).toMatchObject({ request_id: "t-new", reattach: true });
     expect(hook.result.current.chat.messages.map((m) => m.content)).toEqual([
       "What is T1 of Q0?",
@@ -429,7 +447,7 @@ describe("a turn another window started", () => {
     expect(streams).toHaveLength(0);
 
     saved.s1 = stopped;
-    await waitFor(() => expect(streams).toHaveLength(1), { timeout: 3_000 });
+    await followed(hook, 3_000);
     expect(streamCalls()[0].body).toMatchObject({ request_id: "t-cont", reattach: true });
     // The continue's answer follows the answer it continues; nothing of its own is added.
     expect(hook.result.current.chat.messages.map((m) => m.content)).toEqual([
@@ -455,7 +473,7 @@ describe("a turn another window started", () => {
       } as Message,
     ];
     const { hook } = await openSecondWindow();
-    await waitFor(() => expect(streams).toHaveLength(1));
+    await followed(hook);
     expect(hook.result.current.chat.messages.map((m) => m.content)).toEqual(["Calibrate Q0"]);
   });
 
@@ -495,7 +513,7 @@ describe("a turn another window started", () => {
 
   it("keeps a followed answer the starting window has not saved over a shorter saved copy", async () => {
     const { hook } = await openSecondWindow();
-    await waitFor(() => expect(streams).toHaveLength(1));
+    await followed(hook);
     streams[0].push(result("Folded here."));
     streams[0].close();
     await waitFor(() => expect(hook.result.current.chat.isStreaming).toBe(false));

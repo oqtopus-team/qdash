@@ -6,8 +6,9 @@ name: Publish qdash-client
 # publish-typescript-packages.yml computes one QDash version per run, publishes the npm
 # client, and uploads a qdash-client-release record. When that run completes,
 # workflow_run builds both packages from the same commit with the record's PEP 440
-# version, publishes qdash-client, and then qdash-sdk, which requires that exact
-# qdash-client. Pull requests and manual runs only validate.
+# version, publishes qdash-client, and then qdash-sdk. qdash-sdk is self-contained (it does
+# not depend on qdash-client); both carry the same version. Pull requests and manual runs
+# only validate.
 on:
   pull_request:
     branches: [develop]
@@ -113,8 +114,7 @@ jobs:
         working-directory: source
         run: node .github/scripts/client-release.mjs --python
 
-      # Both packages get the record's version; hatch_build.py pins qdash-sdk's
-      # dependency to qdash-client==<version>.
+      # Both packages get the record's version. qdash-sdk must not depend on qdash-client.
       - name: Build packages
         shell: bash
         working-directory: source
@@ -128,18 +128,27 @@ jobs:
           test -f "dist/qdash_client-$CLIENT_VERSION-py3-none-any.whl"
           test -f "dist/qdash_sdk-$CLIENT_VERSION-py3-none-any.whl"
           unzip -p "dist/qdash_sdk-$CLIENT_VERSION-py3-none-any.whl" "qdash_sdk-$CLIENT_VERSION.dist-info/METADATA" \
-            | grep -Fx "Requires-Dist: qdash-client==$CLIENT_VERSION"
+            > sdk-metadata.txt
+          if grep -i "^Requires-Dist: qdash-client" sdk-metadata.txt; then
+            echo "qdash-sdk must not depend on qdash-client" >&2
+            exit 1
+          fi
 
       - name: Run tests
         working-directory: source
-        run: uv run --package qdash-sdk pytest clients/python/tests sdks/python/tests -v
+        # The SDK's distribution tests install each package alone in fresh environments and
+        # prove the SDK imports nothing from qdash-client.
+        run: |
+          uv run --package qdash-client pytest clients/python/tests -v
+          uv run --package qdash-sdk pytest sdks/python/tests -v
 
       - name: Run lint and type checks
         working-directory: source
         run: |
-          uv run --package qdash-sdk ruff check clients/python sdks/python
-          uv run --package qdash-sdk ruff format --check clients/python sdks/python
-          uv run --package qdash-sdk mypy clients/python/src/qdash/client sdks/python/src/qdash/sdk clients/python/tests sdks/python/tests
+          uv run --package qdash-client ruff check clients/python sdks/python
+          uv run --package qdash-client ruff format --check clients/python sdks/python
+          uv run --package qdash-client mypy clients/python/src/qdash/client clients/python/tests
+          uv run --package qdash-sdk mypy sdks/python/src/qdash/sdk sdks/python/src/qdash/calibration sdks/python/tests
 
       # One artifact per package, so each publish job uploads only its own files.
       - name: Upload qdash-client artifact
@@ -181,8 +190,8 @@ jobs:
           # Rerunning this run reuses the same record, so it finds the version published.
           skip-existing: true
 
-  # qdash-sdk requires qdash-client==<version>, so it publishes only after that client
-  # has. If this job fails after the client published, rerun the failed jobs: they reuse
+  # qdash-sdk publishes after qdash-client so one release record lands as a pair. If this
+  # job fails after the client published, rerun the failed jobs: they reuse
   # this run's artifacts and record, and skip-existing skips a version already on PyPI.
   publish-sdk:
     name: Publish qdash-sdk to PyPI

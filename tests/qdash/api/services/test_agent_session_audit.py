@@ -50,6 +50,8 @@ from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from qdash.api.schemas.agent_session import AgentSessionAuditResponse
     from qdash.api.services.flow_service import FlowService
 
@@ -1105,6 +1107,31 @@ def test_records_changing_during_an_export_give_a_fresh_snapshot_or_a_refusal(
 
 # ---------------------------------------------------------------------- decision quota
 
+# The race tests lower the quota so the session fills with a few records instead of 2000;
+# the slot and race logic does not depend on the size of the limit.
+SMALL_QUOTA = 3
+
+
+@pytest.fixture
+def small_quota() -> Iterator[int]:
+    """Lower the agent session decision quota for one test.
+
+    A separate MonkeyPatch keeps the limit in place when the test undoes its own patches.
+    """
+    from qdash.api.services import agent_session_audit
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(agent_session_audit._LEDGER, "limit", SMALL_QUOTA)
+        yield SMALL_QUOTA
+
+
+def test_agent_session_decisions_are_capped_at_2000_per_session() -> None:
+    from qdash.api.services import agent_session_audit
+
+    assert agent_session_audit.MAX_DECISIONS_PER_SESSION == 2000
+    assert agent_session_audit._LEDGER.limit == agent_session_audit.MAX_DECISIONS_PER_SESSION
+    assert "already holds 2000 decisions" in str(agent_session_audit._LEDGER.quota_full().detail)
+
 
 def _fill_decisions(session_id: str, count: int) -> None:
     AgentDecisionDocument.insert_many(
@@ -1147,14 +1174,13 @@ def test_concurrent_distinct_decisions_at_the_last_slot_never_exceed_the_quota(
     sessions: AgentSessionService,
     audit: AgentSessionAuditService,
     monkeypatch: pytest.MonkeyPatch,
+    small_quota: int,
 ) -> None:
-    from qdash.api.services.agent_session_audit import MAX_DECISIONS_PER_SESSION
-
     session = _session(sessions)
-    _fill_decisions(session.session_id, MAX_DECISIONS_PER_SESSION - 1)
+    _fill_decisions(session.session_id, small_quota - 1)
     winner: list[Any] = []
-    # Both recordings see slot 1999 free (the first read of each passes the quota check, the
-    # second chooses the slot); the other one inserts in between.
+    # Both recordings see the last slot free (the first read of each passes the quota check,
+    # the second chooses the slot); the other one inserts in between.
     for on_call in (1, 2):
         _interleave(
             monkeypatch,
@@ -1165,24 +1191,24 @@ def test_concurrent_distinct_decisions_at_the_last_slot_never_exceed_the_quota(
             _decision(audit, session.session_id, key=f"a-{on_call}")
         assert full.value.status_code == 409
         assert "full" in str(full.value.detail)
-        assert AgentDecisionDocument.find({"session_id": session.session_id}).count() == 2000
+        count = AgentDecisionDocument.find({"session_id": session.session_id}).count()
+        assert count == small_quota
         monkeypatch.undo()
         raced = AgentDecisionDocument.find_one({"decision_id": winner[-1].decision_id}).run()
         assert raced is not None
         raced.delete()
     slots = [d.quota_slot for d in AgentDecisionDocument.find({"session_id": session.session_id})]
-    assert sorted(slots) == list(range(MAX_DECISIONS_PER_SESSION - 1))
+    assert sorted(slots) == list(range(small_quota - 1))
 
 
 def test_same_key_races_at_the_cap_record_once_and_replay(
     sessions: AgentSessionService,
     audit: AgentSessionAuditService,
     monkeypatch: pytest.MonkeyPatch,
+    small_quota: int,
 ) -> None:
-    from qdash.api.services.agent_session_audit import MAX_DECISIONS_PER_SESSION
-
     session = _session(sessions)
-    _fill_decisions(session.session_id, MAX_DECISIONS_PER_SESSION - 1)
+    _fill_decisions(session.session_id, small_quota - 1)
     first: list[Any] = []
     _interleave(
         monkeypatch, 2, lambda: first.append(_decision(audit, session.session_id, key="same"))
@@ -1190,7 +1216,7 @@ def test_same_key_races_at_the_cap_record_once_and_replay(
     replayed = _decision(audit, session.session_id, key="same")
     monkeypatch.undo()
     assert replayed.decision_id == first[0].decision_id
-    assert AgentDecisionDocument.find({"session_id": session.session_id}).count() == 2000
+    assert AgentDecisionDocument.find({"session_id": session.session_id}).count() == small_quota
     # With the quota full, a retry of the key still replays; a new key is refused.
     assert _decision(audit, session.session_id, key="same").decision_id == replayed.decision_id
     with pytest.raises(HTTPException) as full:

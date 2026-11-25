@@ -67,6 +67,7 @@ from qdash.datamodel.calibration_pipeline import (
 from qdash.datamodel.one_qubit_execution_mode import ONE_QUBIT_STEP_EXECUTION_MODES
 from qdash.datamodel.two_qubit_execution_mode import TWO_QUBIT_EXECUTION_MODES
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.qubit import QubitDocument
 
 if TYPE_CHECKING:
@@ -326,6 +327,8 @@ class CalibrationPipelineService:
         initial: list[str] | None
         if targets.qids:
             initial = list(targets.qids)
+        elif targets.pairs:
+            initial = targets.pair_qids()
         elif model.wiring is not None:
             initial = mux_target_qids(
                 targets.mux_ids or [], targets.exclude_qids, model.wiring, model.mux_mapping
@@ -499,6 +502,8 @@ class CalibrationPipelineService:
             for doc in QubitDocument.find({"project_id": project_id, "chip_id": chip_id}).run()
         }
         targets = spec.targets
+        if targets.pairs:
+            return self._validate_pair_targets(project_id, chip_id, chip, spec, known, problems)
         if targets.qids:
             try:
                 mapping = resolve_topology_mux_mapping(chip.topology_id)
@@ -577,6 +582,65 @@ class CalibrationPipelineService:
                 exclude_qids=list(targets.exclude_qids),
             ),
             [qid for qid in mux_qids if qid in known and qid not in excluded],
+        )
+
+    def _validate_pair_targets(
+        self,
+        project_id: str,
+        chip_id: str,
+        chip: ChipDocument,
+        spec: CalibrationPipelineSpec,
+        known: set[str],
+        problems: list[PipelineProblem],
+    ) -> tuple[ResolvedPipelineTargets | None, list[str]]:
+        """Pair targets: both qubits of every pair on the chip, and each pair a coupling.
+
+        The direction is the pair's own; a pair the chip only has the other way round is
+        reported, never reversed.
+        """
+        targets = spec.targets
+        try:
+            mapping = resolve_topology_mux_mapping(chip.topology_id)
+        except MuxMappingError as exc:
+            problems.append(_problem("targets.pairs", str(exc)))
+            return None, []
+        couplings = {
+            doc.qid
+            for doc in CouplingDocument.find({"project_id": project_id, "chip_id": chip_id}).run()
+        }
+        for index, (control, target) in enumerate(targets.pairs or []):
+            path = f"targets.pairs[{index}]"
+            missing = [qid for qid in (control, target) if qid not in known]
+            if missing:
+                problems.append(
+                    _problem(
+                        path,
+                        f"qubits {missing} of pair {control}-{target} are not on chip {chip_id}",
+                    )
+                )
+                continue
+            if couplings and f"{control}-{target}" not in couplings:
+                problems.append(
+                    _problem(path, f"{control}-{target} is not a coupling of chip {chip_id}")
+                )
+        for index, step in enumerate(spec.steps):
+            if step.type == "BringUp" or (
+                isinstance(step, ConfigureAllStep) and step.mux_ids is None
+            ):
+                problems.append(
+                    _problem(
+                        f"steps[{index}]",
+                        f"{step.type} works on whole MUXes; pair targets name no MUX, so set "
+                        "MUX or qubit targets for it",
+                    )
+                )
+        self._validate_configure_all_mux_ids(
+            spec, mapping.groups_for_qubit_count(int(chip.size)), chip_id, problems
+        )
+        qids = targets.pair_qids()
+        return (
+            ResolvedPipelineTargets(qids=qids, pairs=[list(pair) for pair in targets.pairs or []]),
+            [qid for qid in qids if qid in known],
         )
 
     def _preflight(

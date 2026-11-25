@@ -6,4 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 
+/**
+ * The user who closed it, or system:auto-close when QDash closed it automatically
+ */
 export type CalibrationSessionResponseClosedBy = string | null;

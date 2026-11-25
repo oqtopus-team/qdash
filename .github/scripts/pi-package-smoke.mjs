@@ -25,8 +25,9 @@ if (name === "pi-qdash") {
     assert.equal(manifest.dependencies[`@oqtopus-team/${library}`], installed.version);
     assert.notEqual(installed.version, "0.0.0");
   }
-  // One client copy, so the SDK's errors are the classes pi-qdash checks against.
-  assert.ok(!existsSync(join(consumer, "node_modules/@oqtopus-team/qdash-sdk/node_modules/@oqtopus-team/qdash-client")));
+  // The SDK is self-contained; pi-qdash uses the one client copy for its other routes.
+  const sdkManifest = JSON.parse(readFileSync(join(consumer, "node_modules/@oqtopus-team/qdash-sdk/package.json"), "utf8"));
+  assert.equal(sdkManifest.dependencies?.["@oqtopus-team/qdash-client"], undefined);
   assert.ok(!existsSync(join(root, "node_modules/@oqtopus-team/qdash-client")));
 }
 assert.ok(existsSync(join(root, "LICENSE")));

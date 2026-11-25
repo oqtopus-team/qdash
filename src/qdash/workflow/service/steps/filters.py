@@ -28,13 +28,19 @@ from typing import TYPE_CHECKING
 
 from prefect import get_run_logger
 
-from qdash.workflow.service.results import FilterResult, OneQubitResult
-from qdash.workflow.service.steps.base import TransformStep
+from qdash.datamodel.step_record import ExcludedTarget, TransformStepRecord
+from qdash.workflow.service.results import (
+    FilterResult,
+    OneQubitResult,
+    QubitCalibData,
+    normalize_metric_value,
+)
+from qdash.workflow.service.steps.base import CandidateSnapshot, TransformStep
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
     from qdash.workflow.service.steps.base import CalibrationStep
     from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
@@ -101,6 +107,51 @@ class StepReferenceFilter(TransformStep):
     def _validate_step_level(self, target: CalibrationStep) -> None:
         """Hook for checks that depend on the filter kind."""
 
+    def _exclusion_reason(self, result: OneQubitResult, qid: str) -> str:
+        """Why ``qid`` did not pass, read from the same result the filter selected with."""
+        data = result.get_qubit(qid)
+        if data is None:
+            return f"no result from {self._source_label()}"
+        if self.call_id is not None:
+            call = data.call(self.call_id)
+            if call is None:
+                return f"call {self.call_id} has no result"
+            if call.status != "success":
+                return f"call {self.call_id} {call.status}"
+        return self._value_reason(data)
+
+    def _value_reason(self, data: QubitCalibData) -> str:
+        """The reason once the source result exists; filters override it."""
+        return "did not meet the filter criteria"
+
+    def _excluded_reasons(
+        self, result: OneQubitResult, input_qids: list[str], output_qids: list[str]
+    ) -> dict[str, str]:
+        kept = set(output_qids)
+        return {qid: self._exclusion_reason(result, qid) for qid in input_qids if qid not in kept}
+
+    def result_record(self, before: CandidateSnapshot, ctx: StepContext) -> TransformStepRecord:
+        """The candidates kept, each one removed with its reason, and the source read."""
+        record = super().result_record(before, ctx)
+        applied = (
+            ctx.filters[before.filter_count] if len(ctx.filters) > before.filter_count else None
+        )
+        update: dict[str, object] = {
+            "kind": "filter",
+            "source_step": self.step,
+            "source_call_id": self.call_id,
+            "source_found": applied is not None,
+        }
+        if applied is None:
+            update["message"] = "No one-qubit result to filter by; every candidate was kept"
+        else:
+            update["criteria"] = applied.filter_criteria
+            update["excluded"] = [
+                ExcludedTarget(target=qid, reason=reason)
+                for qid, reason in applied.excluded_reasons.items()
+            ]
+        return record.model_copy(update=update)
+
     def _source(self, ctx: StepContext) -> OneQubitResult | None:
         if self.step is None:
             return ctx.get_latest_one_qubit_result()
@@ -132,6 +183,28 @@ class FilterByMetric(StepReferenceFilter):
     def name(self) -> str:
         return f"filter_by_{self.metric}"
 
+    def _value_reason(self, data: QubitCalibData) -> str:
+        if self.call_id is not None:
+            call = data.call(self.call_id)
+            raw = call.output.get(self.metric) if call is not None else None
+            value = normalize_metric_value(raw)
+            missing = f"output {self.metric} of call {self.call_id} is missing"
+        else:
+            value = data.get_metric(self.metric)
+            missing = f"metric {self.metric} is missing"
+        if value is None:
+            return missing
+        if not value >= self.threshold:
+            return f"{self.metric} = {value:g} < {self.threshold:g}"
+        return super()._value_reason(data)
+
+    def result_record(self, before: CandidateSnapshot, ctx: StepContext) -> TransformStepRecord:
+        return (
+            super()
+            .result_record(before, ctx)
+            .model_copy(update={"metric": self.metric, "threshold": self.threshold})
+        )
+
     def _validate_step_level(self, target: CalibrationStep) -> None:
         if self.call_id is not None:
             return
@@ -145,7 +218,7 @@ class FilterByMetric(StepReferenceFilter):
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -177,6 +250,7 @@ class FilterByMetric(StepReferenceFilter):
                 filter_criteria=(
                     criteria if self.references_step else f"{self.metric} >= {self.threshold}"
                 ),
+                excluded_reasons=self._excluded_reasons(result, input_qids, output_qids),
             )
         )
         return ctx
@@ -196,9 +270,14 @@ class FilterByStatus(StepReferenceFilter):
     def name(self) -> str:
         return "filter_by_status"
 
+    def _value_reason(self, data: QubitCalibData) -> str:
+        if self.call_id is None and data.status != "success":
+            return f"{self._source_label()} {data.status}"
+        return super()._value_reason(data)
+
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -234,6 +313,7 @@ class FilterByStatus(StepReferenceFilter):
                     if self.references_step
                     else "status == success"
                 ),
+                excluded_reasons=self._excluded_reasons(result, input_qids, output_qids),
             )
         )
         return ctx

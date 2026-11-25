@@ -25,13 +25,38 @@ trap 'rm -rf "$tmpdir"' EXIT
 scan_root="$tmpdir/working"
 mkdir -p "$scan_root"
 git ls-files --cached -z >"$tmpdir/paths"
+# Select with shell builtins only; a subprocess per path dominated the scan time.
+copy_list="$tmpdir/copy-paths"
+copy_count=0
 while IFS= read -r -d '' path; do
   # Deleted files, symlinks, and submodule directories are not regular source files.
   if [ -f "$path" ] && [ ! -L "$path" ]; then
-    mkdir -p "$scan_root/$(dirname "$path")"
-    cp -- "$path" "$scan_root/$path"
+    # The ./ prefix keeps names that start with - from being read as tar options.
+    printf './%s\0' "$path"
+    copy_count=$((copy_count + 1))
   fi
-done <"$tmpdir/paths"
+done <"$tmpdir/paths" >"$copy_list"
+
+# Copy the working tree bytes of the selected files with one tar pipe. COPYFILE_DISABLE
+# keeps macOS metadata out of the archive. A file that disappears or cannot be read fails
+# the pipe, and pipefail fails the scan.
+tar_format=()
+case "$(tar --version 2>/dev/null || true)" in
+  *"GNU tar"*) ;;
+  # bsdtar rewrites non-ASCII names to another Unicode form on macOS unless pax headers
+  # carry the names as raw bytes.
+  *) tar_format=(--format pax --options hdrcharset=BINARY) ;;
+esac
+if [ "$copy_count" -gt 0 ]; then
+  COPYFILE_DISABLE=1 tar -cf - ${tar_format[@]+"${tar_format[@]}"} --no-recursion --null -T "$copy_list" \
+    | tar -xf - -C "$scan_root"
+fi
+# Count NUL terminators so file names with newlines are counted once.
+copied_count="$(find "$scan_root" -type f -print0 | tr -dc '\000' | wc -c | tr -d '[:space:]')"
+if [ "$copied_count" -ne "$copy_count" ]; then
+  echo "Leak scan snapshot has $copied_count of $copy_count tracked files; aborting." >&2
+  exit 1
+fi
 
 # Directory fingerprints omit the commit prefix used by history findings.
 ignore_path="$tmpdir/.betterleaksignore"

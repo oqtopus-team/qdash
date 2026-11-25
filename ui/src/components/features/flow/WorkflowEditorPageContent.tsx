@@ -90,8 +90,10 @@ import { WorkflowExecutionHelpDialog } from "@/components/features/flow/Workflow
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { isExecutionTerminal } from "@/lib/executionStatus";
+import { calibrationSessionHref } from "@/lib/chatCalibrationSession";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime } from "@/lib/utils/datetime";
+import { createRequestId } from "@/lib/utils/requestId";
 import { monoFontFamily, remeasureMonacoFontsWhenLoaded } from "@/lib/fonts";
 import {
   attachPythonFormatter,
@@ -364,7 +366,19 @@ export function WorkflowEditorPageContent() {
         chipId: typeof runChipId === "string" ? runChipId : "",
         username: String(variables.data.parameters?.username ?? ""),
       });
-      toast.success(`Flow execution started! Execution ID: ${execId || "N/A"}`);
+      // The run's calibration session: an automatic one, or none when the server does not
+      // group runs automatically.
+      const calibrationSessionId = response.data.calibration_session_id;
+      toast.success(`Flow execution started! Execution ID: ${execId || "N/A"}`, {
+        ...(calibrationSessionId
+          ? {
+              action: {
+                label: "Open calibration session",
+                onClick: () => router.push(calibrationSessionHref(calibrationSessionId, null)),
+              },
+            }
+          : {}),
+      });
       // The guide's run opens on its execution page, where the guide follows its progress.
       if (followedByJourney && execId && typeof runChipId === "string") {
         router.push(executionHref(runChipId, execId));
@@ -943,7 +957,7 @@ export function WorkflowEditorPageContent() {
           <AlertTriangle className="h-5 w-5" />
           <div>
             <div className="font-medium">Failed to load flow</div>
-            <div className="text-sm">{(primary.error as Error)?.message}</div>
+            <div className="text-sm">{getApiErrorMessage(primary.error, "Unknown error")}</div>
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -962,7 +976,7 @@ export function WorkflowEditorPageContent() {
         {deleteMutation.isError && (
           <div className="alert alert-error mt-4">
             <span>
-              Failed to delete flow: {(deleteMutation.error as Error)?.message || "Unknown error"}
+              Failed to delete flow: {getApiErrorMessage(deleteMutation.error, "Unknown error")}
             </span>
           </div>
         )}
@@ -1040,7 +1054,7 @@ export function WorkflowEditorPageContent() {
           <div className="alert alert-error">
             <AlertTriangle className="h-5 w-5" aria-hidden="true" />
             <span>
-              Failed to load {doc.name}: {(doc.error as Error)?.message || "Unknown error"}
+              Failed to load {doc.name}: {getApiErrorMessage(doc.error, "Unknown error")}
             </span>
           </div>
         </div>
@@ -1253,7 +1267,7 @@ export function WorkflowEditorPageContent() {
           doc.saveError && doc.name ? (
             <div key={doc.name} className="alert alert-error mx-4 mt-2">
               <span>
-                Failed to save {doc.name}: {(doc.saveError as Error)?.message || "Unknown error"}
+                Failed to save {doc.name}: {getApiErrorMessage(doc.saveError, "Unknown error")}
               </span>
             </div>
           ) : null,
@@ -1262,7 +1276,7 @@ export function WorkflowEditorPageContent() {
         {deleteMutation.isError && (
           <div className="alert alert-error mx-4 mt-2">
             <span>
-              Failed to delete flow: {(deleteMutation.error as Error)?.message || "Unknown error"}
+              Failed to delete flow: {getApiErrorMessage(deleteMutation.error, "Unknown error")}
             </span>
           </div>
         )}
@@ -2193,6 +2207,11 @@ export function WorkflowEditorPageContent() {
                 name: execDoc.name,
                 context: captureJourneyContext(),
                 data: {
+                  // One key per confirmed run: a resent request returns this run instead of
+                  // starting another. QDash refuses a key for a run whose chip it cannot tell
+                  // before the launch, so a run without a chip sends none and is recorded by
+                  // the worker when it starts.
+                  ...(execDoc.chipId ? { idempotency_key: createRequestId() } : {}),
                   target_override: targetOverride,
                   parameters: {
                     username: execDoc.username,

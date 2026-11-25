@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { ChevronRight, ExternalLink, Target } from "lucide-react";
+import { ChevronRight, ExternalLink } from "lucide-react";
 
 import type {
   CalibrationGroupPipelineRun,
@@ -10,11 +10,23 @@ import type {
   ExecutionResponseSummary,
 } from "@/schemas";
 
-import { calibrationSessionHref, dispatchStatusStyle } from "@/lib/chatCalibrationSession";
+import {
+  dispatchStatusStyle,
+  runDisplayName,
+  runKindLabel,
+  runTriggerLabel,
+} from "@/lib/chatCalibrationSession";
+import { QubitTile } from "@/components/ui/QubitTile";
+import { type SessionReturnContext, calibrationSessionDetailHref } from "@/lib/executionArea";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 import { pluralize } from "./agentSessionDisplay";
 import { AgentSessionGroupRow } from "./AgentSessionGroupRow";
+import { ExecutionActor } from "./ExecutionAttribution";
+import {
+  CalibrationSessionStatusBadge,
+  calibrationSessionBorderStyle,
+} from "./CalibrationSessionStatus";
 import { ExecutionListCard } from "./ExecutionListCard";
 
 interface CalibrationSessionGroupRowProps {
@@ -27,6 +39,8 @@ interface CalibrationSessionGroupRowProps {
   onOpenExecution: (execution: ExecutionResponseSummary) => void;
   registerCard: (executionId: string, element: HTMLDivElement | null) => void;
   hasDayFilter: boolean;
+  /** The list a calibration session page opened from this row links back to. */
+  sessionReturn?: SessionReturnContext;
 }
 
 /** The expansion key of a calibration session row; agent session rows use their own id. */
@@ -72,12 +86,13 @@ function PipelineRunGroup({
   const dispatch = dispatchStatusStyle(run.dispatch_status);
   const executions = run.executions ?? [];
   const omitted = (run.executions_total ?? 0) - executions.length;
+  const trigger = runTriggerLabel(run.trigger);
   return (
     <li className="flex flex-col gap-2" data-testid="calibration-row-run">
       <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
-        <span className="text-sm font-medium text-base-content">
-          {run.pipeline_name || "Pipeline run"}
-        </span>
+        <span className="text-sm font-medium text-base-content">{runDisplayName(run)}</span>
+        <span className="badge badge-outline badge-sm">{runKindLabel(run.run_kind)}</span>
+        {trigger ? <span className="badge badge-ghost badge-sm">{trigger}</span> : null}
         <span className={`badge badge-soft badge-sm ${dispatch.badge}`}>{dispatch.label}</span>
         {run.decision_id ? (
           <span className="badge badge-ghost badge-sm" title="The decision this run carries out">
@@ -124,8 +139,10 @@ function PipelineRunGroup({
 
 /**
  * One calibration session in the Execution list: the objective and what its records hold, and,
- * expanded, every pipeline run with its step executions and every admitted agent session with
- * the executions it dispatched. Membership comes from the server's records only.
+ * expanded, every run (a workflow, pipeline, or task launch) with its step executions and every
+ * admitted agent session with the executions it dispatched. A run started without a session is
+ * shown in the automatic session QDash created for it; a run recorded without a session is an
+ * ordinary execution row. Membership comes from the server's records only.
  */
 export function CalibrationSessionGroupRow({
   item,
@@ -137,6 +154,7 @@ export function CalibrationSessionGroupRow({
   onOpenExecution,
   registerCard,
   hasDayFilter,
+  sessionReturn,
 }: CalibrationSessionGroupRowProps) {
   const summary = item.calibration_session;
   if (!summary) return null;
@@ -149,12 +167,13 @@ export function CalibrationSessionGroupRow({
   const runs = item.pipeline_runs ?? [];
   const agents = item.nested_agent_sessions ?? [];
   const recommendation = summary.recommendation;
-  const isOpen = summary.status === "open";
+  const targets = summary.targets ?? [];
+  const isAutomatic = summary.origin === "automatic";
 
   return (
     <div
       data-testid="calibration-session-card"
-      className="rounded-box border border-base-200 border-l-4 border-l-primary/60 bg-base-100 shadow-sm"
+      className={`rounded-box border border-base-200 bg-base-100 shadow-sm ${calibrationSessionBorderStyle(summary.status)}`}
     >
       <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-start sm:justify-between sm:p-4">
         <button
@@ -170,11 +189,16 @@ export function CalibrationSessionGroupRow({
           />
           <span className="min-w-0">
             <span className="flex flex-wrap items-center gap-2">
-              <Target className="h-4 w-4 shrink-0 text-base-content/60" aria-hidden="true" />
               <span className="text-sm font-medium wrap-anywhere">{summary.objective}</span>
-              <span className={`badge badge-soft badge-sm ${isOpen ? "badge-info" : ""}`}>
-                {isOpen ? "Open" : "Closed"}
-              </span>
+              <CalibrationSessionStatusBadge status={summary.status} />
+              {isAutomatic ? (
+                <span
+                  className="badge badge-ghost badge-sm"
+                  title="QDash created this session for a run started without one"
+                >
+                  Automatic
+                </span>
+              ) : null}
               {recommendation ? (
                 <span
                   className="badge badge-outline badge-sm"
@@ -188,15 +212,23 @@ export function CalibrationSessionGroupRow({
             </span>
             <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-base-content/60">
               <span>{timeRange(summary.first_activity_at, summary.latest_activity_at)}</span>
-              <span>{summary.created_by}</span>
-              {summary.targets && summary.targets.length > 0 ? (
-                <span>Targets {summary.targets.join(", ")}</span>
+              <ExecutionActor actor={{ username: summary.created_by }} />
+              {targets.length > 0 ? (
+                <span
+                  className="inline-flex flex-wrap items-center gap-1"
+                  data-testid="calibration-session-targets"
+                >
+                  <span>Targets</span>
+                  {targets.map((qid) => (
+                    <QubitTile key={qid} qid={qid} />
+                  ))}
+                </span>
               ) : (
                 <span>No target recorded</span>
               )}
             </span>
             <span className="mt-1 block text-xs text-base-content/60">
-              {pluralize(counts.pipeline_runs, "pipeline run")}
+              {pluralize(counts.pipeline_runs, "run")}
               {counts.agent_sessions > 0
                 ? ` · ${pluralize(counts.agent_sessions, "agent session")}`
                 : ""}
@@ -215,7 +247,11 @@ export function CalibrationSessionGroupRow({
         </button>
         <div className="flex shrink-0 flex-wrap gap-1">
           <Link
-            href={calibrationSessionHref(summary.calibration_session_id, projectId)}
+            href={calibrationSessionDetailHref(
+              summary.calibration_session_id,
+              projectId,
+              sessionReturn,
+            )}
             className="btn btn-ghost btn-sm"
           >
             <ExternalLink data-icon="inline-start" aria-hidden="true" />
@@ -230,12 +266,12 @@ export function CalibrationSessionGroupRow({
           ) : null}
           {(item.pipeline_runs_omitted ?? 0) > 0 ? (
             <p className="text-xs text-base-content/60">
-              {pluralize(item.pipeline_runs_omitted ?? 0, "earlier pipeline run")} not listed here;
-              the calibration session lists all of them
+              {pluralize(item.pipeline_runs_omitted ?? 0, "earlier run")} not listed here; the
+              calibration session lists all of them
             </p>
           ) : null}
           {runs.length > 0 ? (
-            <ul className="flex flex-col gap-3" aria-label="Pipeline runs">
+            <ul className="flex flex-col gap-3" aria-label="Runs">
               {runs.map((run) => (
                 <PipelineRunGroup
                   key={run.run_id}

@@ -1,4 +1,8 @@
-"""Persistence models for calibration sessions and the pipeline runs requested in them."""
+"""Persistence models for calibration sessions and their decisions.
+
+Runs are ``qdash.dbmodel.run.RunDocument``; ``CalibrationPipelineRunDocument`` is its earlier
+name, kept for the code and tests that use it.
+"""
 
 from __future__ import annotations
 
@@ -19,18 +23,20 @@ from qdash.datamodel.calibration_session import (
     CalibrationChildReservation,
     CalibrationDecisionOutcome,
     CalibrationExperimentStage,
-    CalibrationPipelineRunStatus,
+    CalibrationSessionCloseOrigin,
+    CalibrationSessionOrigin,
     CalibrationSessionStatus,
 )
-from qdash.datamodel.launch_origin import ReportedLaunchOrigin  # noqa: TC001 - Bunnet field
+from qdash.dbmodel.run import RunDocument
 
 
 class CalibrationSessionDocument(Document):
     """One calibration objective on one chip.
 
-    Agent sessions name it in ``AgentSessionDocument.calibration_session_id``; pipeline runs
-    are ``CalibrationPipelineRunDocument`` records. Neither is copied here, so the session
-    record changes only when it is closed.
+    Agent sessions name it in ``AgentSessionDocument.calibration_session_id``; runs name it
+    in ``RunDocument.calibration_session_id``. Neither is copied here: the session record holds
+    only its admission control (the count and the reservations), its close, and, for an
+    automatic session, when QDash last checked whether its work ended.
     """
 
     calibration_session_id: str
@@ -40,6 +46,9 @@ class CalibrationSessionDocument(Document):
     # The signed-in user who created it, from the request's authentication.
     created_by: str
     status: CalibrationSessionStatus = CalibrationSessionStatus.OPEN
+    # ``automatic`` when QDash created it for a run started without a session ID. Every
+    # session recorded before this field existed was created by a person: ``manual``.
+    origin: CalibrationSessionOrigin = CalibrationSessionOrigin.MANUAL
     # Raised, on the condition that the session is open, before every run or agent session is
     # started in it. Closing compares it with the value its check of the children read, so a
     # child started meanwhile makes the close fail instead of being hidden by it.
@@ -56,6 +65,9 @@ class CalibrationSessionDocument(Document):
     updated_at: datetime = Field(default_factory=now)
     closed_at: datetime | None = None
     closed_by: str | None = None
+    # ``automatic`` when QDash closed it because its work ended; None for an open session and
+    # for one closed before this was recorded, which a person closed.
+    close_origin: CalibrationSessionCloseOrigin | None = None
     closing_note: str = ""
     # Runs whose dispatch outcome was unknown when the session was closed; the person who
     # closed it stated that they checked them.
@@ -64,6 +76,9 @@ class CalibrationSessionDocument(Document):
     # closed; the person who closed it acknowledged them. One recorded later stays ``pending``
     # admission, is rejected, and never operates.
     closed_with_unknown_starts: list[CalibrationChildReservation] = Field(default_factory=list)
+    # When QDash last checked whether an open automatic session's work has ended; the check
+    # visits the least recently checked sessions first. None until it was first checked.
+    lifecycle_checked_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -87,80 +102,19 @@ class CalibrationSessionDocument(Document):
                     ("created_at", DESCENDING),
                 ]
             ),
-        ]
-
-
-class CalibrationPipelineRunDocument(Document):
-    """One pipeline run requested in a calibration session, recorded before it is launched.
-
-    The record is inserted against its unique ``(project_id, calibration_session_id,
-    idempotency_key)`` before the flow run is created, so a retry finds it instead of
-    launching again. ``dispatch_token`` names the attempt that holds the launch; only that
-    attempt settles it. Once dispatched, the pipeline's step executions are the executions of
-    the project and chip whose ``note.flow_run_id`` is ``flow_run_id``.
-    """
-
-    run_id: str
-    project_id: str
-    calibration_session_id: str
-    chip_id: str
-    idempotency_key: str
-    request_hash: str
-    requested_by: str
-    # How the caller said it started the run (client reported, never verified); None when it
-    # reported nothing. ``requested_by`` stays the user the request authenticated.
-    reported_origin: ReportedLaunchOrigin | None = None
-    status: CalibrationPipelineRunStatus = CalibrationPipelineRunStatus.DISPATCHING
-    dispatch_token: str
-    # The calibration session reservation of the attempt that holds ``dispatch_token``. The
-    # attempt launches only after removing that reservation, so a run still ``dispatching``
-    # whose reservation is pending or was cleared by a close was never launched.
-    reservation_id: str | None = None
-    attempts: int = 1
-    pipeline_name: str = ""
-    backend_name: str = ""
-    flow_run_id: str | None = None
-    # The execution QDash pre-created for the first step; None when pre-creation failed.
-    execution_id: str | None = None
-    # The dispatch response, returned unchanged to a retry of the same request.
-    response: dict[str, Any] | None = None
-    error: str = ""
-    # The normalized spec QDash validated for the attempt that holds the launch: the exact
-    # request, so the audit can compare requested and executed run parameters. None for runs
-    # recorded before it was stored.
-    spec: dict[str, Any] | None = None
-    # The decision of the session this run carries out, named by the request; None when the
-    # request named none (every run recorded before decisions existed).
-    decision_id: str | None = None
-    requested_at: datetime = Field(default_factory=now)
-    updated_at: datetime = Field(default_factory=now)
-
-    model_config = ConfigDict(from_attributes=True)
-
-    class Settings:
-        """MongoDB collection settings."""
-
-        name = "calibration_pipeline_runs"
-        indexes: ClassVar = [
-            IndexModel([("run_id", ASCENDING)], unique=True),
+            # The automatic close visits open automatic sessions, least recently checked first.
             IndexModel(
                 [
-                    ("project_id", ASCENDING),
-                    ("calibration_session_id", ASCENDING),
-                    ("idempotency_key", ASCENDING),
-                ],
-                unique=True,
-            ),
-            IndexModel(
-                [
-                    ("project_id", ASCENDING),
-                    ("calibration_session_id", ASCENDING),
-                    ("requested_at", ASCENDING),
+                    ("status", ASCENDING),
+                    ("origin", ASCENDING),
+                    ("lifecycle_checked_at", ASCENDING),
                 ]
             ),
-            # The Execution list finds the run a step execution belongs to by its flow run.
-            IndexModel([("project_id", ASCENDING), ("flow_run_id", ASCENDING)]),
         ]
+
+
+# The run record, under the name it had when every run was a pipeline run.
+CalibrationPipelineRunDocument = RunDocument
 
 
 class RequestedParameterChange(BaseModel):

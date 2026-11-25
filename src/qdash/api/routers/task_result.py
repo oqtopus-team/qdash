@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
 from qdash.api.dependencies import (
+    get_calibration_session_service,
     get_flow_service,
     get_task_file_service,
     get_task_result_service,
@@ -31,10 +32,13 @@ from qdash.api.schemas.task_result import (
     TaskResultListResponse,
     TimeSeriesData,
 )
+from qdash.api.services.calibration_run_launch import launch_run
+from qdash.api.services.calibration_session_service import CalibrationSessionService
 from qdash.api.services.catalog_task_run import resolve_catalog_task, validate_overrides
 from qdash.api.services.flow_service import FlowService
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_result_service import TaskResultService
+from qdash.datamodel.run import RunIdentity, RunKind
 
 router = APIRouter()
 
@@ -603,6 +607,7 @@ async def re_execute_task_result(
     service: Annotated[TaskResultService, Depends(get_task_result_service)],
     flow_service: Annotated[FlowService, Depends(get_flow_service)],
     task_file_service: Annotated[TaskFileService, Depends(get_task_file_service)],
+    sessions: Annotated[CalibrationSessionService, Depends(get_calibration_session_service)],
     parameter_overrides: Annotated[
         dict[str, dict[str, Any]] | None,
         Body(
@@ -624,6 +629,31 @@ async def re_execute_task_result(
             embed=True,
         ),
     ] = False,
+    calibration_session_id: Annotated[
+        str | None,
+        Body(
+            description=(
+                "Add the run to this calibration session (open, on the task's chip, created "
+                "by the signed-in user); otherwise the request is refused before anything "
+                "starts. Without it, the run joins an automatic session created for it."
+            ),
+            embed=True,
+            min_length=1,
+            max_length=200,
+        ),
+    ] = None,
+    idempotency_key: Annotated[
+        str | None,
+        Body(
+            description=(
+                "A retry with the same key and request returns the recorded run instead of "
+                "starting another. Without a key, every request starts a new run."
+            ),
+            embed=True,
+            min_length=1,
+            max_length=128,
+        ),
+    ] = None,
 ) -> ExecuteFlowResponse:
     """Re-execute a single task using the system single-task-executor deployment.
 
@@ -684,19 +714,48 @@ async def re_execute_task_result(
         else None
     )
 
-    return await flow_service.execute_single_task_from_snapshot(
-        task_name=doc.name,
-        qid=doc.qid,
-        chip_id=doc.chip_id,
-        source_execution_id=doc.execution_id,
-        username=ctx.user.username,
+    async def dispatch(_: object, identity: RunIdentity | None) -> ExecuteFlowResponse:
+        return await flow_service.execute_single_task_from_snapshot(
+            task_name=doc.name,
+            qid=doc.qid,
+            chip_id=doc.chip_id,
+            source_execution_id=doc.execution_id,
+            username=ctx.user.username,
+            project_id=ctx.project_id,
+            tags=doc.tags,
+            source_task_id=task_id,
+            parameter_overrides=parameter_overrides,
+            default_run_parameters=default_run_parameters,
+            update_params=update_params,
+            reconfigure=reconfigure,
+            calibration_run=identity,
+        )
+
+    return await launch_run(
+        sessions,
         project_id=ctx.project_id,
-        tags=doc.tags,
-        source_task_id=task_id,
-        parameter_overrides=parameter_overrides,
-        default_run_parameters=default_run_parameters,
-        update_params=update_params,
-        reconfigure=reconfigure,
+        username=ctx.user.username,
+        chip_id=doc.chip_id,
+        kind=RunKind.TASK,
+        run_name=f"{doc.name} on {doc.qid}",
+        request={
+            "source_task_id": task_id,
+            "parameter_overrides": parameter_overrides,
+            "default_run_parameters": default_run_parameters,
+            "update_params": update_params,
+            "reconfigure": reconfigure,
+        },
+        calibration_session_id=calibration_session_id,
+        idempotency_key=idempotency_key,
+        validate=lambda: None,
+        dispatch=dispatch,
+        # The single-task run claims only its qubit's hardware.
+        preflight=lambda _: flow_service.ensure_hardware_available(
+            project_id=ctx.project_id,
+            chip_id=doc.chip_id,
+            parameters={"qid": doc.qid},
+            workflow=False,
+        ),
     )
 
 

@@ -5,13 +5,11 @@ import {
   getAgentSessionAudit,
   getGetAgentSessionAuditQueryKey,
 } from "@/client/agent-session/agent-session";
+import { AUDIT_PAGE_SIZE, AuditTimeline } from "@/components/features/audit/AuditTimeline";
 import { reportedModelLabel } from "@/components/features/execution/agentSessionDisplay";
 import type { AgentSessionAuditResponse } from "@/schemas";
 
-import { AUDIT_PAGE_SIZE, AuditTimeline } from "./AuditTimeline";
 import { projectRequest } from "./useLinkedProject";
-
-export { auditKindLabel, auditProvenanceLabel, gateOutcomeLabel } from "./AuditTimeline";
 
 /**
  * The agent session's chronological experiment audit (``AuditTimeline``), with the model the
@@ -28,7 +26,7 @@ export function AgentSessionAuditTimeline({
   return (
     <AuditTimeline<AgentSessionAuditResponse>
       title="Experiment audit"
-      description="Every step, result, decision, commit, and expert answer, oldest first, from QDash records. Agent and expert statements are labeled as theirs."
+      description="Steps, results, decisions, and expert answers, oldest first"
       source={{
         queryKey: [...getGetAgentSessionAuditQueryKey(sessionId), projectId],
         sessionId,
@@ -47,21 +45,20 @@ export function AgentSessionAuditTimeline({
       header={(first) => {
         const sessionModel = first?.session.model;
         const missingIdentity = first?.session.missing ?? [];
+        if (!sessionModel && missingIdentity.length === 0) return null;
         return (
-          <>
+          <p className="text-xs text-base-content/60">
             {sessionModel ? (
-              <p className="text-xs text-base-content/60">
+              <span>
                 Created with model {reportedModelLabel(sessionModel)}, reported by{" "}
-                {sessionModel.host || "the client"} and not verified by QDash. Each entry names the
-                model its own record reported.
-              </p>
+                {sessionModel.host || "the client"} and not verified by QDash.
+              </span>
             ) : null}
+            {sessionModel && missingIdentity.length ? " " : null}
             {missingIdentity.length ? (
-              <p className="text-xs text-base-content/60">
-                The session did not record: {missingIdentity.join(", ")}.
-              </p>
+              <span>The session did not record: {missingIdentity.join(", ")}.</span>
             ) : null}
-          </>
+          </p>
         );
       }}
     />

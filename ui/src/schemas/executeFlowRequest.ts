@@ -5,6 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ExecuteFlowRequestCalibrationSessionId } from './executeFlowRequestCalibrationSessionId';
+import type { ExecuteFlowRequestIdempotencyKey } from './executeFlowRequestIdempotencyKey';
 import type { ExecuteFlowRequestParameters } from './executeFlowRequestParameters';
 import type { ExecuteFlowRequestTargetOverride } from './executeFlowRequestTargetOverride';
 
@@ -12,8 +14,12 @@ import type { ExecuteFlowRequestTargetOverride } from './executeFlowRequestTarge
  * Request to execute a Flow.
  */
 export interface ExecuteFlowRequest {
-  /** Targets for this run, overriding direct CalibService and pipeline targets */
+  /** Targets for this run, overriding the initial targets of every CalibrationSession.run (or legacy CalibService.run) and pipeline */
   target_override?: ExecuteFlowRequestTargetOverride;
   /** Execution parameters (overrides default_parameters) */
   parameters?: ExecuteFlowRequestParameters;
+  /** Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it. */
+  calibration_session_id?: ExecuteFlowRequestCalibrationSessionId;
+  /** A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run. */
+  idempotency_key?: ExecuteFlowRequestIdempotencyKey;
 }

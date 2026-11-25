@@ -19,7 +19,7 @@ from qdash.workflow.service.targets import (
 )
 
 if TYPE_CHECKING:
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
 
 GROUPS = {9: ["0", "17", "5", "2"], 4: ["12", "3"]}
 KNOWN = ["0", "1", "2", "3", "5", "6", "12", "17", "20"]
@@ -37,7 +37,7 @@ def _no_mux_mapping() -> MuxMapping:
 
 
 def test_mux_task_on_a_standalone_qubit_is_rejected_not_skipped() -> None:
-    session = cast("CalibSession", SimpleNamespace(mux_mapping=_mapping()))
+    session = cast("ExecutionRuntime", SimpleNamespace(mux_mapping=_mapping()))
 
     with patch("qdash.workflow.calibtasks.active_protocols.is_mux_task", return_value=True):
         with pytest.raises(MuxMappingError, match="cannot run on standalone qubit 6"):
@@ -51,11 +51,11 @@ def _plan() -> StepCalls:
     return StepCalls(step_id="check", calls=(TaskCall(name="CheckRabi"),))
 
 
-def _session(mapping: MuxMapping, backend_name: str = "fake") -> CalibSession:
-    from qdash.workflow.service._internal.session import CalibSession
+def _session(mapping: MuxMapping, backend_name: str = "fake") -> ExecutionRuntime:
+    from qdash.workflow.service._internal.session import ExecutionRuntime
     from qdash.workflow.service._internal.settings import GitHubPolicy, SessionSettings
 
-    session = CalibSession(
+    session = ExecutionRuntime(
         SessionSettings(
             username="alice",
             chip_id="chip-x",
@@ -140,7 +140,7 @@ def test_workers_never_resolve_a_mapping_of_their_own() -> None:
     """A worker without its owner's mapping is refused before any backend exists."""
     from pydantic import ValidationError
 
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
     from qdash.workflow.service._internal.settings import (
         GitHubPolicy,
         SessionSettings,
@@ -160,10 +160,10 @@ def test_workers_never_resolve_a_mapping_of_their_own() -> None:
     with pytest.raises(ValidationError, match="mux_mapping"):
         WorkerSpec(settings=settings, lease=lease)  # type: ignore[call-arg]
     with pytest.raises(ValueError, match="MUX mapping its owner resolved"):
-        CalibSession(settings, lease=lease)
+        ExecutionRuntime(settings, lease=lease)
 
 
-def _reserved_session(mapping: MuxMapping) -> tuple[CalibSession, MagicMock]:
+def _reserved_session(mapping: MuxMapping) -> tuple[ExecutionRuntime, MagicMock]:
     """A session holding a whole-chip reservation, with a mocked orchestrator."""
     from qdash.common.execution_resources import ExecutionResourceScope
 

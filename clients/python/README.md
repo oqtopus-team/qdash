@@ -29,16 +29,8 @@ Add application-facing operations to `QDashClient`. Keep raw request and generat
 details inside the REST layer. Export public classes and response models from
 `src/qdash/client/__init__.py`, then cover the behavior in `clients/python/tests/`.
 
-## Publish the Package
+## Publication
 
-PyPI Trusted Publishing publishes `qdash-client` from this repository. The package version is
-derived from the repository's `v<version>` release tag; do not edit a version in
-`clients/python/pyproject.toml`. The same workflow then publishes
-[`qdash-sdk`](../../sdks/python/README.md) with the same version.
-
-Creating the tag also publishes the TypeScript client and creates the GitHub release:
-
-```bash
-git tag v<version>
-git push origin v<version>
-```
+The client and SDK share QDash's release version. PyPI Trusted Publishing publishes the client
+first, then the SDK. Do not edit a package version manually; see
+[package releases](../../docs/developer-guide/agent/packages.md).

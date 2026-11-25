@@ -1,45 +1,65 @@
 # @oqtopus-team/qdash-sdk
 
 `@oqtopus-team/qdash-sdk` validates and starts QDash calibrations on a chip, lists and runs
-the workflows registered in a project, and saves metric scripts and dashboards. It is built on
-[`@oqtopus-team/qdash-client`](https://www.npmjs.com/package/@oqtopus-team/qdash-client), which
-stays the lower-level API for every other route. Installing the SDK installs the client of the
-same release:
+the workflows registered in a project, and saves metric scripts and dashboards. Its Fern-generated
+API client is included; it does not depend on `@oqtopus-team/qdash-client`. Existing client
+applications can continue using that package independently.
 
 ```bash
 npm install @oqtopus-team/qdash-sdk
 ```
 
-The package is ESM only and requires Node.js 20 or later.
+The package is ESM only and requires Node.js 20 or later. For a shared Python/TypeScript
+profile, run `npx qdash config init --project-id your-project-id`, fill in `api_token`
+in the generated file, and use `await QDash.fromProfile("local")` below. Use `--base-url` for a
+remote deployment. The command creates a new TOML file with `[local]` and never overwrites
+an existing file. For `QDash.fromEnv()`, set `QDASH_BASE_URL`, `QDASH_API_TOKEN`, and
+`QDASH_PROJECT_ID` instead.
 
 ```ts
 import { QDash, customOneQubit, qubitTargets } from "@oqtopus-team/qdash-sdk";
 
-const qdash = QDash.fromEnv(); // or new QDash(client, { projectId: "your-project-id" })
+const qdash = QDash.fromEnv(); // or await QDash.fromProfile("local")
 const chip = qdash.chip("64Qv3");
 const steps = [customOneQubit({ step_name: "t1", tasks: [{ name: "CheckT1" }] })];
 
 const check = await chip.validateCalibration(qubitTargets(["0", "1"]), steps); // nothing runs
+if (!check.valid) throw new Error("Invalid calibration spec");
 const run = await chip.calibrate(qubitTargets(["0", "1"]), steps); // measures
 const result = await run.wait({ timeoutSeconds: 3600 });
 console.log(run.executionId, result.status);
 ```
 
-`result.status` is the whole pipeline run's status. A timeout throws `QDashTimeoutError` and
-leaves the run going. `qdash.workflows.list()`, `get(name)` and `run(name, { parameters })` reach
-the project's registered workflows; `qdash.scripts` and `qdash.dashboards` save metric scripts
-and dashboards built with `Script` and `Dashboard`. `qdash.taskResults.compareLatest({ chipId, qid })` compares
-the two newest results of each task for one qubit or coupling. The SDK sends requests through the given `QDashClient`, and
-its error classes are the client's own, so `instanceof` works with either import. A session
-without a project uses the client's configuration as it is: when no project is configured
-there, QDash applies the user's default project.
+Check `check.valid` before calling `calibrate()`. The example measures real targets; choose them
+for your deployment. `wait()` returns the whole run's status. A timeout leaves the run active; it stops further polling but does not cancel a read already in flight.
+`QDashResultUnknownError` means a launch may have started, but its response is unreadable or
+does not confirm the requested recording. Inspect its `executionId` when present before launching again.
 
-The [TypeScript client reference](https://oqtopus-team.github.io/qdash/reference/clients/typescript#run-a-calibration)
-covers configuration and every call.
+See the [TypeScript reference](https://oqtopus-team.github.io/qdash/reference/clients/typescript)
+for shared Python/TypeScript TOML profiles, workflows, metrics, and dashboards.
+INI profiles remain readable with a deprecation warning. Reuse the session across operations;
+there is no connection to close.
+
+## Read a Result with Context
+
+Reuse a configured `qdash` session and a task ID from `qdash.api.taskResult.listTaskResults()`:
+
+```ts
+const page = await qdash.api.taskResult.listTaskResults({ chip_id: "64Qv3", qid: "0", limit: 1 });
+if (!page.items[0]) throw new Error("No saved results for this target");
+const evidence = await qdash.taskResults.evidence(page.items[0].task_id);
+console.log(evidence.result.output_parameters);
+if (evidence.target.status === "ok") console.log(evidence.target.value.outputs);
+```
+
+This reads the result, its execution, and its target's current stored values. Secondary reads
+report missing or failed context without discarding the result. Cooldown is `not_associated`
+unless you pass `{ cooldownId }`; a supplied cooldown is checked, not treated as proven provenance.
+See the [result context contract](https://oqtopus-team.github.io/qdash/reference/clients/typescript#read-a-result-with-context).
 
 ## Develop the Package
 
-Install from the repository root; the SDK builds against the client in the same checkout:
+Install from the repository root. Generation checks require Node.js (`npx`) and Docker:
 
 ```bash
 bun install --frozen-lockfile

@@ -277,11 +277,13 @@ class FilterResult:
         input_qids: Qubit IDs before filtering
         output_qids: Qubit IDs after filtering
         filter_criteria: Description of filter applied
+        excluded_reasons: Why each removed qubit did not pass, read from the source result
     """
 
     input_qids: list[str] = field(default_factory=list)
     output_qids: list[str] = field(default_factory=list)
     filter_criteria: str = ""
+    excluded_reasons: dict[str, str] = field(default_factory=dict)
 
     @property
     def filtered_out(self) -> list[str]:

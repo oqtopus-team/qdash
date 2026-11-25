@@ -4,6 +4,7 @@ import {
   correctionValuesFromPoint,
   sourceOutputName,
   spectroscopyCorrectionParameterNames,
+  spectroscopyCorrectionSchema,
 } from "../SpectroscopyManualCorrection";
 
 describe("spectroscopyCorrectionParameterNames", () => {
@@ -70,5 +71,35 @@ describe("correctionValuesFromPoint", () => {
 
   it("returns nothing for unsupported tasks", () => {
     expect(correctionValuesFromPoint("CheckT1", { x: 1, y: 2 })).toEqual({});
+  });
+});
+
+describe("spectroscopyCorrectionSchema", () => {
+  const schema = spectroscopyCorrectionSchema(["readout_frequency", "readout_amplitude"], {
+    readout_frequency: 10.1,
+    readout_amplitude: null,
+  });
+
+  it("returns only the changed values as numbers", () => {
+    expect(schema.parse({ readout_frequency: " 10.2 ", readout_amplitude: "" })).toEqual({
+      readout_frequency: 10.2,
+    });
+  });
+
+  it("requires at least one change", () => {
+    const result = schema.safeParse({ readout_frequency: "10.1", readout_amplitude: "" });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((issue) => issue.path)).toEqual([[]]);
+  });
+
+  it.each(["abc", "Infinity", "1e999", ""])("rejects %j as a changed value", (value) => {
+    const result = schema.safeParse({ readout_frequency: value, readout_amplitude: "" });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((issue) => issue.path)).toEqual([["readout_frequency"]]);
+  });
+
+  it("rejects text entered for a parameter without a baseline", () => {
+    const result = schema.safeParse({ readout_frequency: "10.1", readout_amplitude: "abc" });
+    expect(result.error?.issues.map((issue) => issue.path)).toEqual([["readout_amplitude"]]);
   });
 });

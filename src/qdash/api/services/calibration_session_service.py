@@ -1,14 +1,15 @@
-"""Calibration sessions: one objective, the pipeline runs and agent sessions started for it.
+"""Calibration sessions: one objective, the runs and agent sessions started for it.
 
 A calibration session is a record of purpose. It grants no operation and controls none: an
-agent session keeps its own policy, gates, expiry, and pause, and a pipeline run keeps the
-approval of its exact request and the execution lock. What this module adds is the explicit
-relation, written only when a child is started with the session's ID:
+agent session keeps its own policy, gates, expiry, and pause, and a run keeps the approval of
+its exact request, its own admission and dispatch record (``qdash.api.services.run_ledger``),
+and the execution lock. What this module adds is the explicit relation, written only when a
+child is started with the session's ID:
 
 - An agent session stores ``calibration_session_id`` in its own record when it is created.
-- A pipeline run is a ``CalibrationPipelineRunDocument`` inserted before the flow run is
-  created. Its step executions are found by the flow run ID QDash got at dispatch, never by
-  the earliest execution, a tag, the chip, or the time.
+- A run stores it in its ``RunDocument``, inserted before the flow run is created. Its step
+  executions carry the run's ID, never found by the earliest execution, a tag, the chip, or
+  the time.
 
 Every relation is checked here, in the request's project: the session exists there, it is
 open, it is on the child's chip, and the signed-in user created it. Mongo runs standalone, so
@@ -26,28 +27,26 @@ The removal is the child's admission, and it is irrevocable:
   operational gate until the removal lists its reservation in ``admitted_reservation_ids``.
   An agent session whose reservation a close cleared is rejected and never operates, however
   late its record is written, and a crash after the removal is recovered from that list.
-- A pipeline run whose removal succeeded is admitted. Its request may stall before the launch
-  and launch after the session was closed with its outcome acknowledged as unknown: closing
-  cancels nothing that was admitted, and the run stays recorded in the session.
+- A run whose removal succeeded is admitted, and its request records that on the run before
+  launching it. Its request may stall before the launch and launch after the session was
+  closed with its outcome acknowledged as unknown: closing cancels nothing that was admitted,
+  and the run stays recorded in the session. The worker reads the admission from the run.
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 from dataclasses import dataclass, field
-from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from bunnet import SortDirection
 from fastapi import HTTPException, status
-from pymongo.errors import DuplicateKeyError
 
 from qdash.api.schemas.calibration_session import (
     CalibrationAgentSessionChild,
     CalibrationPipelineRunResponse,
+    CalibrationRunStateResponse,
     CalibrationSessionDetailResponse,
     CalibrationSessionResponse,
     CloseCalibrationSessionRequest,
@@ -66,6 +65,14 @@ from qdash.api.services.agent_session_gate import (
     reject_calibration_child,
 )
 from qdash.api.services.execution_service import execution_summary
+from qdash.api.services.run_ledger import (
+    DISPATCH_STALE_AFTER,
+    PipelineDispatch,
+    RunDispatch,
+    dispatch_status,
+    pipeline_request_hash,
+    run_request_hash,
+)
 from qdash.common.utils.datetime import now
 from qdash.datamodel.agent_session import AgentSessionStatus, model_label
 from qdash.datamodel.calibration_session import (
@@ -73,6 +80,9 @@ from qdash.datamodel.calibration_session import (
     CalibrationChildKind,
     CalibrationChildReservation,
     CalibrationPipelineRunStatus,
+    CalibrationRunKind,
+    CalibrationSessionCloseOrigin,
+    CalibrationSessionOrigin,
     CalibrationSessionStatus,
 )
 from qdash.dbmodel.agent_session import AgentSessionDocument
@@ -82,19 +92,27 @@ from qdash.dbmodel.calibration_session import (
 )
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+from qdash.repository.run_ledger import NOTE_RUN_KEY
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
-
-    from qdash.api.schemas.flow import ExecuteFlowResponse
     from qdash.api.services.execution_service import ExecutionService
-    from qdash.datamodel.launch_origin import ReportedLaunchOrigin
+
+# Run hashing and dispatch reads live with the run ledger; re-exported for their callers.
+__all__ = [
+    "DISPATCH_STALE_AFTER",
+    "CalibrationSessionService",
+    "CloseBlockers",
+    "PipelineDispatch",
+    "RunDispatch",
+    "calibration_session_closed",
+    "dispatch_status",
+    "execution_scope_of_run",
+    "pipeline_request_hash",
+    "run_request_hash",
+]
 
 logger = logging.getLogger("uvicorn.app")
 
-# A launch reports back within seconds; one still dispatching after this may have died
-# between creating the flow run and recording it, so its outcome is unknown.
-DISPATCH_STALE_AFTER = timedelta(minutes=5)
 # A reservation older than this whose child was never recorded belongs to a request that
 # stopped (or hangs) between counting the child and writing it.
 RESERVATION_STALE_AFTER = DISPATCH_STALE_AFTER
@@ -103,50 +121,28 @@ RESERVATION_STALE_AFTER = DISPATCH_STALE_AFTER
 MAX_DETAIL_CHILDREN = 100
 OPEN_AGENT_STATUSES = frozenset({AgentSessionStatus.ACTIVE, AgentSessionStatus.WAITING_FOR_HUMAN})
 UNADMITTED_ADMISSIONS = frozenset({CalibrationAdmission.PENDING, CalibrationAdmission.REJECTED})
-# Launch failures raised before any flow run exists: the hardware is busy (409) or the
-# worker has not registered the pipeline deployment (503).
-DEFINITE_REFUSALS = frozenset({status.HTTP_409_CONFLICT, status.HTTP_503_SERVICE_UNAVAILABLE})
+# Runs a session lists, counts, and checks before closing. An agent action's run is shown,
+# counted, and checked through its agent session, which governs its dispatch.
+LISTED_RUNS = {"run_kind": {"$ne": CalibrationRunKind.AGENT_ACTION.value}}
 
 
-@dataclass(frozen=True)
-class PipelineDispatch:
-    """What a pipeline launch in a calibration session returned."""
+def execution_scope_of_run(run: CalibrationPipelineRunDocument) -> dict[str, Any]:
+    """The query for a run's step executions on its chip.
 
-    response: dict[str, Any]
-    run_id: str
-    replayed: bool
-
-
-def pipeline_request_hash(
-    chip_id: str,
-    spec: dict[str, Any],
-    backend_name: str | None,
-    decision_id: str | None = None,
-) -> str:
-    """Hash of what a retry must repeat to reuse a pipeline run's idempotency key.
-
-    ``decision_id`` enters the hash only when given, so a request without one hashes as it
-    always did.
+    The worker stamps ``note.calibration_run_id`` on each; a run recorded before that note
+    existed is found by its flow run.
     """
-    fields: dict[str, Any] = {"chip_id": chip_id, "spec": spec, "backend_name": backend_name}
-    if decision_id is not None:
-        fields["decision_id"] = decision_id
-    payload = json.dumps(
-        fields,
-        sort_keys=True,
-        separators=(",", ":"),
-        default=str,
-    )
-    return hashlib.sha256(payload.encode()).hexdigest()
+    clauses: list[dict[str, Any]] = [{f"note.{NOTE_RUN_KEY}": run.run_id}]
+    if run.flow_run_id:
+        # Only an execution without the stamp is found by its flow run.
+        clauses.append(
+            {"note.flow_run_id": run.flow_run_id, f"note.{NOTE_RUN_KEY}": {"$exists": False}}
+        )
+    return {"project_id": run.project_id, "chip_id": run.chip_id, "$or": clauses}
 
 
 def _response(doc: CalibrationSessionDocument) -> CalibrationSessionResponse:
     return CalibrationSessionResponse.model_validate(doc.model_dump())
-
-
-def _stale(doc: CalibrationPipelineRunDocument) -> bool:
-    updated = utc(doc.updated_at)
-    return updated is not None and now() - updated > DISPATCH_STALE_AFTER
 
 
 def _reservation_stale(reservation: CalibrationChildReservation) -> bool:
@@ -156,7 +152,7 @@ def _reservation_stale(reservation: CalibrationChildReservation) -> bool:
 
 def _child_label(reservation: CalibrationChildReservation) -> str:
     if reservation.kind == CalibrationChildKind.PIPELINE_RUN:
-        return f"pipeline run {reservation.child_id}"
+        return f"run {reservation.child_id}"
     return f"agent session {reservation.child_id}"
 
 
@@ -166,13 +162,6 @@ def calibration_session_closed(calibration_session_id: str) -> HTTPException:
         status_code=status.HTTP_409_CONFLICT,
         detail=f"Calibration session {calibration_session_id} is closed; start a new one",
     )
-
-
-def dispatch_status(doc: CalibrationPipelineRunDocument) -> CalibrationPipelineRunStatus:
-    """The run's dispatch state as a read sees it: a stale ``dispatching`` is ``unknown``."""
-    if doc.status == CalibrationPipelineRunStatus.DISPATCHING and _stale(doc):
-        return CalibrationPipelineRunStatus.UNKNOWN
-    return doc.status
 
 
 class CalibrationSessionService:
@@ -213,6 +202,7 @@ class CalibrationSessionService:
         chip_id: str | None = None,
         created_by: str | None = None,
         statuses: list[CalibrationSessionStatus] | None = None,
+        origins: list[CalibrationSessionOrigin] | None = None,
         limit: int = 20,
         skip: int = 0,
     ) -> ListCalibrationSessionsResponse:
@@ -224,6 +214,13 @@ class CalibrationSessionService:
             query["created_by"] = created_by
         if statuses:
             query["status"] = {"$in": sorted({value.value for value in statuses})}
+        if origins:
+            wanted = sorted({value.value for value in origins})
+            if CalibrationSessionOrigin.MANUAL in origins:
+                # Sessions recorded before ``origin`` existed were all created by a person.
+                query["$or"] = [{"origin": {"$in": wanted}}, {"origin": {"$exists": False}}]
+            else:
+                query["origin"] = {"$in": wanted}
         # One extra row says whether another page follows, without counting every session.
         docs = list(
             CalibrationSessionDocument.find(query)
@@ -248,10 +245,59 @@ class CalibrationSessionService:
         """A calibration session with its most recent pipeline runs and agent sessions.
 
         ``close_blockers`` and the unknown lists are read from every child, not only the ones
-        listed; ``pipeline_run_total`` and ``agent_session_total`` count every child.
+        listed; ``pipeline_run_total`` and ``agent_session_total`` count every child. An open
+        automatic session is first checked, and closed if everything started in it ended
+        (``calibration_session_lifecycle``).
         """
-        doc = self._recover_pipeline_reservations(self._load(project_id, calibration_session_id))
+        doc = self._load(project_id, calibration_session_id)
+        if (
+            doc.origin == CalibrationSessionOrigin.AUTOMATIC
+            and doc.status == CalibrationSessionStatus.OPEN
+        ):
+            # Imported here: the lifecycle check builds on this service.
+            from qdash.api.services.calibration_session_lifecycle import check_automatic_session
+
+            check_automatic_session(doc)
+            doc = self._load(project_id, calibration_session_id)
+        doc = self._recover_pipeline_reservations(doc)
         return self._detail(doc, self._blockers(doc))
+
+    def get_run(
+        self, *, project_id: str, calibration_session_id: str, run_id: str
+    ) -> CalibrationRunStateResponse:
+        """One run of the session, whatever its age, with its whole flow run's state now.
+
+        Found by its ID in the session and project, never through the page a detail response
+        lists. Prefect is read for a launched run in this request (``calibration_run_state``).
+        Read-only: the session is not checked or closed, whatever its origin, and nothing is
+        recorded on the run.
+        """
+        self._load(project_id, calibration_session_id)
+        run = CalibrationPipelineRunDocument.find_one(
+            {
+                "project_id": project_id,
+                "calibration_session_id": calibration_session_id,
+                "run_id": run_id,
+            }
+        ).run()
+        if run is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Run '{run_id}' not found in calibration session '{calibration_session_id}'",
+            )
+        # Imported here: the state read builds on the lifecycle, which builds on this service.
+        from qdash.api.services.calibration_run_state import observe_run_flow
+
+        observation = observe_run_flow(run)
+        listed = self._run_response(run).model_dump()
+        listed["flow_end_state"] = observation.end_state
+        return CalibrationRunStateResponse(
+            **listed,
+            flow_status=observation.status,
+            prefect_state=observation.prefect_state,
+            flow_status_reason=observation.reason,
+            observed_at=observation.observed_at,
+        )
 
     def close(
         self,
@@ -329,6 +375,7 @@ class CalibrationSessionService:
                     "status": CalibrationSessionStatus.CLOSED.value,
                     "closed_at": timestamp,
                     "closed_by": username,
+                    "close_origin": CalibrationSessionCloseOrigin.MANUAL.value,
                     "closing_note": body.closing_note,
                     "closed_with_unknown_runs": blockers.unknown_runs,
                     "closed_with_unknown_starts": [
@@ -457,135 +504,42 @@ class CalibrationSessionService:
                 calibration_session_id,
             )
 
-    async def execute_pipeline(
-        self,
-        *,
-        project_id: str,
-        username: str,
-        calibration_session_id: str,
-        idempotency_key: str,
-        chip_id: str,
-        spec: dict[str, Any],
-        backend_name: str | None,
-        validate: Callable[[], Any],
-        dispatch: Callable[[Any], Awaitable[ExecuteFlowResponse]],
-        response: Callable[[Any, ExecuteFlowResponse], dict[str, Any]],
-        reported_origin: ReportedLaunchOrigin | None = None,
-        decision_id: str | None = None,
-    ) -> PipelineDispatch:
-        """Launch a pipeline run in the session at most once per idempotency key.
+    # -- Association, as the run ledger uses it ---------------------------------------------
 
-        The run is recorded before it is launched. A retry of a dispatched run returns its
-        recorded response; a run still dispatching, or one whose outcome is unknown, is
-        refused rather than launched again; only a run QDash refused before creating a flow
-        run is launched again. ``validate`` returns the validation result (raising 422 for a
-        spec with problems), ``dispatch`` launches it, and ``response`` builds the response
-        stored for retries.
-        """
-        session = self._owned(project_id, calibration_session_id, username)
-        # A run left dispatching by a request that stopped before launching it is rejected
-        # here, so the same key may launch it.
-        self._recover_pipeline_reservations(session)
-        request_hash = pipeline_request_hash(chip_id, spec, backend_name, decision_id)
-        existing = self._find_run(project_id, calibration_session_id, idempotency_key)
-        if existing is not None:
-            replay = self._replay(existing, request_hash)
-            if replay is not None:
-                return replay
+    def load(self, project_id: str, calibration_session_id: str) -> CalibrationSessionDocument:
+        """The session in the project, or 404."""
+        return self._load(project_id, calibration_session_id)
 
-        validated = validate()
-        if decision_id is not None:
-            # Imported here: the audit reads agent sessions, whose service imports this module.
-            from qdash.api.services.calibration_session_audit import check_run_decision
+    def owned(
+        self, project_id: str, calibration_session_id: str, username: str
+    ) -> CalibrationSessionDocument:
+        """The session in the project, created by ``username``; 404 or 403 otherwise."""
+        return self._owned(project_id, calibration_session_id, username)
 
-            check_run_decision(
-                session,
-                decision_id,
-                getattr(validated, "targets", None),
-                getattr(validated, "spec", None),
-            )
-        run_id = existing.run_id if existing is not None else f"cpr-{uuid4()}"
-        reservation = self.reserve_child(
-            project_id=project_id,
-            calibration_session_id=calibration_session_id,
-            chip_id=chip_id,
-            username=username,
-            kind=CalibrationChildKind.PIPELINE_RUN,
-            child_id=run_id,
-        )
-        try:
-            claim = self._claim_run(
-                existing=existing,
-                run_id=run_id,
-                reservation_id=reservation.reservation_id,
-                project_id=project_id,
-                calibration_session_id=calibration_session_id,
-                idempotency_key=idempotency_key,
-                request_hash=request_hash,
-                chip_id=chip_id,
-                username=username,
-                pipeline_name=str(spec.get("name") or ""),
-                reported_origin=reported_origin,
-                spec=getattr(validated, "spec", None) or spec,
-                decision_id=decision_id,
-            )
-            # Only an attempt that removes its own reservation may launch: a close that
-            # cleared it meanwhile has already counted this run as never started.
-            finalized = self.finalize_child(
-                project_id=project_id,
-                calibration_session_id=calibration_session_id,
-                reservation_id=reservation.reservation_id,
-            )
-        except BaseException:
-            # Nothing was launched for this reservation, and nothing will be.
-            self.release_child(
-                project_id=project_id,
-                calibration_session_id=calibration_session_id,
-                reservation_id=reservation.reservation_id,
-            )
-            _reject_unlaunched_run(reservation)
-            raise
-        if not finalized:
-            _reject_unlaunched_run(reservation)
-            raise calibration_session_closed(calibration_session_id)
+    def recover_reservations(self, project_id: str, calibration_session_id: str) -> None:
+        """Reject runs whose request stopped before launching them; nothing if none is found."""
+        doc = CalibrationSessionDocument.find_one(
+            {"project_id": project_id, "calibration_session_id": calibration_session_id}
+        ).run()
+        if doc is not None:
+            self._recover_pipeline_reservations(doc)
 
-        try:
-            dispatched = await dispatch(validated)
-        except HTTPException as exc:
-            definite = exc.status_code in DEFINITE_REFUSALS
-            self._settle(
-                claim,
-                CalibrationPipelineRunStatus.REJECTED
-                if definite
-                else CalibrationPipelineRunStatus.UNKNOWN,
-                error=str(exc.detail),
-            )
-            if definite:
-                raise
-            raise HTTPException(
-                status_code=exc.status_code,
-                detail=(
-                    f"{exc.detail}. The run may have started anyway: pipeline run "
-                    f"{claim.run_id} is recorded with an unknown outcome and is not launched "
-                    "again with this key. Check the Execution list before starting another."
-                ),
-            ) from exc
-        except BaseException as exc:
-            self._settle(claim, CalibrationPipelineRunStatus.UNKNOWN, error=type(exc).__name__)
-            raise
+    @staticmethod
+    def recover_stale_reservations(
+        doc: CalibrationSessionDocument,
+    ) -> CalibrationSessionDocument:
+        """Reject pipeline runs whose request stopped before launching them; the session after."""
+        return CalibrationSessionService._recover_pipeline_reservations(doc)
 
-        stored = response(validated, dispatched)
-        execution_id = dispatched.execution_id
-        self._settle(
-            claim,
-            CalibrationPipelineRunStatus.DISPATCHED,
-            flow_run_id=dispatched.flow_run_id,
-            # The response falls back to the flow run ID when no execution was pre-created.
-            execution_id=execution_id if execution_id != dispatched.flow_run_id else None,
-            response=stored,
-            backend_name=str(getattr(validated, "backend_name", None) or backend_name or ""),
-        )
-        return PipelineDispatch(response=stored, run_id=claim.run_id, replayed=False)
+    @staticmethod
+    def reject_unlaunched(reservation: CalibrationChildReservation) -> None:
+        """Record the run of a reservation that will never launch as ``rejected``."""
+        _reject_unlaunched_run(reservation)
+
+    @staticmethod
+    def closed(calibration_session_id: str) -> HTTPException:
+        """The refusal of a run whose session was closed before it was admitted."""
+        return calibration_session_closed(calibration_session_id)
 
     # -- Internals -----------------------------------------------------------------------
 
@@ -615,160 +569,6 @@ class CalibrationSessionService:
             )
         return doc
 
-    @staticmethod
-    def _find_run(
-        project_id: str, calibration_session_id: str, idempotency_key: str
-    ) -> CalibrationPipelineRunDocument | None:
-        return CalibrationPipelineRunDocument.find_one(
-            {
-                "project_id": project_id,
-                "calibration_session_id": calibration_session_id,
-                "idempotency_key": idempotency_key,
-            }
-        ).run()
-
-    @staticmethod
-    def _replay(
-        existing: CalibrationPipelineRunDocument, request_hash: str
-    ) -> PipelineDispatch | None:
-        """The recorded answer to a retry, a refusal, or None when the run may launch again."""
-        if existing.request_hash != request_hash:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"Idempotency key {existing.idempotency_key} was used for a different "
-                    f"pipeline request (pipeline run {existing.run_id})"
-                ),
-            )
-        state = dispatch_status(existing)
-        if state == CalibrationPipelineRunStatus.DISPATCHED and existing.response is not None:
-            return PipelineDispatch(
-                response=existing.response, run_id=existing.run_id, replayed=True
-            )
-        if state == CalibrationPipelineRunStatus.REJECTED:
-            return None
-        if state == CalibrationPipelineRunStatus.DISPATCHING:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Pipeline run {existing.run_id} is still being dispatched",
-            )
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"The dispatch outcome of pipeline run {existing.run_id} is unknown; it may "
-                "be running. It is not launched again with this key. Check the Execution "
-                "list before starting another run."
-            ),
-        )
-
-    @staticmethod
-    def _claim_run(
-        *,
-        existing: CalibrationPipelineRunDocument | None,
-        run_id: str,
-        reservation_id: str,
-        project_id: str,
-        calibration_session_id: str,
-        idempotency_key: str,
-        request_hash: str,
-        chip_id: str,
-        username: str,
-        pipeline_name: str,
-        reported_origin: ReportedLaunchOrigin | None = None,
-        spec: dict[str, Any] | None = None,
-        decision_id: str | None = None,
-    ) -> CalibrationPipelineRunDocument:
-        """Record the launch before it happens: a new run, or a new attempt of a refused one."""
-        token = str(uuid4())
-        timestamp = now()
-        if existing is None:
-            doc = CalibrationPipelineRunDocument(
-                run_id=run_id,
-                reservation_id=reservation_id,
-                project_id=project_id,
-                calibration_session_id=calibration_session_id,
-                chip_id=chip_id,
-                idempotency_key=idempotency_key,
-                request_hash=request_hash,
-                requested_by=username,
-                reported_origin=reported_origin,
-                dispatch_token=token,
-                pipeline_name=pipeline_name,
-                spec=spec,
-                decision_id=decision_id,
-                requested_at=timestamp,
-                updated_at=timestamp,
-            )
-            try:
-                doc.insert()
-            except DuplicateKeyError as exc:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Another request with this idempotency key is being dispatched",
-                ) from exc
-            return doc
-        result = CalibrationPipelineRunDocument.get_motor_collection().update_one(
-            {
-                "run_id": existing.run_id,
-                "status": CalibrationPipelineRunStatus.REJECTED.value,
-                "dispatch_token": existing.dispatch_token,
-            },
-            {
-                "$set": {
-                    "status": CalibrationPipelineRunStatus.DISPATCHING.value,
-                    "dispatch_token": token,
-                    "reservation_id": reservation_id,
-                    "error": "",
-                    "spec": spec,
-                    "updated_at": timestamp,
-                },
-                "$inc": {"attempts": 1},
-            },
-        )
-        if result.matched_count == 0:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Another request with this idempotency key is being dispatched",
-            )
-        claimed: CalibrationPipelineRunDocument = existing.model_copy(
-            update={
-                "status": CalibrationPipelineRunStatus.DISPATCHING,
-                "dispatch_token": token,
-                "reservation_id": reservation_id,
-                "attempts": existing.attempts + 1,
-                "error": "",
-                "spec": spec,
-            }
-        )
-        return claimed
-
-    @staticmethod
-    def _settle(
-        claim: CalibrationPipelineRunDocument,
-        outcome: CalibrationPipelineRunStatus,
-        **fields: Any,
-    ) -> None:
-        """Record the launch's outcome, only for the attempt that holds it.
-
-        A failure to record leaves the run ``dispatching``, which a read reports as unknown
-        once stale: the launch itself is never undone or repeated for it.
-        """
-        try:
-            CalibrationPipelineRunDocument.get_motor_collection().update_one(
-                {
-                    "run_id": claim.run_id,
-                    "dispatch_token": claim.dispatch_token,
-                    "status": CalibrationPipelineRunStatus.DISPATCHING.value,
-                },
-                {"$set": {"status": outcome.value, "updated_at": now(), **fields}},
-            )
-        except Exception:
-            logger.exception(
-                "Failed to record the dispatch outcome %s of pipeline run %s",
-                outcome.value,
-                claim.run_id,
-            )
-
     def _detail(
         self, doc: CalibrationSessionDocument, blockers: CloseBlockers
     ) -> CalibrationSessionDetailResponse:
@@ -784,7 +584,9 @@ class CalibrationSessionService:
             recommendation=search.recommendation,
             latest_requested_run=search.latest_requested_run,
             pipeline_runs=[self._run_response(run) for run in self._recent_runs(doc)],
-            pipeline_run_total=CalibrationPipelineRunDocument.find(scope).count(),
+            pipeline_run_total=CalibrationPipelineRunDocument.find(
+                {**scope, **LISTED_RUNS}
+            ).count(),
             agent_sessions=self._agent_children(doc),
             agent_session_total=AgentSessionDocument.find(scope).count(),
             close_blockers=blockers.blockers,
@@ -843,7 +645,11 @@ class CalibrationSessionService:
             # An older reservation whose child exists is decided by the child below.
         scope = {"project_id": doc.project_id, "calibration_session_id": doc.calibration_session_id}
         runs = CalibrationPipelineRunDocument.find(
-            {**scope, "status": {"$ne": CalibrationPipelineRunStatus.REJECTED.value}}
+            {
+                **scope,
+                **LISTED_RUNS,
+                "status": {"$ne": CalibrationPipelineRunStatus.REJECTED.value},
+            }
         ).sort([("requested_at", SortDirection.ASCENDING)])
         for run in runs.run():
             blocker, unknown = _run_blocker(self._run_response(run))
@@ -880,6 +686,7 @@ class CalibrationSessionService:
                 {
                     "project_id": doc.project_id,
                     "calibration_session_id": doc.calibration_session_id,
+                    **LISTED_RUNS,
                 }
             )
             .sort([("requested_at", SortDirection.DESCENDING)])
@@ -889,32 +696,31 @@ class CalibrationSessionService:
         return list(reversed(runs))
 
     def _run_response(self, run: CalibrationPipelineRunDocument) -> CalibrationPipelineRunResponse:
-        executions: list[ExecutionHistoryDocument] = []
-        if run.flow_run_id:
-            # Every step of the run: the executions of its flow run on its chip.
-            executions = (
-                ExecutionHistoryDocument.find(
-                    {
-                        "project_id": run.project_id,
-                        "chip_id": run.chip_id,
-                        "note.flow_run_id": run.flow_run_id,
-                    }
-                )
-                .sort(
-                    [
-                        ("start_at", SortDirection.ASCENDING),
-                        ("execution_id", SortDirection.ASCENDING),
-                    ]
-                )
-                .run()
+        # Every step of the run on its chip: those stamped with the run, or, for a run recorded
+        # before the stamp existed, those of its flow run.
+        executions: list[ExecutionHistoryDocument] = (
+            ExecutionHistoryDocument.find(execution_scope_of_run(run))
+            .sort(
+                [
+                    ("start_at", SortDirection.ASCENDING),
+                    ("execution_id", SortDirection.ASCENDING),
+                ]
             )
+            .run()
+        )
         pipeline = None
         if executions and self._executions is not None:
             pipeline = self._executions.pipeline_progress_of(run.project_id, executions)
         return CalibrationPipelineRunResponse(
             run_id=run.run_id,
-            calibration_session_id=run.calibration_session_id,
+            # Only runs of a session are listed here, so every one has it.
+            calibration_session_id=run.calibration_session_id or "",
             chip_id=run.chip_id,
+            run_kind=run.run_kind,
+            trigger=run.trigger,
+            run_name=run.run_name or run.pipeline_name,
+            agent_session_id=run.agent_session_id,
+            action_id=run.action_id,
             idempotency_key=run.idempotency_key,
             requested_by=run.requested_by,
             reported_origin=run.reported_origin,
@@ -923,6 +729,7 @@ class CalibrationSessionService:
             pipeline_name=run.pipeline_name,
             backend_name=run.backend_name,
             flow_run_id=run.flow_run_id,
+            flow_end_state=run.flow_end_state,
             execution_id=run.execution_id,
             error=run.error,
             requested_at=run.requested_at,

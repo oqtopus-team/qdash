@@ -223,9 +223,10 @@ export const useValidateCalibrationPipeline = <TError = HTTPValidationError,
  * deployment. A spec with problems is rejected with 422 and the same problem
  * list that /validate returns.
  *
- * With ``calibration_session_id`` the run is recorded in that calibration
- * session before it is launched, and ``idempotency_key`` makes a retry return
- * the recorded run instead of starting another.
+ * The run is recorded before it is launched. It joins ``calibration_session_id``
+ * when given; otherwise an automatic calibration session created for it.
+ * ``idempotency_key`` makes a retry return the
+ * recorded run instead of starting another.
  * @summary Validate and run a calibration pipeline spec
  */
 export const executeCalibrationPipeline = (

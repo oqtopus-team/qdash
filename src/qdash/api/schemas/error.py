@@ -6,7 +6,7 @@ from __future__ import (
 
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ErrorResponse(JSONResponse):
@@ -37,6 +37,24 @@ class Detail(BaseModel):
     """
 
     detail: str
+
+
+class OperationErrorDetail(Detail):
+    """Error body of a failed operation.
+
+    ``detail`` is a message safe to show users. An unexpected failure also carries ``code``,
+    naming the failed operation, and ``error_id``, the ID under which the server logged the
+    cause; endpoints that do not report one yet return ``detail`` alone.
+    """
+
+    code: str | None = Field(
+        default=None,
+        description="Stable code of the failed operation, e.g. file_read_failed",
+    )
+    error_id: str | None = Field(
+        default=None,
+        description="Opaque ID of the server log entry recording the cause",
+    )
 
 
 class BadRequestResponse(ErrorResponse):

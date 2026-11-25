@@ -13,6 +13,7 @@ from pydantic import (
     model_validator,
 )
 
+from qdash.api.schemas.flow import CALIBRATION_SESSION_FIELD, IDEMPOTENCY_KEY_FIELD
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
 from qdash.datamodel.evaluation import EvaluationExampleModel
 from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
@@ -82,6 +83,12 @@ class QuickRunTaskRequest(BaseModel):
         ),
     )
     update_params: bool = False
+    calibration_session_id: str | None = Field(
+        default=None, min_length=1, max_length=200, description=CALIBRATION_SESSION_FIELD
+    )
+    idempotency_key: str | None = Field(
+        default=None, min_length=1, max_length=128, description=IDEMPOTENCY_KEY_FIELD
+    )
     persist_output_parameters: bool | None = Field(
         default=None,
         deprecated=True,

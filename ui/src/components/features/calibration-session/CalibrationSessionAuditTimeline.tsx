@@ -5,7 +5,7 @@ import {
   getCalibrationSessionAudit,
   getGetCalibrationSessionAuditQueryKey,
 } from "@/client/calibration-session/calibration-session";
-import { AUDIT_PAGE_SIZE, AuditTimeline } from "@/components/features/agent-session/AuditTimeline";
+import { AUDIT_PAGE_SIZE, AuditTimeline } from "@/components/features/audit/AuditTimeline";
 import { projectRequest } from "@/components/features/agent-session/useLinkedProject";
 import type { CalibrationSessionAuditResponse } from "@/schemas";
 
@@ -26,7 +26,7 @@ export function CalibrationSessionAuditTimeline({
     <AuditTimeline<CalibrationSessionAuditResponse>
       scope="calibration_session"
       title="Audit"
-      description="Every decision, pipeline request, dispatch outcome, execution, and agent session step, oldest first, from QDash records. Statements are labeled as such, and facts QDash never received are listed as not recorded."
+      description="Decisions, runs, and agent session steps, oldest first"
       source={{
         queryKey: [...getGetCalibrationSessionAuditQueryKey(calibrationSessionId), projectId],
         sessionId: calibrationSessionId,

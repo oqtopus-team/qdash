@@ -10,6 +10,7 @@ import {
   registerMetricScriptTools,
   scriptSaveProblems,
 } from "../.test-dist/tools/metric-scripts.js";
+import { sdkOver } from "./helpers/sdk-session.mjs";
 
 const SOURCE = [
   "from qdash_metrics import metric",
@@ -77,7 +78,7 @@ function setup(overrides = {}) {
     previewDashboardTemplate: record("previewTemplate", overrides.previewTemplate),
   };
   registerMetricScriptTools({ registerTool(tool) { tools.set(tool.name, tool); } }, {
-    async makeClient() { return client; },
+    sdk: sdkOver, async makeClient() { return client; },
     async resolveChipId(_client, explicit) { return explicit ?? "64Qv3"; },
     pageUrl: (_client, path) => `https://qdash.example${path}`,
   });

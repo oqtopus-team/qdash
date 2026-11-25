@@ -136,14 +136,36 @@ test("a calibration session reads as its runs, each with every step execution, a
     pipeline_run_total: 140,
     unknown_starts: [{ reservation_id: "csr-1", kind: "agent_session", child_id: "as-lost", reserved_by: "alice", reserved_at: "2026-11-23T00:00:00Z" }],
   });
-  assert.match(cut, /Pipeline runs \(latest 2 of 140; the close check covers all\)/);
+  assert.match(cut, /Runs \(latest 2 of 140; the close check covers all\)/);
   assert.match(cut, /- agent session as-lost/);
+  // An automatic session with a scheduled saved-workflow run says both.
+  const scheduled = formatCalibrationSession({
+    ...detail,
+    origin: "automatic",
+    pipeline_runs: [{ ...detail.pipeline_runs[0], run_kind: "workflow", run_name: "nightly", trigger: "schedule", reported_origin: null }],
+  });
+  assert.match(scheduled, /\(open, automatic: QDash created it for a run started without one\)/);
+  assert.match(scheduled, /- workflow run cpr-1 'nightly'/);
+  assert.match(scheduled, /started by a cron schedule of alice; the worker recorded it/);
   assert.match(cut, /never admitted/);
   const pending = formatCalibrationSession({
     ...detail,
     agent_sessions: detail.agent_sessions.map((agent) => ({ ...agent, calibration_admission: "pending" })),
   });
   assert.match(pending, /not admitted yet/);
+  // An automatic close is reported as QDash's, never as a user named system:auto-close.
+  const autoClosed = formatCalibrationSession({
+    ...detail,
+    origin: "automatic",
+    status: "closed",
+    close_origin: "automatic",
+    closed_by: "system:auto-close",
+    closing_note: "Closed automatically: everything started in this session ended.",
+  });
+  assert.match(autoClosed, /Closed by QDash \(automatic close, not a person\): Closed automatically/);
+  assert.doesNotMatch(autoClosed, /system:auto-close/);
+  const manualClosed = formatCalibrationSession({ ...detail, status: "closed", close_origin: "manual", closed_by: "alice", closing_note: "done" });
+  assert.match(manualClosed, /Closed by alice: done\./);
   assert.match(text, /may still start, even after the session is closed/);
   assert.equal(formatCalibrationSession({ ...SESSION, pipeline_runs: [], agent_sessions: [] }).includes("Nothing has been started"), true);
 });

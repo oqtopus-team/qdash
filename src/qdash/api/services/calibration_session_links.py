@@ -3,9 +3,11 @@
 A calibration session never owns an execution through a tag, a name, the chip, or the time.
 Two server records relate one, and this module reads only those:
 
-- A pipeline run recorded in the session (``CalibrationPipelineRunDocument``) whose flow run
-  is the execution's ``note.flow_run_id``, on the execution's chip. Every step execution of
-  the run is then a member.
+- A run recorded in the session (``CalibrationPipelineRunDocument``) whose ``run_id`` is the
+  execution's ``note.calibration_run_id``, which the worker stamps on every step execution,
+  or, for a run recorded before that note existed, whose flow run is the execution's
+  ``note.flow_run_id``; on the execution's chip. An agent action's run is left to its agent
+  session below.
 - An agent session admitted to the session (``calibration_admission`` ``admitted``) whose
   action dispatched the execution, as ``agent_execution_links`` resolves it. A session that is
   pending or rejected never operated, so it relates nothing.
@@ -32,7 +34,11 @@ from qdash.api.schemas.execution import (
     ExecutionAgentSessionLink,
     ExecutionCalibrationSessionLink,
 )
-from qdash.datamodel.calibration_session import CalibrationAdmission, CalibrationSessionStatus
+from qdash.datamodel.calibration_session import (
+    CalibrationAdmission,
+    CalibrationRunKind,
+    CalibrationSessionStatus,
+)
 from qdash.datamodel.launch_origin import ReportedLaunchOrigin
 from qdash.dbmodel.agent_session import AgentSessionDocument
 from qdash.dbmodel.calibration_session import (
@@ -61,6 +67,14 @@ NO_RELATIONS = ExecutionRelations()
 def _flow_run_id(execution: ExecutionHistoryDocument) -> str | None:
     value = (execution.note or {}).get("flow_run_id")
     return value if isinstance(value, str) and value else None
+
+
+def _run_id(execution: ExecutionHistoryDocument) -> str | None:
+    value = (execution.note or {}).get("calibration_run_id")
+    return value if isinstance(value, str) and value else None
+
+
+_NOT_AGENT_ACTION = {"run_kind": {"$ne": CalibrationRunKind.AGENT_ACTION.value}}
 
 
 def calibration_session_refs(
@@ -129,13 +143,28 @@ def resolve_execution_relations(
         return {}
     links = agent_links or {}
     flow_run_ids = sorted({fr for e in rows if (fr := _flow_run_id(e)) is not None})
+    stamped_ids = sorted({r for e in rows if (r := _run_id(e)) is not None})
 
+    run_fields = {
+        "_id": 0,
+        "run_id": 1,
+        "calibration_session_id": 1,
+        "chip_id": 1,
+        "flow_run_id": 1,
+    }
     runs: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    stamped: dict[str, dict[str, Any]] = {}
+    if stamped_ids:
+        for doc in CalibrationPipelineRunDocument.get_motor_collection().find(
+            {"project_id": project_id, "run_id": {"$in": stamped_ids}, **_NOT_AGENT_ACTION},
+            run_fields,
+        ):
+            stamped[str(doc["run_id"])] = doc
     origins: dict[tuple[str, str], list[ReportedLaunchOrigin]] = {}
     if flow_run_ids:
         for doc in CalibrationPipelineRunDocument.get_motor_collection().find(
-            {"project_id": project_id, "flow_run_id": {"$in": flow_run_ids}},
-            {"_id": 0, "run_id": 1, "calibration_session_id": 1, "chip_id": 1, "flow_run_id": 1},
+            {"project_id": project_id, "flow_run_id": {"$in": flow_run_ids}, **_NOT_AGENT_ACTION},
+            run_fields,
         ):
             runs.setdefault((str(doc["chip_id"]), str(doc["flow_run_id"])), []).append(doc)
         for doc in PipelineLaunchDocument.get_motor_collection().find(
@@ -175,9 +204,25 @@ def resolve_execution_relations(
     candidates: dict[str, list[tuple[str, str, str]]] = {}
     for execution in rows:
         found: list[tuple[str, str, str]] = []
+        stamped_run = stamped.get(_run_id(execution) or "")
         flow_run_id = _flow_run_id(execution)
-        if flow_run_id is not None:
+        if stamped_run is not None:
+            # The worker named the run: that record alone, on the execution's chip. A run
+            # without a calibration session relates the execution to none.
+            if stamped_run.get("chip_id") == execution.chip_id and stamped_run.get(
+                "calibration_session_id"
+            ):
+                found.append(
+                    (
+                        str(stamped_run["calibration_session_id"]),
+                        "pipeline_run",
+                        str(stamped_run["run_id"]),
+                    )
+                )
+        elif flow_run_id is not None:
             for run in runs.get((execution.chip_id, flow_run_id), []):
+                if not run.get("calibration_session_id"):
+                    continue
                 found.append(
                     (str(run["calibration_session_id"]), "pipeline_run", str(run["run_id"]))
                 )

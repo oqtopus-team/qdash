@@ -4,10 +4,11 @@ A calibration runs as one user, on one chip, inside one project, on one
 backend. QDash checks them once, authorizing the user the same way the API
 does, and every session of the run inherits the checked result:
 
-- ``CalibService(username, chip_id, project_id=...)`` resolves the context from
-  the parameters the API injects into a Prefect flow.
-- :func:`resolve_calib_context` resolves it for direct Python use; pass the
-  result to ``CalibService.from_context``.
+- :func:`resolve_calib_context` resolves it from the parameters the API injects
+  into a Prefect flow, or for direct Python use; pass the result to
+  ``CalibrationSession.from_context``.
+- The legacy ``CalibService(username, chip_id, project_id=...)`` resolves it in
+  its constructor.
 
 A context cannot be built from arbitrary strings: :class:`CalibContext` only
 comes out of the resolver, which requires an active user with write permission
@@ -185,10 +186,10 @@ def resolve_calib_context(
 
     Example:
         ```python
-        from qdash.workflow import CalibService, resolve_calib_context
+        from qdash.workflow import CalibrationSession, resolve_calib_context
 
         context = resolve_calib_context("alice", "64Qv3")
-        CalibService.from_context(context).run(targets, steps=[...])
+        CalibrationSession.from_context(context).run(targets=targets, steps=[...])
         ```
     """
     return CalibContextResolver().resolve(username, chip_id, project_id=project_id, backend=backend)

@@ -69,16 +69,21 @@ export function objectiveLine(objective: string): string {
 
 function runLine(run: CalibrationPipelineRunResponse): string[] {
   const executions = run.executions ?? [];
-  const name = run.pipeline_name ? ` '${run.pipeline_name}'` : "";
+  const runName = run.run_name || run.pipeline_name;
+  const name = runName ? ` '${runName}'` : "";
+  const kind = (run.run_kind ?? "pipeline").replace("_", " ");
   const outcome = run.pipeline?.status ?? (executions.length ? executions[executions.length - 1].status : null);
-  const head = `- pipeline run ${run.run_id}${name}: ${run.dispatch_status}${outcome ? `, run ${outcome}` : ""}`;
+  const head = `- ${kind} run ${run.run_id}${name}: ${run.dispatch_status}${outcome ? `, run ${outcome}` : ""}`;
   const origin = run.reported_origin;
-  const lines = [
-    head,
-    origin
-      ? `  requested by ${run.requested_by}; ${origin.client || "the caller"} reported it was launched by the agent tool ${origin.tool} (client reported, not verified by QDash; not an agent session)`
-      : `  requested by ${run.requested_by}; no launch origin reported`,
-  ];
+  const requested =
+    run.trigger === "schedule"
+      ? `  started by a cron schedule of ${run.requested_by}; the worker recorded it when it started`
+      : run.trigger === "worker"
+        ? `  started outside QDash's API for ${run.requested_by} (a one-time schedule or Prefect); the worker recorded it when it started`
+        : origin
+          ? `  requested by ${run.requested_by}; ${origin.client || "the caller"} reported it was launched by the agent tool ${origin.tool} (client reported, not verified by QDash; not an agent session)`
+          : `  requested by ${run.requested_by}; no launch origin reported`;
+  const lines = [head, requested];
   if (run.dispatch_status === "unknown") {
     lines.push("  Launch outcome unknown: it was admitted, so it may be running or may still start, even after the session is closed. Check qdash_list_executions before starting another run.");
   }
@@ -176,7 +181,7 @@ export function formatCalibrationSession(detail: CalibrationSessionDetailRespons
   const agentTotal = detail.agent_session_total ?? agents.length;
   const unknownStarts = detail.unknown_starts ?? [];
   const lines = [
-    `Calibration session ${detail.calibration_session_id} (${detail.status}) on chip ${detail.chip_id}`,
+    `Calibration session ${detail.calibration_session_id} (${detail.status}${detail.origin === "automatic" ? ", automatic: QDash created it for a run started without one" : ""}) on chip ${detail.chip_id}`,
     `Objective: ${objectiveLine(detail.objective)}`,
     `Created by ${detail.created_by}`,
     "",
@@ -187,8 +192,8 @@ export function formatCalibrationSession(detail: CalibrationSessionDetailRespons
   if (runs.length) {
     lines.push(
       runTotal > runs.length
-        ? `Pipeline runs (latest ${runs.length} of ${runTotal}; the close check covers all):`
-        : `Pipeline runs (${runs.length}):`,
+        ? `Runs (latest ${runs.length} of ${runTotal}; the close check covers all):`
+        : `Runs (${runs.length}):`,
     );
     for (const run of runs) lines.push(...runLine(run));
   }
@@ -213,7 +218,11 @@ export function formatCalibrationSession(detail: CalibrationSessionDetailRespons
   }
   lines.push(...searchLines(detail));
   if (detail.status === "closed") {
-    lines.push("", `Closed by ${detail.closed_by ?? "unknown"}${detail.closing_note ? `: ${detail.closing_note}` : ""}. Start a new calibration session for further work.`);
+    // An automatic close is QDash's record that the work ended; its closed_by names no person.
+    const closed = detail.close_origin === "automatic"
+      ? "Closed by QDash (automatic close, not a person)"
+      : `Closed by ${detail.closed_by ?? "unknown"}`;
+    lines.push("", `${closed}${detail.closing_note ? `: ${detail.closing_note}` : ""}. Start a new calibration session for further work.`);
   }
   return lines.join("\n");
 }

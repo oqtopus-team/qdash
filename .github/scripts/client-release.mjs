@@ -133,7 +133,7 @@ export function remoteGit(cwd = process.cwd()) {
 }
 
 /**
- * The npm libraries that release with QDash's version: the client and the SDK built on it.
+ * The npm libraries that release with QDash's version: the client and the self-contained SDK.
  * Every one of them carries the run's exact client version.
  */
 export const QDASH_LIBRARIES = ["@oqtopus-team/qdash-client", "@oqtopus-team/qdash-sdk"];

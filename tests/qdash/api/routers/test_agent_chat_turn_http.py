@@ -20,7 +20,7 @@ import httpx
 import pytest
 from fastapi import FastAPI
 
-from qdash.agent.config import AgentConfig
+from qdash.agent.config import AgentConfig, ModelConfig
 from qdash.api.dependencies import (
     get_agent_investigation_service,
     get_agent_runtime,
@@ -462,3 +462,36 @@ async def test_the_recorded_turn_is_named_only_in_the_project_it_was_sent_from(
         run = chat_turn_runs.running("alice", "s1", "r1")
         if run is not None and run.task is not None:
             await asyncio.wait_for(run.task, 5)
+
+
+@pytest.mark.asyncio
+async def test_a_turn_without_a_model_choice_and_no_model_with_a_key_is_refused(
+    init_db: Any, app: FastAPI, runtime: Runtime, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The default model is the first one with a key; with none, the turn says so."""
+    _projects()
+    monkeypatch.setattr(
+        agent,
+        "load_agent_config",
+        lambda: AgentConfig(
+            enabled=True, chat_models=[ModelConfig(provider="openai", name="gpt-6-sol")]
+        ),
+    )
+
+    async def none_available() -> set[tuple[str, str]]:
+        return set()
+
+    monkeypatch.setattr(pi_chat_service, "available_chat_models", none_available)
+    client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
+    async with client:
+        created = await client.post(
+            "/chat/sessions", json={"session_id": "s1", "messages": HISTORY}, headers=ALICE
+        )
+        assert created.status_code == 200
+        response = await client.post(
+            "/chat/stream", json=_turn_body("r1", "What is T1?", HISTORY), headers=ALICE
+        )
+    assert response.status_code == 200
+    assert "event: error" in response.text
+    assert "No chat model is available" in response.text
+    assert runtime.opened == []

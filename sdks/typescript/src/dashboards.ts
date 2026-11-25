@@ -14,9 +14,8 @@
 import { readFile } from "node:fs/promises";
 import { basename, extname } from "node:path";
 
-import type { QDashClient } from "@oqtopus-team/qdash-client";
+import { call, read, writeOptions, type Context } from "./_http.js";
 import type {
-  AbsolutePeriod,
   DashboardCreateRequest,
   DashboardResponse,
   DashboardUpdateRequest,
@@ -29,14 +28,17 @@ import type {
   MetricScriptSummary,
   MetricScriptUpdateRequest,
   MetricScriptValidateResponse,
+  MetricScriptPanelConfigPeriod,
   PanelLayoutModel,
-  RelativePeriod,
-} from "@oqtopus-team/qdash-client/models";
+} from "./types.js";
 
 export type Visibility = "private" | "project";
 export type ParamValue = boolean | number | string;
-/** A number of days back from evaluation time, or a period object. */
-export type PeriodInput = number | RelativePeriod | AbsolutePeriod;
+/**
+ * A number of days back from evaluation time, or a period object with its `kind`:
+ * `{ kind: "relative", days }` or `{ kind: "absolute", start, end }`.
+ */
+export type PeriodInput = number | MetricScriptPanelConfigPeriod;
 
 // Pair distances the API knows; a metric's declared hops are limited to these.
 const KNOWN_HOPS = [1, 2];
@@ -187,7 +189,7 @@ export interface DashboardOptions {
   panels?: DashboardPanelModel[];
 }
 
-function period(input: PeriodInput | undefined): RelativePeriod | AbsolutePeriod {
+function period(input: PeriodInput | undefined): MetricScriptPanelConfigPeriod {
   if (input === undefined) return { kind: "relative", days: 14 };
   if (typeof input === "number") return { kind: "relative", days: input };
   if (input && typeof input === "object") return input;
@@ -411,22 +413,26 @@ export class SavedScript {
 
 /** The project's metric scripts, reached as `qdash.scripts`. */
 export class Scripts {
-  constructor(private readonly client: QDashClient) {}
+  constructor(private readonly context: Context) {}
 
   /** Scripts visible to the caller: shared with the project or their own. */
   async list(): Promise<MetricScriptSummary[]> {
-    return (await this.client.listMetricScripts()).scripts;
+    return (await read(this.context.reads, (requestOptions) => this.context.api.metricScript.listMetricScripts(requestOptions))).scripts;
   }
 
   /** A saved script bound to `revision`, by default its active (last valid) revision. */
   async get(scriptId: string, options: { revision?: number } = {}): Promise<SavedScript> {
-    const response = await this.client.getMetricScript(scriptId);
+    const response = await read(this.context.reads, (requestOptions) =>
+      this.context.api.metricScript.getMetricScript({ script_id: scriptId }, requestOptions),
+    );
     return new SavedScript(response, options.revision ?? response.active_revision);
   }
 
   /** A local `Script` holding a starter template's source; nothing is saved. */
   async template(templateId: string, options: Partial<Omit<ScriptOptions, "source">> = {}): Promise<Script> {
-    const { templates } = await this.client.listMetricScriptTemplates();
+    const { templates } = await read(this.context.reads, (requestOptions) =>
+      this.context.api.metricScript.listMetricScriptTemplates(requestOptions),
+    );
     const template = templates.find((entry) => entry.template_id === templateId);
     if (!template) {
       const known = templates.map((entry) => entry.template_id).join(", ");
@@ -442,20 +448,24 @@ export class Scripts {
 
   /** Compile source on the server and return its catalog or diagnostics; saves nothing. */
   validate(script: Script | string): Promise<MetricScriptValidateResponse> {
-    return this.client.validateMetricScript(typeof script === "string" ? script : script.source);
+    const source = typeof script === "string" ? script : script.source;
+    // A POST: sent once, like every request that is not a GET.
+    return call(() => this.context.api.metricScript.validateMetricScript({ source }, writeOptions()));
   }
 
-  /** Save a new script; the result is bound to its first revision, valid or not. */
+  /** Save a new script; the result is bound to its first revision, valid or not. Sent once. */
   async create(script: Script): Promise<SavedScript> {
-    const response = await this.client.createMetricScript(script.createRequest());
+    const response = await call(() =>
+      this.context.api.metricScript.createMetricScript(script.createRequest(), writeOptions()),
+    );
     return new SavedScript(response, response.revision);
   }
 
   /**
    * Save `script` over the script `target` names. New source becomes the next
    * revision; source equal to the latest adds none. The result is bound to the
-   * latest revision. A `SavedScript` target refuses (409) a script saved again
-   * since it was read; `expectedRevision` sets that guard for an ID.
+   * latest revision. A `SavedScript` target refuses (409, `QDashConflictError`) a script
+   * saved again since it was read; `expectedRevision` sets that guard for an ID. Sent once.
    */
   async update(
     target: string | SavedScript,
@@ -464,7 +474,12 @@ export class Scripts {
   ): Promise<SavedScript> {
     const scriptId = typeof target === "string" ? target : target.scriptId;
     const expected = options.expectedRevision ?? (typeof target === "string" ? undefined : target.response.revision);
-    const response = await this.client.updateMetricScript(scriptId, script.updateRequest(expected));
+    const response = await call(() =>
+      this.context.api.metricScript.updateMetricScript(
+        { script_id: scriptId, ...script.updateRequest(expected) },
+        writeOptions(),
+      ),
+    );
     return new SavedScript(response, response.revision);
   }
 }
@@ -497,25 +512,27 @@ export class SavedDashboard {
 
 /** The project's dashboards, reached as `qdash.dashboards`. */
 export class Dashboards {
-  constructor(private readonly client: QDashClient) {}
+  constructor(private readonly context: Context) {}
 
   /** Dashboards visible to the caller: shared with the project or their own. */
   async list(): Promise<DashboardResponse[]> {
-    return (await this.client.listDashboards()).dashboards;
+    return (await read(this.context.reads, (requestOptions) => this.context.api.dashboard.listDashboards(requestOptions))).dashboards;
   }
 
   async get(dashboardId: string): Promise<SavedDashboard> {
-    return new SavedDashboard(await this.client.getDashboard(dashboardId));
+    return new SavedDashboard(await this.read(dashboardId));
   }
 
-  /** Save a new dashboard owned by the caller. */
+  /** Save a new dashboard owned by the caller. Sent once. */
   async create(dashboard: Dashboard): Promise<SavedDashboard> {
-    return new SavedDashboard(await this.client.createDashboard(dashboard.createRequest()));
+    return new SavedDashboard(
+      await call(() => this.context.api.dashboard.createDashboard(dashboard.createRequest(), writeOptions())),
+    );
   }
 
   /**
    * Replace the settings and panels of the dashboard `target` names. Refused
-   * (409) when it changed since the version the save is based on:
+   * (409, `QDashConflictError`) when it changed since the version the save is based on:
    * `expectedVersion`, else a `SavedDashboard` target's version, else the
    * version read just before saving. Nothing is retried.
    */
@@ -527,7 +544,20 @@ export class Dashboards {
     const dashboardId = typeof target === "string" ? target : target.dashboardId;
     const expected =
       options.expectedVersion ??
-      (typeof target === "string" ? (await this.client.getDashboard(dashboardId)).version : target.version);
-    return new SavedDashboard(await this.client.updateDashboard(dashboardId, dashboard.updateRequest(expected)));
+      (typeof target === "string" ? (await this.read(dashboardId)).version : target.version);
+    return new SavedDashboard(
+      await call(() =>
+        this.context.api.dashboard.updateDashboard(
+          { dashboard_id: dashboardId, ...dashboard.updateRequest(expected) },
+          writeOptions(),
+        ),
+      ),
+    );
+  }
+
+  private read(dashboardId: string): Promise<DashboardResponse> {
+    return read(this.context.reads, (requestOptions) =>
+      this.context.api.dashboard.getDashboard({ dashboard_id: dashboardId }, requestOptions),
+    );
   }
 }

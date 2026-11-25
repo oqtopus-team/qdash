@@ -161,7 +161,7 @@ class MongoExecutionHistoryRepository:
     ) -> list[ExecutionHistoryDocument]:
         """Every execution of one Prefect flow run, oldest first.
 
-        A pipeline run creates one execution per calibration step; they share
+        A pipeline run creates one execution per step it reaches; they share
         ``note.flow_run_id``.
         """
         docs: list[ExecutionHistoryDocument] = (

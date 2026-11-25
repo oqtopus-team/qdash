@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -16,32 +15,15 @@ from qdash.datamodel.flow_targets import FlowTargetOverride
 from qdash.datamodel.task_call import TaskCall
 from qdash.workflow.service.flow_targets import override_target
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
+from tests.qdash.workflow.calibration_session_fake import FakeContext, install_fake_session
 from tests.qdash.workflow.task_call_helpers import names
 
 fake_backend_module = importlib.import_module("qdash.workflow.templates.fake_backend")
 
 
-class RecordingCalibService:
-    def __init__(self, context: Any, **kwargs: Any) -> None:
-        self.context = context
-        self.kwargs = kwargs
-
-    @classmethod
-    def from_context(cls, context: Any, **kwargs: Any) -> RecordingCalibService:
-        return cls(context, **kwargs)
-
-    def run(self, targets: Any, *, steps: list[Any]) -> dict[str, Any]:
-        return {"targets": targets, "steps": steps, "context": self.context}
-
-
 @pytest.fixture(autouse=True)
 def recording_calib_service(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(fake_backend_module, "CalibService", RecordingCalibService)
-    monkeypatch.setattr(
-        fake_backend_module,
-        "resolve_calib_context",
-        lambda username, chip_id, **kwargs: {"username": username, "chip_id": chip_id, **kwargs},
-    )
+    install_fake_session(monkeypatch, fake_backend_module)
 
 
 def test_the_backend_choice_is_part_of_the_resolved_context() -> None:
@@ -49,12 +31,7 @@ def test_the_backend_choice_is_part_of_the_resolved_context() -> None:
         username="alice", chip_id="fake-64q", backend_name="fake", project_id="p"
     )
 
-    assert result["context"] == {
-        "username": "alice",
-        "chip_id": "fake-64q",
-        "project_id": "p",
-        "backend": "fake",
-    }
+    assert result["context"] == FakeContext("alice", "fake-64q", "p", "fake")
 
 
 def test_defaults_to_mux_0_to_3_scheduled_like_hardware() -> None:
@@ -121,7 +98,7 @@ def test_execution_dialog_reads_the_template_default_targets() -> None:
 )
 def test_template_targets_match_an_execution_override(override: FlowTargetOverride) -> None:
     # FlowService passes the override fields the entrypoint accepts as parameters, and
-    # CalibService.run replaces the targets from the run context. Both must agree so the
+    # CalibrationSession.run replaces the targets from the run context. Both must agree so the
     # logged and executed targets are the same.
     assert fake_backend_module.__file__ is not None
     source = Path(fake_backend_module.__file__).read_text()

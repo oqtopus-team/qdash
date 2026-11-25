@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { Target, Wrench } from "lucide-react";
+import { Wrench } from "lucide-react";
 
 import type {
   CalibrationSessionRef,
@@ -10,7 +10,7 @@ import type {
   ReportedLaunchOrigin,
 } from "@/schemas";
 
-import { calibrationSessionHref } from "@/lib/chatCalibrationSession";
+import { type SessionReturnContext, calibrationSessionDetailHref } from "@/lib/executionArea";
 
 /**
  * "Agent tool, reported": the caller said an agent tool launched the pipeline. QDash stores the
@@ -51,7 +51,6 @@ export function CalibrationSessionBadge({ link }: { link: CalibrationSessionRef 
       title={`Calibration session: ${link.objective}`}
       data-testid="calibration-session-badge"
     >
-      <Target className="h-3 w-3 shrink-0" aria-hidden="true" />
       <span className="sr-only">Calibration session: </span>
       <span className="truncate">{link.objective || link.calibration_session_id}</span>
     </span>
@@ -60,9 +59,9 @@ export function CalibrationSessionBadge({ link }: { link: CalibrationSessionRef 
 
 function membershipText(link: ExecutionCalibrationSessionLink): string {
   if (link.via === "pipeline_run") {
-    return `A step of pipeline run ${link.pipeline_run_id ?? ""} recorded in this calibration session`;
+    return `Step of run ${link.pipeline_run_id ?? ""}`;
   }
-  return `Run by agent session ${link.agent_session_id ?? ""}, which was admitted to this calibration session`;
+  return `Run by admitted agent session ${link.agent_session_id ?? ""}`;
 }
 
 /**
@@ -74,11 +73,14 @@ export function ExecutionCalibrationNotice({
   link,
   origin,
   projectId,
+  sessionReturn,
   className = "",
 }: {
   link?: ExecutionCalibrationSessionLink | null;
   origin?: ReportedLaunchOrigin | null;
   projectId?: string | null;
+  /** The list the calibration session page links back to. */
+  sessionReturn?: SessionReturnContext;
   className?: string;
 }) {
   if (!link && !origin) return null;
@@ -88,11 +90,7 @@ export function ExecutionCalibrationNotice({
       className={`alert alert-soft text-sm ${className}`}
       data-testid="execution-calibration-notice"
     >
-      {link ? (
-        <Target className="h-4 w-4" aria-hidden="true" />
-      ) : (
-        <Wrench className="h-4 w-4" aria-hidden="true" />
-      )}
+      {link ? null : <Wrench className="h-4 w-4" aria-hidden="true" />}
       <div className="flex min-w-0 flex-col gap-0.5">
         {link ? (
           <>
@@ -105,13 +103,13 @@ export function ExecutionCalibrationNotice({
         ) : null}
         {origin ? (
           <span className="text-base-content/70">
-            {reportedOriginDetail(origin)}. The recorded user started it with their own sign-in.
+            {reportedOriginDetail(origin)}. Started with the recorded user's sign-in.
           </span>
         ) : null}
       </div>
       {link ? (
         <Link
-          href={calibrationSessionHref(link.calibration_session_id, projectId)}
+          href={calibrationSessionDetailHref(link.calibration_session_id, projectId, sessionReturn)}
           className="link link-hover whitespace-nowrap"
         >
           Open calibration session

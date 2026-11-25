@@ -5,9 +5,7 @@ title: vitepress-openapi
 ---
 
 <script setup lang="ts">
-import { useData } from 'vitepress'
-
-const { isDark } = useData()
+import ApiReference from "../.vitepress/theme/ApiReference.vue";
 </script>
 
-<OASpec :isDark="isDark" />
+<ApiReference />

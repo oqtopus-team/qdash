@@ -28,6 +28,8 @@ from qdash.api.services.calibration_pipeline_service import CalibrationPipelineS
 from qdash.api.services.calibration_session_service import CalibrationSessionService
 from qdash.api.services.flow_service import FlowService
 from qdash.api.services.pipeline_launch import record_pipeline_launch
+from qdash.api.services.run_ledger import RunLedger, pipeline_request_hash
+from qdash.datamodel.run import RunIdentity, RunKind
 
 router = APIRouter(prefix="/calibration-pipelines")
 
@@ -88,9 +90,10 @@ async def execute_pipeline(
     deployment. A spec with problems is rejected with 422 and the same problem
     list that /validate returns.
 
-    With ``calibration_session_id`` the run is recorded in that calibration
-    session before it is launched, and ``idempotency_key`` makes a retry return
-    the recorded run instead of starting another."""
+    The run is recorded before it is launched. It joins ``calibration_session_id``
+    when given; otherwise an automatic calibration session created for it.
+    ``idempotency_key`` makes a retry return the
+    recorded run instead of starting another."""
 
     def validate() -> ValidatePipelineResponse:
         result = service.validate(
@@ -109,7 +112,9 @@ async def execute_pipeline(
             )
         return result
 
-    async def dispatch(result: ValidatePipelineResponse) -> ExecuteFlowResponse:
+    async def dispatch(
+        result: ValidatePipelineResponse, identity: RunIdentity | None
+    ) -> ExecuteFlowResponse:
         assert result.spec is not None  # validate() refused a spec without one
         dispatched = await flows.execute_calibration_pipeline(
             spec=result.spec,
@@ -117,6 +122,7 @@ async def execute_pipeline(
             username=ctx.user.username,
             project_id=ctx.project_id,
             backend_name=result.backend_name,
+            calibration_run=identity,
         )
         # Only what the caller reported, stored as reported; it never decides anything here.
         record_pipeline_launch(
@@ -137,30 +143,37 @@ async def execute_pipeline(
             targets=result.targets,
         ).model_dump(mode="json")
 
-    if request.calibration_session_id is None or request.idempotency_key is None:
-        validated = validate()
-        return ExecutePipelineResponse.model_validate(
-            response(validated, await dispatch(validated))
-        )
-
-    recorded = await sessions.execute_pipeline(
+    recorded = await RunLedger(sessions).launch(
         project_id=ctx.project_id,
         username=ctx.user.username,
+        chip_id=request.chip_id,
+        kind=RunKind.PIPELINE,
+        run_name=str(request.spec.get("name") or ""),
+        request_hash=pipeline_request_hash(
+            request.chip_id, request.spec, request.backend_name, request.decision_id
+        ),
         calibration_session_id=request.calibration_session_id,
         idempotency_key=request.idempotency_key,
-        chip_id=request.chip_id,
-        spec=request.spec,
-        backend_name=request.backend_name,
         validate=validate,
         dispatch=dispatch,
         response=response,
+        recorded_spec=lambda result: result.spec or request.spec,
+        backend_name=request.backend_name,
         reported_origin=request.reported_origin,
         decision_id=request.decision_id,
+        # A pipeline claims the whole chip; refuse it before anything is recorded.
+        preflight=lambda _: flows.ensure_hardware_available(
+            project_id=ctx.project_id,
+            chip_id=request.chip_id,
+            parameters={},
+            workflow=True,
+        ),
     )
     return ExecutePipelineResponse.model_validate(
         {
             **recorded.response,
-            "calibration_session_id": request.calibration_session_id,
+            "calibration_session_id": recorded.calibration_session_id,
+            "calibration_run_id": recorded.run_id,
             "pipeline_run_id": recorded.run_id,
             # The request hash includes the decision, so a replay carries the same link.
             "decision_id": request.decision_id,

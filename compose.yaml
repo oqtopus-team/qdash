@@ -140,6 +140,7 @@ services:
       - ./src/qdash/agent:/app/qdash/agent
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
       - ./src/qdash/datamodel:/app/qdash/datamodel
+      - ./sdks/python/src/qdash/calibration:/app/qdash/calibration # Shared calibration definitions (shipped in qdash-sdk)
       - ./src/qdash/common:/app/qdash/common
       - ./src/qdash/repository:/app/qdash/repository
       - ./src/qdash/config.py:/app/qdash/config.py
@@ -173,6 +174,7 @@ services:
       - ./src/qdash/agent:/app/qdash/agent
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
       - ./src/qdash/datamodel:/app/qdash/datamodel
+      - ./sdks/python/src/qdash/calibration:/app/qdash/calibration # Shared calibration definitions (shipped in qdash-sdk)
       - ./src/qdash/common:/app/qdash/common
       - ./src/qdash/repository:/app/qdash/repository
       - ./src/qdash/config.py:/app/qdash/config.py
@@ -203,6 +205,7 @@ services:
       - ./src/qdash/agent:/app/qdash/agent
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
       - ./src/qdash/datamodel:/app/qdash/datamodel
+      - ./sdks/python/src/qdash/calibration:/app/qdash/calibration # Shared calibration definitions (shipped in qdash-sdk)
       - ./src/qdash/common:/app/qdash/common
       - ./src/qdash/repository:/app/qdash/repository
       - ./src/qdash/config.py:/app/qdash/config.py

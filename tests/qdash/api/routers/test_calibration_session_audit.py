@@ -22,6 +22,7 @@ from qdash.dbmodel.calibration_session import (
 )
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+from tests.qdash.api._legacy_records import make_standalone_agent_session
 from tests.qdash.api.routers.test_calibration_pipeline import good_spec
 from tests.qdash.api.routers.test_calibration_sessions import (
     CHIP,
@@ -209,6 +210,8 @@ class TestGroupedList:
         _plain_execution("agent-exec", minutes_ago=1)
         _agent_action(nested, "completed", execution_id="agent-exec")
         alone = _agent(test_client, None)
+        # A standalone agent session, as recorded before automatic calibration sessions.
+        make_standalone_agent_session("lab-a", alone)
         _plain_execution("alone-exec", minutes_ago=2)
         AgentSessionDocument.get_motor_collection().update_one(
             {"session_id": alone}, {"$set": {"created_at": now() - timedelta(minutes=3)}}
@@ -288,6 +291,7 @@ class TestGroupedList:
                 "run_id": "cpr-clash",
                 "calibration_session_id": other,
                 "idempotency_key": "x",
+                "idempotency_scope": "key:x",
             }
         ).insert()
         _step_execution(executed["execution_id"], "flow-a", 1, "completed")

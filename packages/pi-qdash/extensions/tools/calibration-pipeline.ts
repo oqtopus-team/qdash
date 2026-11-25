@@ -1,11 +1,11 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { QDashClient } from "@oqtopus-team/qdash-client";
-import { QDash } from "@oqtopus-team/qdash-sdk";
 import { Type } from "typebox";
 
 import { pausedSessionConflict } from "../lib/agent-loop.js";
 import { toTextToolResult } from "../lib/results.js";
 import { requireWriteApproval } from "../lib/write-approval.js";
+import { isResultUnknown, resultUnknownToolError, sdkSession, unknownLaunchGuidance, type SdkSessionFactory } from "../lib/sdk-session.js";
 
 /**
  * Declarative calibration pipelines.
@@ -86,9 +86,9 @@ export type PipelineExecution = {
 };
 
 /**
- * The idempotency key of a pipeline run recorded in a calibration session: one per tool
- * call, so a replayed or retried call returns the run it started instead of starting
- * another. The call id comes from the host, never from the model's arguments.
+ * The idempotency key of a pipeline run: one per tool call, so a replayed or retried call
+ * returns the run it started instead of starting another, whether it is recorded in a named
+ * calibration session or in the automatic one QDash creates. The call id comes from the host, never from the model's arguments.
  */
 export function pipelineRunKey(toolCallId: string): string {
   const key = `qdash_run_pipeline:${toolCallId}`;
@@ -135,6 +135,8 @@ export type CalibrationPipelineDependencies = {
   makeClient(params: ConnectionParams): Promise<PipelineClient>;
   /** The chip to run on: the explicit id, else the session/default chip. */
   resolveChipId(client: PipelineClient, chipId?: string): Promise<string>;
+  /** The SDK session for a resolved client; defaults to one with the client's settings. */
+  sdk?: SdkSessionFactory;
 };
 
 const TASK_PREVIEW = 8;
@@ -380,7 +382,7 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
     }),
     async execute(_toolCallId, params: ConnectionParams & { backendName?: string; taskNames?: string[] }) {
       const client = await deps.makeClient(params);
-      const qdash = new QDash(client);
+      const qdash = (deps.sdk ?? sdkSession)(client);
       const catalog = (await qdash.pipelines.catalog({ backendName: params.backendName })) as PipelineCatalog;
       const taskNames = params.taskNames ?? [];
       let declared: TaskParameters[] | string = [];
@@ -415,7 +417,7 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
     async execute(_toolCallId, params: ConnectionParams & { chipId?: string; spec: Record<string, unknown>; backendName?: string }) {
       const client = await deps.makeClient(params);
       const chipId = await deps.resolveChipId(client, params.chipId);
-      const result = (await new QDash(client).pipelines.validate(params.spec, {
+      const result = (await (deps.sdk ?? sdkSession)(client).pipelines.validate(params.spec, {
         chipId,
         backendName: params.backendName,
       })) as PipelineValidation;
@@ -435,9 +437,9 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
     promptSnippet: "Run a validated QDash calibration pipeline spec",
     promptGuidelines: [
       "Use qdash_run_pipeline only for a spec that qdash_plan_pipeline reported valid.",
-      "When the run serves a calibration objective, pass that objective's calibrationSessionId (from qdash_create_calibration_session or the user) so QDash records the run, with all its step executions, in it. It grants nothing: the user still approves this exact run.",
+      "When the run serves a calibration objective, pass that objective's calibrationSessionId (from qdash_create_calibration_session or the user) so QDash records the run, with all its step executions, in it. Without it the run joins an automatic session of its own. It grants nothing: the user still approves this exact run.",
       "When the run carries out an experiment you recorded with qdash_record_calibration_decision, pass that decision's decisionId too, so the session's audit links your intent to this run. Record the decision first; never pass a decision of another session.",
-      "If QDash reports that a run's launch outcome is unknown, do not start it again: check qdash_list_executions and tell the user.",
+      "If QDash reports that a run's launch outcome is unknown, do not start it again: check the reported execution ID with qdash_get_execution, or without one page through qdash_list_executions for the run's chipId, and tell the user.",
       "Tell the user before running that completed tasks update calibrated parameters in QDash directly.",
       "Do not use qdash_run_pipeline to run a task an agent session action failed to run; that skips the session's candidate gate. Report the failure instead.",
       "After it starts, follow the execution with qdash_wait_execution and summarize failed targets.",
@@ -464,12 +466,16 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
       if (conflict) {
         return toTextToolResult(conflict, { blocked: true }, { tool: "qdash_run_pipeline", chipId: params.chipId, started: false, blockedByPausedSession: true });
       }
-      const qdash = new QDash(client);
+      const qdash = (deps.sdk ?? sdkSession)(client);
       try {
         // Dispatch only: the run handle's wait() is deliberately not called here.
-        const recording = params.calibrationSessionId
-          ? { calibrationSessionId: params.calibrationSessionId, idempotencyKey: pipelineRunKey(toolCallId), ...(params.decisionId ? { decisionId: params.decisionId } : {}) }
-          : undefined;
+        // Every run is recorded before it starts, in the named calibration session if any.
+        // The key ties this tool call to that one run.
+        const recording = {
+          idempotencyKey: pipelineRunKey(toolCallId),
+          ...(params.calibrationSessionId ? { calibrationSessionId: params.calibrationSessionId } : {}),
+          ...(params.decisionId ? { decisionId: params.decisionId } : {}),
+        };
         // The origin is this tool's own constant, never the model's arguments: QDash shows it as
         // reported, so a run started here is told apart from one the user started directly.
         const run = await qdash.pipelines.execute(params.spec, { chipId: params.chipId, backendName: params.backendName }, recording, { reportedOrigin: PIPELINE_TOOL_ORIGIN });
@@ -484,6 +490,8 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
           ...(result.replayed ? { replayed: true } : {}),
         });
       } catch (error) {
+        // Answered, but without the recording asked for: the run may be going.
+        if (isResultUnknown(error)) throw resultUnknownToolError(error, { chipId: params.chipId });
         const problems = problemsFromError(error);
         if (problems) {
           const text = [
@@ -498,9 +506,9 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
           throw new Error("QDash cannot run pipelines right now: the worker has not registered the calibration-pipeline deployment. Ask an operator to restart the worker, then try again.");
         }
         const detail = errorDetail(error);
-        if (params.calibrationSessionId && detail && /unknown|may have started|being dispatched/i.test(detail)) {
+        if (detail && /unknown|may have started|being dispatched/i.test(detail)) {
           // Never retried with a new call: the first launch may be running.
-          throw new Error(`${detail} Do not start this run again; check qdash_list_executions and tell the user.`);
+          throw new Error(`${detail} ${unknownLaunchGuidance(undefined, { chipId: params.chipId })}`);
         }
         throw error;
       }

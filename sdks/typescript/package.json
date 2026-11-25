@@ -2,7 +2,7 @@
   "name": "@oqtopus-team/qdash-sdk",
   "version": "0.0.0",
   "packageManager": "bun@1.4.0",
-  "description": "TypeScript SDK for QDash calibrations and registered workflows, built on @oqtopus-team/qdash-client",
+  "description": "TypeScript SDK for the QDash API: a generated client of the whole API, with calibration, workflow and dashboard helpers",
   "type": "module",
   "license": "Apache-2.0",
   "author": "OQTOPUS Team <oqtopus-team@googlegroups.com>",
@@ -23,6 +23,9 @@
   ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "qdash": "./dist/cli.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -30,16 +33,20 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --sourcemap --clean --out-dir dist --external @oqtopus-team/qdash-client",
+    "build": "tsup src/index.ts src/cli.ts --format esm --sourcemap --clean --out-dir dist && tsc -p tsconfig.build.json",
     "check": "tsc --noEmit && vitest run",
+    "generate": "node scripts/generate.mjs",
+    "generate:check": "node scripts/generate.mjs --check",
     "prepack": "bun run build",
     "test": "vitest run"
   },
   "dependencies": {
-    "@oqtopus-team/qdash-client": "workspace:*"
+    "ini": "^6.0.0",
+    "smol-toml": "^1.9.1"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/ini": "^4.1.1",
+    "@types/node": "^20.19.0",
     "tsup": "^8.5.0",
     "typescript": "^5.8.0",
     "vitest": "^4.1.11"

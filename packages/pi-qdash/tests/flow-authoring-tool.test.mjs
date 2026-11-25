@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { flowCodeProblems, formatFlowExecution, registerFlowAuthoringTools } from "../.test-dist/tools/flow-authoring.js";
+import { sdkOver } from "./helpers/sdk-session.mjs";
 
 const CODE = [
   "from prefect import flow",
@@ -17,12 +18,12 @@ function registeredTools(saveFlow, chipId = "64Qv3", executeFlow = async () => {
   const calls = [];
   const sessionQueries = [];
   registerFlowAuthoringTools({ registerTool(tool) { tools.set(tool.name, tool); } }, {
-    async makeClient() {
+    sdk: sdkOver, async makeClient() {
       return {
         // null stands for a profile without a project.
         config: { projectId: projectId ?? undefined },
         async saveFlow(request) { calls.push(request); return saveFlow(request); },
-        async executeFlow(name, parameters) { calls.push({ execute: name, parameters }); return executeFlow(name, parameters); },
+        async executeFlow(name, parameters, options) { calls.push({ execute: name, parameters, ...options }); return executeFlow(name, parameters, options); },
         // The pause guard: the user's agent sessions waiting for an expert.
         async listAgentSessions(options) { sessionQueries.push(options); return typeof pausedSessions === "function" ? pausedSessions() : pausedSessions; },
         // A tool that starts a run must not follow it.
@@ -46,8 +47,24 @@ test("code that QDash would reject is reported before anyone is asked to approve
   const problems = flowCodeProblems("1bad", "def x():\n    pass\n", "x");
   assert.equal(problems.length, 3);
   assert.match(problems[0], /name '1bad'/);
-  assert.match(problems[1], /@flow/);
+  assert.match(problems[1], /@calibration_flow/);
   assert.match(problems[2], /import prefect/);
+});
+
+test("a calibration_flow needs its import from qdash.workflow, not prefect", () => {
+  const code = [
+    "from qdash.calibration import CustomOneQubit, QubitTargets, TaskCall",
+    "from qdash.workflow import CalibrationSession, calibration_flow, resolve_calib_context",
+    "",
+    '@calibration_flow(session_name="T1 check")',
+    "def my_check(username: str, chip_id: str, project_id: str | None = None):",
+    "    context = resolve_calib_context(username, chip_id, project_id=project_id)",
+    "    return CalibrationSession.from_context(context).run(targets=QubitTargets([\"0\"]), steps=[])",
+    "",
+  ].join("\n");
+  assert.deepEqual(flowCodeProblems("my_check", code, "my_check"), []);
+  const missing = flowCodeProblems("my_check", code.replace("calibration_flow, ", ""), "my_check");
+  assert.deepEqual(missing, ["the code uses `@calibration_flow` but does not import it from qdash.workflow"]);
 });
 
 test("a save sends QDash's request shape and reports the registered flow", async () => {
@@ -77,12 +94,13 @@ test("a save sends QDash's request shape and reports the registered flow", async
 });
 
 test("running a saved flow is confirmation-gated and reports the execution", async () => {
-  const started = { execution_id: "20261022-001", flow_run_id: "fr-1", flow_run_url: "http://prefect/fr-1", qdash_ui_url: "http://qdash/execution/20261022-001", message: "Flow 'my_check' started" };
+  const started = { execution_id: "20261022-001", flow_run_id: "fr-1", flow_run_url: "http://prefect/fr-1", qdash_ui_url: "http://qdash/execution/20261022-001", message: "Flow 'my_check' started", calibration_session_id: "cs-auto", calibration_run_id: "cr-auto" };
   const { run, calls } = registeredTools(async () => ({}), "64Qv3", async () => started);
   await assert.rejects(run.execute("t", { name: "my_check" }, undefined, undefined, uiContext(false)), /requires explicit confirmation/);
   assert.equal(calls.length, 0);
   const result = await run.execute("t", { name: "my_check", parameters: { qids: ["0"] } }, undefined, undefined, approved("t"));
-  assert.deepEqual(calls, [{ execute: "my_check", parameters: { qids: ["0"] } }]);
+  // Recorded under the call's key: a replayed call returns the run it started.
+  assert.deepEqual(calls, [{ execute: "my_check", parameters: { qids: ["0"] }, idempotencyKey: "qdash_execute_flow:t" }]);
   assert.equal(result.details.executionId, "20261022-001");
   assert.equal(result.details.started, true);
   assert.equal(result.content[0].text, formatFlowExecution(started, "my_check"));
@@ -90,11 +108,29 @@ test("running a saved flow is confirmation-gated and reports the execution", asy
 
   // Without parameters the saved defaults run: an empty object is sent, as before.
   await run.execute("t", { name: "my_check" }, undefined, undefined, approved("t"));
-  assert.deepEqual(calls.at(-1), { execute: "my_check", parameters: {} });
+  assert.deepEqual(calls.at(-1), { execute: "my_check", parameters: {}, idempotencyKey: "qdash_execute_flow:t" });
+});
+
+test("a flow run names the calibration session and run it is recorded in", async () => {
+  const started = { execution_id: "20261022-003", flow_run_id: "fr-3", flow_run_url: "", qdash_ui_url: "", message: "started", calibration_session_id: "cs-1", calibration_run_id: "cpr-1" };
+  const { run, calls } = registeredTools(async () => ({}), "64Qv3", async () => started);
+  const result = await run.execute("c9", { name: "my_check", calibrationSessionId: "cs-1" }, undefined, undefined, approved("c9"));
+  assert.deepEqual(calls, [{ execute: "my_check", parameters: {}, idempotencyKey: "qdash_execute_flow:c9", calibrationSessionId: "cs-1" }]);
+  assert.equal(result.details.calibrationSessionId, "cs-1");
+  assert.equal(result.details.calibrationRunId, "cpr-1");
+  assert.match(result.content[0].text, /Recorded in calibration session cs-1 as run cpr-1/);
+});
+
+test("a chipless flow QDash refuses before launch is reported once, never retried without the key", async () => {
+  const refusal = new Error("my_check names no chip (no chip_id parameter and no chip saved with the flow), so QDash cannot record it in a calibration session or replay it by idempotency key. Nothing was started.");
+  const { run, calls } = registeredTools(async () => ({}), "64Qv3", async () => { throw refusal; });
+  await assert.rejects(run.execute("c10", { name: "my_check" }, undefined, undefined, approved("c10")), /Nothing was started/);
+  // One launch request, with the call's key; no keyless retry follows the refusal.
+  assert.deepEqual(calls, [{ execute: "my_check", parameters: {}, idempotencyKey: "qdash_execute_flow:c10" }]);
 });
 
 test("running a flow without a project keeps the server's default and the confirmation gate", async () => {
-  const started = { execution_id: "20261022-002", flow_run_id: "fr-2", flow_run_url: "", qdash_ui_url: "", message: "started" };
+  const started = { execution_id: "20261022-002", flow_run_id: "fr-2", flow_run_url: "", qdash_ui_url: "", message: "started", calibration_session_id: "cs-auto", calibration_run_id: "cr-auto" };
   const { run, calls } = registeredTools(async () => ({}), "64Qv3", async () => started, null);
   await assert.rejects(run.execute("t", { name: "my_check" }, undefined, undefined, { hasUI: false }), /requires explicit confirmation/);
   await assert.rejects(run.execute("t", { name: "my_check" }, undefined, undefined, uiContext(false)), /requires explicit confirmation/);
@@ -106,7 +142,8 @@ test("running a flow without a project keeps the server's default and the confir
   assert.equal(calls.length, 0);
   const viaHost = await run.execute("t", { name: "my_check" }, undefined, undefined, approved("t"));
   const viaUi = await run.execute("t", { name: "my_check" }, undefined, undefined, uiContext(true));
-  assert.deepEqual(calls, [{ execute: "my_check", parameters: {} }, { execute: "my_check", parameters: {} }]);
+  const sent = { execute: "my_check", parameters: {}, idempotencyKey: "qdash_execute_flow:t" };
+  assert.deepEqual(calls, [sent, sent]);
   for (const result of [viaHost, viaUi]) {
     assert.equal(result.details.started, true);
     assert.equal(result.details.executionId, "20261022-002");
@@ -167,7 +204,7 @@ test("a flow does not run around the user's agent session paused for an expert",
   const any = await unknown.run.execute("t", { name: "my_check" }, undefined, undefined, approved("t"));
   assert.equal(any.details.blockedByPausedSession, true);
   assert.deepEqual(unknown.sessionQueries, [{ chipId: undefined, statuses: ["waiting_for_human"], mine: true, limit: 100 }]);
-  const started = registeredTools(async () => ({}), "64Qv3", async () => ({ execution_id: "e-1", flow_run_id: "f", flow_run_url: "", qdash_ui_url: "", message: "ok" }), "project-1", paused);
+  const started = registeredTools(async () => ({}), "64Qv3", async () => ({ execution_id: "e-1", flow_run_id: "f", flow_run_url: "", qdash_ui_url: "", message: "ok", calibration_session_id: "cs-auto", calibration_run_id: "cr-auto" }), "project-1", paused);
   const other = await started.run.execute("t", { name: "my_check", parameters: { chip_id: "64Qv3", qids: ["Q02"] } }, undefined, undefined, approved("t"));
   assert.equal(other.details.started, true);
 });
@@ -177,7 +214,7 @@ test("a flow does not run when a full page of paused sessions hides older ones",
   const pausedOn = (count, qid) => Array.from({ length: count }, (_, index) => ({
     session_id: `s-${index}`, chip_id: "64Qv3", status: "waiting_for_human", active_intervention_id: `int-${index}`, policy: { qids: [qid] },
   }));
-  const ok = async () => ({ execution_id: "e-1", flow_run_id: "f", flow_run_url: "", qdash_ui_url: "", message: "ok" });
+  const ok = async () => ({ execution_id: "e-1", flow_run_id: "f", flow_run_url: "", qdash_ui_url: "", message: "ok", calibration_session_id: "cs-auto", calibration_run_id: "cr-auto" });
   const params = { name: "my_check", parameters: { chip_id: "64Qv3", qids: ["Q00"] } };
   for (const count of [100, 101]) {
     const execute = async () => { throw new Error("must not run"); };

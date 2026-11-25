@@ -29,12 +29,13 @@ from qdash.workflow.service.steps import (
     StepContext,
 )
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
+from tests.qdash.workflow.calibration_session_fake import install_fake_session
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from qdash.datamodel.one_qubit_execution_mode import OneQubitExecutionMode
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
 
 REPEATED = [
     TaskCall(name="CheckRamsey", call_id="ramsey_coarse", run={"detuning": 0.001}),
@@ -101,9 +102,9 @@ def _worker_spec() -> Any:
     )
 
 
-def _session() -> CalibSession:
+def _session() -> ExecutionRuntime:
     return cast(
-        "CalibSession",
+        "ExecutionRuntime",
         SimpleNamespace(
             username="alice",
             chip_id="64Q",
@@ -248,7 +249,7 @@ def test_serial_mode_runs_calls_in_the_parent_session(
 
     _schedule(monkeypatch)
     parent = RecordingSession(recorder.log, recorder.fail)
-    set_current_session(cast("CalibSession", parent))
+    set_current_session(cast("ExecutionRuntime", parent))
     try:
         step = CustomOneQubit(step_name="ramsey", execution_mode="sequential", tasks=list(REPEATED))
         ctx = step.execute(_session(), QubitTargets(["0", "1"]), StepContext())
@@ -499,15 +500,16 @@ def test_coherence_check_runs_one_step_with_per_target_fail_fast(
     template = importlib.import_module("qdash.workflow.templates.coherence_check")
     captured: dict[str, Any] = {}
 
-    class CapturingCalibService:
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            captured["kwargs"] = kwargs
+    fake = install_fake_session(monkeypatch, template)
+    original_run = fake.run
 
-        def run(self, targets: Any, *, steps: list[Any]) -> None:
-            captured["targets"] = targets
-            captured["steps"] = steps
+    def capture(self: Any, *args: Any, **kwargs: Any) -> None:
+        recorded = original_run(self, *args, **kwargs)
+        captured["kwargs"] = recorded["kwargs"]
+        captured["targets"] = recorded["targets"]
+        captured["steps"] = recorded["steps"]
 
-    monkeypatch.setattr(template, "CalibService", CapturingCalibService)
+    monkeypatch.setattr(fake, "run", capture)
     template.coherence_check(username="alice", chip_id="64Q", qids=["0", "1", "4", "5"])
     _schedule(monkeypatch)
     # Qubit 4 fails its first Rabi; the default policy stops only that target.

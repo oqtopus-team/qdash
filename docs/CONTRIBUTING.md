@@ -27,4 +27,4 @@ Follow [Development Flow](./developer-guide/development-flow.md) for branches an
 
 ## Commit Message Guidelines
 
-For how to write commit messages, see [Commit Message Format](./developer-guide/development-flow.md#commit-message-format).
+For how to write commit messages, see [Conventional Commits](./developer-guide/development-flow.md#conventional-commits).

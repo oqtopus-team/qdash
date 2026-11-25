@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from qdash.api.schemas.task_file import TaskInfo
     from qdash.api.services.flow_service import FlowService
     from qdash.api.services.task_file_service import TaskFileService
+    from qdash.datamodel.run import RunIdentity
 
 
 def matches_parameter_type(value: object, value_type: object) -> bool:
@@ -164,8 +165,14 @@ async def run_catalog_task(
     execution_name: str,
     source_task_id: str | None = None,
     tags: list[str] | None = None,
+    calibration_run: RunIdentity | None = None,
+    ungrouped: bool = False,
 ) -> ExecuteFlowResponse:
-    """Start one catalog run of ``task`` after checking the overrides."""
+    """Start one catalog run of ``task`` after checking the overrides.
+
+    ``calibration_run`` is the run recorded for the launch, stamped by the worker on its
+    execution; ``ungrouped`` leaves a run without one out of any calibration session.
+    """
     validate_overrides(task, input_overrides, run_overrides)
 
     # The session takes the same readout_duration the task runs with.
@@ -201,6 +208,8 @@ async def run_catalog_task(
         update_params=update_params,
         reconfigure=reconfigure,
         execution_name=execution_name,
+        calibration_run=calibration_run,
+        ungrouped=ungrouped,
     )
 
 

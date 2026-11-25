@@ -1,6 +1,7 @@
 # Developer Commands
 
-Run commands from the repository root unless noted.
+Run commands from the repository root. On the host, run checks and commits inside Nix
+(`nix develop -c task check`); in the DevContainer, run them directly.
 
 ## Setup and Services
 

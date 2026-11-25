@@ -1,12 +1,11 @@
 /**
  * Registered workflows of a project: flows saved to QDash, from the UI or
- * `QDashClient.saveFlow`, with a deployment and a target chip. These reach the
+ * `qdash.api.flow.saveFlow`, with a deployment and a target chip. These reach the
  * server's `/flows` routes; nothing is uploaded, registered or run locally.
  */
-import type { QDashClient } from "@oqtopus-team/qdash-client";
-import type { ExecuteFlowResponse, FlowSummary, GetFlowResponse } from "@oqtopus-team/qdash-client/models";
-
-import { runResult, waitForRun, type RunResult, type WaitOptions } from "./runs.js";
+import { dispatch, read, resultUnknown, writeOptions, type Context } from "./_http.js";
+import { Run, type Executions } from "./runs.js";
+import type { ExecuteFlowResponse, FlowSummary, GetFlowResponse } from "./types.js";
 
 // The names the server accepts when a flow is saved; anything else is rejected
 // before it becomes part of a request path.
@@ -22,29 +21,34 @@ function checkedName(name: string): string {
 export interface WorkflowRunOptions {
   /** Override the saved `default_parameters` for this run only. */
   parameters?: Record<string, unknown>;
+  /**
+   * Add the run to this calibration session (open, on the run's chip, created by the
+   * signed-in user). Without it, the run joins an automatic session created for it.
+   */
+  calibrationSessionId?: string;
+  /** A retry with the same key returns the recorded run instead of starting another. */
+  idempotencyKey?: string;
 }
 
 /** A dispatched workflow run. */
-export class WorkflowRun {
+export class WorkflowRun extends Run {
   constructor(
-    private readonly client: QDashClient,
+    executions: Executions,
     readonly name: string,
     /** The dispatch response as the API returned it, including `flow_run_id`. */
     readonly response: ExecuteFlowResponse,
-  ) {}
-
-  get executionId(): string {
-    return this.response.execution_id;
+  ) {
+    super(executions, response.execution_id);
   }
 
-  /** The run's current state; `QDashNotFoundError` before it exists. */
-  async get(): Promise<RunResult> {
-    return runResult(this.executionId, await this.client.getExecution(this.executionId));
+  /** The run's calibration session: the one named, an automatic one, or null. */
+  get calibrationSessionId(): string | null {
+    return this.response.calibration_session_id ?? null;
   }
 
-  /** Poll until the whole run ends; a failed or cancelled run is returned. */
-  async wait(options: WaitOptions = {}): Promise<RunResult> {
-    return runResult(this.executionId, await waitForRun(this.client, this.executionId, options));
+  /** The run's record in that session; every step execution of the run carries it. */
+  get calibrationRunId(): string | null {
+    return this.response.calibration_run_id ?? null;
   }
 }
 
@@ -82,26 +86,64 @@ export class Workflow {
 
 /** The project's registered workflows, reached as `qdash.workflows`. */
 export class Workflows {
-  constructor(private readonly client: QDashClient) {}
+  constructor(
+    private readonly context: Context,
+    private readonly executions: Executions,
+  ) {}
 
   /** Summaries of the workflows registered in the session's project. */
   async list(): Promise<FlowSummary[]> {
-    return (await this.client.listFlows()).flows;
+    return (await read(this.context.reads, (requestOptions) => this.context.api.flow.listFlows(requestOptions))).flows;
   }
 
   /** The registered workflow `name`; `QDashNotFoundError` when there is none. */
   async get(name: string): Promise<Workflow> {
-    return new Workflow(this, await this.client.getFlow(checkedName(name)));
+    const checked = checkedName(name);
+    const detail = await read(this.context.reads, (requestOptions) => this.context.api.flow.getFlow({ name: checked }, requestOptions));
+    return new Workflow(this, detail);
   }
 
   /**
    * Dispatch the registered workflow `name`. The server merges `parameters` over
    * the saved defaults and runs on the saved `chip_id` unless the merged
-   * parameters carry one. Returns once dispatched.
+   * parameters carry one. Returns once dispatched. The request is sent once: a
+   * transport error or an error status is thrown, never retried. A success answer
+   * that cannot be read throws `QDashResultUnknownError`. With a session or
+   * key, a response that does not echo the recorded run throws
+   * `QDashResultUnknownError`: the run may have started without them, so reconcile
+   * it instead of retrying.
    */
   async run(name: string, options: WorkflowRunOptions = {}): Promise<WorkflowRun> {
     const checked = checkedName(name);
-    const response = await this.client.executeFlow(checked, { ...(options.parameters ?? {}) });
-    return new WorkflowRun(this.client, checked, response);
+    const { calibrationSessionId: id, idempotencyKey: key } = options;
+    if ((id != null && (typeof id !== "string" || !id.trim())) || (key != null && (typeof key !== "string" || !key.trim()))) {
+      throw new TypeError("calibrationSessionId and idempotencyKey must be non-empty when given");
+    }
+    const answer = await dispatch("Workflow", () =>
+      this.context.api.flow
+        .executeFlow(
+          {
+            name: checked,
+            parameters: { ...(options.parameters ?? {}) },
+            ...(id != null ? { calibration_session_id: id } : {}),
+            ...(key != null ? { idempotency_key: key } : {}),
+          },
+          writeOptions(),
+        )
+        .withRawResponse(),
+    );
+    const response = answer.data;
+    // A server that predates run recording ignores both fields and starts the flow anyway.
+    if (
+      (id != null || key != null) &&
+      (typeof response?.calibration_run_id !== "string" || (id != null && response.calibration_session_id !== id))
+    ) {
+      throw resultUnknown(
+        "Workflow result unknown: the run may have started without its calibration session or key. " +
+          "Do not retry automatically; reconcile the execution first.",
+        answer,
+      );
+    }
+    return new WorkflowRun(this.executions, checked, response);
   }
 }

@@ -118,6 +118,7 @@ export const NESTED_READ_TOOL_NAMES = [
   "qdash_get_provenance_stats",
   "qdash_get_task_knowledge",
   "qdash_get_task_result",
+  "qdash_get_task_result_evidence",
   "qdash_get_timeseries",
   "qdash_investigate",
   "qdash_list_agent_action_candidates",
@@ -180,6 +181,8 @@ export const DEFERRED_TOOL_NAMES = [
   "qdash_update_forum_post",
   "qdash_create_forum_evidence_reply",
   "qdash_create_forum_image_reply",
+  // Task result diagnosis: one result joined with its execution, target, and a named cooldown.
+  "qdash_get_task_result_evidence",
   // Figure evidence packaging and numeric figure analysis.
   "qdash_analyze_figure_json",
   "qdash_build_qcal_evidence",

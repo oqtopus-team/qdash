@@ -18,7 +18,7 @@ from qdash.workflow.service.session_context import get_session
 
 if TYPE_CHECKING:
     from qdash.datamodel.task_call import StepCalls
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
     from qdash.workflow.service._internal.settings import WorkerSpec
 
 
@@ -40,7 +40,7 @@ def batch_capable_tasks(backend_name: str) -> dict[str, bool]:
 class OneQubitStageRunner:
     """Run one-qubit schedules without owning the execution lifecycle."""
 
-    def __init__(self, session: CalibSession) -> None:
+    def __init__(self, session: ExecutionRuntime) -> None:
         self.session = session
 
     def collect_mux_group_qids(

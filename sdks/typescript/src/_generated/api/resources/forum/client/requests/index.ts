@@ -1,0 +1,16 @@
+export type { BodyUploadForumImage } from "./BodyUploadForumImage.js";
+export type { CloseForumPostRequest } from "./CloseForumPostRequest.js";
+export type { DeleteForumCategoryRequest } from "./DeleteForumCategoryRequest.js";
+export type { DeleteForumLabelRequest } from "./DeleteForumLabelRequest.js";
+export type { DeleteForumPostRequest } from "./DeleteForumPostRequest.js";
+export type { ForumCategoryCreate } from "./ForumCategoryCreate.js";
+export type { ForumCategoryUpdate } from "./ForumCategoryUpdate.js";
+export type { ForumLabelCreate } from "./ForumLabelCreate.js";
+export type { ForumLabelUpdate } from "./ForumLabelUpdate.js";
+export type { ForumPostCreate } from "./ForumPostCreate.js";
+export type { ForumPostUpdate } from "./ForumPostUpdate.js";
+export type { GetForumPostRepliesRequest } from "./GetForumPostRepliesRequest.js";
+export type { GetForumPostRequest } from "./GetForumPostRequest.js";
+export type { ListForumCategoriesRequest } from "./ListForumCategoriesRequest.js";
+export type { ListForumPostsRequest } from "./ListForumPostsRequest.js";
+export type { ReopenForumPostRequest } from "./ReopenForumPostRequest.js";

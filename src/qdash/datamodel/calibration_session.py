@@ -1,11 +1,18 @@
 """Calibration sessions: one calibration objective and the runs that work toward it.
 
-A calibration session groups the pipeline runs and agent sessions started for one objective on
-one chip. It is a record of purpose, not an authority: it grants no operation, holds no
-hardware, and stops nothing. Each child keeps its own authority (an agent session its policy,
-gates, expiry, and pause; a pipeline run the approval of its exact request and the execution
-lock), and each relation is an explicit server record written when the child was started with
-the session's ID. Nothing is grouped by chip, time, tag, or chat.
+A calibration session groups the runs and agent sessions started for one objective on one
+chip. A run is one launch of a saved workflow, a calibration pipeline, a single task, or an
+agent action; every step execution of the run carries the session and run IDs in its note.
+A session is a record of purpose, not an authority: it grants no operation, holds no hardware,
+and stops nothing. Each child keeps its own authority (an agent session its policy, gates,
+expiry, and pause; a run the approval of its exact request and the execution lock), and each
+relation is an explicit server record written when the child was started. Nothing is grouped
+by chip, time, tag, or chat.
+
+A run is its own durable record (``qdash.datamodel.run``); its session is an association, not
+part of the run's identity. A run or agent session started without a session ID gets a session
+of its own (``origin`` ``automatic``), created before the launch; one started with a session
+ID joins that session or is refused.
 """
 
 from __future__ import annotations
@@ -15,35 +22,72 @@ from enum import StrEnum
 
 from pydantic import BaseModel
 
+# Run vocabulary, defined with the run; re-exported here, where it was first defined.
+from qdash.datamodel.run import (
+    RUN_CONTEXT_KEY,
+    CalibrationPipelineRunStatus,
+    CalibrationRunKind,
+    CalibrationRunTrigger,
+    RunIdentity,
+)
+
+# Earlier names of the run identity and its context key.
+CalibrationRunIdentity = RunIdentity
+CALIBRATION_RUN_CONTEXT_KEY = RUN_CONTEXT_KEY
+
+__all__ = [
+    "CALIBRATION_RUN_CONTEXT_KEY",
+    "CalibrationAdmission",
+    "CalibrationChildKind",
+    "CalibrationChildReservation",
+    "CalibrationDecisionOutcome",
+    "CalibrationExperimentStage",
+    "CalibrationPipelineRunStatus",
+    "CalibrationRunIdentity",
+    "CalibrationRunKind",
+    "CalibrationRunTrigger",
+    "CalibrationSessionCloseOrigin",
+    "CalibrationSessionOrigin",
+    "CalibrationSessionStatus",
+]
+
 
 class CalibrationSessionStatus(StrEnum):
     """Whether a calibration session accepts new runs.
 
-    ``closed`` is a person's statement that work on the objective has ended. It says nothing
-    about whether the objective was met and is refused while a child still runs or waits.
+    ``closed`` says that work on the objective has ended: a person's statement, or, for an
+    automatic session, QDash's record that everything started in it ended (see
+    ``CalibrationSessionCloseOrigin``). It says nothing about whether the objective was met or
+    how the runs ended, and is refused while a child still runs or waits.
     """
 
     OPEN = "open"
     CLOSED = "closed"
 
 
-class CalibrationPipelineRunStatus(StrEnum):
-    """Dispatch state of one pipeline run requested in a calibration session.
+class CalibrationSessionOrigin(StrEnum):
+    """How a calibration session came to exist.
 
-    ``dispatching``: the request was recorded and its launch has not reported back.
-    ``dispatched``: QDash created the pipeline's flow run; its executions carry its
-    ``flow_run_id``.
-    ``rejected``: QDash refused the launch before any flow run was created (the hardware was
-    busy or the worker deployment was missing); a retry with the same key may launch it.
-    ``unknown``: the launch failed in a way that may have created a flow run anyway, or it
-    stayed ``dispatching`` past the time a launch takes. A retry with the same key never
-    launches it again.
+    ``manual``: a person or agent created it for an objective (every session recorded before
+    automatic sessions existed). ``automatic``: QDash created it for a run started without a
+    session ID; it is an ordinary session that a later run may name to add to it.
     """
 
-    DISPATCHING = "dispatching"
-    DISPATCHED = "dispatched"
-    REJECTED = "rejected"
-    UNKNOWN = "unknown"
+    MANUAL = "manual"
+    AUTOMATIC = "automatic"
+
+
+class CalibrationSessionCloseOrigin(StrEnum):
+    """Who closed a calibration session.
+
+    ``manual``: the person who created it closed it (every session closed before this was
+    recorded). ``automatic``: QDash closed an automatic session once every run and agent
+    session in it had ended and nothing was being started, dispatched, or settled in it. An
+    automatic close only stops new runs from joining; it cancels nothing and judges nothing.
+    """
+
+    MANUAL = "manual"
+    AUTOMATIC = "automatic"
 
 
 class CalibrationChildKind(StrEnum):

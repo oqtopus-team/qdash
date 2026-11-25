@@ -1,30 +1,24 @@
 from __future__ import annotations
 
 import importlib
-from typing import Any
 
 import pytest
 
 from qdash.workflow.calibtasks.qubex import CheckAdaptiveChevron
+from tests.qdash.workflow.calibration_session_fake import (
+    fake_session_class,
+    install_fake_session,
+)
 from tests.qdash.workflow.task_call_helpers import effective_settings, names, settings
 
 bringup_module = importlib.import_module("qdash.workflow.templates.bringup")
 
 
-class FakeCalibService:
-    last_kwargs: dict[str, Any] | None = None
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.args = args
-        self.kwargs = kwargs
-        FakeCalibService.last_kwargs = kwargs
-
-    def run(self, targets: Any, *, steps: list[Any]) -> dict[str, Any]:
-        return {"targets": targets, "steps": steps}
+FakeCalibService = fake_session_class()
 
 
 def test_bringup_starts_with_measurements(monkeypatch) -> None:
-    monkeypatch.setattr(bringup_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, bringup_module, FakeCalibService)
 
     result = bringup_module.bringup(
         username="alice",
@@ -63,7 +57,7 @@ def test_bringup_step_accepts_resonator_assignment_order() -> None:
 
 
 def test_bringup_template_passes_template_task_list(monkeypatch) -> None:
-    monkeypatch.setattr(bringup_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, bringup_module, FakeCalibService)
 
     result = bringup_module.bringup(username="alice", chip_id="16Q-test", mux_ids=[0])
 
@@ -71,7 +65,7 @@ def test_bringup_template_passes_template_task_list(monkeypatch) -> None:
 
 
 def test_bringup_template_preserves_task_specific_acquisition_settings(monkeypatch) -> None:
-    monkeypatch.setattr(bringup_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, bringup_module, FakeCalibService)
 
     result = bringup_module.bringup(username="alice", chip_id="16Q-test", mux_ids=[0])
 
@@ -94,7 +88,7 @@ def test_bringup_template_preserves_task_specific_acquisition_settings(monkeypat
 
 
 def test_bringup_template_requires_explicit_mux_ids(monkeypatch) -> None:
-    monkeypatch.setattr(bringup_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, bringup_module, FakeCalibService)
 
     with pytest.raises(ValueError, match="mux_ids is required"):
         bringup_module.bringup(username="alice", chip_id="16Q-test")

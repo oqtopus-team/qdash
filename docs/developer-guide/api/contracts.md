@@ -1,104 +1,76 @@
 # API Contracts
 
-A QDash API contract consists of the route decorator, typed parameters, Pydantic request and
-response models, documented errors, and the generated OpenAPI operation.
+Routes, typed parameters, schemas, and OpenAPI together define the public API.
 
 ## Model Request and Response Bodies
 
-Put reusable HTTP models in `src/qdash/api/schemas/` and name the file for the domain router. Use
-`<Action><Resource>Request` for request bodies and a descriptive `<Resource>Response` or
-`<Action><Resource>Response` for responses.
-
-Set `response_model` on JSON routes and return the declared type. This makes runtime serialization,
-OpenAPI, and generated clients agree. A collection can use either a domain wrapper or a raw list;
-preserve the established shape for that endpoint family. Prefer a wrapper when the contract needs
-metadata such as `total`, pagination, or warnings:
-
-```python
-class ListChipsResponse(BaseModel):
-    chips: list[ChipResponse]
-    total: int
-```
-
-Do not change an existing raw list to a wrapper without treating it as a breaking response change.
+Keep HTTP models in `src/qdash/api/schemas/`. Set `response_model` on JSON routes and return that
+type. Preserve existing list and wrapper shapes; adding pagination metadata does not justify
+silently replacing a raw list with an object.
 
 ## Type Path and Query Parameters
 
-Use snake_case Python names for query parameters. Describe and constrain a value with
-`Annotated` and FastAPI's `Query` when its bounds or meaning are not evident from the type:
-
-```python
-force: Annotated[
-    bool,
-    Query(
-        description="If true, also delete the chip's qubits and couplings.",
-    ),
-] = False
-```
-
-Use Python domain types such as `datetime`, `date`, enums, and constrained numbers instead of
-accepting a string and parsing it in the router. Keep pagination names and defaults consistent
-within the endpoint family. QDash currently has both `skip`/`limit` and `offset`/`limit` contracts;
-do not silently translate one family to the other.
-
-FastAPI returns `422 Unprocessable Entity` when a typed path, query, or body fails schema
-validation. Domain validation performed after parsing uses the status that describes that domain
-failure.
+Use snake_case names and domain types such as dates and enums. Add `Query` constraints when a
+value has bounds. Keep pagination names and defaults consistent within each endpoint family.
+FastAPI schema validation returns 422; domain validation uses the appropriate status below.
 
 ## Preserve Project Boundaries
 
-Project-scoped routes resolve identity and permissions through dependencies in
-`src/qdash/api/lib/project.py`:
+Use dependencies from `src/qdash/api/lib/project.py`:
 
-| Dependency | Required access |
+| Dependency | Access |
 | --- | --- |
-| `get_project_context` | Active project membership with read access |
-| `get_project_context_editor` | Editor or owner write access |
-| `get_project_context_owner` | Owner-level administration |
-| `get_project_context_from_path` and variants | Same checks for a `project_id` path parameter |
+| `get_project_context` | Read |
+| `get_project_context_editor` | Editor or owner |
+| `get_project_context_owner` | Owner |
+| `get_project_context_from_path` and role variants | Same checks with a path project ID |
 
-Project resolution uses the path parameter first, then `X-Project-Id`, then the user's default
-project. Services and repositories receive the resolved `project_id`; they must not trust a project
-identifier supplied inside an ordinary request body.
-
-A lookup for a resource in another project generally returns `404` so the response does not reveal
-that the resource exists. Permission failures for a known project return `403`.
+Project resolution prefers the path, then `X-Project-Id`, the user's default, then an owned
+project. Pass the resolved ID to services and repositories; do not trust a body-supplied ID.
+Return 404 for a resource outside the resolved project to avoid revealing its existence.
 
 ## Return Stable Errors
 
-FastAPI exceptions and QDash error response classes use a JSON `detail` field. Choose status codes
-by failure meaning:
-
-| Status | Use |
+| Status | Meaning |
 | --- | --- |
-| `400 Bad Request` | Parsed request violates a domain rule or field combination |
-| `401 Unauthorized` | Bearer credentials are missing or invalid |
-| `403 Forbidden` | Authenticated user lacks the required role or permission |
-| `404 Not Found` | Resource is absent in the resolved scope |
-| `409 Conflict` | Current resource or reservation state prevents the operation |
-| `422 Unprocessable Entity` | FastAPI request validation fails |
-| `502 Bad Gateway` | A required upstream service returned an invalid failure |
-| `503 Service Unavailable` | A required service is temporarily unavailable |
+| 400 | Invalid domain rule or field combination |
+| 401 | Missing or invalid credentials |
+| 403 | Insufficient permission |
+| 404 | Resource absent in this scope |
+| 409 | Conflicting resource or reservation state |
+| 422 | Request schema validation failed |
+| 502 | Invalid upstream response |
+| 503 | Required service unavailable |
 
-Do not return exception text that exposes credentials, paths, or upstream internals. If an error is
-part of the public contract, add it to the route's `responses` metadata and test both its status and
-`detail` payload.
+Use the JSON `detail` field, without exposing credentials or internal exception details.
+Declare public errors in route metadata and test their status and payload.
+
+### Report Unexpected File Operation Failures
+
+Workspace text-file reads and saves, and workflow source reads, writes, creation, and deletion,
+report unexpected failures with a safe `detail` string, a stable operation `code`, and an opaque
+`error_id`. The API logs the same ID with the underlying traceback. Expected 4xx responses keep
+their existing payloads.
+
+Raise `OperationFailedError` from `qdash.api.lib.errors` with a fixed public message and chain
+the original exception with `from exc`. Do not include exception text or internal paths in the
+message, or log the same failure again in the service. The handler registered in the app factory
+owns diagnostic logging. This exception currently extends `HTTPException` so existing HTTP-error
+pass-through handlers preserve it.
+
+Declare `OperationErrorDetail` from `qdash.api.schemas.error` in the route's `responses` metadata.
+Its `code` and `error_id` fields are optional because other failure paths on the same routes still
+return only `detail`. Directory preparation, deployment, dispatch, Git operations, and post-save
+hooks are outside this migration; clients must continue to accept responses without an error ID.
+The UI's `getApiErrorMessage` appends the ID when present. See
+[error investigation](../../user-guide/operations.md#investigate-an-error-id) for the operator procedure.
+
+Test the HTTP response and matching traceback log together, including absence of internal
+exception text in the response. Keep regression coverage for expected errors and successful calls.
 
 ## Keep OpenAPI and Clients Synchronized
 
-The route and schema source generate `docs/oas/openapi.json`, the UI schemas and API functions, and
-the TypeScript client. These generated files are one contract chain:
-
-```mermaid
-flowchart LR
-    route[FastAPI routes and schemas] --> generate[task generate]
-    generate --> openapi[docs/oas/openapi.json]
-    openapi --> ui[ui/src/schemas and ui/src/client]
-    openapi --> client[clients/typescript/src/generated]
-```
-
-Do not edit generated outputs manually. After a route, parameter, schema, status, or
-`operation_id` changes, run:
+After changing a route, parameter, schema, status, or operation ID:
 
 ```bash
 task generate
@@ -106,10 +78,7 @@ task test-api
 task test-client-ts
 ```
 
-Review the generated diff. A changed path, method, operation ID, required field, enum value,
-success status, or response shape can break callers. Adding an optional response field is usually
-compatible, but verify both generated TypeScript surfaces rather than assuming it.
-
-`src/qdash/api/app/factory.py` adds global bearer-auth metadata and normalizes binary response
-formats after FastAPI builds the schema. Tests for those transformations live in
+Never edit generated OpenAPI, UI clients/schemas, or TypeScript client files manually.
+Review their diff for breaking paths, required fields, enum values, statuses, and response shapes.
+Application-wide OpenAPI changes belong in `src/qdash/api/app/factory.py` and
 `tests/qdash/api/test_app_factory.py`.

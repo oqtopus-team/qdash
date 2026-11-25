@@ -9,12 +9,14 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from qdash.api.services.flow_service.execution import EXECUTION_IN_PROGRESS_DETAIL
 from qdash.common.utils.datetime import now
 from qdash.datamodel.agent_session import AgentSessionStatus
 from qdash.datamodel.calibration_session import (
     CalibrationAdmission,
     CalibrationChildKind,
     CalibrationPipelineRunStatus,
+    CalibrationRunKind,
 )
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
@@ -245,23 +247,77 @@ class TestSessions:
 
 
 class TestPipelineRuns:
-    def test_unassociated_pipeline_keeps_its_behavior(self, test_client, lab):
+    def test_pipeline_without_session_gets_an_automatic_one(self, test_client, lab):
         with prefect(["flow-run-plain"]) as create:
             response = _run(test_client, None, key=None)
         assert response.status_code == 202, response.text
         body = response.json()
         assert body["flow_run_id"] == "flow-run-plain"
-        assert body["calibration_session_id"] is None
-        assert body["pipeline_run_id"] is None
+        session_id = body["calibration_session_id"]
+        assert session_id.startswith("cs-auto-")
+        assert body["pipeline_run_id"] == body["calibration_run_id"]
         assert create.await_count == 1
-        assert CalibrationPipelineRunDocument.find_all().count() == 0
+        [record] = CalibrationPipelineRunDocument.find_all().to_list()
+        assert record.calibration_session_id == session_id
+        assert record.run_kind == CalibrationRunKind.PIPELINE
+        assert record.status == CalibrationPipelineRunStatus.DISPATCHED
+        # The worker receives the run before it starts, and the pre-created step names it.
+        assert create.await_args is not None
+        context = create.await_args.kwargs["context"]
+        # With the launch's dispatch token, which only this flow run receives.
+        assert context["qdash_calibration_run"] == {
+            "calibration_session_id": session_id,
+            "run_id": record.run_id,
+            "dispatch_token": record.dispatch_token,
+        }
+        assert record.dispatch_token not in response.text
+        execution = ExecutionHistoryDocument.find_one({"execution_id": body["execution_id"]}).run()
+        assert execution is not None
+        assert execution.note["calibration_session_id"] == session_id
+        assert execution.note["calibration_run_id"] == record.run_id
+        session = test_client.get(f"/calibration-sessions/{session_id}", headers=_headers())
+        assert session.json()["origin"] == "automatic"
+        assert session.json()["created_by"] == "owner"
 
-    def test_key_and_session_go_together(self, test_client, lab):
+    def test_unkeyed_requests_are_new_runs_and_a_key_replays_one(self, test_client, lab):
+        with prefect(["flow-run-a", "flow-run-b", "flow-run-c"]) as create:
+            first = _run(test_client, None, key=None)
+            _release_locks()
+            second = _run(test_client, None, key=None)
+            _release_locks()
+            keyed = _run(test_client, None, key="k")
+            _release_locks()
+            again = _run(test_client, None, key="k")
+        assert {r.status_code for r in (first, second, keyed, again)} == {202}
+        # Without a key every request is a new run in a new automatic session.
+        assert first.json()["calibration_session_id"] != second.json()["calibration_session_id"]
+        # A keyed retry reaches the same session and run and launches nothing.
+        assert again.json()["calibration_session_id"] == keyed.json()["calibration_session_id"]
+        assert again.json()["calibration_run_id"] == keyed.json()["calibration_run_id"]
+        assert again.json()["replayed"] is True
+        assert create.await_count == 3
+        assert CalibrationSessionDocument.find_all().count() == 3
+
+    def test_a_named_session_takes_a_server_key_and_a_decision_needs_one(self, test_client, lab):
+        session_id = _create_session(test_client)
+        with prefect(["flow-run-a"]) as create:
+            response = _run(test_client, session_id, key=None)
+            assert response.status_code == 202, response.text
+            assert response.json()["calibration_session_id"] == session_id
+            body = {"chip_id": CHIP, "spec": good_spec(), "decision_id": "d-1"}
+            refused = test_client.post(
+                "/calibration-pipelines/execute", headers=_headers(), json=body
+            )
+            assert refused.status_code == 422
+        assert create.await_count == 1
+
+    def test_an_invalid_spec_leaves_no_automatic_session(self, test_client, lab):
         with prefect() as create:
-            assert _run(test_client, None, key="k").status_code == 422
-            session_id = _create_session(test_client)
-            assert _run(test_client, session_id, key=None).status_code == 422
+            response = _run(test_client, None, key="k", spec={"name": "x", "steps": "no"})
+        assert response.status_code == 422
         create.assert_not_awaited()
+        assert CalibrationSessionDocument.find_all().count() == 0
+        assert CalibrationPipelineRunDocument.find_all().count() == 0
 
     def test_one_run_groups_every_step_execution_of_its_flow_run(self, test_client, lab):
         session_id = _create_session(test_client)
@@ -289,7 +345,9 @@ class TestPipelineRuns:
         assert [e["execution_id"] for e in run["executions"]] == [first_execution, "step-3-exec"]
         steps = {step["index"]: step for step in run["pipeline"]["steps"]}
         assert steps[1]["execution_id"] == first_execution
-        assert steps[2]["status"] == "skipped"
+        # The plan carries no transform-recording marker, as in runs recorded before
+        # transforms had executions: its filter is reported as not recorded, never pending.
+        assert steps[2]["status"] == "not_recorded"
         assert steps[3]["execution_id"] == "step-3-exec"
         assert run["pipeline"]["status"] == "running"
         assert detail["close_blockers"] == [f"pipeline run {run['run_id']} is running"]
@@ -349,23 +407,88 @@ class TestPipelineRuns:
         ][0]
         assert run["dispatch_status"] == "unknown"
 
-    def test_busy_hardware_is_a_refusal_the_same_key_can_retry(self, test_client, lab):
+    def test_busy_hardware_refuses_before_a_named_session_records_anything(self, test_client, lab):
         session_id = _create_session(test_client)
         with prefect(["flow-run-busy", "flow-run-a"]) as create:
             # An unrelated run holds the chip.
             assert _run(test_client, None, key=None).status_code == 202
+            executions = ExecutionHistoryDocument.find_all().count()
+            before = _session_doc(session_id)
             refused = _run(test_client, session_id)
             assert refused.status_code == 409
-            [record] = CalibrationPipelineRunDocument.find_all().to_list()
-            assert record.status == CalibrationPipelineRunStatus.REJECTED
+            assert refused.json()["detail"] == EXECUTION_IN_PROGRESS_DETAIL
+            # No run, reservation, admission count, or execution; nothing reached Prefect.
+            assert (
+                CalibrationPipelineRunDocument.find({"calibration_session_id": session_id}).count()
+                == 0
+            )
+            after = _session_doc(session_id)
+            assert after.child_count == before.child_count
+            assert after.pending_children == []
+            assert ExecutionHistoryDocument.find_all().count() == executions
+            assert create.await_count == 1
             _release_locks()
             retried = _run(test_client, session_id)
         assert retried.status_code == 202, retried.text
         assert retried.json()["flow_run_id"] == "flow-run-a"
+        assert retried.json()["replayed"] is False
         assert create.await_count == 2
-        [record] = CalibrationPipelineRunDocument.find_all().to_list()
+        [record] = CalibrationPipelineRunDocument.find(
+            {"calibration_session_id": session_id}
+        ).to_list()
         assert record.status == CalibrationPipelineRunStatus.DISPATCHED
-        assert record.attempts == 2
+        assert record.attempts == 1
+
+    def test_busy_hardware_refuses_before_an_automatic_session_is_created(self, test_client, lab):
+        with prefect(["flow-run-busy"]) as create:
+            assert _run(test_client, None, key=None).status_code == 202
+            sessions = CalibrationSessionDocument.find_all().count()
+            executions = ExecutionHistoryDocument.find_all().count()
+            unkeyed = _run(test_client, None, key=None)
+            keyed = _run(test_client, None, key="k")
+        assert unkeyed.status_code == keyed.status_code == 409
+        assert create.await_count == 1
+        assert CalibrationSessionDocument.find_all().count() == sessions
+        assert CalibrationPipelineRunDocument.find_all().count() == 1
+        assert ExecutionHistoryDocument.find_all().count() == executions
+
+    def test_a_retry_replays_its_run_while_that_run_holds_the_chip(self, test_client, lab):
+        with prefect(["flow-run-a"]) as create:
+            first = _run(test_client, None, key="k")
+            # The lock is still held by the first run's own execution.
+            again = _run(test_client, None, key="k")
+        assert first.status_code == again.status_code == 202, again.text
+        assert again.json()["replayed"] is True
+        assert again.json()["flow_run_id"] == "flow-run-a"
+        assert again.json()["calibration_run_id"] == first.json()["calibration_run_id"]
+        assert create.await_count == 1
+
+    def test_a_claim_taken_after_the_preflight_still_refuses_the_launch(self, test_client, lab):
+        from qdash.api.services.flow_service.execution import ExecutionCoordinator
+
+        with prefect(["flow-run-busy", "flow-run-a"]) as create:
+            assert _run(test_client, None, key=None).status_code == 202
+            executions = ExecutionHistoryDocument.find_all().count()
+            # Another run claims the chip between the preflight check and the claim.
+            with patch.object(ExecutionCoordinator, "ensure_available", return_value=None):
+                late = _run(test_client, None, key="k")
+            assert late.status_code == 409
+            assert late.json()["detail"] == EXECUTION_IN_PROGRESS_DETAIL
+            assert create.await_count == 1
+            assert ExecutionHistoryDocument.find_all().count() == executions
+            # The late refusal is recorded as rejected, as before the preflight existed.
+            [rejected] = CalibrationPipelineRunDocument.find({"idempotency_key": "k"}).to_list()
+            assert rejected.status == CalibrationPipelineRunStatus.REJECTED
+            assert rejected.attempts == 1
+            # Its retry while the chip is still busy is refused before another attempt.
+            assert _run(test_client, None, key="k").status_code == 409
+            [still] = CalibrationPipelineRunDocument.find({"idempotency_key": "k"}).to_list()
+            assert still.attempts == 1
+            _release_locks()
+            retried = _run(test_client, None, key="k")
+        assert retried.status_code == 202, retried.text
+        assert retried.json()["calibration_run_id"] == rejected.run_id
+        assert create.await_count == 2
 
     def test_missing_deployment_is_a_refusal(self, test_client, lab):
         from qdash.api.services.flow_service.prefect_gateway import SystemDeploymentUnavailable
@@ -441,7 +564,13 @@ class TestAccess:
         assert create(cs="cs-unknown").status_code == 404
         plain = create(cs=None)
         assert plain.status_code == 201
-        assert plain.json()["calibration_session_id"] is None
+        # Started alone, it gets an automatic session of its own and is admitted to it.
+        automatic = plain.json()["calibration_session_id"]
+        assert automatic.startswith("cs-auto-") and automatic != session_id
+        assert plain.json()["calibration_admission"] == "admitted"
+        auto_doc = CalibrationSessionDocument.find_one({"calibration_session_id": automatic}).run()
+        assert auto_doc is not None and auto_doc.origin == "automatic"
+        assert auto_doc.created_by == "owner" and auto_doc.chip_id == CHIP
         attached = create()
         assert attached.status_code == 201, attached.text
         assert attached.json()["calibration_session_id"] == session_id
@@ -696,10 +825,10 @@ class TestPipelineStartReservation:
     def test_close_while_a_run_is_being_claimed_is_refused(self, test_client, lab):
         from fastapi import HTTPException
 
-        from qdash.api.services.calibration_session_service import CalibrationSessionService
+        from qdash.api.services.run_ledger import RunLedger
 
         session_id = _create_session(test_client)
-        original = CalibrationSessionService._claim_run
+        original = RunLedger._claim
         refusals: list[HTTPException] = []
 
         def close_then_claim(**kwargs):
@@ -710,22 +839,22 @@ class TestPipelineStartReservation:
             return original(**kwargs)
 
         with (
-            patch.object(CalibrationSessionService, "_claim_run", staticmethod(close_then_claim)),
+            patch.object(RunLedger, "_claim", staticmethod(close_then_claim)),
             prefect(["flow-run-a"]) as create,
         ):
             response = _run(test_client, session_id)
         assert response.status_code == 202, response.text
         assert create.await_count == 1
         [refusal] = refusals
-        assert "pipeline run" in str(refusal.detail) and "being started" in str(refusal.detail)
+        assert "run cpr-" in str(refusal.detail) and "being started" in str(refusal.detail)
         assert _session_doc(session_id).status == "open"
         assert _session_doc(session_id).pending_children == []
 
     def test_a_request_whose_reservation_a_close_cleared_never_launches(self, test_client, lab):
-        from qdash.api.services.calibration_session_service import CalibrationSessionService
+        from qdash.api.services.run_ledger import RunLedger
 
         session_id = _create_session(test_client)
-        original = CalibrationSessionService._claim_run
+        original = RunLedger._claim
 
         def stall_past_a_close(**kwargs):
             # A reservation this old was never launched, so the close needs no acknowledgment.
@@ -734,7 +863,7 @@ class TestPipelineStartReservation:
             return original(**kwargs)
 
         with (
-            patch.object(CalibrationSessionService, "_claim_run", staticmethod(stall_past_a_close)),
+            patch.object(RunLedger, "_claim", staticmethod(stall_past_a_close)),
             prefect(["flow-run-a"]) as create,
         ):
             response = _run(test_client, session_id)
@@ -1038,9 +1167,7 @@ class TestAgentAdmission:
         ]
         return [response.status_code for response in responses]
 
-    def test_an_admitted_session_is_admitted_and_one_created_alone_is_never_checked(
-        self, test_client, lab
-    ):
+    def test_an_attached_session_and_one_created_alone_are_both_admitted(self, test_client, lab):
         from qdash.api.services.agent_session_gate import pass_execution_gate
 
         session_id = _create_session(test_client)
@@ -1054,7 +1181,13 @@ class TestAgentAdmission:
         plain = test_client.post(
             "/agent-sessions", headers=_headers(), json={"chip_id": CHIP, "policy": POLICY}
         )
-        assert plain.json()["calibration_admission"] is None
+        # Created alone, it is admitted to its own automatic session through the same steps.
+        assert plain.json()["calibration_admission"] == "admitted"
+        automatic = _session_doc(plain.json()["calibration_session_id"])
+        assert automatic.origin == "automatic"
+        assert automatic.admitted_reservation_ids == [
+            _agent_doc(plain.json()["session_id"]).calibration_reservation_id
+        ]
         doc = _session_doc(session_id)
         assert doc.pending_children == []
         assert doc.admitted_reservation_ids == [

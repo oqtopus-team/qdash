@@ -21,6 +21,7 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_get_timeseries` — inspect one target metric over time
    - `qdash_inspect_timeseries_csv`, `qdash_compare_timeseries` — validate and compare multiple QDash or CSV timeseries
    - `qdash_list_task_results`, `qdash_get_task_result` — find and inspect calibration results
+   - `qdash_get_task_result_evidence` — diagnose one result with its execution, the stored values of its target, and a cooldown you name; missing context is reported, never inferred
    - `qdash_get_task_knowledge` — interpret a task's purpose, expected result, failure modes, and check questions
    - `qdash_list_flows`, `qdash_get_flow` — list or inspect calibration flows
    - `qdash_validate_metric_script`, `qdash_preview_metric_script` — check and preview a metric script on a chip; they run the code on the server but save nothing (see the `qdash-metric-scripts` skill)
@@ -123,10 +124,11 @@ not the objective itself.
   agent session, create a calibration session for that goal with
   `qdash_create_calibration_session`, or reuse the one the user names. The chat shows a
   session once it is created; there is no need to read it again for that.
-- Pass its ID as `calibrationSessionId` to every `qdash_run_pipeline` and
-  `qdash_create_agent_session` call for that goal. QDash records the run before it starts; a
-  pipeline run is one record that covers all its step executions. A run started without the ID
-  is not part of the session, and nothing moves it there later.
+- Pass its ID as `calibrationSessionId` to every `qdash_run_pipeline`, `qdash_execute_flow`, and
+  `qdash_create_agent_session` call for that goal. QDash records the run before it starts; one
+  run covers all its step executions. A run started without the ID goes to an automatic session
+  of its own; never to the objective's, and nothing moves it there later. Automatic sessions
+  close when their work ends. Never reuse a closed session for a new run.
 - The session grants nothing. Each pipeline run is still the exact request the user approves,
   and an agent session is still bounded by its own policy, gates, expiry, and pause. Never
   present the session as permission, and never use it to skip an approval.
@@ -135,7 +137,8 @@ not the objective itself.
   the one with the user before starting runs in it).
 - Report progress with `qdash_get_calibration_session`. Statuses belong to each run and agent
   session; judge the results themselves before saying the objective is met. Closing a
-  calibration session is the user's decision in QDash, not yours.
+  manual objective session is the user's decision in QDash, not yours. QDash closes automatic
+  sessions itself; this does not mean the objective succeeded.
 - When saying how a run was started, use QDash's records: an execution with a linked
   `agent_session` was dispatched by that agent session; a pipeline run with a `reported_origin`
   was launched by the named tool, which reported it itself (QDash does not verify it, and it is
@@ -147,9 +150,10 @@ not the objective itself.
   `qdash_run_pipeline`, record your reading of each result citing the run, and end with a
   conclusion. Resume from `qdash_get_calibration_session` and
   `qdash_get_calibration_session_audit`, not from memory.
-- When QDash says a pipeline run's launch outcome is unknown, do not start it again: check
-  `qdash_list_executions` and tell the user. Such a run was admitted and may still start, even
-  after the calibration session is closed.
+- When QDash says a pipeline run's launch outcome is unknown, do not start it again: check the
+  reported execution ID with `qdash_get_execution`, or without one page through
+  `qdash_list_executions` for the run's `chipId`, and tell the user. Such a run was admitted and
+  may still start, even after the calibration session is closed.
 - An agent session that QDash reports as not admitted refuses every operation; do not work
   around it. A rejected one never operates: start a new calibration session for further work.
 
@@ -179,13 +183,13 @@ Rules:
 
 ## Authoring a flow
 
-A flow is a Python module with one `@flow` function that QDash runs on its workflow worker, with hardware and database access. Pipelines (above) cover ordered task lists without code; write a flow only when the user needs logic a pipeline cannot express: loops until convergence, branching on results, custom parameter sweeps.
+A flow is a Python module with one `@calibration_flow` function (from `qdash.workflow`; older flows use Prefect's `@flow`) that QDash runs on its workflow worker, with hardware and database access. Its body resolves the context and runs calibrations in the launch's calibration session: `session = CalibrationSession.from_context(resolve_calib_context(username, chip_id, project_id=project_id))`, then `session.run(targets=..., steps=...)` with targets and steps imported from `qdash.calibration` (the same definitions a pipeline spec has). Keep the `flow_name` and `project_id` parameters in the signature, because QDash injects them at launch, but do not pass `flow_name` to `run`: the run is named after the launched saved flow and reads that flow's saved defaults on its own. `@calibration_flow(session_name="...")` names the calibration session QDash creates for a launch that names none; write it as a string literal. `CalibService` is the legacy entry point: keep it in a saved flow you only edit lightly, but do not use it in new code. Pipelines (above) cover ordered task lists without code; write a flow only when the user needs logic a pipeline cannot express: loops until convergence, branching on results, custom parameter sweeps.
 
 Workflow:
 
-1. Start from what exists. `qdash_query` with `flow_templates` lists the templates and `flow_template` returns one with its code; `qdash_get_flow` returns a saved flow; `flow_helper_files` / `flow_helper_file` show the helpers templates import. Keep the template's structure: its imports, the `@flow` signature, and the terminal handling at the end of the run.
-2. Write the module. Name the `@flow` function like the flow unless the user wants otherwise. Task and parameter names must come from `qdash_get_pipeline_catalog` and the template; do not invent them. When a shell workspace is available, draft the file there and run `python -m py_compile` on it before showing it.
-3. Show the user the complete code and the chip it is for, then `qdash_save_flow`. QDash checks the `@flow` function, formats the file, registers a Prefect deployment, and replaces a flow of the same name. A rejection comes back as text with QDash's reason; fix the code and save again.
+1. Start from what exists. `qdash_query` with `flow_templates` lists the templates and `flow_template` returns one with its code; `qdash_get_flow` returns a saved flow; `flow_helper_files` / `flow_helper_file` show the helpers templates import. Keep the template's structure: its imports, the `@calibration_flow` decorator and signature, and the explicit context and session construction.
+2. Write the module. Name the decorated function like the flow unless the user wants otherwise. Task and parameter names must come from `qdash_get_pipeline_catalog` and the template; do not invent them. When a shell workspace is available, draft the file there and run `python -m py_compile` on it before showing it.
+3. Show the user the complete code and the chip it is for, then `qdash_save_flow`. QDash checks the decorated function, formats the file, registers a Prefect deployment, and replaces a flow of the same name. A rejection comes back as text with QDash's reason; fix the code and save again.
 4. Saving does not run anything. Run it only when the user asks: `qdash_execute_flow` with the flow's parameters (confirmation-gated, takes the project execution lock), then `qdash_wait_execution`.
 
 ## Metric scripts and dashboards

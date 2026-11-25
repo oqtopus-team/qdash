@@ -1,6 +1,6 @@
 """The Python SDK's script and dashboard authoring against the real API routes.
 
-Each test drives ``qdash.sdk`` through ``QDashClient`` on the FastAPI test client, with the
+Each test drives a ``qdash.sdk`` session on the FastAPI test client, with the
 in-process metric runtime validating script source, so request bodies, permissions, pins and
 version guards are the server's own.
 """
@@ -12,12 +12,18 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from qdash.api.metric_runtime.template_library import TEMPLATES
-from qdash.client import QDashClient, QDashConfig
-from qdash.client.services.errors import QDashApiError, QDashNotFoundError
-from qdash.client.services.models import MetricScriptEvaluateRequest
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.metric_script import MetricScriptDocument
-from qdash.sdk import Dashboard, MetricScriptError, QDash, Script
+from qdash.sdk import (
+    Dashboard,
+    MetricScriptError,
+    QDash,
+    QDashApiError,
+    QDashConfig,
+    QDashNotFoundError,
+    Script,
+)
+from qdash.sdk._generated._authoring import MetricScriptEvaluateRequest
 from tests.qdash.api.routers.test_dashboard import (
     PROJECT,
     _create_project_member,
@@ -45,7 +51,7 @@ def _session(test_client: TestClient, headers: dict[str, str], project_id: str =
     token = headers["Authorization"].removeprefix("Bearer ")
     config = QDashConfig(base_url="http://testserver", api_token=token, project_id=project_id)
     # TestClient is an httpx.Client that answers from the app in process.
-    return QDash(QDashClient(config, http_client=cast("httpx.Client", test_client)))
+    return QDash(config, http_client=cast("httpx.Client", test_client))
 
 
 def _pins(script_id: str) -> dict[str, list[int]]:
@@ -194,17 +200,17 @@ def test_values_keep_missing_and_counts(test_client, init_db, runtime) -> None:
     qdash = _session(test_client, _create_project_owner())
     _seed_chip()
     script = qdash.scripts.create(qdash.scripts.template("zx90_median"))
-    result = qdash.client.evaluate_metric_script(
-        script.script_id,
-        MetricScriptEvaluateRequest.model_validate(
-            {"metric_id": "zx90_median", "chip_id": "chip-1", "period": {"kind": "relative"}}
-        ),
+    request = MetricScriptEvaluateRequest.model_validate(
+        {"metric_id": "zx90_median", "chip_id": "chip-1", "period": {"kind": "relative"}}
+    )
+    result = qdash.api.metric_script.evaluate_metric_script(
+        script.script_id, **request.model_dump(mode="json", exclude_unset=True)
     )
     assert result.metric.unit == "%"
     assert result.cells
-    statuses = {cell.status.value for cell in result.cells}
+    statuses = {cell.status for cell in result.cells}
     assert statuses <= {"ok", "missing", "empty", "error"}
-    assert all(cell.value is None for cell in result.cells if cell.status.value != "ok")
+    assert all(cell.value is None for cell in result.cells if cell.status != "ok")
     counts = [cell.assessment.count for cell in result.cells if cell.assessment]
     assert counts
     assert all(count == 0 for count in counts)
@@ -225,22 +231,22 @@ def test_series_trend_dashboard_through_the_sdk(test_client, init_db, runtime) -
     assert (config["view"], config["targets"]) == ("timeseries", ["0>1", "1>0"])
     assert "series" not in config and "cells" not in config
 
-    result = qdash.client.evaluate_metric_script(
-        script.script_id,
-        MetricScriptEvaluateRequest.model_validate(
-            {
-                "metric_id": trend.id,
-                "chip_id": "chip-1",
-                "period": config["period"],
-                "params": config["params"],
-                "targets": config["targets"],
-            }
-        ),
+    request = MetricScriptEvaluateRequest.model_validate(
+        {
+            "metric_id": trend.id,
+            "chip_id": "chip-1",
+            "period": config["period"],
+            "params": config["params"],
+            "targets": config["targets"],
+        }
+    )
+    result = qdash.api.metric_script.evaluate_metric_script(
+        script.script_id, **request.model_dump(mode="json", exclude_unset=True)
     )
     assert [cell.key for cell in result.cells] == ["0>1", "1>0"]
     for cell in result.cells:
         # No task results are stored: every weekly bin is an honest gap.
-        assert cell.status.value == "missing"
+        assert cell.status == "missing"
         assert cell.series
         assert all(point.value is None for point in cell.series)
-        assert all(point.status.value == "no_data" for point in cell.series)
+        assert all(point.status == "no_data" for point in cell.series)

@@ -11,6 +11,7 @@ from qdash.api.services.flow_service.prefect_gateway import SystemDeploymentUnav
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.qubit import QubitDocument
@@ -209,13 +210,74 @@ class TestValidate:
         ]
         assert calls[0]["settings"]["run"] == {"shots": {"value": 2048}}
         assert calls[1]["settings"]["run"] == {"shots": {"value": 4096}}
-        assert data["targets"] == {"qids": ["0", "1"], "mux_ids": [], "exclude_qids": []}
+        assert data["targets"] == {
+            "qids": ["0", "1"],
+            "mux_ids": [],
+            "exclude_qids": [],
+            "pairs": [],
+        }
         assert data["task_run_count"] == 6
         assert data["spec_version"] == 2
         assert isinstance(data["plan_digest"], str)
         assert data["warnings"] == []
         # The normalized spec carries the defaults the worker will use.
         assert data["spec"]["steps"][0]["configure"] is False
+
+    def test_pair_targets_resolve_to_their_qubits_and_check_couplings(
+        self, test_client, chip, auth_headers
+    ):
+        from qdash.dbmodel.coupling import CouplingDocument
+
+        for coupling in ("0-1", "4-5"):
+            CouplingDocument(
+                project_id="test_project",
+                username="test_user",
+                qid=coupling,
+                chip_id=CHIP,
+                data={},
+                system_info={},
+            ).insert()
+        spec = {
+            "spec_version": 2,
+            "targets": {"pairs": [["0", "1"], ["5", "4"]]},
+            "steps": [
+                {
+                    "type": "TwoQubitCalibration",
+                    "execution_mode": "manual",
+                    "rounds": [[["0", "1"]], [["5", "4"]]],
+                }
+            ],
+        }
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data["targets"]["pairs"] == [["0", "1"], ["5", "4"]]
+        assert data["targets"]["qids"] == ["0", "1", "4", "5"]
+        # The direction is the pair's own: 5-4 is not a coupling of the chip.
+        assert {
+            (problem["path"], problem["message"])
+            for problem in data["problems"]
+            if problem["path"].startswith("targets")
+        } == {("targets.pairs[1]", "5-4 is not a coupling of chip 64Qv3")}
+
+    def test_bring_up_on_pair_targets_is_reported(self, test_client, chip, auth_headers):
+        spec = {
+            "spec_version": 2,
+            "targets": {"pairs": [["0", "1"]]},
+            "steps": [{"type": "BringUp", "execution_mode": "sequential"}],
+        }
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        assert response.status_code == 200, response.text
+        paths = [problem["path"] for problem in response.json()["problems"]]
+        assert "steps[0]" in paths
 
     def test_version_1_spec_is_rejected_with_a_converted_spec(
         self, test_client, chip, auth_headers
@@ -756,7 +818,7 @@ class TestExecute:
         assert parameters["chip_id"] == CHIP
         assert parameters["flow_name"] == "coarse-then-coherence"
         assert parameters["backend_name"] == "qubex"
-        assert "pipeline" in parameters["tags"]
+        assert parameters["tags"] == []
         # The worker gets the normalized spec, not the raw request body.
         assert parameters["spec"]["steps"][0]["configure"] is False
         assert parameters["spec"]["steps"][2]["execution_mode"] == "parallel_by_round"
@@ -766,6 +828,71 @@ class TestExecute:
             "t1_long",
             "CheckT2Echo",
         ]
+
+    def test_execute_leaves_an_unnamed_spec_unnamed(self, test_client, chip, auth_headers):
+        """An omitted name reaches the worker as omitted, and adds no pipeline tag.
+
+        The scheduled execution is named after the first step, as the worker will
+        name that step's execution, not after a default pipeline name.
+        """
+        read_deployment, create_flow_run = prefect_gateway_mocks()
+        spec = good_spec()
+        del spec["name"]
+        with (
+            patch(
+                "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.read_deployment_id",
+                new=read_deployment,
+            ),
+            patch(
+                "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+                new=create_flow_run,
+            ),
+        ):
+            response = test_client.post(
+                "/calibration-pipelines/execute",
+                headers=auth_headers,
+                json={"chip_id": CHIP, "spec": spec},
+            )
+        assert response.status_code == 202, response.text
+        data = response.json()
+        parameters = create_flow_run.call_args.kwargs["parameters"]
+        assert parameters["flow_name"] is None
+        assert "name" not in parameters["spec"]
+        assert parameters["tags"] == []
+        execution = ExecutionHistoryDocument.find_one({"execution_id": data["execution_id"]}).run()
+        assert execution is not None
+        assert execution.name == data["steps"][0]["name"] == "one_qubit_check"
+        assert execution.tags == []
+
+    def test_execute_keeps_explicit_name_and_tags(self, test_client, chip, auth_headers):
+        """A given name, even 'pipeline', and a caller's own 'pipeline' tag are kept."""
+        read_deployment, create_flow_run = prefect_gateway_mocks()
+        spec = {**good_spec(), "name": "pipeline", "tags": ["pipeline", "nightly"]}
+        with (
+            patch(
+                "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.read_deployment_id",
+                new=read_deployment,
+            ),
+            patch(
+                "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+                new=create_flow_run,
+            ),
+        ):
+            response = test_client.post(
+                "/calibration-pipelines/execute",
+                headers=auth_headers,
+                json={"chip_id": CHIP, "spec": spec},
+            )
+        assert response.status_code == 202, response.text
+        parameters = create_flow_run.call_args.kwargs["parameters"]
+        assert parameters["flow_name"] == "pipeline"
+        assert parameters["spec"]["name"] == "pipeline"
+        assert parameters["tags"] == ["nightly", "pipeline"]
+        execution = ExecutionHistoryDocument.find_one(
+            {"execution_id": response.json()["execution_id"]}
+        ).run()
+        assert execution is not None
+        assert execution.name == "pipeline"
 
     def test_execute_rejects_invalid_spec_before_dispatch(self, test_client, chip, auth_headers):
         _, create_flow_run = prefect_gateway_mocks()

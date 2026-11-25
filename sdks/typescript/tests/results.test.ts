@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { QDashClient, QDashConfig } from "@oqtopus-team/qdash-client";
 import {
   QDash,
   QDashApiError,
@@ -125,12 +124,9 @@ function qdashWith(rows: unknown[], details: Record<string, Detail> = {}, total 
     }
     return json({ detail: `no ${url.pathname}` }, 404);
   };
-  const client = new QDashClient(
-    new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token", retry: { maxAttempts: 1 } }),
-    { fetch },
-  );
+  const qdash = new QDash({ baseUrl: "https://qdash.example/api", apiToken: "token", readAttempts: 1 }, { fetch });
   const detailReads = () => requests.filter((url) => url.pathname.startsWith("/api/tasks/")).map((url) => url.pathname).sort();
-  return { qdash: new QDash(client), requests, detailReads };
+  return { qdash, requests, detailReads };
 }
 
 describe("qdash.taskResults.compareLatest", () => {

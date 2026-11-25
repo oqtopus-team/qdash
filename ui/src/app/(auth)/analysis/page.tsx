@@ -10,6 +10,7 @@ import { TimeSeriesView } from "@/components/features/analysis/TimeSeriesView";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { AnalysisPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { ViewSwitch } from "@/components/ui/ViewSwitch";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useAnalysisUrlState } from "@/hooks/useUrlState";
 
@@ -41,37 +42,18 @@ function AnalyzePageContent() {
           description="Time series, histograms, CDFs and correlations of chip parameters"
         />
 
-        {/* View Selection Tabs */}
-        <div className="tabs tabs-boxed w-fit max-w-full gap-1 overflow-x-auto flex-nowrap">
-          <button
-            className={`tab tab-sm sm:tab-md whitespace-nowrap ${
-              currentView === "timeseries" ? "tab-active" : ""
-            }`}
-            onClick={() => setCurrentView("timeseries")}
-          >
-            Time Series
-          </button>
-          <button
-            className={`tab tab-sm sm:tab-md whitespace-nowrap ${currentView === "histogram" ? "tab-active" : ""}`}
-            onClick={() => setCurrentView("histogram")}
-          >
-            Histogram
-          </button>
-          <button
-            className={`tab tab-sm sm:tab-md whitespace-nowrap ${currentView === "cdf" ? "tab-active" : ""}`}
-            onClick={() => setCurrentView("cdf")}
-          >
-            CDF
-          </button>
-          <button
-            className={`tab tab-sm sm:tab-md whitespace-nowrap ${
-              currentView === "correlation" ? "tab-active" : ""
-            }`}
-            onClick={() => setCurrentView("correlation")}
-          >
-            Correlation
-          </button>
-        </div>
+        <ViewSwitch
+          ariaLabel="Analysis view"
+          className="overflow-x-auto"
+          value={currentView}
+          onValueChange={setCurrentView}
+          items={[
+            { value: "timeseries", label: "Time Series" },
+            { value: "histogram", label: "Histogram" },
+            { value: "cdf", label: "CDF" },
+            { value: "correlation", label: "Correlation" },
+          ]}
+        />
 
         {currentView === "timeseries" ? (
           <TimeSeriesView />

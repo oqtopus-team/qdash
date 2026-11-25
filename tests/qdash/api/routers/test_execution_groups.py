@@ -12,6 +12,7 @@ from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.user import UserDocument
+from tests.qdash.api._legacy_records import make_standalone_agent_session
 
 START = datetime(2026, 11, 20, 3, 0, tzinfo=UTC)
 
@@ -93,6 +94,8 @@ def _setup(test_client) -> tuple[str, str]:
     )
     assert created.status_code == 201, created.text
     session_id: str = created.json()["session_id"]
+    # A standalone agent session, as recorded before automatic calibration sessions.
+    make_standalone_agent_session("lab-a", session_id)
     AgentSessionDocument.get_motor_collection().update_one(
         {"session_id": session_id}, {"$set": {"created_at": START - timedelta(hours=1)}}
     )

@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { cleanup, fireEvent, render as rtlRender, screen } from "@testing-library/react";
+import { withNuqsTestingAdapter } from "nuqs/adapters/testing";
+import type { ReactElement, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ExecutionDetailClient } from "../ExecutionClient";
@@ -37,6 +38,11 @@ afterEach(() => {
   cleanup();
   investigate.mockClear();
 });
+
+/** Renders the page as opened with `searchParams`, the Executions view it links back to. */
+function render(ui: ReactElement, searchParams = "") {
+  return rtlRender(ui, { wrapper: withNuqsTestingAdapter({ searchParams }) });
+}
 
 describe("ExecutionDetailClient failure investigation", () => {
   it("shows the error log with its action and opens the floating chat", () => {
@@ -82,6 +88,36 @@ describe("ExecutionDetailClient parameter changes", () => {
     fireEvent.click(details.querySelector("summary")!);
     expect(details.open).toBe(false);
     expect(screen.queryByText("parameter changes body")).toBeNull();
+  });
+});
+
+describe("ExecutionDetailClient transform step", () => {
+  it("shows the recorded decision instead of measurement-only panels", () => {
+    execution = {
+      name: "nightly_filter_by_status",
+      status: "completed",
+      chip_id: "64Q",
+      task: [],
+      note: {
+        step_kind: "transform",
+        step_type: "FilterByStatus",
+        transform_result: {
+          kind: "filter",
+          input_qids: ["0", "1"],
+          output_qids: ["0"],
+          excluded: [{ target: "1", reason: "step check failed" }],
+          source_found: true,
+        },
+      },
+    };
+    render(<ExecutionDetailClient chipId="64Q" executionId="exec-2" />);
+
+    expect(screen.getByRole("heading", { name: "Step outcome" })).toBeTruthy();
+    expect(screen.getByText("Kept 1 of 2 qubits")).toBeTruthy();
+    expect(screen.getByText("step check failed")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Execution Flow" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Parameter changes" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Task Topology" })).toBeNull();
   });
 });
 
@@ -158,6 +194,81 @@ describe("ExecutionDetailClient calibration session", () => {
     pipeline_run_id: "cpr-1",
   };
 
+  const crumbs = () =>
+    Array.from(
+      screen.getByRole("navigation", { name: "Breadcrumb" }).querySelectorAll("a"),
+      (link) => [link.textContent, link.getAttribute("href")],
+    );
+
+  it("places a pipeline step under Execution, its session's objective, and its run", () => {
+    execution = {
+      name: "Pipeline step",
+      status: "completed",
+      chip_id: "64Q",
+      task: [],
+      calibration_session: member,
+    };
+    render(<ExecutionDetailClient chipId="64Q" executionId="exec-1" />);
+    expect(crumbs()).toEqual([
+      ["Execution", "/execution?chip=64Q&project=lab-a"],
+      ["Bring up qubits", "/calibration-sessions/cs-1?project=lab-a&from=executions&chip=64Q"],
+      ["Run cpr-1", "/calibration-sessions/cs-1?project=lab-a&from=executions&chip=64Q#run-cpr-1"],
+    ]);
+  });
+
+  it("returns to the Executions view it was opened from, through its session too", () => {
+    execution = {
+      name: "Pipeline step",
+      status: "completed",
+      chip_id: "64Q",
+      task: [],
+      calibration_session: member,
+    };
+    render(
+      <ExecutionDetailClient chipId="64Q" executionId="exec-1" />,
+      "project=lab-a&date=20261120&flat=true&page=2",
+    );
+    const session =
+      "/calibration-sessions/cs-1?project=lab-a&from=executions&chip=64Q&date=20261120&flat=true&page=2";
+    expect(crumbs()).toEqual([
+      ["Execution", "/execution?chip=64Q&date=20261120&flat=true&page=2&project=lab-a"],
+      ["Bring up qubits", session],
+      ["Run cpr-1", `${session}#run-cpr-1`],
+    ]);
+  });
+
+  it("ignores an invalid view in its URL", () => {
+    execution = { name: "Daily run", status: "completed", chip_id: "64Q", task: [] };
+    render(
+      <ExecutionDetailClient chipId="64Q" executionId="exec-1" />,
+      "date=tomorrow&flat=no&page=0&status=closed",
+    );
+    expect(crumbs()).toEqual([["Execution", "/execution?chip=64Q&project=lab-a"]]);
+  });
+
+  it("places an agent session's execution under its session without a run", () => {
+    execution = {
+      name: "Agent step",
+      status: "completed",
+      chip_id: "64Q",
+      task: [],
+      calibration_session: {
+        ...member,
+        via: "agent_session",
+        pipeline_run_id: undefined,
+        agent_session_id: "as-1",
+      },
+    };
+    render(<ExecutionDetailClient chipId="64Q" executionId="exec-1" />);
+    expect(crumbs().map(([label]) => label)).toEqual(["Execution", "Bring up qubits"]);
+  });
+
+  it("places a standalone execution directly under Execution on its chip", () => {
+    execution = { name: "Daily run", status: "completed", chip_id: "64Q", task: [] };
+    render(<ExecutionDetailClient chipId="64Q" executionId="exec-1" />);
+    expect(crumbs()).toEqual([["Execution", "/execution?chip=64Q&project=lab-a"]]);
+  });
+
   it("links a manual pipeline step back to its calibration session, without an agent label", () => {
     execution = {
       name: "Pipeline step",
@@ -172,7 +283,7 @@ describe("ExecutionDetailClient calibration session", () => {
     expect(note.textContent).toContain("Bring up qubits (closed)");
     expect(
       screen.getByRole("link", { name: "Open calibration session" }).getAttribute("href"),
-    ).toBe("/calibration-sessions/cs-1?project=lab-a");
+    ).toBe("/calibration-sessions/cs-1?project=lab-a&from=executions&chip=64Q");
     expect(screen.queryByText("Agent")).toBeNull();
     expect(screen.queryByTestId("reported-origin-badge")).toBeNull();
   });

@@ -9,7 +9,7 @@ from pydantic import ValidationError
 
 from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY, FlowTargetOverride
 from qdash.workflow import TaskCall
-from qdash.workflow.service._internal.session import CalibSession
+from qdash.workflow.service._internal.session import ExecutionRuntime
 from qdash.workflow.service._internal.settings import SessionSettings
 from qdash.workflow.service.flow_targets import (
     override_pipeline,
@@ -77,7 +77,7 @@ def test_context_override_replaces_the_pipeline_targets(monkeypatch):
         flow_run=SimpleNamespace(context={TARGET_CONTEXT_KEY: override.model_dump()})
     )
     run_pipeline = MagicMock(return_value={})
-    monkeypatch.setattr(CalibSession, "run_pipeline", run_pipeline)
+    monkeypatch.setattr(ExecutionRuntime, "run_pipeline", run_pipeline)
     settings = SessionSettings(
         username="user", chip_id="chip", project_id="project", backend_name="fake"
     )
@@ -173,7 +173,7 @@ def test_invalid_overrides_stop_the_run_before_a_session_exists(monkeypatch):
         flow_run=SimpleNamespace(context={TARGET_CONTEXT_KEY: SELECTED.model_dump()})
     )
     created = MagicMock()
-    monkeypatch.setattr(runs, "CalibSession", created)
+    monkeypatch.setattr(runs, "ExecutionRuntime", created)
     settings = SessionSettings(
         username="user", chip_id="chip", project_id="project", backend_name="fake"
     )
@@ -200,7 +200,7 @@ def test_selected_pairs_reach_the_pipeline_as_targets(monkeypatch):
         flow_run=SimpleNamespace(context={TARGET_CONTEXT_KEY: SELECTED.model_dump()})
     )
     run_pipeline = MagicMock(return_value={})
-    monkeypatch.setattr(CalibSession, "run_pipeline", run_pipeline)
+    monkeypatch.setattr(ExecutionRuntime, "run_pipeline", run_pipeline)
     settings = SessionSettings(
         username="user", chip_id="chip", project_id="project", backend_name="fake"
     )

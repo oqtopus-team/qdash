@@ -7,6 +7,6 @@
  */
 
 /**
- * Record the run in this calibration session, which must be open, on this chip, and created by the signed-in user. It groups the run with the session's other work and grants nothing: the run is the request approved here. Requires idempotency_key.
+ * Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
  */
 export type ExecutePipelineRequestCalibrationSessionId = string | null;

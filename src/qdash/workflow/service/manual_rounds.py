@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
     from qdash.common.mux_mapping import MuxMapping
     from qdash.datamodel.task_call import StepCalls
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
 
 MANUAL_STAGE_RESULT = "1q_manual"
 
@@ -58,7 +58,7 @@ def chip_coupling_ids(project_id: str | None, chip_id: str) -> set[str]:
 
 
 def check_qubit_rounds(
-    session: CalibSession,
+    session: ExecutionRuntime,
     rounds: QubitRounds,
     *,
     step: str,
@@ -79,7 +79,7 @@ def check_qubit_rounds(
 
 
 def check_pair_rounds(
-    session: CalibSession,
+    session: ExecutionRuntime,
     rounds: PairRounds,
     *,
     step: str,
@@ -103,7 +103,7 @@ def check_pair_rounds(
 
 
 def run_qubit_rounds(
-    session: CalibSession,
+    session: ExecutionRuntime,
     rounds: QubitRounds,
     *,
     plan: StepCalls,
@@ -132,7 +132,7 @@ def run_qubit_rounds(
 
 
 def run_pair_rounds(
-    session: CalibSession,
+    session: ExecutionRuntime,
     rounds: PairRounds,
     *,
     plan: StepCalls,

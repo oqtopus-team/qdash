@@ -1,7 +1,10 @@
 "use client";
 
+import { useEffect, useRef, useState, type ReactNode } from "react";
+
+import { Info } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useQueryStates } from "nuqs";
 
 import {
   getGetCalibrationSessionQueryKey,
@@ -16,6 +19,9 @@ import {
   sessionAuditHref,
   sessionStatusBadgeClass,
 } from "@/components/features/execution/agentSessionDisplay";
+import { ExecutionBreadcrumbs } from "@/components/features/execution/ExecutionAreaNav";
+import { ExecutionActor } from "@/components/features/execution/ExecutionAttribution";
+import { CalibrationSessionStatusBadge } from "@/components/features/execution/CalibrationSessionStatus";
 import { ReportedOriginBadge } from "@/components/features/execution/ExecutionCalibrationContext";
 import { getStatusBadgeClass } from "@/components/features/execution/ExecutionListCard";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -23,7 +29,23 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { QubitTile } from "@/components/ui/QubitTile";
 import { useAuth } from "@/contexts/AuthContext";
-import { calibrationSessionsHref, dispatchStatusStyle } from "@/lib/chatCalibrationSession";
+import {
+  dispatchStatusStyle,
+  runDisplayName,
+  runKindLabel,
+  runTriggerLabel,
+} from "@/lib/chatCalibrationSession";
+import {
+  type ExecutionCrumb,
+  type SessionReturnContext,
+  calibrationSessionCrumbs,
+  executionDetailHref,
+  runAnchorId,
+  runIdFromHash,
+  sessionReturnFromQuery,
+  sessionReturnParsers,
+} from "@/lib/executionArea";
+import { transformSummary } from "@/lib/transformStep";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime } from "@/lib/utils/datetime";
 import type {
@@ -39,6 +61,44 @@ import { CloseCalibrationSessionButton } from "./CloseCalibrationSessionButton";
 /** How often an open session is read again while the page shows it. */
 const REFRESH_MS = 15_000;
 
+/** An objective longer than this, or on several lines, is also shown whole below the heading. */
+const LONG_OBJECTIVE = 120;
+
+/**
+ * The list this page links back to, from its URL: the Executions list or the session list with
+ * its filters. Only known parameters with valid values are read, and every link they build
+ * stays on an Execution-area route.
+ */
+function useSessionReturn(): SessionReturnContext {
+  const [state] = useQueryStates(sessionReturnParsers);
+  return sessionReturnFromQuery(state);
+}
+
+/** The run the page's `#run-…` fragment names, read again when the fragment changes. */
+function useTargetRunId(): string | null {
+  const [runId, setRunId] = useState<string | null>(null);
+  useEffect(() => {
+    const read = () => setRunId(runIdFromHash(window.location.hash));
+    read();
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
+  }, []);
+  return runId;
+}
+
+/** Builds the link to one execution of the session. */
+type ExecutionLink = (chipId: string, executionId: string) => string;
+
+/** The heading of a page that could not show its session. */
+function PlainHeader({ crumbs }: { crumbs: ExecutionCrumb[] }) {
+  return (
+    <>
+      <ExecutionBreadcrumbs crumbs={crumbs} />
+      <PageHeader title="Calibration session" className="mt-2" />
+    </>
+  );
+}
+
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
@@ -48,25 +108,28 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function executionHref(chipId: string, executionId: string, projectId: string | null) {
-  const path = `/execution/${encodeURIComponent(chipId)}/${encodeURIComponent(executionId)}`;
-  return projectId ? `${path}?project=${encodeURIComponent(projectId)}` : path;
-}
+/** Words for the planned-step states that have no execution behind them. */
+const STEP_STATUS_LABELS: Record<string, string> = {
+  skipped: "not reached",
+  not_recorded: "not recorded",
+};
 
 function StatusBadge({ status }: { status: string }) {
   return (
-    <span className={`badge badge-soft badge-sm ${getStatusBadgeClass(status)}`}>{status}</span>
+    <span className={`badge badge-soft badge-sm ${getStatusBadgeClass(status)}`}>
+      {STEP_STATUS_LABELS[status] ?? status}
+    </span>
   );
 }
 
 function ExecutionLinks({
   chipId,
   executions,
-  projectId,
+  executionLink,
 }: {
   chipId: string;
   executions: ExecutionResponseSummary[];
-  projectId: string | null;
+  executionLink: ExecutionLink;
 }) {
   if (executions.length === 0) return null;
   return (
@@ -74,7 +137,7 @@ function ExecutionLinks({
       {executions.map((execution) => (
         <li key={execution.execution_id} className="flex items-center justify-between gap-2">
           <Link
-            href={executionHref(chipId, execution.execution_id, projectId)}
+            href={executionLink(chipId, execution.execution_id)}
             className="link link-hover truncate font-mono text-xs"
           >
             {execution.execution_id}
@@ -86,21 +149,34 @@ function ExecutionLinks({
   );
 }
 
-/** One pipeline run: its launch, then each planned step and the execution it ran in. */
+/** One run: its launch, then each planned step and the execution it ran in. */
 function PipelineRunItem({
   run,
-  projectId,
+  executionLink,
+  targeted,
 }: {
   run: CalibrationPipelineRunResponse;
-  projectId: string | null;
+  executionLink: ExecutionLink;
+  /** Whether the link that opened the page pointed at this run. */
+  targeted: boolean;
 }) {
   const dispatch = dispatchStatusStyle(run.dispatch_status);
   const steps = run.pipeline?.steps ?? [];
   const executions = run.executions ?? [];
+  const trigger = runTriggerLabel(run.trigger);
   return (
-    <li className="flex flex-col gap-2 py-3" data-testid="calibration-pipeline-run">
+    <li
+      id={runAnchorId(run.run_id)}
+      className={`flex scroll-mt-20 flex-col gap-2 py-3 ${
+        targeted ? "-mx-2 rounded-box bg-base-200 px-2" : ""
+      }`}
+      aria-current={targeted ? "location" : undefined}
+      data-testid="calibration-pipeline-run"
+    >
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium">{run.pipeline_name || "Pipeline run"}</span>
+        <span className="text-sm font-medium">{runDisplayName(run)}</span>
+        <span className="badge badge-outline badge-sm">{runKindLabel(run.run_kind)}</span>
+        {trigger ? <span className="badge badge-ghost badge-sm">{trigger}</span> : null}
         <span className={`badge badge-soft badge-sm ${dispatch.badge}`}>{dispatch.label}</span>
         {run.pipeline ? <StatusBadge status={run.pipeline.status} /> : null}
         {run.reported_origin ? <ReportedOriginBadge origin={run.reported_origin} /> : null}
@@ -110,9 +186,8 @@ function PipelineRunItem({
       </div>
       {run.dispatch_status === "unknown" ? (
         <p className="text-xs text-warning">
-          QDash could not confirm whether this run started. It was admitted, so it may be running or
-          may still start, even after the session is closed. Check the Execution list before
-          starting it again.
+          Start not confirmed: it may be running or may still start, even after close. Check the
+          Execution list before starting it again.
         </p>
       ) : null}
       {run.dispatch_status === "rejected" && run.error ? (
@@ -121,14 +196,24 @@ function PipelineRunItem({
       {steps.length > 0 ? (
         <ol className="flex flex-col gap-1">
           {steps.map((step) => (
-            <li key={step.index} className="flex items-center justify-between gap-2 text-xs">
+            <li
+              key={step.key || step.index}
+              className="flex items-center justify-between gap-2 text-xs"
+            >
               <span className="min-w-0 truncate">
                 {step.index}. {step.name}
+                {step.transform ? (
+                  // A filter or schedule runs no task; its recorded decision is its result.
+                  <span className="text-base-content/60">
+                    {" "}
+                    · {transformSummary(step.transform)}
+                  </span>
+                ) : null}
               </span>
               <span className="flex shrink-0 items-center gap-2">
                 {step.execution_id ? (
                   <Link
-                    href={executionHref(run.chip_id, step.execution_id, projectId)}
+                    href={executionLink(run.chip_id, step.execution_id)}
                     className="link link-hover font-mono"
                   >
                     {step.execution_id}
@@ -140,7 +225,11 @@ function PipelineRunItem({
           ))}
         </ol>
       ) : (
-        <ExecutionLinks chipId={run.chip_id} executions={executions} projectId={projectId} />
+        <ExecutionLinks
+          chipId={run.chip_id}
+          executions={executions}
+          executionLink={executionLink}
+        />
       )}
     </li>
   );
@@ -160,10 +249,12 @@ function AgentSessionItem({
   chipId,
   agent,
   projectId,
+  executionLink,
 }: {
   chipId: string;
   agent: CalibrationAgentSessionChild;
   projectId: string | null;
+  executionLink: ExecutionLink;
 }) {
   const executions = agent.executions ?? [];
   return (
@@ -197,7 +288,7 @@ function AgentSessionItem({
           <QubitTile key={qid} qid={qid} />
         ))}
       </div>
-      <ExecutionLinks chipId={chipId} executions={executions} projectId={projectId} />
+      <ExecutionLinks chipId={chipId} executions={executions} executionLink={executionLink} />
     </li>
   );
 }
@@ -210,6 +301,20 @@ export function CalibrationSessionPageContent({
   const linked = useLinkedProject();
   const { username } = useAuth();
   const projectId = linked.status === "ready" ? linked.projectId : null;
+  const sessionReturn = useSessionReturn();
+  const crumbs = calibrationSessionCrumbs(sessionReturn, projectId);
+  const targetRunId = useTargetRunId();
+  // Opened from the Executions list, an execution page returns to that list's view, as long as
+  // the execution is on the chip that view shows.
+  const executionLink: ExecutionLink = (chipId, executionId) =>
+    executionDetailHref(
+      chipId,
+      executionId,
+      projectId,
+      sessionReturn.from === "executions" && sessionReturn.list.chip === chipId
+        ? sessionReturn.list
+        : undefined,
+    );
   const session = useGetCalibrationSession(calibrationSessionId, {
     query: {
       queryKey: [...getGetCalibrationSessionQueryKey(calibrationSessionId), projectId],
@@ -219,11 +324,22 @@ export function CalibrationSessionPageContent({
     request: projectId ? projectRequest(projectId) : undefined,
   });
   const data = session.data?.data;
+  const targetRunShown =
+    targetRunId !== null && (data?.pipeline_runs ?? []).some((run) => run.run_id === targetRunId);
+
+  // The fragment's run appears only once the session has loaded, after the browser looked for
+  // it; bring it into view then, once per fragment.
+  const scrolledToRun = useRef<string | null>(null);
+  useEffect(() => {
+    if (!targetRunId || !targetRunShown || scrolledToRun.current === targetRunId) return;
+    scrolledToRun.current = targetRunId;
+    document.getElementById(runAnchorId(targetRunId))?.scrollIntoView({ block: "start" });
+  }, [targetRunId, targetRunShown]);
 
   if (linked.status === "unavailable" || linked.status === "no_project") {
     return (
       <PageContainer maxWidth>
-        <PageHeader title="Calibration session" />
+        <PlainHeader crumbs={crumbs} />
         <div role="alert" className="alert alert-error alert-soft">
           <span>
             {linked.status === "unavailable"
@@ -247,7 +363,7 @@ export function CalibrationSessionPageContent({
   if (session.isError || !data) {
     return (
       <PageContainer maxWidth>
-        <PageHeader title="Calibration session" />
+        <PlainHeader crumbs={crumbs} />
         <div role="alert" className="alert alert-error alert-soft">
           <span>
             {getApiErrorMessage(session.error, "This calibration session could not be loaded")}
@@ -264,47 +380,69 @@ export function CalibrationSessionPageContent({
   const blockers = data.close_blockers ?? [];
   const unknownAgentStarts = (data.unknown_starts ?? []).map((start) => start.child_id);
   const isOpen = data.status === "open";
+  const isAutomatic = data.origin === "automatic";
+  const longObjective = data.objective.length > LONG_OBJECTIVE || data.objective.includes("\n");
   return (
     <PageContainer maxWidth>
-      <PageHeader
-        title="Calibration session"
-        description={`${data.chip_id} · created by ${data.created_by} ${formatDateTime(data.created_at)}`}
-        actions={
-          <Link href={calibrationSessionsHref({ projectId })} className="btn btn-ghost btn-sm">
-            All calibration sessions
-          </Link>
-        }
-      />
+      <header className="mb-4 flex min-w-0 flex-col gap-1 sm:mb-6">
+        <ExecutionBreadcrumbs crumbs={crumbs} />
+        <p className="mt-2 text-xs text-base-content/60">
+          {isAutomatic ? "Automatic calibration session" : "Calibration session"}
+        </p>
+        {/* The objective names the session; for an automatic one it is the run's recorded name. */}
+        <h1 className="line-clamp-3 text-xl font-medium wrap-anywhere">{data.objective}</h1>
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-base-content/60">
+          <span>Chip {data.chip_id}</span>
+          <ExecutionActor actor={{ username: data.created_by }} />
+          <span>Created {formatDateTime(data.created_at)}</span>
+        </p>
+      </header>
       <div className="flex flex-col gap-4">
-        <section className="card card-border bg-base-100">
+        <section className="card card-border bg-base-100" aria-label="Summary">
           <div className="card-body grid gap-3 p-4 sm:grid-cols-2 md:grid-cols-4">
-            <div className="sm:col-span-2 md:col-span-4">
-              <Field label="Objective">
-                <p className="whitespace-pre-wrap wrap-anywhere">{data.objective}</p>
-              </Field>
-            </div>
+            {longObjective ? (
+              <div className="sm:col-span-2 md:col-span-4">
+                <Field label="Objective">
+                  <p className="whitespace-pre-wrap wrap-anywhere">{data.objective}</p>
+                </Field>
+              </div>
+            ) : null}
             <Field label="Status">
-              <span
-                className={`badge badge-soft badge-sm ${isOpen ? "badge-info" : "badge-ghost"}`}
-              >
-                {isOpen ? "Open" : "Closed"}
-              </span>
+              <CalibrationSessionStatusBadge status={data.status} />
             </Field>
-            <Field label="Pipeline runs">{runTotal}</Field>
+            <Field label="Origin">
+              {isAutomatic ? (
+                <span
+                  className="badge badge-ghost badge-sm"
+                  title="QDash created this session for a run started without one"
+                >
+                  Automatic
+                </span>
+              ) : (
+                <span className="badge badge-ghost badge-sm">Created for an objective</span>
+              )}
+            </Field>
+            <Field label="Runs">{runTotal}</Field>
             <Field label="Agent sessions">{agentTotal}</Field>
             <Field label="Still running or waiting">{blockers.length}</Field>
             <Field label="Decisions">{data.decision_total ?? 0}</Field>
             {!isOpen ? (
               <div className="sm:col-span-2 md:col-span-4">
                 <Field label="Closed">
-                  {data.closed_by} · {formatDateTime(data.closed_at ?? null)}
+                  {/* An automatic close is QDash's record that the work ended, not a person's. */}
+                  {data.close_origin === "automatic"
+                    ? "Automatically, when its work ended"
+                    : data.closed_by}{" "}
+                  · {formatDateTime(data.closed_at ?? null)}
                   {data.closing_note ? `: ${data.closing_note}` : ""}
                 </Field>
               </div>
             ) : null}
             <p className="text-xs text-base-content/60 sm:col-span-2 md:col-span-4">
-              Groups the work started for this objective. It grants nothing: each pipeline run is
-              approved on its own, and each agent session keeps its own policy and pause.
+              It grants nothing: runs and agent sessions keep their own approvals.
+              {isAutomatic
+                ? " QDash created it for a run started without a session and closes it when everything in it has ended."
+                : ""}
             </p>
             {isOpen && projectId && username === data.created_by ? (
               <div className="sm:col-span-2 md:col-span-4">
@@ -325,23 +463,43 @@ export function CalibrationSessionPageContent({
           experiments={data.experiments ?? []}
           recommendation={data.recommendation}
           latestRun={data.latest_requested_run}
-          executionHref={(executionId) => executionHref(data.chip_id, executionId, projectId)}
+          executionHref={(executionId) => executionLink(data.chip_id, executionId)}
         />
 
-        <section className="card card-border bg-base-100" aria-label="Pipeline runs">
+        <section className="card card-border bg-base-100" aria-label="Runs">
           <div className="card-body gap-1 p-4">
-            <h2 className="text-sm font-medium">Pipeline runs</h2>
-            <ListedOf shown={runs.length} total={runTotal} noun="pipeline runs" />
+            <h2 className="text-sm font-medium">Runs</h2>
+            <ListedOf shown={runs.length} total={runTotal} noun="runs" />
+            {targetRunId && !targetRunShown ? (
+              <div
+                role="status"
+                className="alert alert-info alert-soft my-2 text-sm"
+                data-testid="calibration-run-not-listed"
+              >
+                <Info className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="wrap-anywhere">
+                  {runs.length > 0
+                    ? `Run ${targetRunId} is not among the latest ${runs.length} runs listed here.`
+                    : `Run ${targetRunId} is not listed here.`}{" "}
+                  Its executions stay on the Execution list.
+                </span>
+              </div>
+            ) : null}
             {runs.length === 0 ? (
               <EmptyState
-                title="No pipeline runs"
-                description="Pipelines started with this session's ID appear here, each with all of its step executions"
+                title="No runs"
+                description="Runs started with this session's ID appear here"
                 emoji="empty"
               />
             ) : (
               <ul className="flex flex-col divide-y divide-base-content/10">
                 {runs.map((run) => (
-                  <PipelineRunItem key={run.run_id} run={run} projectId={projectId} />
+                  <PipelineRunItem
+                    key={run.run_id}
+                    run={run}
+                    executionLink={executionLink}
+                    targeted={run.run_id === targetRunId}
+                  />
                 ))}
               </ul>
             )}
@@ -355,7 +513,7 @@ export function CalibrationSessionPageContent({
             {agents.length === 0 ? (
               <EmptyState
                 title="No agent sessions"
-                description="Agent sessions created with this session's ID appear here with the executions they ran"
+                description="Agent sessions created with this session's ID appear here"
                 emoji="robot"
               />
             ) : (
@@ -366,6 +524,7 @@ export function CalibrationSessionPageContent({
                     chipId={data.chip_id}
                     agent={agent}
                     projectId={projectId}
+                    executionLink={executionLink}
                   />
                 ))}
               </ul>

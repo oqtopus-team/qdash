@@ -56,9 +56,7 @@ describe("the calibration sessions shown in a chat", () => {
     // The ID QDash does not know shows nothing.
     expect(rows).toHaveLength(2);
     expect(rows[0].textContent).toContain("Bring up qubits 0 and 1");
-    expect(rows[0].textContent).toContain(
-      "2 pipeline runs · 1 agent session · 1 running or waiting",
-    );
+    expect(rows[0].textContent).toContain("2 runs · 1 agent session · 1 running or waiting");
     expect(rows[1].textContent).toContain("Closed");
     const links = screen.getAllByRole("link", { name: "Open" });
     expect(links[0].getAttribute("href")).toBe("/calibration-sessions/cs-1?project=p1");
@@ -111,9 +109,7 @@ describe("the calibration sessions shown in a chat", () => {
       pipeline_run_total: 140,
     };
     render(<ChatCalibrationSessions calibrationSessionIds={["cs-1"]} />);
-    expect(screen.getByTestId("chat-calibration-session").textContent).toContain(
-      "140 pipeline runs",
-    );
+    expect(screen.getByTestId("chat-calibration-session").textContent).toContain("140 runs");
   });
 
   it("shows nothing without a named session", () => {

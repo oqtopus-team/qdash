@@ -1,7 +1,9 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CalibrationSessionPageContent } from "@/components/features/calibration-session/CalibrationSessionPageContent";
+import { formatDateTime } from "@/lib/utils/datetime";
 
 const state = vi.hoisted(() => ({
   detail: null as null | Record<string, unknown>,
@@ -112,6 +114,14 @@ const DETAIL = {
   unknown_runs: ["cpr-2"],
 };
 
+function renderPage(searchParams = "") {
+  return render(
+    <NuqsTestingAdapter searchParams={searchParams}>
+      <CalibrationSessionPageContent calibrationSessionId="cs-1" />
+    </NuqsTestingAdapter>,
+  );
+}
+
 afterEach(cleanup);
 beforeEach(() => {
   state.detail = DETAIL;
@@ -120,8 +130,27 @@ beforeEach(() => {
 });
 
 describe("CalibrationSessionPageContent", () => {
+  it("names an automatic session and what each of its runs launched", () => {
+    const [first] = DETAIL.pipeline_runs;
+    state.detail = {
+      ...DETAIL,
+      origin: "automatic",
+      objective: "Workflow nightly_1q",
+      pipeline_runs: [
+        { ...first, run_kind: "workflow", run_name: "nightly_1q", trigger: "schedule" },
+      ],
+    };
+    renderPage();
+    expect(screen.getByText("Automatic")).toBeTruthy();
+    expect(screen.getByText(/QDash created it for a run started without a session/)).toBeTruthy();
+    const [run] = screen.getAllByTestId("calibration-pipeline-run");
+    expect(within(run).getByText("nightly_1q")).toBeTruthy();
+    expect(within(run).getByText("Workflow")).toBeTruthy();
+    expect(within(run).getByText("Scheduled")).toBeTruthy();
+  });
+
   it("shows one pipeline run with every step execution, and the agent session with its executions", () => {
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    renderPage();
     expect(state.requests[0]).toEqual({
       key: ["/calibration-sessions/cs-1", "lab-a"],
       project: "lab-a",
@@ -158,7 +187,7 @@ describe("CalibrationSessionPageContent", () => {
       },
     ];
     state.detail = { ...DETAIL, pipeline_runs: [manual, tool] };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    renderPage();
     const [manualRow, toolRow] = screen.getAllByTestId("calibration-pipeline-run");
     expect(within(manualRow).queryByTestId("reported-origin-badge")).toBeNull();
     const badge = within(toolRow).getByTestId("reported-origin-badge");
@@ -169,24 +198,39 @@ describe("CalibrationSessionPageContent", () => {
 
   it("offers closing only to its creator while it is open, and says that it grants nothing", () => {
     state.username = "bob";
-    const { unmount } = render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    const { unmount } = renderPage();
     expect(screen.queryByRole("button", { name: "Close session" })).toBeNull();
     expect(screen.getByText(/It grants nothing/)).toBeTruthy();
     unmount();
 
     state.username = "alice";
     state.detail = { ...DETAIL, status: "closed", closed_by: "alice", closing_note: "done" };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    renderPage();
     expect(screen.queryByRole("button", { name: "Close session" })).toBeNull();
     expect(screen.getByText("Closed", { selector: ".badge" })).toBeTruthy();
   });
 
+  it("labels an automatic close as QDash's, not a person's", () => {
+    state.detail = {
+      ...DETAIL,
+      origin: "automatic",
+      status: "closed",
+      closed_by: "system:auto-close",
+      close_origin: "automatic",
+      closing_note: "Closed automatically: everything started in this session ended.",
+    };
+    renderPage();
+    expect(screen.getByText(/Automatically, when its work ended/)).toBeTruthy();
+    expect(screen.queryByText(/system:auto-close/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Close session" })).toBeNull();
+  });
+
   it("says when the lists are cut, and counts every child", () => {
     state.detail = { ...DETAIL, pipeline_run_total: 140, agent_session_total: 1 };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    renderPage();
     const [cut] = screen.getAllByTestId("calibration-list-cut");
     expect(cut.textContent).toBe(
-      "Showing the latest 2 of 140 pipeline runs. Close checks every one of them.",
+      "Showing the latest 2 of 140 runs. Close checks every one of them.",
     );
     expect(screen.getAllByTestId("calibration-list-cut")).toHaveLength(1);
     expect(screen.getByText("140")).toBeTruthy();
@@ -207,7 +251,7 @@ describe("CalibrationSessionPageContent", () => {
         },
       ],
     };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    renderPage();
     fireEvent.click(screen.getByRole("button", { name: "Close session" }));
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText(/agent sessions as-lost were being started/)).toBeTruthy();
@@ -220,7 +264,7 @@ describe("CalibrationSessionPageContent", () => {
 
   it("says an admitted pipeline run with an unknown start may still start after closing", () => {
     state.detail = { ...DETAIL, close_blockers: [], unknown_runs: ["cpr-2"] };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    renderPage();
     fireEvent.click(screen.getByRole("button", { name: "Close session" }));
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText(/may still start after I close/)).toBeTruthy();
@@ -233,15 +277,15 @@ describe("CalibrationSessionPageContent", () => {
       ...DETAIL,
       agent_sessions: [{ ...agent, calibration_admission: "pending" }],
     };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
+    renderPage();
     const row = screen.getByTestId("calibration-agent-session");
     expect(within(row).getByText("Not admitted yet")).toBeTruthy();
   });
 
   it("names empty sections", () => {
     state.detail = { ...DETAIL, pipeline_runs: [], agent_sessions: [], close_blockers: [] };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
-    expect(screen.getByText("No pipeline runs")).toBeTruthy();
+    renderPage();
+    expect(screen.getByText("No runs")).toBeTruthy();
     expect(screen.getByText("No agent sessions")).toBeTruthy();
   });
 
@@ -361,12 +405,12 @@ describe("CalibrationSessionPageContent", () => {
         missing: ["an authoritative record of what this run wrote to the hardware"],
       },
     };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
-    const progress = screen.getByRole("region", { name: "Search progression" });
-    const stages = within(progress).getByRole("list", { name: "Stages reached" });
-    expect(within(stages).getByText("Baseline").className).toContain("step-primary");
-    expect(within(stages).getByText("Confirmation").className).not.toContain("step-primary");
+    renderPage();
+    const progress = screen.getByRole("region", { name: "Experiments" });
+    // The stage is a column of the comparison, not a separate stepper.
+    expect(within(progress).queryByRole("list", { name: "Stages reached" })).toBeNull();
     const table = within(progress).getByRole("table", { name: "Candidate comparison" });
+    expect(within(table).getAllByText("Screening")).toHaveLength(2);
     expect(within(table).getByText("256.0 ns")).toBeTruthy();
     expect(within(table).getByText("0.9900 ± 0.0020")).toBeTruthy();
     expect(within(table).getByText("adiabatic_safe_factor 0.75 → 0.8")).toBeTruthy();
@@ -374,15 +418,28 @@ describe("CalibrationSessionPageContent", () => {
     expect(within(table).getByText(/Executed adiabatic_safe_factor 0.75/)).toBeTruthy();
     expect(within(table).getByText("No run carried it out")).toBeTruthy();
     expect(within(table).getByText("10.0 min")).toBeTruthy();
-    expect(within(progress).getByText("Keeps the baseline")).toBeTruthy();
-    expect(within(progress).getByText("Agent statement")).toBeTruthy();
-    const notice = within(progress).getByRole("status").textContent ?? "";
-    expect(notice).toMatch(/The latest requested run \(candidate c03/);
-    expect(notice).toMatch(/completed every execution/);
-    expect(notice).toMatch(/requested candidate is not the recommended candidate incumbent/);
+    // The rationale is a statement in its own column, apart from the measured values.
+    const rationaleColumn = within(table)
+      .getAllByRole("columnheader")
+      .findIndex((header) => header.textContent === "Rationale");
+    const firstRow = within(table).getAllByRole("row")[1];
+    expect(within(firstRow).getAllByRole("cell")[rationaleColumn].textContent).toBe(
+      "Latest validated chain",
+    );
+    const conclusion = within(progress).getByRole("group", { name: "Conclusion" });
+    expect(within(conclusion).getByText("Keep baseline")).toBeTruthy();
+    expect(within(conclusion).getByText("Agent statement")).toBeTruthy();
+    expect(within(conclusion).getByText("c03 was not confirmed.")).toBeTruthy();
+    const latest = within(progress).getByRole("group", { name: "Latest requested run" });
+    expect(within(latest).getByText("Completed")).toBeTruthy();
+    expect(within(latest).getByText("c03")).toBeTruthy();
+    expect(within(latest).getByText("Not the recommended candidate incumbent")).toBeTruthy();
+    // Requested and finished are separate facts; a run without an end is not shown finished.
+    expect(within(latest).getByText("Requested")).toBeTruthy();
+    expect(within(latest).getByText("Finished").nextElementSibling?.textContent).toBe("—");
     // A completed run is never presented as the hardware state.
-    expect(notice).toMatch(/QDash records no authoritative hardware write/);
-    expect(notice).not.toMatch(/last state the session wrote|wrote its results/);
+    expect(within(latest).getByText("Hardware state is not tracked")).toBeTruthy();
+    expect(latest.textContent).not.toMatch(/last state the session wrote|wrote its results/);
     const link = within(table).getAllByRole("link", { name: "Execution" })[0];
     expect(link.getAttribute("href")).toBe("/execution/64Qv3/exec-9?project=lab-a");
     expect(screen.getByTestId("calibration-audit").getAttribute("data-project")).toBe("lab-a");
@@ -404,10 +461,67 @@ describe("CalibrationSessionPageContent", () => {
         missing: [],
       },
     };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
-    const notice = screen.getByRole("status");
-    expect(notice.className).toContain("alert-warning");
-    expect(notice.textContent).toMatch(/names no decision.*QDash refused its launch/);
+    renderPage();
+    const latest = screen.getByRole("group", { name: "Latest requested run" });
+    expect(within(latest).getByText("Refused, never ran")).toBeTruthy();
+    expect(within(latest).getByText("No candidate")).toBeTruthy();
+    expect(within(latest).queryByText(/recommended candidate/)).toBeNull();
+  });
+
+  it("keeps the requested and finished times of the latest run apart", () => {
+    state.detail = {
+      ...DETAIL,
+      experiments: [],
+      recommendation: null,
+      latest_requested_run: {
+        pipeline_run_id: "cpr-11",
+        requested_at: "2026-11-23T00:40:00Z",
+        finished_at: "2026-11-23T02:15:00Z",
+        dispatch_status: "dispatched",
+        execution_outcome: "partial",
+        candidate_id: "c05",
+        execution_ids: ["exec-11"],
+        candidate_is_recommended: false,
+        missing: [],
+      },
+    };
+    renderPage();
+    const latest = screen.getByRole("group", { name: "Latest requested run" });
+    const requested = within(latest).getByText("Requested").nextElementSibling?.textContent;
+    const finished = within(latest).getByText("Finished").nextElementSibling?.textContent;
+    expect(requested).toBe(formatDateTime("2026-11-23T00:40:00Z"));
+    expect(finished).toBe(formatDateTime("2026-11-23T02:15:00Z"));
+    expect(requested).not.toBe(finished);
+    expect(within(latest).getByText("Partly completed")).toBeTruthy();
+    // No recommendation names the other candidate, so the mismatch stays generic.
+    expect(within(latest).getByText("Not the recommended candidate")).toBeTruthy();
+  });
+
+  it.each([
+    ["running", "Not finished"],
+    ["unknown", "Unknown"],
+  ])("shows the finish state for a %s latest run", (outcome, finishedLabel) => {
+    state.detail = {
+      ...DETAIL,
+      experiments: [],
+      recommendation: null,
+      latest_requested_run: {
+        pipeline_run_id: "cpr-12",
+        requested_at: "2026-11-23T00:40:00Z",
+        dispatch_status: outcome === "unknown" ? "unknown" : "dispatched",
+        execution_outcome: outcome,
+        candidate_id: "c06",
+        execution_ids: ["exec-12"],
+        candidate_is_recommended: true,
+        missing: [],
+      },
+    };
+    renderPage();
+    const latest = screen.getByRole("group", { name: "Latest requested run" });
+    expect(within(latest).getByText("Finished").nextElementSibling?.textContent).toBe(
+      finishedLabel,
+    );
+    expect(within(latest).queryByText(/recommended candidate/)).toBeNull();
   });
 
   it("never shows a conclusion that was not recorded", () => {
@@ -418,8 +532,141 @@ describe("CalibrationSessionPageContent", () => {
       recommendation: null,
       latest_requested_run: null,
     };
-    render(<CalibrationSessionPageContent calibrationSessionId="cs-1" />);
-    expect(screen.queryByRole("region", { name: "Search progression" })).toBeNull();
-    expect(screen.queryByText(/Recommends|Keeps the baseline/)).toBeNull();
+    renderPage();
+    expect(screen.queryByRole("region", { name: "Experiments" })).toBeNull();
+    expect(screen.queryByText(/Recommend|Keep baseline/)).toBeNull();
+  });
+
+  describe("place in the Execution area", () => {
+    const crumbLinks = () =>
+      within(screen.getByRole("navigation", { name: "Breadcrumb" }))
+        .getAllByRole("link")
+        .map((link) => [link.textContent, link.getAttribute("href")]);
+
+    it("names the session by its objective, under Execution and the session list", () => {
+      renderPage();
+      expect(
+        screen.getByRole("heading", { level: 1, name: "Bring up qubits 0 and 1" }),
+      ).toBeTruthy();
+      expect(screen.getByText("Calibration session")).toBeTruthy();
+      // An old bookmark or chat link has no list to return to: the plain session list.
+      expect(crumbLinks()).toEqual([
+        ["Execution", "/execution?project=lab-a"],
+        ["Calibration sessions", "/calibration-sessions?project=lab-a"],
+      ]);
+    });
+
+    it("heads an automatic session with the workflow name it recorded", () => {
+      state.detail = { ...DETAIL, origin: "automatic", objective: "Workflow nightly_1q" };
+      renderPage();
+      expect(screen.getByRole("heading", { level: 1, name: "Workflow nightly_1q" })).toBeTruthy();
+      expect(screen.getByText("Automatic calibration session")).toBeTruthy();
+    });
+
+    it("links back to the session list with the filters and page it was opened from", () => {
+      renderPage("chip=64Qv3&status=closed&origin=automatic&mine=true&page=2");
+      expect(crumbLinks()).toEqual([
+        ["Execution", "/execution?chip=64Qv3&project=lab-a"],
+        [
+          "Calibration sessions",
+          "/calibration-sessions?chip=64Qv3&status=closed&origin=automatic&mine=true&page=2&project=lab-a",
+        ],
+      ]);
+    });
+
+    it("links back to the Executions list on its chip when opened from there", () => {
+      renderPage("from=executions&chip=64Qv3");
+      expect(crumbLinks()).toEqual([["Execution", "/execution?chip=64Qv3&project=lab-a"]]);
+    });
+
+    it("drops return values it does not know and keeps links on Execution-area routes", () => {
+      renderPage("from=https://evil.example&status=bogus&page=-4&mine=maybe&chip=//evil.example");
+      expect(crumbLinks()).toEqual([
+        ["Execution", "/execution?chip=%2F%2Fevil.example&project=lab-a"],
+        ["Calibration sessions", "/calibration-sessions?chip=%2F%2Fevil.example&project=lab-a"],
+      ]);
+    });
+
+    it("keeps a long objective whole for reading below its clamped heading", () => {
+      const objective = `Bring up qubits ${"0-1 ".repeat(60)}\nthen check coherence`;
+      state.detail = { ...DETAIL, objective };
+      renderPage();
+      const heading = screen.getByRole("heading", { level: 1 });
+      expect(heading.textContent).toBe(objective);
+      expect(heading.className).toContain("line-clamp-3");
+      expect(heading.className).toContain("wrap-anywhere");
+      const summary = screen.getByRole("region", { name: "Summary" });
+      expect(within(summary).getByText("Objective")).toBeTruthy();
+      expect(within(summary).getByText(/then check coherence/).className).toContain(
+        "whitespace-pre-wrap",
+      );
+    });
+
+    it("anchors each run so an execution's breadcrumbs can point at it", () => {
+      renderPage();
+      const [run] = screen.getAllByTestId("calibration-pipeline-run");
+      expect(run.id).toBe("run-cpr-1");
+    });
+
+    it("returns to the Executions day, flat list and page, also from its executions", () => {
+      renderPage("from=executions&chip=64Qv3&date=20261120&flat=true&page=2&status=closed");
+      // Only the Executions list's own filters travel; the session list's status does not.
+      expect(crumbLinks()).toEqual([
+        ["Execution", "/execution?chip=64Qv3&date=20261120&flat=true&page=2&project=lab-a"],
+      ]);
+      const runs = screen.getByRole("region", { name: "Runs" });
+      expect(within(runs).getByRole("link", { name: "exec-1" }).getAttribute("href")).toBe(
+        "/execution/64Qv3/exec-1?project=lab-a&date=20261120&flat=true&page=2",
+      );
+    });
+
+    it("carries no Executions view to executions of another chip", () => {
+      renderPage("from=executions&chip=OTHER&date=20261120&page=2");
+      const runs = screen.getByRole("region", { name: "Runs" });
+      expect(within(runs).getByRole("link", { name: "exec-1" }).getAttribute("href")).toBe(
+        "/execution/64Qv3/exec-1?project=lab-a",
+      );
+    });
+
+    it("keeps the Executions day and grouping out of the session list's return link", () => {
+      renderPage("status=open&date=20261120&flat=true&page=3");
+      expect(crumbLinks()).toEqual([
+        ["Execution", "/execution?project=lab-a"],
+        ["Calibration sessions", "/calibration-sessions?status=open&page=3&project=lab-a"],
+      ]);
+      // An execution opened from a session reached from the session list carries no view.
+      const runs = screen.getByRole("region", { name: "Runs" });
+      expect(within(runs).getByRole("link", { name: "exec-1" }).getAttribute("href")).toBe(
+        "/execution/64Qv3/exec-1?project=lab-a",
+      );
+    });
+
+    describe("a link to one run", () => {
+      afterEach(() => window.history.replaceState(null, "", "/"));
+
+      it("marks and scrolls to the run when the page lists it", () => {
+        const scrollIntoView = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
+        window.history.replaceState(null, "", "/calibration-sessions/cs-1#run-cpr-2");
+        renderPage();
+        const [first, second] = screen.getAllByTestId("calibration-pipeline-run");
+        expect(second.getAttribute("aria-current")).toBe("location");
+        expect(first.getAttribute("aria-current")).toBeNull();
+        expect(scrollIntoView).toHaveBeenCalledTimes(1);
+        scrollIntoView.mockRestore();
+        expect(screen.queryByTestId("calibration-run-not-listed")).toBeNull();
+      });
+
+      it("says so when the run is not among the latest runs listed", () => {
+        window.history.replaceState(null, "", "/calibration-sessions/cs-1#run-cpr-old");
+        state.detail = { ...DETAIL, pipeline_run_total: 30 };
+        renderPage();
+        expect(screen.getByTestId("calibration-run-not-listed").textContent).toBe(
+          "Run cpr-old is not among the latest 2 runs listed here. Its executions stay on the Execution list.",
+        );
+        for (const run of screen.getAllByTestId("calibration-pipeline-run")) {
+          expect(run.getAttribute("aria-current")).toBeNull();
+        }
+      });
+    });
   });
 });

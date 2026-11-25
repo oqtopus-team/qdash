@@ -2581,6 +2581,36 @@
               }
             }
           },
+          "400": {
+            "description": "The path is invalid or not a text file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The file is not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The file could not be read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationErrorDetail"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -2625,6 +2655,26 @@
                     "type": "string"
                   },
                   "title": "Response Savefilecontent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The path is outside the workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The file could not be saved or applying the save failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationErrorDetail"
                 }
               }
             }
@@ -5505,7 +5555,7 @@
           "calibration-pipeline"
         ],
         "summary": "Validate and run a calibration pipeline spec",
-        "description": "Runs the spec as one execution through the worker's calibration-pipeline\ndeployment. A spec with problems is rejected with 422 and the same problem\nlist that /validate returns.\n\nWith ``calibration_session_id`` the run is recorded in that calibration\nsession before it is launched, and ``idempotency_key`` makes a retry return\nthe recorded run instead of starting another.",
+        "description": "Runs the spec as one execution through the worker's calibration-pipeline\ndeployment. A spec with problems is rejected with 422 and the same problem\nlist that /validate returns.\n\nThe run is recorded before it is launched. It joins ``calibration_session_id``\nwhen given; otherwise an automatic calibration session created for it.\n``idempotency_key`` makes a retry return the\nrecorded run instead of starting another.",
         "operationId": "executeCalibrationPipeline",
         "security": [
           {
@@ -5570,7 +5620,7 @@
           "calibration-session"
         ],
         "summary": "Create a calibration session",
-        "description": "Record one calibration objective on a chip.\n\nPipeline runs and agent sessions started with its ID are grouped under it. It grants no\noperation: each run is still approved, gated, and locked on its own.",
+        "description": "Record one calibration objective on a chip.\n\nRuns (saved workflows, pipelines, tasks) and agent sessions started with its ID are grouped\nunder it. A run started without one gets an automatic session instead. It grants no\noperation: each run is still approved, gated, and locked on its own.",
         "operationId": "createCalibrationSession",
         "security": [
           {
@@ -5678,6 +5728,27 @@
               "title": "Status"
             },
             "description": "Only sessions in these statuses"
+          },
+          {
+            "name": "origin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CalibrationSessionOrigin"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only sessions of these origins: manual (created for an objective) or automatic (created by QDash for a run started without a session ID)",
+              "title": "Origin"
+            },
+            "description": "Only sessions of these origins: manual (created for an objective) or automatic (created by QDash for a run started without a session ID)"
           },
           {
             "name": "mine",
@@ -5803,6 +5874,79 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CalibrationSessionDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calibration-sessions/{calibration_session_id}/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "calibration-session"
+        ],
+        "summary": "Get one run of a calibration session with its flow run state",
+        "description": "The run with every step execution, found by its ID however many runs the session has.\n\n``flow_status`` is the whole flow run's state, read from Prefect in this request; a step\nexecution that completed never makes it completed. Prefect being unreadable is\n``unavailable`` and a flow run Prefect does not report is ``unknown``, never running or\nended. The read changes nothing: no session is checked or closed.",
+        "operationId": "getCalibrationSessionRun",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "calibration_session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Calibration Session Id"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalibrationRunStateResponse"
                 }
               }
             }
@@ -8635,7 +8779,7 @@
           "task"
         ],
         "summary": "Execute a single task from the task catalog",
-        "description": "Execute one task without requiring a previous execution snapshot.",
+        "description": "Execute one task without requiring a previous execution snapshot.\n\nThe run is recorded before it is launched. It joins ``calibration_session_id`` when given;\notherwise an automatic calibration session created for it.",
         "operationId": "quickRunTask",
         "security": [
           {
@@ -12885,6 +13029,16 @@
               }
             }
           },
+          "500": {
+            "description": "The flow file, its deployment or its metadata could not be saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationErrorDetail"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -13487,6 +13641,26 @@
               }
             }
           },
+          "404": {
+            "description": "The flow or its source file is not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The flow file could not be read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationErrorDetail"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -13549,6 +13723,26 @@
                     "type": "string"
                   },
                   "title": "Response Deleteflow"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The flow is not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The flow file or its metadata could not be deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationErrorDetail"
                 }
               }
             }
@@ -13655,6 +13849,16 @@
               }
             }
           },
+          "500": {
+            "description": "The flow file could not be read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationErrorDetail"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -13674,7 +13878,7 @@
           "flow"
         ],
         "summary": "Execute a flow",
-        "description": "Execute a Flow via Prefect deployment.",
+        "description": "Execute a Flow via Prefect deployment, as one run of a calibration session.\n\nThe run is recorded before it is launched. It joins ``calibration_session_id`` when given\n(refused before launch if that session cannot take it); otherwise an automatic session\ncreated for it. Every step execution of the run\ncarries the run ID, and the session ID when it has one. ``idempotency_key`` makes a retry\nreturn the recorded run instead of starting another.",
         "operationId": "executeFlow",
         "security": [
           {
@@ -13725,6 +13929,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ExecuteFlowResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The flow file could not be read or the run could not be started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationErrorDetail"
                 }
               }
             }
@@ -25298,6 +25512,34 @@
             "title": "Reconfigure",
             "description": "Run Configure (system_manager load + push) before executing the task",
             "default": false
+          },
+          "calibration_session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibration Session Id",
+            "description": "Add the run to this calibration session (open, on the task's chip, created by the signed-in user); otherwise the request is refused before anything starts. Without it, the run joins an automatic session created for it."
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key",
+            "description": "A retry with the same key and request returns the recorded run instead of starting another. Without a key, every request starts a new run."
           }
         },
         "type": "object",
@@ -26204,6 +26446,20 @@
             "type": "string",
             "title": "Run Id"
           },
+          "run_kind": {
+            "$ref": "#/components/schemas/CalibrationRunKind",
+            "default": "pipeline"
+          },
+          "run_name": {
+            "type": "string",
+            "title": "Run Name",
+            "description": "The workflow, pipeline, or task it launched",
+            "default": ""
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/CalibrationRunTrigger",
+            "default": "api"
+          },
           "pipeline_name": {
             "type": "string",
             "title": "Pipeline Name",
@@ -26267,7 +26523,7 @@
           "requested_at"
         ],
         "title": "CalibrationGroupPipelineRun",
-        "description": "One pipeline run of a calibration session row, with its step executions."
+        "description": "One run of a calibration session row, whatever it launched, with its step executions."
       },
       "CalibrationLatestRequestedRun": {
         "properties": {
@@ -26674,6 +26930,46 @@
             "type": "string",
             "title": "Chip Id"
           },
+          "run_kind": {
+            "$ref": "#/components/schemas/CalibrationRunKind",
+            "description": "What the run launched: a pipeline, a saved workflow, a task, or an agent action",
+            "default": "pipeline"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/CalibrationRunTrigger",
+            "description": "api when a signed-in request recorded it before launch; schedule or worker when the worker recorded a flow run QDash had not launched (a schedule) as it started",
+            "default": "api"
+          },
+          "run_name": {
+            "type": "string",
+            "title": "Run Name",
+            "description": "The workflow or pipeline name, or the task the run launched",
+            "default": ""
+          },
+          "agent_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Session Id",
+            "description": "For an agent action's run, the agent session that ran it"
+          },
+          "action_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Id",
+            "description": "For an agent action's run, the action that dispatched it"
+          },
           "idempotency_key": {
             "type": "string",
             "title": "Idempotency Key"
@@ -26720,6 +27016,17 @@
             ],
             "title": "Flow Run Id"
           },
+          "flow_end_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunFlowEndState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How the run's whole flow run ended, as Prefect reported it once it was terminal (completed, failed, cancelled, or crashed); null while it may still run or was not observed"
+          },
           "execution_id": {
             "anyOf": [
               {
@@ -26764,7 +27071,7 @@
             },
             "type": "array",
             "title": "Executions",
-            "description": "Every execution of the run's flow run on the chip, oldest first"
+            "description": "Every step execution of the run on the chip, oldest first: those the worker stamped with the run, or, for older runs, those of its flow run"
           }
         },
         "type": "object",
@@ -26782,7 +27089,7 @@
           "updated_at"
         ],
         "title": "CalibrationPipelineRunResponse",
-        "description": "One pipeline run requested in a calibration session, with its step executions."
+        "description": "One run requested in a calibration session, with its step executions."
       },
       "CalibrationPipelineRunStatus": {
         "type": "string",
@@ -26793,7 +27100,7 @@
           "unknown"
         ],
         "title": "CalibrationPipelineRunStatus",
-        "description": "Dispatch state of one pipeline run requested in a calibration session.\n\n``dispatching``: the request was recorded and its launch has not reported back.\n``dispatched``: QDash created the pipeline's flow run; its executions carry its\n``flow_run_id``.\n``rejected``: QDash refused the launch before any flow run was created (the hardware was\nbusy or the worker deployment was missing); a retry with the same key may launch it.\n``unknown``: the launch failed in a way that may have created a flow run anyway, or it\nstayed ``dispatching`` past the time a launch takes. A retry with the same key never\nlaunches it again."
+        "description": "Dispatch state of one run, whatever its kind.\n\n``dispatching``: the request was recorded and its launch has not reported back.\n``dispatched``: QDash created the run's flow run; its executions carry its ``run_id``.\n``rejected``: QDash refused the launch before any flow run was created (the hardware was\nbusy, the worker deployment was missing, or the attempt was never admitted); a retry with\nthe same key may launch it.\n``unknown``: the launch failed in a way that may have created a flow run anyway, or it\nstayed ``dispatching`` past the time a launch takes. A retry with the same key never\nlaunches it again."
       },
       "CalibrationRecommendationRef": {
         "properties": {
@@ -26830,6 +27137,232 @@
         ],
         "title": "CalibrationRecommendationRef",
         "description": "The session's current recommendation: a decision's conclusion, never a status."
+      },
+      "CalibrationRunKind": {
+        "type": "string",
+        "enum": [
+          "pipeline",
+          "workflow",
+          "task",
+          "agent_action"
+        ],
+        "title": "CalibrationRunKind",
+        "description": "What one run launched.\n\n``pipeline``: a calibration pipeline spec (every run recorded before other kinds existed).\n``workflow``: a saved workflow (flow). ``task``: one catalog task, from the Task Workbench\nor a re-execution. ``agent_action``: the task an agent session's action ran."
+      },
+      "CalibrationRunStateResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "calibration_session_id": {
+            "type": "string",
+            "title": "Calibration Session Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "run_kind": {
+            "$ref": "#/components/schemas/CalibrationRunKind",
+            "description": "What the run launched: a pipeline, a saved workflow, a task, or an agent action",
+            "default": "pipeline"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/CalibrationRunTrigger",
+            "description": "api when a signed-in request recorded it before launch; schedule or worker when the worker recorded a flow run QDash had not launched (a schedule) as it started",
+            "default": "api"
+          },
+          "run_name": {
+            "type": "string",
+            "title": "Run Name",
+            "description": "The workflow or pipeline name, or the task the run launched",
+            "default": ""
+          },
+          "agent_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Session Id",
+            "description": "For an agent action's run, the agent session that ran it"
+          },
+          "action_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Id",
+            "description": "For an agent action's run, the action that dispatched it"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "title": "Idempotency Key"
+          },
+          "requested_by": {
+            "type": "string",
+            "title": "Requested By"
+          },
+          "reported_origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportedLaunchOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How the caller said it started the run (client reported, not verified); null when nothing was reported, as for a run requested directly"
+          },
+          "dispatch_status": {
+            "$ref": "#/components/schemas/CalibrationPipelineRunStatus",
+            "description": "Whether QDash launched the run: dispatching, dispatched, rejected (nothing was started), or unknown (it may have started; check the Execution list)"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "pipeline_name": {
+            "type": "string",
+            "title": "Pipeline Name"
+          },
+          "backend_name": {
+            "type": "string",
+            "title": "Backend Name"
+          },
+          "flow_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow Run Id"
+          },
+          "flow_end_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunFlowEndState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How the run's whole flow run ended, as Prefect reported it once it was terminal (completed, failed, cancelled, or crashed); null while it may still run or was not observed"
+          },
+          "execution_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Id",
+            "description": "The first step's execution, as returned at dispatch"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error",
+            "default": ""
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Requested At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "pipeline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PipelineProgress"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The run as a whole, from its step executions; null until its first execution exists"
+          },
+          "executions": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionResponseSummary"
+            },
+            "type": "array",
+            "title": "Executions",
+            "description": "Every step execution of the run on the chip, oldest first: those the worker stamped with the run, or, for older runs, those of its flow run"
+          },
+          "flow_status": {
+            "$ref": "#/components/schemas/RunFlowStatus",
+            "description": "The whole flow run's state in this read: dispatching, not_launched, running (Prefect reports a state it may still leave), completed, failed, cancelled, crashed, unknown (no flow run recorded, an unknown launch outcome, or Prefect does not report it), or unavailable (Prefect could not be read). Never derived from step executions"
+          },
+          "prefect_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prefect State",
+            "description": "Prefect's state type for the flow run in this read, such as RUNNING or SCHEDULED; null when Prefect was not read or did not report it"
+          },
+          "flow_status_reason": {
+            "type": "string",
+            "title": "Flow Status Reason",
+            "description": "Why the state is what it is, for display",
+            "default": ""
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Observed At",
+            "description": "When this read decided flow_status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "calibration_session_id",
+          "chip_id",
+          "idempotency_key",
+          "requested_by",
+          "dispatch_status",
+          "attempts",
+          "pipeline_name",
+          "backend_name",
+          "requested_at",
+          "updated_at",
+          "flow_status",
+          "observed_at"
+        ],
+        "title": "CalibrationRunStateResponse",
+        "description": "One run of a calibration session, with its whole flow run's state read now.\n\n``flow_end_state`` is the terminal state Prefect reports in this read, and null otherwise,\nwhatever an earlier read recorded."
+      },
+      "CalibrationRunTrigger": {
+        "type": "string",
+        "enum": [
+          "api",
+          "schedule",
+          "worker"
+        ],
+        "title": "CalibrationRunTrigger",
+        "description": "Who started a run, as QDash recorded it.\n\n``api``: a signed-in request to QDash recorded the run before launching it. ``schedule``:\nPrefect's scheduler started the flow run from a cron schedule; the worker recorded it when\nthe flow started. ``worker``: the worker found a flow run QDash had not recorded (a\none-time schedule, or a run started in Prefect directly) and recorded it when it started."
       },
       "CalibrationSessionAuditResponse": {
         "properties": {
@@ -26898,6 +27431,15 @@
         "title": "CalibrationSessionAuditResponse",
         "description": "A page of one snapshot of a calibration session's audit, or all of it.\n\nThe events have the same schema and semantics as an agent session's audit, and an admitted\nagent session's events appear inside it with ``agent_session_id`` set. A snapshot is two\nmatching projected reads, not an atomic database view."
       },
+      "CalibrationSessionCloseOrigin": {
+        "type": "string",
+        "enum": [
+          "manual",
+          "automatic"
+        ],
+        "title": "CalibrationSessionCloseOrigin",
+        "description": "Who closed a calibration session.\n\n``manual``: the person who created it closed it (every session closed before this was\nrecorded). ``automatic``: QDash closed an automatic session once every run and agent\nsession in it had ended and nothing was being started, dispatched, or settled in it. An\nautomatic close only stops new runs from joining; it cancels nothing and judges nothing."
+      },
       "CalibrationSessionDetailResponse": {
         "properties": {
           "calibration_session_id": {
@@ -26923,6 +27465,11 @@
           },
           "status": {
             "$ref": "#/components/schemas/CalibrationSessionStatus"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/CalibrationSessionOrigin",
+            "description": "manual when a person or agent created it for an objective; automatic when QDash created it for a run started without a session ID (a later run may name it)",
+            "default": "manual"
           },
           "created_at": {
             "type": "string",
@@ -26955,7 +27502,19 @@
                 "type": "null"
               }
             ],
-            "title": "Closed By"
+            "title": "Closed By",
+            "description": "The user who closed it, or system:auto-close when QDash closed it automatically"
+          },
+          "close_origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationSessionCloseOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "manual when the creator closed it; automatic when QDash closed an automatic session because every run and agent session in it ended. Null while open, and for a session closed before this was recorded (closed by its creator). Closing says nothing about how the runs ended."
           },
           "closing_note": {
             "type": "string",
@@ -27110,6 +27669,11 @@
           "status": {
             "$ref": "#/components/schemas/CalibrationSessionStatus"
           },
+          "origin": {
+            "$ref": "#/components/schemas/CalibrationSessionOrigin",
+            "description": "automatic when QDash created it for a run started without a session ID",
+            "default": "manual"
+          },
           "created_by": {
             "type": "string",
             "title": "Created By"
@@ -27181,6 +27745,15 @@
         "title": "CalibrationSessionGroupSummary",
         "description": "One calibration session as the display parent of the work started in it.\n\n``status`` is open or closed; neither says whether the objective was met."
       },
+      "CalibrationSessionOrigin": {
+        "type": "string",
+        "enum": [
+          "manual",
+          "automatic"
+        ],
+        "title": "CalibrationSessionOrigin",
+        "description": "How a calibration session came to exist.\n\n``manual``: a person or agent created it for an objective (every session recorded before\nautomatic sessions existed). ``automatic``: QDash created it for a run started without a\nsession ID; it is an ordinary session that a later run may name to add to it."
+      },
       "CalibrationSessionRef": {
         "properties": {
           "calibration_session_id": {
@@ -27235,6 +27808,11 @@
           "status": {
             "$ref": "#/components/schemas/CalibrationSessionStatus"
           },
+          "origin": {
+            "$ref": "#/components/schemas/CalibrationSessionOrigin",
+            "description": "manual when a person or agent created it for an objective; automatic when QDash created it for a run started without a session ID (a later run may name it)",
+            "default": "manual"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -27266,7 +27844,19 @@
                 "type": "null"
               }
             ],
-            "title": "Closed By"
+            "title": "Closed By",
+            "description": "The user who closed it, or system:auto-close when QDash closed it automatically"
+          },
+          "close_origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationSessionCloseOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "manual when the creator closed it; automatic when QDash closed an automatic session because every run and agent session in it ended. Null while open, and for a session closed before this was recorded (closed by its creator). Closing says nothing about how the runs ended."
           },
           "closing_note": {
             "type": "string",
@@ -27311,7 +27901,7 @@
           "closed"
         ],
         "title": "CalibrationSessionStatus",
-        "description": "Whether a calibration session accepts new runs.\n\n``closed`` is a person's statement that work on the objective has ended. It says nothing\nabout whether the objective was met and is refused while a child still runs or waits."
+        "description": "Whether a calibration session accepts new runs.\n\n``closed`` says that work on the objective has ended: a person's statement, or, for an\nautomatic session, QDash's record that everything started in it ended (see\n``CalibrationSessionCloseOrigin``). It says nothing about whether the objective was met or\nhow the runs ended, and is refused while a child still runs or waits."
       },
       "CancelExecutionResponse": {
         "properties": {
@@ -28766,7 +29356,7 @@
               }
             ],
             "title": "Calibration Session Id",
-            "description": "Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy."
+            "description": "Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy. Without it, the session joins an automatic calibration session created for it."
           }
         },
         "type": "object",
@@ -31183,6 +31773,27 @@
         "title": "EvaluatorModel",
         "description": "The extension that produced the evaluation."
       },
+      "ExcludedTarget": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "title": "Target",
+            "description": "Qubit ID the filter removed from the candidates"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Why it did not pass, read from the source result"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target",
+          "reason"
+        ],
+        "title": "ExcludedTarget",
+        "description": "A candidate a filter left out, and why."
+      },
       "ExecuteAgentActionRequest": {
         "properties": {
           "source_execution_id": {
@@ -31231,13 +31842,41 @@
                 "type": "null"
               }
             ],
-            "description": "Targets for this run, overriding direct CalibService and pipeline targets"
+            "description": "Targets for this run, overriding the initial targets of every CalibrationSession.run (or legacy CalibService.run) and pipeline"
           },
           "parameters": {
             "additionalProperties": true,
             "type": "object",
             "title": "Parameters",
             "description": "Execution parameters (overrides default_parameters)"
+          },
+          "calibration_session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibration Session Id",
+            "description": "Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it."
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key",
+            "description": "A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run."
           }
         },
         "type": "object",
@@ -31281,6 +31920,36 @@
             "type": "string",
             "title": "Message",
             "description": "Success message"
+          },
+          "calibration_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibration Session Id",
+            "description": "The calibration session the run joined: the one the request named, or an automatic one; null when the run joined none"
+          },
+          "calibration_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibration Run Id",
+            "description": "The run QDash recorded for the launch; every step execution carries it. Null only for a run the worker records when it starts (a saved flow with no chip)"
+          },
+          "replayed": {
+            "type": "boolean",
+            "title": "Replayed",
+            "description": "True when a retry returned the run an earlier request with its key started",
+            "default": false
           }
         },
         "type": "object",
@@ -31331,7 +32000,7 @@
               }
             ],
             "title": "Calibration Session Id",
-            "description": "Record the run in this calibration session, which must be open, on this chip, and created by the signed-in user. It groups the run with the session's other work and grants nothing: the run is the request approved here. Requires idempotency_key."
+            "description": "Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it."
           },
           "idempotency_key": {
             "anyOf": [
@@ -31345,7 +32014,7 @@
               }
             ],
             "title": "Idempotency Key",
-            "description": "With calibration_session_id: a retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it."
+            "description": "A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run."
           },
           "decision_id": {
             "anyOf": [
@@ -31477,6 +32146,36 @@
             "title": "Message",
             "description": "Success message"
           },
+          "calibration_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibration Session Id",
+            "description": "The calibration session the run joined: the one the request named, or an automatic one; null when the run joined none"
+          },
+          "calibration_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibration Run Id",
+            "description": "The run QDash recorded for the launch; every step execution carries it. Null only for a run the worker records when it starts (a saved flow with no chip)"
+          },
+          "replayed": {
+            "type": "boolean",
+            "title": "Replayed",
+            "description": "True when a retry returned the run an earlier request with its key started",
+            "default": false
+          },
           "steps": {
             "items": {
               "$ref": "#/components/schemas/ResolvedPipelineStep"
@@ -31494,18 +32193,6 @@
               }
             ]
           },
-          "calibration_session_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Calibration Session Id",
-            "description": "The calibration session the run is recorded in, if any"
-          },
           "pipeline_run_id": {
             "anyOf": [
               {
@@ -31516,7 +32203,7 @@
               }
             ],
             "title": "Pipeline Run Id",
-            "description": "The run's record in that calibration session"
+            "description": "The run QDash recorded for the launch (calibration_run_id)"
           },
           "decision_id": {
             "anyOf": [
@@ -31529,12 +32216,6 @@
             ],
             "title": "Decision Id",
             "description": "The decision the recorded run carries out, as QDash linked it; null when the request named none. A client that sent a decision checks it is echoed here"
-          },
-          "replayed": {
-            "type": "boolean",
-            "title": "Replayed",
-            "description": "True when a retry returned the run an earlier request with its key started",
-            "default": false
           }
         },
         "type": "object",
@@ -32185,7 +32866,7 @@
           "steps"
         ],
         "title": "ExecutionPlanRun",
-        "description": "One CalibService.run call of the entrypoint."
+        "description": "One CalibrationSession.run (or legacy CalibService.run) call of the entrypoint."
       },
       "ExecutionPlanStep": {
         "properties": {
@@ -32288,7 +32969,7 @@
           "summary"
         ],
         "title": "ExecutionPlanStep",
-        "description": "One step of a CalibService run, as stated in the saved source."
+        "description": "One step of a CalibrationSession.run call, as the saved source states it."
       },
       "ExecutionResponseDetail": {
         "properties": {
@@ -38715,6 +39396,44 @@
         "title": "NumericBounds",
         "description": "Inclusive numeric bounds for one agent-controlled parameter."
       },
+      "OperationErrorDetail": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code",
+            "description": "Stable code of the failed operation, e.g. file_read_failed"
+          },
+          "error_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Id",
+            "description": "Opaque ID of the server log entry recording the cause"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "OperationErrorDetail",
+        "description": "Error body of a failed operation.\n\n``detail`` is a message safe to show users. An unexpected failure also carries ``code``,\nnaming the failed operation, and ``error_id``, the ID under which the server logged the\ncause; endpoints that do not report one yet return ``detail`` alone."
+      },
       "PanelLayoutModel": {
         "properties": {
           "x": {
@@ -39368,7 +40087,7 @@
           "steps"
         ],
         "title": "PipelineProgress",
-        "description": "A pipeline run as a whole: one execution per calibration step, same flow run.\n\n``status`` is the whole run's: running while any step runs or the run holds\nthe project lock between steps, otherwise the outcome of the last step."
+        "description": "A pipeline run as a whole: one execution per step it reached, same flow run.\n\n``status`` is the whole run's: running while any step runs or the run holds\nthe project lock between steps, otherwise the outcome of the last step."
       },
       "PipelineStepProgress": {
         "properties": {
@@ -39392,6 +40111,12 @@
             ],
             "title": "Step Id",
             "description": "Plan-scoped step id; null for transforms and older runs"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Identifier of this step occurrence in the plan: the step_id of a calibration step; a transform's name, suffixed with its index when the name repeats",
+            "default": ""
           },
           "type": {
             "type": "string",
@@ -39419,7 +40144,18 @@
           "status": {
             "type": "string",
             "title": "Status",
-            "description": "The execution status, \"skipped\" for transforms, or \"pending\" before it starts"
+            "description": "The execution status; \"pending\" before the step starts while the run may still reach it; \"skipped\" when the run ended without reaching it; \"not_recorded\" for a transform of a run recorded before transform steps had executions"
+          },
+          "transform": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformStepRecord"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A transform step's recorded outcome: candidates kept and excluded with reasons, or the CR groups planned; null for calibration steps and unfinished transforms"
           },
           "task_total": {
             "type": "integer",
@@ -39452,7 +40188,7 @@
           "status"
         ],
         "title": "PipelineStepProgress",
-        "description": "One planned step of a pipeline run and how far its execution got."
+        "description": "One planned step of a pipeline run and how far its execution got.\n\nEvery step the run reaches, calibration or transform, has its own execution."
       },
       "PipelineStepTypeInfo": {
         "properties": {
@@ -40048,6 +40784,34 @@
             "type": "boolean",
             "title": "Update Params",
             "default": false
+          },
+          "calibration_session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibration Session Id",
+            "description": "Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it."
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key",
+            "description": "A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run."
           },
           "persist_output_parameters": {
             "anyOf": [
@@ -41052,7 +41816,7 @@
             },
             "type": "array",
             "title": "Qids",
-            "description": "Explicit qids, or empty when targeting MUXes."
+            "description": "Explicit qids, the qubits of the pairs, or empty when targeting MUXes."
           },
           "mux_ids": {
             "items": {
@@ -41067,6 +41831,17 @@
             },
             "type": "array",
             "title": "Exclude Qids"
+          },
+          "pairs": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Pairs",
+            "description": "Directed [control, target] coupling pairs, or empty without pair targets."
           }
         },
         "type": "object",
@@ -41173,6 +41948,33 @@
         ],
         "title": "RetryEvaluationRunResponse",
         "description": "A run reset for another attempt."
+      },
+      "RunFlowEndState": {
+        "type": "string",
+        "enum": [
+          "completed",
+          "failed",
+          "cancelled",
+          "crashed"
+        ],
+        "title": "RunFlowEndState",
+        "description": "How the whole flow run that carried out a run ended, as Prefect reported it.\n\nRecorded once QDash reads a terminal Prefect state for the run's flow run: the flow as a\nwhole, after its retries, never one step of it. A state Prefect may still leave (scheduled,\nawaiting retry, pending, running, paused, cancelling) is never recorded. ``completed``,\n``failed``, ``cancelled``, and ``crashed`` are Prefect's own terminal state types; they say\nhow the flow run ended, not whether its calibration results are good."
+      },
+      "RunFlowStatus": {
+        "type": "string",
+        "enum": [
+          "dispatching",
+          "not_launched",
+          "running",
+          "completed",
+          "failed",
+          "cancelled",
+          "crashed",
+          "unknown",
+          "unavailable"
+        ],
+        "title": "RunFlowStatus",
+        "description": "The state of a run's whole flow run, as one read of the run found it.\n\nNever stored: each read decides it from the run's record and, for a launched run, from\nPrefect at that moment. ``dispatching``: the launch has not reported back.\n``not_launched``: QDash refused the launch; no flow run was created. ``running``: Prefect\nreports a state the flow run may still leave (scheduled, awaiting retry, late, pending,\nrunning, paused, or cancelling). ``completed``, ``failed``, ``cancelled``, and ``crashed``:\nPrefect reports that terminal state now. ``unknown``: the launch outcome is unknown, no flow\nrun was recorded, or Prefect does not report the flow run. ``unavailable``: Prefect could\nnot be read. A step execution's status never decides it."
       },
       "SaveFileRequest": {
         "properties": {
@@ -44677,6 +45479,192 @@
         "title": "TokenResponse",
         "description": "Token response model for login."
       },
+      "TransformStepRecord": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "filter",
+              "cr_schedule",
+              "transform"
+            ],
+            "title": "Kind",
+            "description": "\"filter\", \"cr_schedule\", or \"transform\" for a custom transform step"
+          },
+          "input_qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Input Qids",
+            "description": "Candidates before the step"
+          },
+          "output_qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Output Qids",
+            "description": "Candidates after the step"
+          },
+          "input_couplings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Input Couplings",
+            "description": "Candidate couplings before the step"
+          },
+          "output_couplings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Output Couplings",
+            "description": "Candidate couplings after the step"
+          },
+          "excluded": {
+            "items": {
+              "$ref": "#/components/schemas/ExcludedTarget"
+            },
+            "type": "array",
+            "title": "Excluded",
+            "description": "Filters: each removed candidate with its reason"
+          },
+          "criteria": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Criteria",
+            "description": "Filters: the condition applied"
+          },
+          "source_step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Step",
+            "description": "Filters: step_id read; null for the latest one-qubit result"
+          },
+          "source_call_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Call Id",
+            "description": "Filters: call_id read"
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric",
+            "description": "FilterByMetric: the metric compared"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold",
+            "description": "FilterByMetric: minimum kept"
+          },
+          "source_found": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Found",
+            "description": "Filters: false when no one-qubit result existed, so every candidate was kept unfiltered"
+          },
+          "groups": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Groups",
+            "description": "cr_schedule: parallel groups of control-target couplings, in order"
+          },
+          "max_parallel_ops": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Parallel Ops",
+            "description": "cr_schedule: group cap"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction",
+            "description": "cr_schedule: \"forward\", \"reverse\" or \"as listed\""
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "description": "Why the step produced nothing, when it did not"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "TransformStepRecord",
+        "description": "The outcome of one transform step, copied when the step ended.\n\nLists are snapshots: later steps never change a recorded outcome. Fields that do not\napply to a kind stay at their defaults (``None`` or empty)."
+      },
       "UISettings": {
         "properties": {
           "task_files": {
@@ -45925,6 +46913,18 @@
             ],
             "title": "Tasks",
             "description": "Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to BRINGUP_TASKS."
+          },
+          "execution_mode": {
+            "type": "string",
+            "enum": [
+              "parallel_by_round",
+              "parallel_by_mux",
+              "simultaneous_spectroscopy",
+              "sequential"
+            ],
+            "title": "Execution Mode",
+            "description": "How MUX targets run; explicit qubit targets run directly in parallel. parallel_by_mux (default): MUXes run in parallel and the qubits of one MUX run one after another. parallel_by_round: rounds of qubits from different MUXes. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. Bring-up has no manual rounds.",
+            "default": "parallel_by_mux"
           }
         },
         "additionalProperties": false,
@@ -45947,8 +46947,7 @@
             "type": "string",
             "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
             "title": "Name",
-            "description": "Display name of the execution.",
-            "default": "pipeline"
+            "description": "Optional display name of the run. Each step's execution is named <name>_<step name> when given, and after the step alone when omitted."
           },
           "targets": {
             "$ref": "#/components/schemas/PipelineTargets"
@@ -46667,7 +47666,7 @@
               }
             ],
             "title": "Qids",
-            "description": "Qubit ids as QDash lists them, e.g. [\"0\", \"1\"]. Set exactly one of qids and mux_ids, as a nonempty list without duplicates."
+            "description": "Qubit ids as QDash lists them, e.g. [\"0\", \"1\"]. Set exactly one of qids, mux_ids and pairs, as a nonempty list without duplicates."
           },
           "mux_ids": {
             "anyOf": [
@@ -46682,7 +47681,27 @@
               }
             ],
             "title": "Mux Ids",
-            "description": "MUX ids; every qubit of each MUX is a target. Set exactly one of qids and mux_ids, as a nonempty list without duplicates."
+            "description": "MUX ids; every qubit of each MUX is a target. Set exactly one of qids, mux_ids and pairs, as a nonempty list without duplicates."
+          },
+          "pairs": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "maxItems": 2,
+                  "minItems": 2
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pairs",
+            "description": "Directed coupling pairs [control, target], e.g. [[\"0\", \"1\"], [\"4\", \"5\"]]; the candidate qubits are their qubits and the candidate couplings the pairs, in that direction. Set exactly one of qids, mux_ids and pairs."
           },
           "exclude_qids": {
             "items": {
@@ -46690,14 +47709,14 @@
             },
             "type": "array",
             "title": "Exclude Qids",
-            "description": "Qubits to leave out of the MUX targets. Must be empty with qids.",
+            "description": "Qubits to leave out of the MUX targets. Must be empty with qids or pairs.",
             "default": []
           }
         },
         "additionalProperties": false,
         "type": "object",
         "title": "PipelineTargets",
-        "description": "Which qubits the pipeline starts from: explicit qids or whole MUXes.\n\nSet exactly one of qids and mux_ids to a nonempty list without duplicates.\nexclude_qids may be nonempty only with mux_ids."
+        "description": "Which qubits or couplings the pipeline starts from.\n\nSet exactly one of qids, mux_ids and pairs to a nonempty list without duplicates.\nexclude_qids may be nonempty only with mux_ids."
       },
       "TaskSettings": {
         "properties": {

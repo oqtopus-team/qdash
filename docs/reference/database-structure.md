@@ -1,22 +1,10 @@
 # Database Collections
 
-QDash persists Bunnet documents in MongoDB; this page maps each collection to the class and module
-that define its fields and indexes.
+<a id="use-the-code-as-the-schema"></a>
 
-## Use the Code as the Schema
-
-`src/qdash/dbmodel/document_models.py` is the complete registration list used by API startup.
-Each document's `Settings.name` defines its collection, and `Settings.indexes` defines its managed
-indexes. The document class is the source of truth for fields, defaults, validation, and indexes.
-
-Related model layers serve different contracts:
-
-| Layer | Source | Contract |
-| --- | --- | --- |
-| Persisted MongoDB documents | `src/qdash/dbmodel/` | Stored fields, collection names, and indexes |
-| Domain models | `src/qdash/datamodel/` | Values shared by API, repositories, and workflow code |
-| HTTP schemas | `src/qdash/api/schemas/` | Request and response payloads |
-| Public API | [OpenAPI](./openapi.md) | Generated HTTP operations and schemas |
+MongoDB document classes in `src/qdash/dbmodel/` define stored fields, defaults, and indexes.
+`document_models.py` registers them; `Settings.name` gives the collection name.
+For HTTP schemas, use [OpenAPI](./openapi.md).
 
 ## Identity and Projects
 
@@ -26,9 +14,6 @@ Related model layers serve different contracts:
 | `user_avatar` | `UserAvatarDocument` | `user_avatar.py` |
 | `project` | `ProjectDocument` | `project.py` |
 | `project_membership` | `ProjectMembershipDocument` | `project_membership.py` |
-
-`UserDocument.agent_instructions`, a user's own Agent instructions, is stored in the
-`copilot_instructions` field, its name before the Copilot to Agent rename.
 
 ## Calibration and Hardware
 
@@ -46,9 +31,6 @@ Related model layers serve different contracts:
 | `cooldown` | `CooldownDocument` | `cooldown.py` |
 | `cooldown_wiring_event` | `CooldownWiringEventDocument` | `cooldown_wiring_event.py` |
 
-The [Calibration Data Lifecycle](../developer-guide/workflow/calibration-data-lifecycle.md) explains
-how accepted parameters, task results, and history differ.
-
 ## Executions and Workflows
 
 | Collection | Document | Module |
@@ -64,8 +46,27 @@ how accepted parameters, task results, and history differ.
 | `evaluation` | `EvaluationDocument` | `evaluation.py` |
 | `evaluation_asset` | `EvaluationAssetDocument` | `evaluation_asset.py` |
 
-[Workflow Engine Architecture](../developer-guide/workflow/engine-architecture.md) explains the
-runtime lifecycle, reservations, and terminal state handling.
+### Step Execution Metadata
+
+New step executions add optional fields to `execution_history.note`. Existing documents, IDs,
+indexes and task/artifact references remain valid; no migration or backfill is required.
+Single-task executions can lack this step metadata. `step_record.py` under
+`src/qdash/datamodel/` defines transform results and step keys.
+
+| Note field | Meaning |
+| --- | --- |
+| `step_index` | One-based position within the step sequence |
+| `step_key` | Plan-scoped occurrence key: calibration `step_id`, or transform name made unique with its position |
+| `step_kind` | `calibration` or `transform` |
+| `step_type` | Runtime step class name |
+| `step_id` | Calibration step identity used by filter references; absent on transforms |
+| `transform_result` | Copied input/output candidates, filter decisions or generated schedule |
+| `pipeline.records_transform_steps` | System pipeline plan records transforms; absent in old plans |
+
+A transform Execution has no task results or measurement artifacts. Its `calib_data_path` is
+retained for schema compatibility but the directory is not created. Readers must not require
+that path to exist. Saved workflows can run several sequences in one Run; step keys and indices
+identify occurrences within a sequence, not globally across the Run.
 
 ## Notes, Forum, and Notifications
 
@@ -89,17 +90,6 @@ runtime lifecycle, reservations, and terminal state handling.
 | `copilot_store_teardown` | None (raw collection, one lease per owner and store) | `api/services/agent_chat_session_service.py` |
 | `copilot_store_generation` | None (raw collection, the current generation per owner and store) | `api/services/agent_chat_session_service.py` |
 
-The four `copilot_*` collections and the `copilot_chat_turn_unique_idx` index keep the names they
-had before the chat was renamed from Copilot to Agent, so existing chats, turn records, and store
-leases stay readable without a data migration.
-
-[Notes Architecture](../developer-guide/architecture/notes.md) explains current-state notes and
-their audit events.
-[Dashboards Architecture](../developer-guide/architecture/dashboards.md) explains
-dashboards, metric scripts, and their revisions. A `metric_script` document also stores the
-revisions each dashboard pins (`pins`, keyed by `dashboard_id`) and a `version` write counter;
-`dashboard` documents have a `version` too.
-
 ## Agent and Provenance
 
 | Collection | Document | Module |
@@ -112,32 +102,23 @@ revisions each dashboard pins (`pins`, keyed by `dashboard_id`) and a `version` 
 | `agent_interventions` | `AgentInterventionDocument` | `agent_session.py` |
 | `agent_decisions` | `AgentDecisionDocument` | `agent_session.py` |
 | `calibration_sessions` | `CalibrationSessionDocument` | `calibration_session.py` |
-| `calibration_pipeline_runs` | `CalibrationPipelineRunDocument` | `calibration_session.py` |
+| `calibration_pipeline_runs` | `RunDocument` (alias `CalibrationPipelineRunDocument`) | `run.py` |
 | `calibration_decisions` | `CalibrationDecisionDocument` | `calibration_session.py` |
 | `pipeline_launches` | `PipelineLaunchDocument` | `pipeline_launch.py` |
 | `parameter_versions` | `ParameterVersionDocument` | `provenance.py` |
 | `provenance_relations` | `ProvenanceRelationDocument` | `provenance.py` |
 | `provenance_activities` | `ActivityDocument` | `provenance.py` |
 
-`agent_candidate_set_commits` was called `agent_campaign_commits` before the agent plan
-vocabulary replaced "campaign". The `calibration-migration` container in `compose.yaml` runs
-`python -m qdash.dbmodel.migration run --execute` before the API starts, and that run moves
-the records of an existing deployment into the new collection once.
+The `copilot_*` names remain for compatibility after the Agent rename. The raw store collections
+are defined in `src/qdash/api/services/agent_chat_session_service.py`.
+See [calibration data](../developer-guide/workflow/calibration-data-lifecycle.md),
+[session records](../developer-guide/agent/calibration-sessions.md), and
+[provenance](../developer-guide/architecture/provenance.md) for lifecycle rules.
 
-An `agent_sessions` document created in a calibration session stores its
-`calibration_session_id`, its `calibration_admission` (`pending`, `admitted`, or `rejected`),
-and the `calibration_reservation_id` the admission rests on; older documents have none. A
-`calibration_sessions` document lists the reservations of admitted agent sessions in
-`admitted_reservation_ids`. A `calibration_pipeline_runs` document stores the caller's
-`reported_origin` when one was reported, the normalized `spec` it validated, and the
-`decision_id` of the decision it carries out when the request named one; older runs have
-neither. A `calibration_decisions` document is one append-only decision of a calibration
-session's audit. A `pipeline_launches` document keeps the same
-report for any dispatched pipeline, keyed by `(project_id, flow_run_id)`; both are client
-reported and never verified.
-[Calibration Sessions](../developer-guide/agent/calibration-sessions.md) and
-[Calibration Session Audit](../developer-guide/agent/calibration-session-audit.md) explain
-these collections.
+Automatic session lifecycle fields:
 
-[Provenance Architecture](../developer-guide/architecture/provenance.md) explains version,
-relationship, and activity records.
+| Collection | Fields | Meaning |
+| --- | --- | --- |
+| `calibration_sessions` | `close_origin`, `closed_by`, `closing_note` | Manual or system closure and its recorded reason |
+| `calibration_sessions` | `lifecycle_checked_at` | Sweep ordering; indexed with status and origin |
+| `calibration_pipeline_runs` | `flow_end_state`, `flow_end_observed_at` | Last terminal-state evidence from lifecycle checks; not live execution status |

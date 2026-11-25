@@ -9,8 +9,10 @@
 /**
  * Whether a calibration session accepts new runs.
  *
- * ``closed`` is a person's statement that work on the objective has ended. It says nothing
- * about whether the objective was met and is refused while a child still runs or waits.
+ * ``closed`` says that work on the objective has ended: a person's statement, or, for an
+ * automatic session, QDash's record that everything started in it ended (see
+ * ``CalibrationSessionCloseOrigin``). It says nothing about whether the objective was met or
+ * how the runs ended, and is refused while a child still runs or waits.
  */
 export type CalibrationSessionStatus = typeof CalibrationSessionStatus[keyof typeof CalibrationSessionStatus];
 

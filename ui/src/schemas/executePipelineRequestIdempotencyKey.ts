@@ -7,6 +7,6 @@
  */
 
 /**
- * With calibration_session_id: a retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it.
+ * A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run.
  */
 export type ExecutePipelineRequestIdempotencyKey = string | null;

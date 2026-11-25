@@ -25,6 +25,7 @@ export interface ModelOption {
 }
 
 const DEFAULT_CHAT_MODEL_KEY = "default";
+const NO_CHAT_MODEL_LABEL = "No chat model available";
 const CHAT_MODEL_KEY_PREFIX = "model:";
 
 const CHAT_MODEL_STORAGE_KEY = "qdash_chat_model_key";
@@ -53,7 +54,8 @@ function readModel(value: unknown): ModelOverride | null {
   };
 }
 
-function modelIdentity(model: ModelOverride): string {
+/** The `provider:name` of a model, as stored choices name it. */
+export function modelIdentity(model: ModelOverride): string {
   return `${model.provider}:${model.name}`;
 }
 
@@ -70,7 +72,9 @@ export function chatModelIdentityOfKey(key: string): string | null {
 /**
  * The chat models a user can pick, default first. The default option sends no
  * override, so the server's `chat_models[0]` answers; it is labelled with that
- * model's name once the config is known.
+ * model's name once the config is known. The server lists only models whose API
+ * key the agent runtime has, so a config with none left yields a lone default
+ * option without a model (see `hasNoChatModel`).
  */
 export function buildChatModelOptions(config: Record<string, unknown> | null): ModelOption[] {
   const chatModels = config && Array.isArray(config.chat_models) ? config.chat_models : [];
@@ -78,7 +82,7 @@ export function buildChatModelOptions(config: Record<string, unknown> | null): M
   const options: ModelOption[] = [
     {
       key: DEFAULT_CHAT_MODEL_KEY,
-      label: configuredModel?.name ?? "Configured default",
+      label: configuredModel?.name ?? (config ? NO_CHAT_MODEL_LABEL : "Configured default"),
       model: null,
       isConfiguredDefault: true,
       resolvedModel: configuredModel,
@@ -143,5 +147,12 @@ export function resolveChatModelOption(options: ModelOption[], key: string): Mod
     options.find((option) => option.key === key) ??
     options.find((option) => option.isConfiguredDefault) ??
     options[0]
+  );
+}
+
+/** Whether a loaded config offers no chat model at all: none has its API key set. */
+export function hasNoChatModel(options: ModelOption[]): boolean {
+  return (
+    options.length === 1 && options[0].isConfiguredDefault === true && !options[0].resolvedModel
   );
 }
