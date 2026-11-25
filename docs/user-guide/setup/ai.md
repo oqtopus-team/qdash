@@ -21,8 +21,9 @@ order is the default. If none are available, configure a key before sending a me
 selected model that fails does not switch providers. Apply changes as below. Writes still need
 user approval and project permission.
 
-For the supplied DeepSeek preview model, set `OPENAI_COMPATIBLE_BASE_URL_DEEPSEEK` to
-`https://api.ai.sakura.ad.jp/v1` and `OPENAI_COMPATIBLE_API_KEY_DEEPSEEK` to your API token.
+For the supplied DeepSeek preview model, set `OPENAI_COMPATIBLE_BASE_URL_DEEPSEEK` to your
+provider's base URL ending with `/v1` and `OPENAI_COMPATIBLE_API_KEY_DEEPSEEK` to your API token.
+The endpoint is empty in the environment templates; choose a provider that serves the configured model.
 After applying changes, select **preview/DeepSeek-V4.1-Flash-1017** in the chat model menu.
 Preview model availability can change; check the provider's model list if requests fail.
 
