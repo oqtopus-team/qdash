@@ -1,17 +1,23 @@
 import type { QDashApiClient } from "./_generated/index.js";
 import {
   buildApi,
+  call,
   defaultSleep,
+  passthrough,
+  read,
   sessionAuth,
   sessionFetch,
+  writeOptions,
+  type CallOptions,
   type Context,
   type Fetch,
+  type FetchOptions,
   type Sleep,
 } from "./_http.js";
 import { QDashConfig, type QDashConfigOptions } from "./config.js";
 import { Dashboards, Scripts } from "./dashboards.js";
 import { QDashConfigError } from "./errors.js";
-import { Chip, Pipelines } from "./pipelines.js";
+import { Chip, Pipelines, preflightCalibrationSession } from "./pipelines.js";
 import { TaskResults } from "./results.js";
 import { Executions, Run } from "./runs.js";
 import { Workflows } from "./workflows.js";
@@ -38,6 +44,20 @@ export interface QDashSessionOptions {
 
 /** Options of `QDash.fromEnv` and `QDash.fromProfile`. */
 export type QDashFactoryOptions = QDashSessionOptions;
+
+/**
+ * Request options `QDash.read` and `QDash.send` give a generated call: retries off (the SDK
+ * applies its own) and the caller's abort signal. Pass them on as the call's request options.
+ */
+export type QDashCallOptions = CallOptions;
+
+/** Options of `QDash.read`, `QDash.send` and `QDash.preflightCalibrationSession`. */
+export interface QDashRequestOptions {
+  /** Cancels the request and its retries; the call rejects with the signal's reason. */
+  signal?: AbortSignal;
+}
+
+export type { FetchOptions as QDashFetchOptions, QueryValue as QDashQueryValue } from "./_http.js";
 
 function checkedProject(projectId: unknown): string | undefined {
   if (projectId !== undefined && (typeof projectId !== "string" || !projectId)) {
@@ -90,6 +110,7 @@ export class QDash {
   readonly taskResults: TaskResults;
 
   private readonly snapshot: QDashConfig;
+  private readonly context: Context;
   private readonly executions: Executions;
   private readonly [SHARED]: Shared;
 
@@ -118,6 +139,7 @@ export class QDash {
       sleep: this[SHARED].sleep,
       now: () => performance.now(),
     };
+    this.context = context;
     this.executions = new Executions(context);
     this.pipelines = new Pipelines(context, this.executions);
     this.workflows = new Workflows(context, this.executions);
@@ -159,6 +181,50 @@ export class QDash {
   /** The project sent as `X-Project-Id`, or undefined for the server's default. */
   get projectId(): string | undefined {
     return this.snapshot.projectId;
+  }
+
+  /**
+   * Send a read of the generated client with the helpers' read policy: sent again after a
+   * transport error or a status of 408, 429, 500, 502, 503 or 504, up to `config.readAttempts`
+   * in total, and failing with the SDK's errors (`QDashNotFoundError` for 404 and so on). Pass
+   * the given options to the call, e.g.
+   * `qdash.read((o) => qdash.api.chip.listChips(o))`. Use it only for requests that change
+   * nothing: a request is sent again without checking its method.
+   */
+  read<T>(request: (options: QDashCallOptions) => Promise<T>, options: QDashRequestOptions = {}): Promise<T> {
+    return read({ ...this.context.reads, ...(options.signal ? { signal: options.signal } : {}) }, request);
+  }
+
+  /**
+   * Send a call of the generated client once, failing with the SDK's errors; for requests that
+   * change state. Pass the given options to the call, e.g.
+   * `qdash.send((o) => qdash.api.forum.createForumPost(body, o))`.
+   */
+  send<T>(request: (options: QDashCallOptions) => Promise<T>, options: QDashRequestOptions = {}): Promise<T> {
+    return call(() => request(writeOptions(options.signal)), options.signal);
+  }
+
+  /**
+   * Send a request to `path` of the API, such as `/executions/figure`, with this session's
+   * auth, project, headers, timeout and fetch, for a route the generated client has no
+   * usable method for: a binary or text download, or any GET by path. Resolves with the
+   * response of a success status, its body unread; an error status throws the SDK's error for
+   * it. GET and HEAD follow the read policy of `read`; other methods are sent once. `path` is
+   * relative to the API root; an absolute URL is refused, so credentials never leave it.
+   */
+  fetch(path: string, options: FetchOptions = {}): Promise<Response> {
+    return passthrough(this.context, this.snapshot.projectId, path, options);
+  }
+
+  /**
+   * Check that `calibrationSessionId` is a calibration session of the signed-in user on
+   * `chipId` before a write that records into it, such as creating an agent session in it:
+   * reads the session list, never the detail, so an automatic session is not closed. Throws
+   * `QDashPreflightError` when the session is not found, or the server cannot list sessions,
+   * so the caller sends nothing.
+   */
+  preflightCalibrationSession(calibrationSessionId: string, chipId: string, options: QDashRequestOptions = {}): Promise<void> {
+    return preflightCalibrationSession(this.context, calibrationSessionId, chipId, options.signal);
   }
 
   /** Calibration on `chipId` through this session; sends no request. */

@@ -16,7 +16,7 @@
  * reasoning. An identity that is missing or does not look like an identifier
  * is left out, and QDash shows it as not reported rather than guessing.
  */
-import type { AgentModelIdentity } from "@oqtopus-team/qdash-client";
+import type { AgentModelIdentity } from "./qdash-connection.js";
 
 /**
  * Extension-context key naming the host when it is not pi itself. The QDash

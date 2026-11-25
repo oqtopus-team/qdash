@@ -1,18 +1,19 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { QDashClient } from "@oqtopus-team/qdash-client";
+import type { QDashConnection } from "../lib/qdash-connection.js";
 import { Type } from "typebox";
 
 import { pausedSessionConflict } from "../lib/agent-loop.js";
 import { toTextToolResult } from "../lib/results.js";
 import { requireWriteApproval } from "../lib/write-approval.js";
 import { isResultUnknown, resultUnknownToolError, sdkSession, unknownLaunchGuidance, type SdkSessionFactory } from "../lib/sdk-session.js";
+import { CONFIG_PATH_DESCRIPTION, PROFILE_DESCRIPTION } from "../lib/connection.js";
 
 /**
  * Declarative calibration pipelines.
  *
  * The agent writes a CalibrationPipelineSpec (targets, ordered steps, run
  * parameters); QDash validates it against the chip, backend, and task catalog,
- * then runs it as one execution. The spec cannot reference code, only the
+ * then records an execution for each step reached. The spec cannot reference code, only the
  * Step classes and task names QDash exposes, so QDash owns the validation and
  * these tools only relay it. The spec schema is deliberately not restated
  * here: `qdash_get_pipeline_catalog` returns QDash's own JSON schema.
@@ -129,7 +130,7 @@ export type PipelineCatalog = {
 };
 
 /** The client these tools use; tests pass a stub with the same `api` methods and `config`. */
-export type PipelineClient = QDashClient;
+export type PipelineClient = QDashConnection;
 
 export type CalibrationPipelineDependencies = {
   makeClient(params: ConnectionParams): Promise<PipelineClient>;
@@ -353,8 +354,8 @@ function statusOf(error: unknown): number | undefined {
 }
 
 const connectionParams = {
-  profile: Type.Optional(Type.String({ description: "QDash profile name. Defaults to env when QDASH_BASE_URL is set, otherwise 'default'." })),
-  configPath: Type.Optional(Type.String({ description: "Optional path to qdash config.ini." })),
+  profile: Type.Optional(Type.String({ description: PROFILE_DESCRIPTION })),
+  configPath: Type.Optional(Type.String({ description: CONFIG_PATH_DESCRIPTION })),
   useEnv: Type.Optional(Type.Boolean({ description: "Force QDASH_* environment variables instead of a profile." })),
 };
 

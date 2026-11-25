@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 
-import { QDashClient, QDashConfig } from "@oqtopus-team/qdash-client";
+import { QDash } from "@oqtopus-team/qdash-sdk";
+
+import { QDashConnection } from "../.test-dist/lib/qdash-connection.js";
 
 import { buildAgentLoopContext, decideAgentStep, measurementKey } from "../.test-dist/lib/agent-loop.js";
 import { SESSION_GRANTED_WRITE_TOOL_NAMES, REVIEWED_WRITE_TOOL_NAMES, NESTED_READ_TOOL_NAMES, DEFERRED_TOOL_NAMES } from "../.test-dist/lib/tool-policy.js";
@@ -20,7 +22,7 @@ function tools() {
   const registered = new Map();
   registerAgentLoopTools({ registerTool(tool) { registered.set(tool.name, tool); } }, {
     async makeClient() {
-      return new QDashClient(new QDashConfig({ baseUrl: fake.baseUrl, apiToken: "fixture-token" }));
+      return new QDashConnection(new QDash({ baseUrl: fake.baseUrl, apiToken: "fixture-token" }));
     },
   });
   const call = (name) => (id, params) => registered.get(name).execute(id, params, undefined, undefined, { hasUI: false });

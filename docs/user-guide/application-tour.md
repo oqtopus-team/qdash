@@ -1,6 +1,7 @@
 # Application Tour
 
-Use the sidebar to find the page for your task.
+Use the sidebar to find the page for your task. On mobile, the bottom bar opens **Overview**,
+**Workflow**, **Execution**, and **Agent**. Tap **More** for the remaining pages.
 
 ## Project Context
 

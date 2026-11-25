@@ -27,12 +27,16 @@ for one of these purposes; keep measurement preparation free of writes.
 `taskResults.evidence`: the SDK joins authorized reads; the tool bounds and redacts output and
 adds web links. Keep reusable joins in the SDK so scripts can use them without Pi.
 
-`extensions/lib/sdk-session.ts` maps resolved legacy client settings into the SDK. Production
-uses the built-in fetch and `process.env`; a custom host must pass its fetch and environment
-through `sdkSessionFactory({ fetch, env })` in the affected tool's `sdk` dependency. Private
-client transport settings are not copied. The client's retry backoff does not apply to SDK
-reads. Client and SDK password logins are independent; API-token authentication avoids this
-extra login. The hosted runtime still supplies a private INI profile, not TOML.
+`extensions/lib/connection.ts` resolves environment, TOML, or legacy INI settings and
+creates a TypeScript SDK session. `extensions/lib/qdash-connection.ts` adapts its generated
+API calls and responses for pi. Tool requests within one connection share its sign-in,
+project, and transport. The hosted runtime supplies its own temporary INI file for each
+authenticated connection. Standalone profile selection is described in
+[pi-qdash configuration](../../reference/pi-qdash.md#configuration).
+
+Use generated SDK methods for known routes, including list filters and task knowledge Markdown.
+Figure downloads use the SDK transport to read the response bytes and headers. Standalone
+pi also exposes `qdash_raw_get` for paths supplied explicitly by the caller.
 
 `tests/sdk-adapter-integration.test.mjs` exercises the real adapter and SDK against a local
 HTTP server, including project headers, session preflight, single dispatch, and uncertain

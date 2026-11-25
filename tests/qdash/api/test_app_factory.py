@@ -1,5 +1,6 @@
 """Tests for the FastAPI application factory."""
 
+from copy import deepcopy
 from typing import Any, cast
 
 import pytest
@@ -92,6 +93,75 @@ def test_openapi_publishes_the_pipeline_spec_without_changing_routes() -> None:
     assert "PipelineTargets" in schemas
     # Requests keep a plain object, so the validate route still reports problems itself.
     assert schemas["ValidatePipelineRequest"]["properties"]["spec"]["type"] == "object"
+
+
+def test_openapi_publishes_optional_list_queries_as_plain_arrays() -> None:
+    paths = create_app(settings=_settings()).openapi()["paths"]
+
+    def query(path: str, name: str) -> dict[str, Any]:
+        parameters = paths[path]["get"]["parameters"]
+        return cast("dict[str, Any]", next(p for p in parameters if p["name"] == name))
+
+    status = query("/agent-sessions", "status")
+    assert status["required"] is False
+    assert status["schema"]["type"] == "array"
+    assert status["schema"]["items"] == {"$ref": "#/components/schemas/AgentSessionStatus"}
+    assert "anyOf" not in status["schema"]
+    assert status["schema"]["description"] == "Only sessions in these statuses"
+    for path, name in [
+        ("/calibration-sessions", "status"),
+        ("/calibration-sessions", "origin"),
+        ("/chips/{chip_id}/qubits", "qids"),
+        ("/provenance/changes", "parameter_names"),
+        ("/provenance/degradation-trends", "parameter_names"),
+    ]:
+        assert query(path, name)["schema"]["type"] == "array", (path, name)
+    # A scalar that may be null keeps its null branch.
+    chip_id = query("/agent-sessions", "chip_id")
+    assert {"type": "null"} in chip_id["schema"]["anyOf"]
+
+
+def test_plain_optional_query_arrays_leaves_other_schemas_alone() -> None:
+    nullable_list = {"anyOf": [{"type": "array", "items": {"type": "string"}}, {"type": "null"}]}
+    schema: dict[str, Any] = {
+        "paths": {
+            "/x": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "required",
+                            "in": "query",
+                            "required": True,
+                            "schema": deepcopy(nullable_list),
+                        },
+                        {"name": "header", "in": "header", "schema": deepcopy(nullable_list)},
+                        {
+                            "name": "defaulted",
+                            "in": "query",
+                            "schema": {**deepcopy(nullable_list), "default": ["a"]},
+                        },
+                        {
+                            "name": "mixed",
+                            "in": "query",
+                            "schema": {"anyOf": [{"type": "array"}, {"type": "string"}]},
+                        },
+                        {
+                            "name": "list",
+                            "in": "query",
+                            "schema": {**deepcopy(nullable_list), "title": "L"},
+                        },
+                    ]
+                }
+            }
+        }
+    }
+    original = deepcopy(schema)
+
+    factory._plain_optional_query_arrays(schema)
+
+    parameters = schema["paths"]["/x"]["get"]["parameters"]
+    assert parameters[:4] == original["paths"]["/x"]["get"]["parameters"][:4]
+    assert parameters[4]["schema"] == {"type": "array", "items": {"type": "string"}, "title": "L"}
 
 
 def test_component_models_refuse_to_replace_another_model() -> None:

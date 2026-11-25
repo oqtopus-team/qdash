@@ -174,7 +174,7 @@ class ValidatePipelineResponse(BaseModel):
 
 
 class ExecutePipelineRequest(ValidatePipelineRequest):
-    """Validate, then dispatch the pipeline as one execution."""
+    """Dispatch one pipeline run with a separate execution for each step reached."""
 
     calibration_session_id: str | None = Field(
         default=None,

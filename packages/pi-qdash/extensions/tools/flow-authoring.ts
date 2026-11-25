@@ -1,11 +1,12 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { QDashClient } from "@oqtopus-team/qdash-client";
+import type { QDashConnection } from "../lib/qdash-connection.js";
 import { Type } from "typebox";
 
 import { pausedSessionConflict } from "../lib/agent-loop.js";
 import { toTextToolResult } from "../lib/results.js";
 import { requireWriteApproval } from "../lib/write-approval.js";
 import { isResultUnknown, resultUnknownToolError, sdkSession, type SdkSessionFactory } from "../lib/sdk-session.js";
+import { CONFIG_PATH_DESCRIPTION, PROFILE_DESCRIPTION } from "../lib/connection.js";
 
 /**
  * Flow authoring: saving a calibration flow the agent wrote.
@@ -66,7 +67,7 @@ export function flowRunKey(toolCallId: string): string {
 }
 
 /** The client these tools use; tests pass a stub with `saveFlow`, `executeFlow` and `config`. */
-export type FlowClient = QDashClient;
+export type FlowClient = QDashConnection;
 
 export type FlowAuthoringDependencies = {
   makeClient(params: ConnectionParams): Promise<FlowClient>;
@@ -135,8 +136,8 @@ export function formatFlowExecution(result: FlowExecution, name: string): string
 }
 
 const connectionParams = {
-  profile: Type.Optional(Type.String({ description: "QDash profile name. Defaults to env when QDASH_BASE_URL is set, otherwise 'default'." })),
-  configPath: Type.Optional(Type.String({ description: "Optional path to qdash config.ini." })),
+  profile: Type.Optional(Type.String({ description: PROFILE_DESCRIPTION })),
+  configPath: Type.Optional(Type.String({ description: CONFIG_PATH_DESCRIPTION })),
   useEnv: Type.Optional(Type.Boolean({ description: "Force QDASH_* environment variables instead of a profile." })),
 };
 

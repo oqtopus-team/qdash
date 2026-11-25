@@ -22,5 +22,5 @@ within_hours?: number;
 /**
  * Filter by parameter names (from metrics config)
  */
-parameter_names?: string[] | null;
+parameter_names?: string[];
 };

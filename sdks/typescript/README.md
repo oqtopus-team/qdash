@@ -57,6 +57,10 @@ report missing or failed context without discarding the result. Cooldown is `not
 unless you pass `{ cooldownId }`; a supplied cooldown is checked, not treated as proven provenance.
 See the [result context contract](https://oqtopus-team.github.io/qdash/reference/clients/typescript#read-a-result-with-context).
 
+Use `qdash.read` and `qdash.send` for generated reads and writes with SDK error handling,
+or `qdash.fetch` for a response body such as a figure download. See the
+[API reference](https://oqtopus-team.github.io/qdash/reference/clients/typescript#generated-api).
+
 ## Develop the Package
 
 Install from the repository root. Generation checks require Node.js (`npx`) and Docker:

@@ -9,9 +9,9 @@ import type * as QDashApi from "../../../../index.js";
 export interface ListCalibrationSessionsRequest {
     chip_id?: string | null;
     /** Only sessions in these statuses */
-    status?: QDashApi.CalibrationSessionStatus[] | null;
+    status?: QDashApi.CalibrationSessionStatus | QDashApi.CalibrationSessionStatus[];
     /** Only sessions of these origins: manual (created for an objective) or automatic (created by QDash for a run started without a session ID) */
-    origin?: QDashApi.CalibrationSessionOrigin[] | null;
+    origin?: QDashApi.CalibrationSessionOrigin | QDashApi.CalibrationSessionOrigin[];
     /** Only sessions the signed-in user created */
     mine?: boolean;
     limit?: number;

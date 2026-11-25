@@ -12,8 +12,19 @@ Upgrade MongoDB separately through its required intermediate releases and FCV st
 Back up the stopped `agent-runtime-state` volume before a runtime upgrade that migrates conversations.
 
 When upgrading from Copilot naming, move custom `config/copilot/` files to `config/agent/` and
-rename `QDASH_COPILOT_PROFILE` to `QDASH_AGENT_PROFILE`. Update clients calling `/copilot/` to
+rename `QDASH_COPILOT_PROFILE` to `QDASH_AGENT_PROFILE`. If you set `COPILOT_CONFIG_PATH`,
+rename it to `AGENT_CONFIG_PATH` and point it at the moved configuration file. Update clients calling `/copilot/` to
 `/agent/`; old routes have no aliases. Saved chats and instructions remain.
+
+If you use a Python or TypeScript SDK with `[profiles.<name>]` in `config.toml`, back it up
+and [migrate its profile tables](../reference/clients/python.md#migrate-nested-toml-profiles)
+before using that file with the updated SDK or standalone pi-qdash. If both configuration
+files exist, standalone pi now prefers TOML for file-based connections. Check the active
+project with `/qdash-config` before starting a calibration. Keep `config.ini` for
+`qdash-agent` and other applications using the legacy client.
+
+For the first deployment with calibration sessions, follow the [coordinated upgrade procedure](./operations.md#upgrade-calibration-session-support)
+before restarting any services.
 
 ## Select a Version
 

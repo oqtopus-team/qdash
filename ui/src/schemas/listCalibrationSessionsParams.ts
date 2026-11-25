@@ -13,11 +13,11 @@ chip_id?: string | null;
 /**
  * Only sessions in these statuses
  */
-status?: CalibrationSessionStatus[] | null;
+status?: CalibrationSessionStatus[];
 /**
  * Only sessions of these origins: manual (created for an objective) or automatic (created by QDash for a run started without a session ID)
  */
-origin?: CalibrationSessionOrigin[] | null;
+origin?: CalibrationSessionOrigin[];
 /**
  * Only sessions the signed-in user created
  */

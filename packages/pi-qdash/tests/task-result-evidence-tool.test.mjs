@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { QDashClient, QDashConfig } from "@oqtopus-team/qdash-client";
+import { QDash } from "@oqtopus-team/qdash-sdk";
+
+import { QDashConnection } from "../.test-dist/lib/qdash-connection.js";
 
 import { EVIDENCE_BOUNDS, evidenceText, presentEvidence, registerTaskResultEvidenceTool, TASK_RESULT_EVIDENCE_TOOL } from "../.test-dist/tools/task-result-evidence.js";
 import { applyToolPolicy } from "../.test-dist/lib/script-policy.js";
@@ -39,7 +41,7 @@ const RESULT = {
 /** The tool over a QDash client whose fetch answers from `routes` by path; anything else is a 404. */
 function toolWith(routes) {
   const requests = [];
-  const client = new QDashClient(new QDashConfig({ baseUrl: "http://qdash.test/api", apiToken: "token", retry: { maxAttempts: 1 } }), {
+  const client = new QDashConnection(new QDash({ baseUrl: "http://qdash.test/api", apiToken: "token", readAttempts: 1 }, {
     fetch: async (input, init) => {
       const request = new Request(input, init);
       const path = new URL(request.url).pathname;
@@ -51,7 +53,7 @@ function toolWith(routes) {
         headers: { "Content-Type": "application/json" },
       });
     },
-  });
+  }));
   const tools = new Map();
   registerTaskResultEvidenceTool({ registerTool: (tool) => tools.set(tool.name, tool) }, { sdk: sdkOver, makeClient: async () => client });
   return { tool: tools.get(TASK_RESULT_EVIDENCE_TOOL), requests };

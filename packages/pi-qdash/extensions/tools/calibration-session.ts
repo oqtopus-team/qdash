@@ -1,24 +1,24 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { QDashClient } from "@oqtopus-team/qdash-client";
-import type {
-  AgentAuditEvent,
-  CalibrationAgentSessionChild,
-  CalibrationDecisionResponse,
-  CalibrationExperimentRow,
-  CalibrationMeasuredValue,
-  CalibrationPipelineRunResponse,
-  CalibrationSessionAuditResponse,
-  CalibrationSessionDetailResponse,
-  CalibrationSessionResponse,
-  ListCalibrationSessionsResponse,
-  RecordCalibrationDecisionRequest,
-} from "@oqtopus-team/qdash-client/models";
+import type { QDashConnection } from "../lib/qdash-connection.js";
+import type { QDashApi } from "@oqtopus-team/qdash-sdk";
+type AgentAuditEvent = QDashApi.AgentAuditEvent;
+type CalibrationAgentSessionChild = QDashApi.CalibrationAgentSessionChild;
+type CalibrationDecisionResponse = QDashApi.CalibrationDecisionResponse;
+type CalibrationExperimentRow = QDashApi.CalibrationExperimentRow;
+type CalibrationMeasuredValue = QDashApi.CalibrationMeasuredValue;
+type CalibrationPipelineRunResponse = QDashApi.CalibrationPipelineRunResponse;
+type CalibrationSessionAuditResponse = QDashApi.CalibrationSessionAuditResponse;
+type CalibrationSessionDetailResponse = QDashApi.CalibrationSessionDetailResponse;
+type CalibrationSessionResponse = QDashApi.CalibrationSessionResponse;
+type ListCalibrationSessionsResponse = QDashApi.ListCalibrationSessionsResponse;
+type RecordCalibrationDecisionRequest = QDashApi.RecordCalibrationDecisionRequest;
 import { createHash } from "node:crypto";
 import { Type } from "typebox";
 
 import { hostModelIdentity, type HostModelContext } from "../lib/host-model.js";
 import { toTextToolResult } from "../lib/results.js";
 import { requireWriteApproval } from "../lib/write-approval.js";
+import { CONFIG_PATH_DESCRIPTION, PROFILE_DESCRIPTION } from "../lib/connection.js";
 
 /**
  * Calibration sessions: one calibration objective on one chip, and the pipeline
@@ -47,7 +47,10 @@ import { requireWriteApproval } from "../lib/write-approval.js";
 
 type ConnectionParams = { profile?: string; configPath?: string; useEnv?: boolean };
 
-export type CalibrationSessionClient = Pick<QDashClient, "api">;
+export type CalibrationSessionClient = Pick<
+  QDashConnection,
+  "createCalibrationSession" | "getCalibrationSession" | "recordCalibrationDecision" | "getCalibrationSessionAudit" | "listCalibrationSessions"
+>;
 
 export type CalibrationSessionDependencies = {
   makeClient(params: ConnectionParams): Promise<CalibrationSessionClient>;
@@ -56,8 +59,8 @@ export type CalibrationSessionDependencies = {
 };
 
 const connectionParams = {
-  profile: Type.Optional(Type.String({ description: "QDash profile name. Defaults to env when QDASH_BASE_URL is set, otherwise 'default'." })),
-  configPath: Type.Optional(Type.String({ description: "Optional path to qdash config.ini." })),
+  profile: Type.Optional(Type.String({ description: PROFILE_DESCRIPTION })),
+  configPath: Type.Optional(Type.String({ description: CONFIG_PATH_DESCRIPTION })),
   useEnv: Type.Optional(Type.Boolean({ description: "Force QDASH_* environment variables instead of a profile." })),
 };
 
@@ -357,7 +360,7 @@ export function registerCalibrationSessionTools(pi: Pick<ExtensionAPI, "register
         title: "Create QDash calibration session?",
         message: `This records the objective "${objectiveLine(objective)}" on chip ${chipId}. It starts nothing and grants nothing; each run started in it is still approved on its own.`,
       });
-      const created = (await client.api.createCalibrationSession({ chip_id: chipId, objective })) as CalibrationSessionResponse;
+      const created = (await client.createCalibrationSession({ chip_id: chipId, objective })) as CalibrationSessionResponse;
       const text = [
         `Created calibration session ${created.calibration_session_id} on chip ${created.chip_id}.`,
         `Objective: ${objectiveLine(created.objective)}`,
@@ -388,7 +391,7 @@ export function registerCalibrationSessionTools(pi: Pick<ExtensionAPI, "register
     }),
     async execute(_toolCallId, params: ConnectionParams & { calibrationSessionId: string }) {
       const client = await deps.makeClient(params);
-      const detail = (await client.api.getCalibrationSession(params.calibrationSessionId)) as CalibrationSessionDetailResponse;
+      const detail = (await client.getCalibrationSession(params.calibrationSessionId)) as CalibrationSessionDetailResponse;
       return toTextToolResult(formatCalibrationSession(detail), detail, {
         tool: "qdash_get_calibration_session",
         chipId: detail.chip_id,
@@ -449,7 +452,7 @@ export function registerCalibrationSessionTools(pi: Pick<ExtensionAPI, "register
     async execute(toolCallId, params: DecisionParams, _signal, _onUpdate, ctx) {
       const client = await deps.makeClient(params);
       const key = calibrationDecisionKey(params.calibrationSessionId, toolCallId);
-      const decision = (await client.api.recordCalibrationDecision(
+      const decision = (await client.recordCalibrationDecision(
         params.calibrationSessionId,
         decisionRequest(params, key, ctx as HostModelContext | undefined),
       )) as CalibrationDecisionResponse;
@@ -479,7 +482,7 @@ export function registerCalibrationSessionTools(pi: Pick<ExtensionAPI, "register
     }),
     async execute(_toolCallId, params: ConnectionParams & { calibrationSessionId: string; cursor?: string; limit?: number }) {
       const client = await deps.makeClient(params);
-      const audit = (await client.api.getCalibrationSessionAudit(params.calibrationSessionId, {
+      const audit = (await client.getCalibrationSessionAudit(params.calibrationSessionId, {
         ...(params.cursor ? { cursor: params.cursor } : {}),
         ...(params.limit ? { limit: Math.max(1, Math.min(500, Math.trunc(params.limit))) } : {}),
       })) as CalibrationSessionAuditResponse;
@@ -508,7 +511,7 @@ export function registerCalibrationSessionTools(pi: Pick<ExtensionAPI, "register
     }),
     async execute(_toolCallId, params: ConnectionParams & { chipId?: string; mine?: boolean; openOnly?: boolean; limit?: number }) {
       const client = await deps.makeClient(params);
-      const listed = (await client.api.listCalibrationSessions({
+      const listed = (await client.listCalibrationSessions({
         ...(params.chipId ? { chip_id: params.chipId } : {}),
         ...(params.mine ? { mine: true } : {}),
         ...(params.openOnly ? { status: ["open"] } : {}),

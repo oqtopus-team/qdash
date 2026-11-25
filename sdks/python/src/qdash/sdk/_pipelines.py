@@ -131,7 +131,7 @@ class Pipelines:
         idempotency_key: str | None = None,
         decision_id: str | None = None,
     ) -> PipelineRun:
-        """Dispatch a pipeline as one execution and return its run handle.
+        """Dispatch a pipeline and return a handle for the whole run across steps.
 
         The server validates the spec again and rejects one with problems with
         ``QDashValidationError``. Requires a configured project, so the run cannot fall back

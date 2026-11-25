@@ -348,14 +348,14 @@ export class TaskClient {
     public getTaskKnowledgeMarkdown(
         request: QDashApi.GetTaskKnowledgeMarkdownRequest,
         requestOptions?: TaskClient.RequestOptions,
-    ): core.HttpResponsePromise<void> {
+    ): core.HttpResponsePromise<string> {
         return core.HttpResponsePromise.fromPromise(this.__getTaskKnowledgeMarkdown(request, requestOptions));
     }
 
     private async __getTaskKnowledgeMarkdown(
         request: QDashApi.GetTaskKnowledgeMarkdownRequest,
         requestOptions?: TaskClient.RequestOptions,
-    ): Promise<core.WithRawResponse<void>> {
+    ): Promise<core.WithRawResponse<string>> {
         const { task_name: taskName } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -373,6 +373,7 @@ export class TaskClient {
             method: "GET",
             headers: _headers,
             queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            responseType: "text",
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,
@@ -380,7 +381,7 @@ export class TaskClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: undefined, rawResponse: _response.rawResponse };
+            return { data: _response.body as string, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {

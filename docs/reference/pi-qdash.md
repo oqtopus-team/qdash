@@ -12,16 +12,26 @@ npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 pi install npm:@oqtopus-team/pi-qdash
 ```
 
-Start `pi`, then run `/qdash-setup <profile> <chip_id>` with your saved profile and chip.
-`/qdash-dashboard` should show that chip's current data; check `/qdash-config` if it cannot connect.
-QDash web Agent includes the extension already.
+If you already use a Python or TypeScript SDK profile, reuse its `config.toml`. For a new
+profile, follow the [SDK setup](./clients/typescript.md#connect-to-a-deployment) to run
+`qdash config init`, set your project ID, and supply your API token.
 
-`qdash_config_info` shows non-secret connection settings. pi-qdash still reads the legacy
-client's `config.ini` or `QDASH_*` environment variables, not the SDK's `config.toml`.
-Keep your INI file when migrating standalone SDK scripts to TOML. See
-[existing client configuration](./clients/typescript.md#existing-client-applications).
-API tokens avoid separate password logins by the client and SDK; with username/password,
-a tool using both can sign in twice.
+Start `pi` and run `/qdash-setup local <chip_id>`, replacing `local` with your profile name
+and `<chip_id>` with your chip. Check the selected chip on the dashboard. Use `/qdash-config`
+to inspect the connection without displaying credentials. QDash web Agent includes the
+extension and supplies its own connection settings.
+
+Standalone pi looks for `config.toml` in `$XDG_CONFIG_HOME/qdash/` (default
+`~/.config/qdash/`). When that file is absent, it reads the existing `config.ini`.
+If both exist, tools can select the INI explicitly with `configPath`. If the selected
+TOML is invalid or lacks the requested profile, correct the file or profile name.
+With no selected profile or explicit path, `QDASH_BASE_URL` selects environment configuration.
+For file-based connections, omitting the profile selects TOML’s `default_profile`, or
+`default` when unset. Standalone pi requires TLS verification and does not support a
+profile-level `proxy`. Use a separate profile if your SDK uses custom transport settings.
+For legacy INI profiles, set `retry_max_attempts` to a positive integer. The SDK manages
+read backoff and ignores legacy backoff settings. In `qdash_config_info`, `active.readAttempts`
+shows the total read-attempt limit. A profile needs credentials before it can connect.
 Set `QDASH_WEB_URL` if the web UI is not the API base URL without `/api`.
 
 If a launch reports an unknown outcome, do not repeat it. Use `qdash_get_execution` with
@@ -180,7 +190,8 @@ Image replies accept at most eight PNG, JPEG, GIF, or WebP files, at most 5 MB e
 ## Fallback tools
 
 `qdash_query` provides other reads. Its file actions cover calibration configuration only;
-use source tools for code. `qdash_raw_get` reaches other read-only GET endpoints.
+use source tools for code. In standalone pi, use `qdash_raw_get` only when neither a
+dedicated tool nor a `qdash_query` action covers the read.
 
 ## Safety
 

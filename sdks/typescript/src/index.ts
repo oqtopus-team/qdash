@@ -15,7 +15,14 @@
  * `qdash.run(executionId)` follows any dispatched run.
  */
 export { QDash } from "./session.js";
-export type { QDashFactoryOptions, QDashSessionOptions } from "./session.js";
+export type {
+  QDashCallOptions,
+  QDashFactoryOptions,
+  QDashFetchOptions,
+  QDashQueryValue,
+  QDashRequestOptions,
+  QDashSessionOptions,
+} from "./session.js";
 export {
   DEFAULT_PROFILE,
   INI_CONFIG_DEPRECATION_CODE,

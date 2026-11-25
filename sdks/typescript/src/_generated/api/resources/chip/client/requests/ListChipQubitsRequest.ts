@@ -10,5 +10,5 @@ export interface ListChipQubitsRequest {
     chip_id: string;
     limit?: number;
     offset?: number;
-    qids?: string[] | null;
+    qids?: string | string[];
 }

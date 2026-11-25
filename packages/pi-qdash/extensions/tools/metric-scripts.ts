@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { QDashClient } from "@oqtopus-team/qdash-client";
+import type { QDashConnection } from "../lib/qdash-connection.js";
 import { Script } from "@oqtopus-team/qdash-sdk";
 import { Type } from "typebox";
 
@@ -7,6 +7,7 @@ import { dashboardPagePath, metricScriptPagePath } from "../lib/links.js";
 import { toTextToolResult } from "../lib/results.js";
 import { requireWriteApproval } from "../lib/write-approval.js";
 import { sdkSession, type SdkSessionFactory } from "../lib/sdk-session.js";
+import { CONFIG_PATH_DESCRIPTION, PROFILE_DESCRIPTION } from "../lib/connection.js";
 
 /**
  * Metric scripts and dashboards.
@@ -25,9 +26,9 @@ import { sdkSession, type SdkSessionFactory } from "../lib/sdk-session.js";
 
 type ConnectionParams = { profile?: string; configPath?: string; useEnv?: boolean };
 
-/** The slice of QDashClient these tools use; tests pass a stub. */
+/** The slice of QDashConnection these tools use; tests pass a stub. */
 export type MetricScriptClient = Pick<
-  QDashClient,
+  QDashConnection,
   | "listMetricScripts"
   | "getMetricScript"
   | "listMetricScriptTemplates"
@@ -35,8 +36,7 @@ export type MetricScriptClient = Pick<
   | "validateMetricScript"
   | "evaluateMetricScriptDraft"
   | "evaluateMetricScript"
-  | "createMetricScript"
-  | "updateMetricScript"
+  | "qdash"
   | "listDashboards"
   | "getDashboard"
   | "listDashboardTemplates"
@@ -557,8 +557,8 @@ export function formatSavedDashboard(result: DashboardResponse, created: boolean
 // ---------------------------------------------------------------------------
 
 const connectionParams = {
-  profile: Type.Optional(Type.String({ description: "QDash profile name. Defaults to env when QDASH_BASE_URL is set, otherwise 'default'." })),
-  configPath: Type.Optional(Type.String({ description: "Optional path to qdash config.ini." })),
+  profile: Type.Optional(Type.String({ description: PROFILE_DESCRIPTION })),
+  configPath: Type.Optional(Type.String({ description: CONFIG_PATH_DESCRIPTION })),
   useEnv: Type.Optional(Type.Boolean({ description: "Force QDASH_* environment variables instead of a profile." })),
 };
 
@@ -747,7 +747,7 @@ export function registerMetricScriptTools(pi: Pick<ExtensionAPI, "registerTool">
       await requireWriteApproval(tool, toolCallId, params, ctx, { title: "Save QDash metric script?", message: `This saves ${what} to the project.` });
       try {
         const created = !params.scriptId;
-        const qdash = (deps.sdk ?? sdkSession)(client as QDashClient);
+        const qdash = (deps.sdk ?? sdkSession)(client);
         const script = new Script({
           name: params.name,
           source: params.source,

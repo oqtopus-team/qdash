@@ -3,31 +3,28 @@
  * `qdash_wait_agent_intervention`, split into one poll and its result so two
  * hosts can run them:
  *
- * - The pi CLI runs the client's own polling loop (`client.waitForExecution`
- *   and friends) and builds its result with `result`; a wait the client has
- *   no loop for runs `pollUntilSettled`.
+ * - The pi CLI runs the connection's polling loop (`client.waitForExecution`
+ *   and friends, see `qdash-connection.ts`) and builds its result with
+ *   `result`; a wait the connection has no loop for runs `pollUntilSettled`.
  * - The QDash Agent Runtime polls once per durable wake with `check` and
  *   parks between polls, so a wait holds no process, keeps its deadline across
  *   restarts, and ends at once when the user stops it (see
  *   `agent-runtime/src/durable-waits.ts`).
  *
- * `check` decides "done" exactly as the client's loop does (the client keeps
- * its rule private); `tests/waits.test.mjs` pins the two together.
+ * `check` decides "done" exactly as the connection's loop does;
+ * `tests/waits.test.mjs` pins the two together.
  *
  * Both hosts bound each poll with `boundedCheck`: a read that hangs ends the
  * wait at its deadline (with the tool's timeout error) or at once when the
- * user cancels, and its late answer or failure is dropped. The client's
- * requests take no `AbortSignal`, so the abandoned HTTP read itself still runs
- * until the client's request timeout; it only reads, and a check stops before
- * its next request once the signal aborted.
+ * user cancels, and its late answer or failure is dropped. A check passes the
+ * signal to its reads, so a cancel also aborts the HTTP read in flight; a read
+ * abandoned at the deadline runs until the session's request timeout. It only
+ * reads, and a check stops before its next request once the signal aborted.
  */
 
-import {
-  QDashClient,
-  QDashTimeoutError,
-  type AgentActionResponse,
-  type ExecutionResponseDetail,
-} from "@oqtopus-team/qdash-client";
+import { QDashTimeoutError } from "@oqtopus-team/qdash-sdk";
+
+import type { AgentActionResponse, ExecutionResponseDetail, QDashConnection } from "./qdash-connection.js";
 
 import {
   buildAgentLoopContext,
@@ -40,6 +37,7 @@ import {
   UNANSWERED_INTERVENTION_STATUSES,
   type AgentLoopContext,
 } from "./agent-loop.js";
+import { connectClient } from "./connection.js";
 import { qdashWebBaseUrl, qdashWebUrl, withQDashLinks } from "./links.js";
 import { toTextToolResult, toToolResult } from "./results.js";
 
@@ -83,9 +81,9 @@ export interface WaitSpec<P, T> {
    * Poll once: the value the client's loop would return now, or undefined to poll again.
    * A check that makes several requests stops before the next one once `signal` aborted.
    */
-  check(client: QDashClient, params: P, signal?: AbortSignal): Promise<T | undefined>;
+  check(client: QDashConnection, params: P, signal?: AbortSignal): Promise<T | undefined>;
   /** The tool result for the value the wait ended with. */
-  result(client: QDashClient, params: P, value: T): WaitToolResult;
+  result(client: QDashConnection, params: P, value: T): WaitToolResult;
   /** The error the client's loop throws once the deadline passed with no value. */
   timeoutError(params: P, timing: WaitTiming): Error;
 }
@@ -107,8 +105,8 @@ export function executionSettled(execution: ExecutionResponseDetail): boolean {
 
 export const WAIT_EXECUTION: WaitSpec<WaitExecutionParams, ExecutionResponseDetail> = {
   timing: (params) => timing(params.timeoutSeconds ?? 600, params.pollIntervalSeconds ?? 0.5),
-  async check(client, params) {
-    const execution = await client.getExecution(params.executionId);
+  async check(client, params, signal) {
+    const execution = await client.getExecution(params.executionId, signal);
     return executionSettled(execution) ? execution : undefined;
   },
   result: (client, params, execution) =>
@@ -132,8 +130,8 @@ export const WAIT_AGENT_ACTION: WaitSpec<WaitAgentActionParams, AgentActionRespo
   // waitForAgentActionExecution waits 600 s by default, waitForAgentAction 120 s.
   timing: (params) =>
     timing(params.timeoutSeconds ?? (params.waitForExecution ? 600 : 120), params.pollIntervalSeconds ?? 0.5),
-  async check(client, params) {
-    const action = await client.getAgentAction(params.sessionId, params.actionId);
+  async check(client, params, signal) {
+    const action = await client.getAgentAction(params.sessionId, params.actionId, signal);
     return action.execution_status === "failed" || action[actionField(params)] != null ? action : undefined;
   },
   result: (_client, _params, action) => {
@@ -178,16 +176,16 @@ export const WAIT_AGENT_INTERVENTION: WaitSpec<WaitAgentInterventionParams, Agen
     };
   },
   async check(client, params, signal) {
-    const session = await client.getAgentSession(params.sessionId);
+    const session = await client.getAgentSession(params.sessionId, signal);
     throwIfAborted(signal);
     if (session.status === "waiting_for_human" && session.active_intervention_id) {
-      const active = await client.getAgentIntervention(params.sessionId, session.active_intervention_id);
+      const active = await client.getAgentIntervention(params.sessionId, session.active_intervention_id, signal);
       if (UNANSWERED_INTERVENTION_STATUSES.has(active.status)) return undefined;
       throwIfAborted(signal);
     }
     const [actions, interventions] = await Promise.all([
-      client.listAgentActions(params.sessionId),
-      client.listAgentInterventions(params.sessionId),
+      client.listAgentActions(params.sessionId, signal),
+      client.listAgentInterventions(params.sessionId, signal),
     ]);
     return buildAgentLoopContext({ session, actions, interventions });
   },
@@ -233,7 +231,7 @@ export type BoundedCheck<T> = { kind: "value"; value: T | undefined } | { kind: 
  */
 export function boundedCheck<P, T>(
   spec: Pick<WaitSpec<P, T>, "check">,
-  client: QDashClient,
+  client: QDashConnection,
   params: P,
   options: { timeoutMs: number; signal?: AbortSignal },
 ): Promise<BoundedCheck<T>> {
@@ -272,7 +270,7 @@ export function boundedCheck<P, T>(
  */
 export async function pollUntilSettled<P, T>(
   spec: WaitSpec<P, T>,
-  client: QDashClient,
+  client: QDashConnection,
   params: P,
   signal?: AbortSignal,
   sleep: (ms: number, signal?: AbortSignal) => Promise<void> = abortableSleep,
@@ -327,6 +325,7 @@ export function isWaitToolName(name: string): name is WaitToolName {
  * The client a host-owned connection names: always its explicit profile and
  * config file, never the environment or pi-qdash's selected profile.
  */
-export function connectionClient(args: { profile: string; configPath: string }): Promise<QDashClient> {
-  return QDashClient.fromProfile(args.profile, args.configPath);
+export function connectionClient(args: { profile: string; configPath: string }): Promise<QDashConnection> {
+  if (!args.configPath) return Promise.reject(new Error("A host-owned QDash connection must name its config file."));
+  return connectClient({ profile: args.profile, configPath: args.configPath, useEnv: false });
 }

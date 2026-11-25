@@ -663,7 +663,7 @@ class ChipClient:
         *,
         limit: typing.Optional[int] = None,
         offset: typing.Optional[int] = None,
-        qids: typing.Optional[typing.Sequence[str]] = None,
+        qids: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ListQubitsResponse:
         """
@@ -700,7 +700,7 @@ class ChipClient:
 
         offset : typing.Optional[int]
 
-        qids : typing.Optional[typing.Sequence[str]]
+        qids : typing.Optional[typing.Union[str, typing.Sequence[str]]]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -1859,7 +1859,7 @@ class AsyncChipClient:
         *,
         limit: typing.Optional[int] = None,
         offset: typing.Optional[int] = None,
-        qids: typing.Optional[typing.Sequence[str]] = None,
+        qids: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ListQubitsResponse:
         """
@@ -1896,7 +1896,7 @@ class AsyncChipClient:
 
         offset : typing.Optional[int]
 
-        qids : typing.Optional[typing.Sequence[str]]
+        qids : typing.Optional[typing.Union[str, typing.Sequence[str]]]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.

@@ -8,7 +8,9 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 
-import { QDashClient, QDashConfig } from "@oqtopus-team/qdash-client";
+import { QDash } from "@oqtopus-team/qdash-sdk";
+
+import { QDashConnection } from "../.test-dist/lib/qdash-connection.js";
 
 import { DEFAULT_HOST_NAME, HOST_NAME_KEY, hostModelIdentity } from "../.test-dist/lib/host-model.js";
 import { HOST_WRITE_APPROVAL_KEY } from "../.test-dist/lib/write-approval.js";
@@ -144,7 +146,7 @@ function loopTools() {
   const registered = new Map();
   registerAgentLoopTools({ registerTool(tool) { registered.set(tool.name, tool); } }, {
     async makeClient() {
-      return new QDashClient(new QDashConfig({ baseUrl: fake.baseUrl, apiToken: "fixture-token" }));
+      return new QDashConnection(new QDash({ baseUrl: fake.baseUrl, apiToken: "fixture-token" }));
     },
   });
   return (name, id, params, ctx) => registered.get(name).execute(id, params, undefined, undefined, { hasUI: false, ...ctx });

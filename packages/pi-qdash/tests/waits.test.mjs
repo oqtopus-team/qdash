@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { QDashClient, QDashTimeoutError } from "@oqtopus-team/qdash-client";
+import { QDashTimeoutError } from "@oqtopus-team/qdash-sdk";
+
+import { QDashConnection } from "../.test-dist/lib/qdash-connection.js";
 
 import {
   EXECUTION_TERMINAL_STATUSES,
@@ -17,7 +19,7 @@ import {
 
 /** A client whose reads return `responses` in order (the last repeats), with the client's own polling loops. */
 function fakeClient(method, responses) {
-  const client = Object.create(QDashClient.prototype);
+  const client = Object.create(QDashConnection.prototype);
   const queue = [...responses];
   let calls = 0;
   client[method] = async () => {

@@ -167,6 +167,20 @@ is preferred. Password authentication caches a login token; create a new client 
 generated client: configure its base URL, authentication, and project explicitly; it does not
 inherit a `QDash` client's configuration.
 
+## Configure the Existing Client
+
+For `qdash-client` and its `qdash-agent` command, put the following section in
+`$XDG_CONFIG_HOME/qdash/config.ini` (default `~/.config/qdash/config.ini`).
+Replace the URL, token, and project ID with those from your deployment. Keep the file
+readable only by your user.
+
+```ini
+[local]
+base_url = http://localhost:5714/api
+api_token = <your-api-token>
+project_id = your-project-id
+```
+
 ## Call the Existing Client's High-Level API
 
 ```python
@@ -288,7 +302,8 @@ system pipeline runs; saved-workflow run handles list executions instead.
 
 For a stored spec, use `qdash.pipelines.validate(spec, chip_id=...)` and
 `qdash.pipelines.execute(spec, chip_id=...)`. The returned run's `wait()` returns the raw execution
-detail. See [Pipeline specs](../../developer-guide/workflow/calibration-pipeline.md).
+detail. Read `detail.pipeline.status` for the whole pipeline when present and `detail.status` for
+the individual execution. See [Pipeline specs](../../developer-guide/workflow/calibration-pipeline.md).
 
 ## Run a Registered Workflow
 

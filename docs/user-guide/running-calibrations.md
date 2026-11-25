@@ -52,6 +52,8 @@ input resolution and exploratory runs.
 ## Monitor a Run
 
 On **Execution**, open a run or task to inspect status, progress, parameters, and artifacts.
+For a pipeline, each step reached has its own execution, including filters and schedule
+generation. Open its calibration session to see the pipeline status and step outcomes.
 Cancellation requests can take time to stop an uninterruptible hardware operation.
 
 **Group sessions** collects runs under their calibration objective or agent session. Expand a

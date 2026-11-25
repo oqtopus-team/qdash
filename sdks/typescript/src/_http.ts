@@ -5,7 +5,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import { ApiError, ApiTimeoutError, QDashApiClient } from "./_generated/index.js";
 import { isResponseBodyError } from "./_generated/core/fetcher/getResponseBody.js";
-import type { RawResponse } from "./_generated/core/index.js";
+import { toRawResponse, type RawResponse } from "./_generated/core/index.js";
 import type { QDashConfig } from "./config.js";
 import {
   QDashApiError,
@@ -406,4 +406,104 @@ export interface Context {
   readonly sleep: Sleep;
   /** Milliseconds of a monotonic-enough clock, for polling deadlines. */
   readonly now: () => number;
+}
+
+/** A query value of `QDash.fetch`; null and undefined are left out, each array item is sent. */
+export type QueryValue = string | number | boolean | null | undefined | readonly (string | number | boolean)[];
+
+/** Options of `QDash.fetch`. */
+export interface FetchOptions {
+  /** The HTTP method (default `GET`). Only GET and HEAD are sent again after a transient failure. */
+  method?: string;
+  /** Query parameters; null and undefined values are left out. */
+  query?: Readonly<Record<string, QueryValue>>;
+  /** A JSON body, sent with `Content-Type: application/json`. */
+  json?: unknown;
+  /** A body sent as it is, such as `FormData`; not with `json`. */
+  body?: BodyInit;
+  /** Extra headers, such as `Accept`; they cannot replace the session's auth or project. */
+  headers?: Readonly<Record<string, string>>;
+  /** Cancels the request and its retries; the request rejects with the signal's reason. */
+  signal?: AbortSignal;
+}
+
+const PROTECTED_HEADERS = new Set(["authorization", "x-project-id"]);
+
+function apiUrl(baseUrl: string, path: string, query: FetchOptions["query"]): string {
+  if (typeof path !== "string" || !path || /^[a-z][a-z0-9+.-]*:/i.test(path) || path.startsWith("//")) {
+    throw new TypeError("path must be a non-empty path of the QDash API, not an absolute URL");
+  }
+  const url = new URL(`${baseUrl}/${path.replace(/^\/+/, "")}`);
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (value === undefined || value === null) continue;
+    if (Array.isArray(value)) for (const item of value) url.searchParams.append(key, String(item));
+    else url.searchParams.set(key, String(value));
+  }
+  return url.toString();
+}
+
+async function errorBody(response: Response): Promise<unknown> {
+  let text: string;
+  try {
+    text = await response.text();
+  } catch {
+    return undefined;
+  }
+  if (!text) return undefined;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
+
+/**
+ * Send a request to `path` of the API through the generated client's passthrough fetch: the
+ * session's auth, headers, timeout and fetch, with its project as `X-Project-Id`. Resolves with
+ * the response of a success status, its body unread. An error status throws the SDK error
+ * for it (`QDashNotFoundError` for 404 and so on), a timeout or failed connection throws
+ * `QDashTransportError`, and a caller's abort rejects with the signal's reason. GET and HEAD
+ * are sent again after a transient failure, up to the read policy's attempts; other methods
+ * are sent once.
+ */
+export async function passthrough(
+  context: Context,
+  projectId: string | undefined,
+  path: string,
+  options: FetchOptions = {},
+): Promise<Response> {
+  const method = (options.method ?? "GET").toUpperCase();
+  if (options.json !== undefined && options.body !== undefined) throw new TypeError("Pass json or body, not both");
+  const url = apiUrl(context.config.baseUrl, path, options.query);
+  const headers: Record<string, string> = {};
+  for (const [key, value] of Object.entries(options.headers ?? {})) {
+    if (PROTECTED_HEADERS.has(key.toLowerCase())) throw new TypeError(`${key} is set by the session and cannot be passed`);
+    headers[key] = value;
+  }
+  if (options.json !== undefined) headers["Content-Type"] = "application/json";
+  if (projectId !== undefined) headers["X-Project-Id"] = projectId;
+  const body = options.json !== undefined ? JSON.stringify(options.json) : options.body;
+  const signal = options.signal;
+  const send = async (callOptions: CallOptions): Promise<Response> => {
+    let response: Response;
+    try {
+      response = await context.api.fetch(url, { method, ...(body !== undefined ? { body } : {}) }, {
+        headers,
+        maxRetries: 0,
+        ...(callOptions.abortSignal ? { abortSignal: callOptions.abortSignal } : {}),
+      });
+    } catch (error) {
+      if (signal?.aborted || error instanceof ApiError) throw error;
+      if (error instanceof Error && error.name === "TimeoutError") {
+        throw new ApiTimeoutError(`Timeout exceeded when calling ${method} ${new URL(url).pathname}.`, { cause: error });
+      }
+      // No response: the same error the generated client raises, translated by `call`.
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new ApiError({ message: reason, cause: error });
+    }
+    if (response.ok) return response;
+    throw new ApiError({ statusCode: response.status, body: await errorBody(response), rawResponse: toRawResponse(response) });
+  };
+  if (method === "GET" || method === "HEAD") return read({ ...context.reads, ...(signal ? { signal } : {}) }, send);
+  return call(() => send(writeOptions(signal)), signal);
 }

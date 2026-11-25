@@ -169,12 +169,12 @@ class CalibrationPipelineClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ExecutePipelineResponse:
         """
-        Runs the spec as one execution through the worker's calibration-pipeline
-        deployment. A spec with problems is rejected with 422 and the same problem
-        list that /validate returns.
+        Dispatch one pipeline run. Each step the worker reaches creates an execution.
+
+        An invalid spec returns 422 with the same problems as /validate.
 
         The run is recorded before it is launched. It joins ``calibration_session_id``
-        when given; otherwise an automatic calibration session created for it.
+        when given; otherwise QDash creates an automatic calibration session.
         ``idempotency_key`` makes a retry return the
         recorded run instead of starting another.
 
@@ -448,12 +448,12 @@ class AsyncCalibrationPipelineClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ExecutePipelineResponse:
         """
-        Runs the spec as one execution through the worker's calibration-pipeline
-        deployment. A spec with problems is rejected with 422 and the same problem
-        list that /validate returns.
+        Dispatch one pipeline run. Each step the worker reaches creates an execution.
+
+        An invalid spec returns 422 with the same problems as /validate.
 
         The run is recorded before it is launched. It joins ``calibration_session_id``
-        when given; otherwise an automatic calibration session created for it.
+        when given; otherwise QDash creates an automatic calibration session.
         ``idempotency_key`` makes a retry return the
         recorded run instead of starting another.
 

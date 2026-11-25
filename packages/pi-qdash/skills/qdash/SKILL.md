@@ -1,6 +1,6 @@
 ---
 name: qdash
-description: Query a running QDash instance from pi via the pi-qdash extension and @oqtopus-team/qdash-client. Use when inspecting chips, metrics, task results, tasks, projects, files, flows, metric scripts, dashboards, executions, forum posts, provenance, or QDash profile/configuration, including the latest stored value or status of a qubit or coupling ("what is the T1 of Q0?"). Also holds the execution paths and approval scope that the calibration and characterization skills load.
+description: Query a running QDash instance from pi via the pi-qdash extension and @oqtopus-team/qdash-sdk. Use when inspecting chips, metrics, task results, tasks, projects, files, flows, metric scripts, dashboards, executions, forum posts, provenance, or QDash profile/configuration, including the latest stored value or status of a qubit or coupling ("what is the T1 of Q0?"). Also holds the execution paths and approval scope that the calibration and characterization skills load.
 ---
 
 <!-- Confirmation gates are implemented by the host harness. Skills should state that a gate exists, not instruct how or when to ask for confirmation. -->
@@ -46,7 +46,7 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_apply_agent_candidate_commit` — apply a reviewed candidate commit
    - `qdash_create_forum_post`, `qdash_update_forum_post` — create or update Forum content
    - `qdash_create_forum_evidence_reply`, `qdash_create_forum_image_reply` — publish previously reviewed evidence replies
-   - `qdash_run_pipeline` — run a validated pipeline spec as one execution
+   - `qdash_run_pipeline` — dispatch a validated pipeline run
    - `qdash_save_flow`, `qdash_execute_flow` — save a Prefect flow you wrote as a QDash workflow, and run a saved flow (see Authoring a flow)
    - `qdash_save_metric_script`, `qdash_save_dashboard` — save a metric script, and create or update a dashboard with its panels (see the `qdash-metric-scripts` skill)
 4. Agent session tools (see the `qdash-agent-calibration` skill):
@@ -159,7 +159,7 @@ not the objective itself.
 
 ## Composing a calibration pipeline
 
-A calibration pipeline spec is a JSON description of one calibration run: `spec_version: 2`, targets, an ordered list of steps, and the settings of each task call. QDash validates it against the chip, backend, and task catalog and runs it as one execution. The spec can only name the step types and tasks QDash exposes; it cannot contain code.
+A calibration pipeline spec is a JSON description of one calibration run: `spec_version: 2`, targets, an ordered list of steps, and the settings of each task call. QDash validates it against the chip, backend, and task catalog and records an execution for each step it reaches. The spec can only name the step types and tasks QDash exposes; it cannot contain code.
 
 A step's `tasks` are calls, not names: `{"name": "CheckRamsey", "call_id": "ramsey_fine", "run": {"detuning": 0.0002}}`. Put `run`, `input`, and `update_calibration_parameters` on the call itself; to share a value such as `shots`, repeat it on each call that needs it, or use `default_run_parameters` for run values every task shares. The top-level `task_parameters` (per-task defaults) is deprecated: QDash still applies it, under each call's own settings, and planning reports a warning. Do not add it to a new spec. One step may run the same task several times (a coarse and a fine Ramsey, two Configure/Rabi rounds) when every occurrence has its own `call_id`; a task that appears once may omit it. Each call on each target gets its own `task_id` in the results.
 
@@ -268,15 +268,15 @@ For cryostat wiring requests, start with `qdash_get_cooldown_wiring`. Pass `cool
 
 ## Configuration
 
-The extension uses `@oqtopus-team/qdash-client` and supports:
+Standalone pi can reuse the SDK profile created by `qdash config init`. Look for
+`config.toml` under `$XDG_CONFIG_HOME/qdash/` or, by default, `~/.config/qdash/`.
+An explicit `profile` selects that table. Otherwise TOML uses `default_profile`, or
+`default` when unset. An explicit `configPath` selects one file. Without a TOML file,
+the extension still reads `config.ini`.
 
-- `QDASH_*` environment variables (`QDASH_BASE_URL`, `QDASH_API_TOKEN`, `QDASH_PROJECT_ID`, etc.)
-- `QDASH_WEB_URL`: the QDash web UI address used for links in tool output, when it differs from the API base URL (for example inside a deployment where the API is reached by an internal hostname)
-- `$XDG_CONFIG_HOME/qdash/config.ini`
-- `~/.config/qdash/config.ini`
-- explicit `profile` / `configPath` parameters
-
-If `QDASH_BASE_URL` is set and no profile is specified, the tools default to environment variables. Otherwise they use profile `default`.
+When no profile or path is selected, `QDASH_BASE_URL` selects environment settings,
+including `QDASH_API_TOKEN` and `QDASH_PROJECT_ID`. Use `QDASH_WEB_URL` when web links
+should use a different host from the API.
 
 ## Evidence curation workflow
 

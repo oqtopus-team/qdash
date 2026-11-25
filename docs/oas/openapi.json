@@ -2991,17 +2991,10 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/AgentSessionStatus"
-                  }
-                },
-                {
-                  "type": "null"
-                }
-              ],
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/AgentSessionStatus"
+              },
               "description": "Only sessions in these statuses",
               "title": "Status"
             },
@@ -5555,7 +5548,7 @@
           "calibration-pipeline"
         ],
         "summary": "Validate and run a calibration pipeline spec",
-        "description": "Runs the spec as one execution through the worker's calibration-pipeline\ndeployment. A spec with problems is rejected with 422 and the same problem\nlist that /validate returns.\n\nThe run is recorded before it is launched. It joins ``calibration_session_id``\nwhen given; otherwise an automatic calibration session created for it.\n``idempotency_key`` makes a retry return the\nrecorded run instead of starting another.",
+        "description": "Dispatch one pipeline run. Each step the worker reaches creates an execution.\n\nAn invalid spec returns 422 with the same problems as /validate.\n\nThe run is recorded before it is launched. It joins ``calibration_session_id``\nwhen given; otherwise QDash creates an automatic calibration session.\n``idempotency_key`` makes a retry return the\nrecorded run instead of starting another.",
         "operationId": "executeCalibrationPipeline",
         "security": [
           {
@@ -5713,17 +5706,10 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/CalibrationSessionStatus"
-                  }
-                },
-                {
-                  "type": "null"
-                }
-              ],
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/CalibrationSessionStatus"
+              },
               "description": "Only sessions in these statuses",
               "title": "Status"
             },
@@ -5734,17 +5720,10 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/CalibrationSessionOrigin"
-                  }
-                },
-                {
-                  "type": "null"
-                }
-              ],
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/CalibrationSessionOrigin"
+              },
               "description": "Only sessions of these origins: manual (created for an objective) or automatic (created by QDash for a run started without a session ID)",
               "title": "Origin"
             },
@@ -8109,17 +8088,10 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                {
-                  "type": "null"
-                }
-              ],
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
               "title": "Qids"
             }
           },
@@ -8964,7 +8936,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response"
+            "description": "The task's knowledge as Markdown, images inlined as data URIs",
+            "content": {
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -20442,17 +20421,10 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                {
-                  "type": "null"
-                }
-              ],
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
               "description": "Filter by parameter names (from metrics config)",
               "title": "Parameter Names"
             },
@@ -20546,17 +20518,10 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                {
-                  "type": "null"
-                }
-              ],
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
               "description": "Filter by parameter names",
               "title": "Parameter Names"
             },
@@ -32048,7 +32013,7 @@
           "spec"
         ],
         "title": "ExecutePipelineRequest",
-        "description": "Validate, then dispatch the pipeline as one execution.",
+        "description": "Dispatch one pipeline run with a separate execution for each step reached.",
         "examples": [
           {
             "chip_id": "64Qv3",

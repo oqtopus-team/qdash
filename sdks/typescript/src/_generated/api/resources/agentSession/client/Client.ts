@@ -4,7 +4,6 @@ import type { BaseClientOptions, BaseRequestOptions } from "../../../../BaseClie
 import { type NormalizedClientOptionsWithAuth, normalizeClientOptionsWithAuth } from "../../../../BaseClient.js";
 import { mergeHeaders, mergeOnlyDefinedHeaders } from "../../../../core/headers.js";
 import * as core from "../../../../core/index.js";
-import { toJson } from "../../../../core/json.js";
 import { mergeAdditionalBodyParameters } from "../../../../core/requestBody.js";
 import { handleNonStatusCodeError } from "../../../../errors/handleNonStatusCodeError.js";
 import * as errors from "../../../../errors/index.js";
@@ -50,7 +49,7 @@ export class AgentSessionClient {
         const { chip_id: chipId, status, mine, limit } = request;
         const _queryParams: Record<string, unknown> = {
             chip_id: chipId,
-            status: status !== undefined ? toJson(status) : undefined,
+            status: Array.isArray(status) ? status.map((item) => item) : status != null ? status : undefined,
             mine,
             limit,
         };

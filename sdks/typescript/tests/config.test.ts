@@ -104,6 +104,13 @@ describe("config file discovery", () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  it("reads an explicitly selected legacy INI file with no extension or warning", async () => {
+    file("runtime-profile", ini);
+    const warn = vi.spyOn(process, "emitWarning").mockImplementation(() => {});
+    expect((await QDashConfig.fromIniFile(join(dir, "runtime-profile"))).baseUrl).toBe("http://ini.local");
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it("falls back to config.ini only without config.toml, with a deprecation of the SDK", async () => {
     mkdirSync(join(dir, "qdash"));
     file("qdash/config.ini", ini);

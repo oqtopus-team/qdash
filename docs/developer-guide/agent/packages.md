@@ -27,20 +27,20 @@ or skill changes. [Pi Extension Design](./extensions.md) explains the shared-hos
 
 `.github/workflows/publish-typescript-packages.yml` owns the release sequence:
 client → TypeScript SDK → pi packages. The SDK includes its generated API client and has no
-dependency on the legacy client package. Its verified release record supplies the Python client
+dependency on the legacy client package. The client job’s verified release record supplies the Python client
 and SDK versions to `publish-qdash-client.yml`.
 
 | Trigger | Result |
 | --- | --- |
-| Pull request | Validate and pack; no publication |
-| Push to `develop` | Publish beta packages |
+| PR to `develop` affecting package workflow paths | Validate and pack; no publication |
+| Push to `develop` affecting those paths | Publish beta packages |
 | QDash `vX.Y.Z` tag | Publish all six packages as `X.Y.Z` |
 | Manual branch run | Validate only |
 | Manual tag run | Retry the stable release |
 
 No package-specific tag or routine manifest bump is needed. Packed dependencies use exact release
-versions instead of `workspace:*`. Beta pi packages use a run/attempt suffix; they pin the client
-version from the same run.
+versions instead of `workspace:*`. Beta pi packages use a run/attempt suffix. The packed pi-qdash extension pins the
+TypeScript SDK version published by the same release workflow.
 
 The Python publication validates the originating workflow, commit, ref, and release record before
 running that commit's code. Stable tags must resolve to a commit on `main`; beta commits must be

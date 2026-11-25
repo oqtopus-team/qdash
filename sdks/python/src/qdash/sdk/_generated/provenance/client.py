@@ -447,7 +447,7 @@ class ProvenanceClient:
         *,
         limit: typing.Optional[int] = None,
         within_hours: typing.Optional[int] = None,
-        parameter_names: typing.Optional[typing.Sequence[str]] = None,
+        parameter_names: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> RecentChangesResponse:
         """
@@ -482,7 +482,7 @@ class ProvenanceClient:
         within_hours : typing.Optional[int]
             Time window in hours
 
-        parameter_names : typing.Optional[typing.Sequence[str]]
+        parameter_names : typing.Optional[typing.Union[str, typing.Sequence[str]]]
             Filter by parameter names (from metrics config)
 
         request_options : typing.Optional[RequestOptions]
@@ -514,7 +514,7 @@ class ProvenanceClient:
         *,
         min_streak: typing.Optional[int] = None,
         limit: typing.Optional[int] = None,
-        parameter_names: typing.Optional[typing.Sequence[str]] = None,
+        parameter_names: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> DegradationTrendsResponse:
         """
@@ -549,7 +549,7 @@ class ProvenanceClient:
         limit : typing.Optional[int]
             Maximum number of trends to return
 
-        parameter_names : typing.Optional[typing.Sequence[str]]
+        parameter_names : typing.Optional[typing.Union[str, typing.Sequence[str]]]
             Filter by parameter names
 
         request_options : typing.Optional[RequestOptions]
@@ -1139,7 +1139,7 @@ class AsyncProvenanceClient:
         *,
         limit: typing.Optional[int] = None,
         within_hours: typing.Optional[int] = None,
-        parameter_names: typing.Optional[typing.Sequence[str]] = None,
+        parameter_names: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> RecentChangesResponse:
         """
@@ -1174,7 +1174,7 @@ class AsyncProvenanceClient:
         within_hours : typing.Optional[int]
             Time window in hours
 
-        parameter_names : typing.Optional[typing.Sequence[str]]
+        parameter_names : typing.Optional[typing.Union[str, typing.Sequence[str]]]
             Filter by parameter names (from metrics config)
 
         request_options : typing.Optional[RequestOptions]
@@ -1214,7 +1214,7 @@ class AsyncProvenanceClient:
         *,
         min_streak: typing.Optional[int] = None,
         limit: typing.Optional[int] = None,
-        parameter_names: typing.Optional[typing.Sequence[str]] = None,
+        parameter_names: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> DegradationTrendsResponse:
         """
@@ -1249,7 +1249,7 @@ class AsyncProvenanceClient:
         limit : typing.Optional[int]
             Maximum number of trends to return
 
-        parameter_names : typing.Optional[typing.Sequence[str]]
+        parameter_names : typing.Optional[typing.Union[str, typing.Sequence[str]]]
             Filter by parameter names
 
         request_options : typing.Optional[RequestOptions]

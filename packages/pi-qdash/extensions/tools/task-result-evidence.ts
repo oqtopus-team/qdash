@@ -10,13 +10,14 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { QDashClient } from "@oqtopus-team/qdash-client";
+import type { QDashConnection } from "../lib/qdash-connection.js";
 import type { TaskResultContext, TaskResultEvidence } from "@oqtopus-team/qdash-sdk";
 import { Type } from "typebox";
 
 import { qdashObjectLinks, qdashWebBaseUrl } from "../lib/links.js";
 import { redact, toTextToolResult } from "../lib/results.js";
 import { sdkSession, type SdkSessionFactory } from "../lib/sdk-session.js";
+import { CONFIG_PATH_DESCRIPTION, PROFILE_DESCRIPTION } from "../lib/connection.js";
 
 export const TASK_RESULT_EVIDENCE_TOOL = "qdash_get_task_result_evidence";
 
@@ -29,7 +30,7 @@ type EvidenceParams = {
 };
 
 export type TaskResultEvidenceDependencies = {
-  makeClient(params: EvidenceParams): Promise<QDashClient>;
+  makeClient(params: EvidenceParams): Promise<QDashConnection>;
   /** The SDK session for a resolved client; defaults to one with the client's settings. */
   sdk?: SdkSessionFactory;
 };
@@ -305,8 +306,8 @@ export function registerTaskResultEvidenceTool(pi: Pick<ExtensionAPI, "registerT
       "The cooldown is reported only for a cooldownId you pass; QDash's task result does not say which cooldown it ran in.",
     ],
     parameters: Type.Object({
-      profile: Type.Optional(Type.String({ description: "QDash profile name. Defaults to env when QDASH_BASE_URL is set, otherwise 'default'." })),
-      configPath: Type.Optional(Type.String({ description: "Optional path to qdash config.ini." })),
+      profile: Type.Optional(Type.String({ description: PROFILE_DESCRIPTION })),
+      configPath: Type.Optional(Type.String({ description: CONFIG_PATH_DESCRIPTION })),
       useEnv: Type.Optional(Type.Boolean({ description: "Force QDASH_* environment variables instead of a profile." })),
       taskId: Type.String({ description: "Task result ID, as in qdash_list_task_results." }),
       cooldownId: Type.Optional(Type.String({ description: "A cooldown to check against the result, from qdash_list_cooldowns. Never inferred when omitted." })),

@@ -15,6 +15,10 @@ Use **Execution** for run-wide progress or **Chip** for the latest task results 
 Check the status, message, parameters, and figure. Download raw data when available. For a saved
 value's origin or history, follow [data and provenance](./data-and-provenance.md).
 
+For **ReadoutClassification** and **EFReadoutClassification**, download the **Raw data**
+NetCDF file when the run produced a Qubex classifier. It preserves that run’s classifier,
+training shots, and confusion matrix even after a later run replaces the chip’s classifier.
+
 ## Record Result Context
 
 Add a result note for an anomaly, interpretation, or parameter choice. Use a pinned chip or

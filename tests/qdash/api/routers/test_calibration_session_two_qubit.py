@@ -20,6 +20,7 @@ from typing import Any
 import pytest
 
 from qdash.dbmodel.calibration_session import CalibrationPipelineRunDocument
+from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.task import TaskDocument
 from tests.qdash.api.routers.test_calibration_pipeline import good_spec
 from tests.qdash.api.routers.test_calibration_session_audit import (
@@ -99,7 +100,18 @@ def _post(test_client, session_id: str, key: str, spec: dict[str, Any], decision
 
 
 @pytest.fixture
-def coupling_tasks(lab):  # noqa: F811 - the fixture above, extended
+def coupling_tasks(lab, tmp_path, monkeypatch):  # noqa: F811 - the fixture above, extended
+    # Exercise the real directed-pair checks against this test's chip and MUX.
+    monkeypatch.setenv("CONFIG_PATH", str(tmp_path))
+    wiring = tmp_path / CHIP / "config" / "wiring.yaml"
+    wiring.parent.mkdir(parents=True)
+    wiring.write_text(
+        f"{CHIP}:\n  - mux: 0\n    ctrl: [C0-0, C0-1, C0-2, C0-3]\n    read_out: R0-0\n",
+        encoding="utf-8",
+    )
+    CouplingDocument(
+        project_id="lab-a", username="owner", chip_id=CHIP, qid="0-1", data={}, system_info={}
+    ).insert()
     for name in ("CheckCrossResonance", "CreateZX90"):
         TaskDocument(
             project_id="lab-a",
