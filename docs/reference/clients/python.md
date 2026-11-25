@@ -340,6 +340,13 @@ lock acquisition still prevents launch, but a rejected run record can remain.
 
 ## Follow an Existing Run
 
+All SDK run handles display progress during `wait()` by default: the whole run's status,
+time elapsed since waiting began, and available step or task counts. Notebooks and interactive
+terminals update one display in place; redirected stderr logs only status or progress changes.
+Terminal output goes to stderr. Pass `progress=False` to silence the display, including when
+using `CalibrationSession.run()`. Interrupting the wait or reaching its timeout does not cancel
+the remote run.
+
 ```python
 from qdash.sdk import QDash
 

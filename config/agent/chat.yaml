@@ -86,8 +86,9 @@ chat_models:
     reasoning_effort: medium
   # DeepSeek V4.1 Flash (preview) through an OpenAI Chat Completions API,
   # selectable in the chat's model menu. Set OPENAI_COMPATIBLE_BASE_URL_DEEPSEEK
-  # to https://api.ai.sakura.ad.jp/v1 and OPENAI_COMPATIBLE_API_KEY_DEEPSEEK to
-  # its API key. The endpoint reads max_tokens (ignoring max_completion_tokens,
+  # to your provider's base URL ending with /v1 and
+  # OPENAI_COMPATIBLE_API_KEY_DEEPSEEK to its API key. Choose an endpoint serving
+  # the configured model. The endpoint reads max_tokens (ignoring max_completion_tokens,
   # top_p, and top_k) and streams thinking in delta.reasoning, which the runtime
   # shows and sends back on tool rounds. It documents no thinking switch or
   # effort, so no reasoning_effort is set and the Thinking menu does not change

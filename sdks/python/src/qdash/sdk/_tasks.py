@@ -336,6 +336,9 @@ class TaskRun(Run):
     def __repr__(self) -> str:
         return f"TaskRun(name={self.name!r}, qid={self.qid!r}, execution_id={self.execution_id!r})"
 
+    def _progress_label(self) -> str:
+        return f"task {self.name} on {self.qid} (run {self.execution_id})"
+
 
 class Tasks:
     """The task catalog and single-task runs, reached as ``QDash.tasks``."""

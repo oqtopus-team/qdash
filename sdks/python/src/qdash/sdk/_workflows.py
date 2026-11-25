@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from qdash.sdk._http import api_errors, given, read_options
+from qdash.sdk._progress import state_not_found, state_of_run
 from qdash.sdk._runs import FLOW_TERMINAL_STATUSES
 from qdash.sdk.errors import QDashConfigError, QDashNotFoundError
 
@@ -218,6 +219,7 @@ class WorkflowRun:
         *,
         timeout_seconds: float = 3600.0,
         poll_interval_seconds: float = 5.0,
+        progress: bool = True,
     ) -> WorkflowRunResult:
         """Poll the recorded run until the whole flow run ends and return its result.
 
@@ -228,16 +230,24 @@ class WorkflowRun:
         first execution: ``detail`` is None when the server has none. Raises ``TimeoutError``,
         naming the last state read, when the run has not ended within ``timeout_seconds``; the
         run keeps going. Raises ``RuntimeError`` for a run without a recorded calibration run.
+
+        ``progress`` shows the whole run's status, its step and task counts as each poll
+        reads them, and the time waited: updated in place in a notebook cell or an
+        interactive terminal (on stderr), and as one stderr line per change otherwise.
+        ``progress=False`` writes nothing.
         """
         session_id, run_id = self._require_recorded()
         last: list[str] = ["the run was not found"]
+        display = self._executions.progress(f"workflow {self.name} run {run_id}", enabled=progress)
 
         def read() -> WorkflowRunResult | None:
             try:
                 state = self._executions.calibration_run(session_id, run_id)
             except QDashNotFoundError:
                 last[0] = "the run was not found"
+                display.update(state_not_found())
                 return None
+            display.update(state_of_run(state))
             flow_status = str(state.flow_status)
             last[0] = f"{flow_status}: {state.flow_status_reason}".rstrip(": ")
             if flow_status not in FLOW_TERMINAL_STATUSES:
@@ -252,6 +262,7 @@ class WorkflowRun:
                 f"Workflow run {run_id!r} (execution {self.execution_id!r}) did not end within "
                 f"{timeout_seconds} seconds; last read: {last[0]}"
             ),
+            progress=display,
         )
 
     def cancel(self) -> WorkflowCancellation:

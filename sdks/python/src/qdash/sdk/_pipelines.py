@@ -62,6 +62,7 @@ class PipelineRun:
         *,
         timeout_seconds: float = 3600.0,
         poll_interval_seconds: float = 5.0,
+        progress: bool = True,
     ) -> ExecutionResponseDetail:
         """Poll until the whole pipeline run ends, then return the execution detail.
 
@@ -70,11 +71,18 @@ class PipelineRun:
         raised. An execution the server does not list yet is polled again. Raises
         ``TimeoutError`` when the run has not ended within ``timeout_seconds``; the run itself
         keeps going.
+
+        ``progress`` shows the whole run's status, its step and task counts as each poll
+        reads them, and the time waited: updated in place in a notebook cell or an
+        interactive terminal (on stderr), and as one stderr line per change otherwise.
+        ``progress=False`` writes nothing.
         """
         return self._executions.wait(
             self.execution_id,
             timeout_seconds=timeout_seconds,
             poll_interval_seconds=poll_interval_seconds,
+            progress=progress,
+            label=f"pipeline run {self.execution_id}",
         )
 
 
