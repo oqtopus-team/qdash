@@ -234,7 +234,8 @@ def calibration_pipeline(
             that bypassed the API is still held to the same shape; a queued
             version 1 spec is converted first (see ``parse_dispatched_spec``).
         project_id: Project the execution belongs to (injected by the API).
-        flow_name: Display name of the execution; defaults to the spec name.
+        flow_name: Display name of the run; defaults to the spec name. A run with
+            neither names each step's execution after the step alone.
         tags: Extra tags; merged with the spec's tags.
         backend_name: Hardware backend; defaults to the configured backend.
     """
@@ -242,11 +243,13 @@ def calibration_pipeline(
     parsed = parse_dispatched_spec(spec, logger)
     targets = build_targets(parsed)
     steps = build_steps(parsed)
-    all_tags = sorted({*(tags or []), *parsed.tags, "pipeline"})
+    all_tags = sorted({*(tags or []), *parsed.tags})
+    # None leaves the run unnamed: each step's execution is then named after the step.
     name = flow_name or parsed.name
 
     logger.info(
-        f"Pipeline '{name}': {len(steps)} steps, {len(parsed.all_tasks())} task calls per target, "
+        f"Pipeline '{name or 'unnamed'}': {len(steps)} steps, "
+        f"{len(parsed.all_tasks())} task calls per target, "
         f"targets={parsed.targets.model_dump(exclude_none=True)}"
     )
 

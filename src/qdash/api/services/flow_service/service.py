@@ -55,6 +55,7 @@ from qdash.api.services.manual_round_checks import load_chip_round_model
 from qdash.common.manual_rounds import MANUAL_TARGET_OVERRIDE_REASON
 from qdash.common.mux_mapping import resolve_topology_mux_mapping
 from qdash.config import get_settings
+from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec, step_name
 from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY, FlowTargetOverride
 from qdash.datamodel.run import RUN_CONTEXT_KEY, RunIdentity
 from qdash.repository.run_ledger import NOTE_RUN_KEY, NOTE_SESSION_KEY, UNGROUPED_MARKER
@@ -673,14 +674,17 @@ class FlowService:
             ),
         )
 
-        name = flow_name or str(spec.get("name") or "pipeline")
-        all_tags = sorted({*(tags or []), *(spec.get("tags") or []), "pipeline"})
+        # An unnamed run stays unnamed for the worker, which then names each step's
+        # execution after the step alone; only the scheduled row needs a label now.
+        run_name = flow_name or (str(spec["name"]) if spec.get("name") else None)
+        name = run_name or _first_step_name(spec)
+        all_tags = sorted({*(tags or []), *(spec.get("tags") or [])})
         parameters: dict[str, Any] = {
             "username": username,
             "chip_id": chip_id,
             "spec": spec,
             "project_id": project_id,
-            "flow_name": name,
+            "flow_name": run_name,
             "tags": all_tags,
             "backend_name": backend_name,
         }
@@ -882,6 +886,23 @@ def calibration_note_of(calibration_run: RunIdentity | None) -> dict[str, str]:
     if calibration_run.calibration_session_id is not None:
         note[NOTE_SESSION_KEY] = calibration_run.calibration_session_id
     return note
+
+
+_UNNAMED_PIPELINE_LABEL = "calibration-pipeline"
+
+
+def _first_step_name(spec: dict[str, Any]) -> str:
+    """The name the worker gives an unnamed run's first step execution.
+
+    The scheduled row the API pre-creates becomes that execution, so it carries the
+    same name. A spec that does not parse (the route always sends a validated one)
+    falls back to the pipeline flow's name.
+    """
+    try:
+        parsed = CalibrationPipelineSpec.model_validate(spec)
+    except ValueError:
+        return _UNNAMED_PIPELINE_LABEL
+    return step_name(parsed.steps[0])
 
 
 def _execute_response(

@@ -45,8 +45,11 @@ def test_patterns_constants_and_defaults_are_kept() -> None:
     pipeline = Pipeline(targets=QubitTargets(["0"]), steps=[{"type": "BringUp"}])
 
     assert pipeline.spec_version == 2
-    assert pipeline.name == "pipeline"
+    # The name is optional: unset it is left out, and a given name is sent as given.
+    assert pipeline.name is None
     assert "name" not in pipeline.to_spec()
+    named = Pipeline(name="pipeline", targets=QubitTargets(["0"]), steps=[{"type": "BringUp"}])
+    assert named.to_spec()["name"] == "pipeline"
     assert CustomOneQubit(tasks=[TaskCall(name="CheckT1")]).step_name == "custom_one_qubit"
 
 

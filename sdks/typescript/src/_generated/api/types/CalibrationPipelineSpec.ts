@@ -8,7 +8,7 @@ import type * as QDashApi from "../index.js";
 export interface CalibrationPipelineSpec {
     /** Spec format version. Convert a version 1 spec with migrate_pipeline_spec. */
     spec_version: number;
-    /** Display name of the execution. */
+    /** Optional display name of the run. Each step's execution is named <name>_<step name> when given, and after the step alone when omitted. */
     name?: string | undefined;
     targets: QDashApi.PipelineTargets;
     steps: QDashApi.CalibrationPipelineSpecStepsItem[];
