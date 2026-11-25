@@ -4,7 +4,8 @@ import Link from "next/link";
 
 import { useEffect, useId, useState } from "react";
 import { twMerge } from "tailwind-merge";
-import { Ban, Brain, ChevronRight, CircleX, Wrench } from "lucide-react";
+import { Ban, Brain, ChevronRight, CircleX, History, Wrench } from "lucide-react";
+import { useChatFollowing } from "@/contexts/ChatFollowContext";
 import type {
   ChatTrace as ChatTraceData,
   ToolClassification,
@@ -592,15 +593,97 @@ function TraceSteps({
   );
 }
 
+/** The one-line summary of a finished answer's work: how long it took and what it did. */
+function workHistoryLabel(trace: ChatTraceData): { title: string; details: string[] } {
+  const updates = trace.steps.filter((s) => s.kind === "text" && s.text.trim()).length;
+  const tools = trace.steps.filter(isTool);
+  const failed = tools.filter((s) => s.status === "error").length;
+  const details = [
+    ...(updates ? [plural(updates, "update")] : []),
+    ...(tools.length ? [plural(tools.length, "tool")] : []),
+    ...(failed ? [`${failed} failed`] : []),
+  ];
+  const title =
+    trace.durationMs > 0 ? `Worked for ${formatDuration(trace.durationMs)}` : "Work history";
+  return { title, details };
+}
+
 /**
- * The work before a finished answer: its prose, and its calls folded into the
- * same groups the live turn showed, so nothing jumps when the turn ends.
+ * The work before a finished answer: its progress updates, and its calls folded
+ * into the same groups the live turn showed.
+ *
+ * `foldable`: the answer has its own text, so the work is history behind it. It
+ * folds into one row (folded at first) that names how long the work took and
+ * what it did, and opens to the same steps. Failures and executions stay
+ * visible while it is folded. Without it (an answer that is only a question, an
+ * approval, a partial answer that never ended, or nothing yet), the work is
+ * shown as it streamed, since its updates may be all the text there is.
+ *
+ * `finishedHere`: the answer of a turn this view streamed, now ended. If it ends
+ * while the user reads away from the bottom, the work stays as it streamed, so
+ * what they read neither moves nor hides; it folds once the thread follows the
+ * bottom again.
  */
-export function ChatTraceSummary({ trace }: { trace: ChatTraceData }) {
+export function ChatTraceSummary({
+  trace,
+  foldable = false,
+  finishedHere = false,
+}: {
+  trace: ChatTraceData;
+  foldable?: boolean;
+  finishedHere?: boolean;
+}) {
+  const contentId = useId();
+  const [open, setOpen] = useState(false);
+  const following = useChatFollowing();
+  const [held, setHeld] = useState(() => finishedHere && !following);
+  useEffect(() => {
+    if (held && following) setHeld(false);
+  }, [held, following]);
   if (trace.steps.length === 0) return null;
+  if (!foldable || held) {
+    return (
+      <div className="mb-3">
+        <TraceSteps steps={trace.steps} live={false} figuresOutside />
+      </div>
+    );
+  }
+  const { title, details } = workHistoryLabel(trace);
   return (
-    <div className="mb-3">
-      <TraceSteps steps={trace.steps} live={false} figuresOutside />
+    <div className="mb-3 min-w-0" data-testid="work-history">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-controls={contentId}
+        className="group flex w-full min-w-0 cursor-pointer items-center gap-2 text-left text-sm"
+        data-testid="work-history-summary"
+      >
+        <History
+          className="w-3.5 h-3.5 shrink-0 text-base-content/45"
+          strokeWidth={1.75}
+          aria-hidden="true"
+        />
+        <span className="min-w-0 truncate text-base-content/65 group-hover:text-base-content/85">
+          {title}
+        </span>
+        {details.length > 0 && (
+          <span className="shrink-0 text-xs tabular-nums text-base-content/40">
+            · {details.join(" · ")}
+          </span>
+        )}
+        <ChevronRight
+          className={`w-3 h-3 shrink-0 text-base-content/40 transition-transform ${
+            open ? "rotate-90" : ""
+          }`}
+          aria-hidden="true"
+        />
+      </button>
+      {!open && <FoldedGroupNotes steps={trace.steps.filter(isTool)} showFigures={false} />}
+      {/* Hidden, not unmounted, while folded: rows keep what the user opened. */}
+      <div id={contentId} hidden={!open} className={`${ROW_INDENT} mt-2`}>
+        <TraceSteps steps={trace.steps} live={false} figuresOutside />
+      </div>
     </div>
   );
 }
