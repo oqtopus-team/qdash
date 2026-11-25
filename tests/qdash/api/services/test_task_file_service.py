@@ -1,5 +1,6 @@
 import ast
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,7 @@ from qdash.api.services.task_file_service import (
     TaskFileService,
 )
 from qdash.common.config.backend import clear_cache as clear_backend_config_cache
+from tests.qdash.api._fs_swaps import swap_after_listing, swap_dir_for_link
 
 
 def test_uses_calib_tasks_path_from_environment(monkeypatch, tmp_path: Path) -> None:
@@ -745,3 +747,97 @@ def test_list_task_info_keeps_file_links_inside_backend(calibtasks: Path) -> Non
     tasks = TaskFileService(calibtasks).list_task_info("fake", sort_order="file_path").tasks
 
     assert [task.file_path for task in tasks] == ["alias.py", "one_qubit/rabi.py"]
+
+
+def test_list_task_info_skips_link_cycles(calibtasks: Path) -> None:
+    backend = calibtasks / "fake"
+    (backend / "alias.py").symlink_to(backend / "one_qubit" / "rabi.py")
+    (backend / "self.py").symlink_to("self.py")
+    (backend / "ping.py").symlink_to("pong.py")
+    (backend / "pong.py").symlink_to("ping.py")
+    (backend / "one_qubit" / "loop").symlink_to("loop")
+
+    tasks = TaskFileService(calibtasks).list_task_info("fake", sort_order="file_path").tasks
+
+    assert [(task.name, task.file_path) for task in tasks] == [
+        ("FakeRabi", "alias.py"),
+        ("FakeRabi", "one_qubit/rabi.py"),
+    ]
+
+
+@pytest.fixture
+def swap_backend(calibtasks: Path) -> tuple[Path, Path]:
+    """A backend with sibling directories and an outside directory with the same layout."""
+    backend = calibtasks / "fake"
+    for name in ("a", "b", "c"):
+        _write_task(backend / name / "task.py", f"Inside{name.upper()}")
+    outside = calibtasks.parent / "outside"
+    _write_task(outside / "task.py", "OutsideTask")
+    return backend, outside
+
+
+def test_list_task_info_refuses_backend_replaced_after_validation(
+    calibtasks: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service = TaskFileService(calibtasks)
+    resolve = service._resolve_backend_path
+
+    def resolve_then_swap(backend: str) -> Path:
+        checked = resolve(backend)
+        checked.rename(calibtasks / "original")
+        checked.symlink_to(calibtasks.parent / "outside", target_is_directory=True)
+        return checked
+
+    monkeypatch.setattr(service, "_resolve_backend_path", resolve_then_swap)
+
+    assert service.list_task_info("fake").tasks == []
+
+
+def test_task_discovery_refuses_directory_swapped_for_link_before_descent(
+    swap_backend: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend, outside = swap_backend
+    # "b" is listed as a directory, then swapped for a link while a sibling is read.
+    swapped = swap_after_listing(
+        monkeypatch, [backend / "a", backend / "c"], swap_dir_for_link(backend / "b", outside)
+    )
+
+    tasks = TaskFileService(backend.parent)._collect_tasks_from_directory(backend, backend)
+
+    assert swapped == [True]
+    names = {task.name for task in tasks}
+    assert "OutsideTask" not in names
+    assert {"FakeRabi", "InsideA", "InsideC"} <= names
+
+
+def test_task_discovery_parses_files_from_the_listed_directory(
+    swap_backend: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend, outside = swap_backend
+    # "b" is swapped for a link after its own entries were listed, before they are parsed.
+    swapped = swap_after_listing(
+        monkeypatch, [backend / "b"], swap_dir_for_link(backend / "b", outside)
+    )
+
+    tasks = TaskFileService(backend.parent)._collect_tasks_from_directory(backend, backend)
+
+    assert swapped == [True]
+    assert [(task.name, task.file_path) for task in tasks] == [
+        ("InsideA", "a/task.py"),
+        ("InsideB", "b/task.py"),
+        ("InsideC", "c/task.py"),
+        ("FakeRabi", "one_qubit/rabi.py"),
+    ]
+
+
+def test_task_discovery_closes_descriptors_when_stopped_early(
+    swap_backend: tuple[Path, Path],
+) -> None:
+    backend, _ = swap_backend
+    baseline = len(os.listdir("/dev/fd"))
+
+    files = TaskFileService(backend.parent)._iter_python_files(backend)
+    assert next(files).parts == ("a", "task.py")
+    files.close()
+
+    assert len(os.listdir("/dev/fd")) == baseline

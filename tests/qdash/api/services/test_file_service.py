@@ -1,3 +1,4 @@
+import os
 import shutil
 import zipfile
 from pathlib import Path
@@ -7,6 +8,7 @@ from fastapi import HTTPException
 from git import Repo
 
 from qdash.api.services.file_service import FileService
+from tests.qdash.api._fs_swaps import swap_after_listing, swap_dir_for_link
 
 
 def test_get_file_content_includes_saved_git_diff_base(tmp_path: Path) -> None:
@@ -240,6 +242,115 @@ def test_download_zip_file_single_file_keeps_name(tmp_path: Path) -> None:
         shutil.rmtree(Path(response.path).parent, ignore_errors=True)
 
 
+def test_download_zip_file_skips_link_cycles_and_keeps_valid_files(tmp_path: Path) -> None:
+    config_dir = tmp_path / "qubex-config"
+    (config_dir / "64Q").mkdir(parents=True)
+    (config_dir / "64Q" / "chip.yaml").write_text("chip: test\n", encoding="utf-8")
+    (config_dir / "64Q" / "alias.yaml").symlink_to("chip.yaml")
+    (config_dir / "64Q" / "self.yaml").symlink_to("self.yaml")
+    (config_dir / "64Q" / "ping.yaml").symlink_to("pong.yaml")
+    (config_dir / "64Q" / "pong.yaml").symlink_to("ping.yaml")
+
+    response = FileService(config_base_path=config_dir).download_zip_file(".")
+
+    try:
+        assert _archived_files(response) == {
+            "64Q/alias.yaml": b"chip: test\n",
+            "64Q/chip.yaml": b"chip: test\n",
+        }
+    finally:
+        shutil.rmtree(Path(response.path).parent, ignore_errors=True)
+
+
+def test_download_zip_file_reports_single_link_cycle_as_missing(tmp_path: Path) -> None:
+    config_dir = tmp_path / "qubex-config"
+    config_dir.mkdir()
+    (config_dir / "self.yaml").symlink_to("self.yaml")
+
+    with pytest.raises(HTTPException) as exc_info:
+        FileService(config_base_path=config_dir).download_zip_file("self.yaml")
+
+    assert exc_info.value.status_code == 404
+
+
+@pytest.fixture
+def swap_tree(tmp_path: Path) -> tuple[Path, Path]:
+    """A config tree with sibling directories and an outside directory with the same layout."""
+    config_dir = tmp_path / "qubex-config"
+    for name in ("a", "b", "c"):
+        (config_dir / name).mkdir(parents=True)
+        (config_dir / name / "params.yaml").write_text(f"{name}: inside\n", encoding="utf-8")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "params.yaml").write_text("top secret\n", encoding="utf-8")
+    return config_dir, outside
+
+
+def test_download_zip_file_refuses_directory_swapped_for_link_before_descent(
+    swap_tree: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_dir, outside = swap_tree
+    # "b" is listed as a directory, then swapped for a link while a sibling is read.
+    swapped = swap_after_listing(
+        monkeypatch,
+        [config_dir / "a", config_dir / "c"],
+        swap_dir_for_link(config_dir / "b", outside),
+    )
+
+    response = FileService(config_base_path=config_dir).download_zip_file(".")
+
+    try:
+        assert swapped == [True]
+        files = _archived_files(response)
+        assert all(b"top secret" not in content for content in files.values())
+        assert files["a/params.yaml"] == b"a: inside\n"
+        assert files["c/params.yaml"] == b"c: inside\n"
+    finally:
+        shutil.rmtree(Path(response.path).parent, ignore_errors=True)
+
+
+def test_download_zip_file_reads_files_from_the_listed_directory(
+    swap_tree: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_dir, outside = swap_tree
+    # "b" is swapped for a link after its own entries were listed, before they are read.
+    swapped = swap_after_listing(
+        monkeypatch, [config_dir / "b"], swap_dir_for_link(config_dir / "b", outside)
+    )
+
+    response = FileService(config_base_path=config_dir).download_zip_file(".")
+
+    try:
+        assert swapped == [True]
+        assert _archived_files(response) == {
+            "a/params.yaml": b"a: inside\n",
+            "b/params.yaml": b"b: inside\n",
+            "c/params.yaml": b"c: inside\n",
+        }
+    finally:
+        shutil.rmtree(Path(response.path).parent, ignore_errors=True)
+
+
+def test_download_zip_file_refuses_single_file_whose_ancestor_was_swapped(
+    swap_tree: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_dir, outside = swap_tree
+    service = FileService(config_base_path=config_dir)
+    resolve = service._resolve_download_path
+
+    def resolve_then_swap(path: str) -> Path:
+        resolved = resolve(path)
+        swap_dir_for_link(config_dir / "b", outside)()
+        return resolved
+
+    monkeypatch.setattr(service, "_resolve_download_path", resolve_then_swap)
+
+    with pytest.raises(HTTPException) as exc_info:
+        service.download_zip_file("b/params.yaml")
+
+    assert exc_info.value.status_code == 404
+
+
 # --- Workspaces: the same service serves config and knowledge ---
 
 
@@ -331,3 +442,21 @@ def test_git_env_without_credentials_only_marks_the_mount_safe(tmp_path: Path, m
 
     assert env["GIT_CONFIG_COUNT"] == "1"
     assert "QDASH_GIT_TOKEN" not in env
+
+
+def test_download_zip_file_closes_descriptors_when_archiving_fails(
+    swap_tree: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_dir, _ = swap_tree
+    baseline = len(os.listdir("/dev/fd"))
+
+    def fail(*_args: object) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(FileService, "_archive_file", staticmethod(fail))
+
+    with pytest.raises(HTTPException) as exc_info:
+        FileService(config_base_path=config_dir).download_zip_file(".")
+
+    assert exc_info.value.status_code == 500
+    assert len(os.listdir("/dev/fd")) == baseline

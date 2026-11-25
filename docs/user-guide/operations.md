@@ -106,7 +106,7 @@ then recreate with `docker compose up -d`.
 
 ### Files Are Missing from a Configuration ZIP
 
-**Download as ZIP** skips symbolic links to directories and files outside the configuration
-tree. Links to regular files inside the tree are included. If a required file is missing,
+**Download as ZIP** skips symbolic links to directories, files outside the configuration
+tree, and cyclic links. Links to regular files inside the tree are included. If a required file is missing,
 place a regular copy inside the configuration tree and download again. Check the API logs
 for skipped links.

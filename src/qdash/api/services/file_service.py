@@ -21,6 +21,7 @@ from fastapi.responses import FileResponse
 from git import Repo
 from git.exc import GitCommandError
 
+from qdash.api.lib.confined_tree import ConfinedTree
 from qdash.api.lib.errors import OperationFailedError
 from qdash.api.lib.file_utils import validate_relative_path
 from qdash.api.schemas.file import FileTreeNode
@@ -194,116 +195,132 @@ class FileService:
 
         """
         import shutil
+        import stat
         import tempfile
 
-        source_path = self._resolve_download_path(path)
-        if not source_path.exists():
-            raise HTTPException(status_code=404, detail=f"Path not found: {path}")
-
-        temp_dir = tempfile.mkdtemp()
-        temp_dir_path = Path(temp_dir)
-        timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d_%H%M%S")
-        zip_filename = f"{source_path.name}_{timestamp}.zip"
-
-        try:
-            actual_zip_path = temp_dir_path / zip_filename
-            with zipfile.ZipFile(actual_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-                if source_path.is_dir():
-                    self._archive_directory(zf, source_path)
-                else:
-                    self._archive_file(zf, source_path, source_path.name)
-
-            if not actual_zip_path.is_file():
-                raise Exception(f"Failed to create zip file at {actual_zip_path}")
-
-            logger.info(f"Created zip file: {actual_zip_path}")
-
-            def cleanup_temp_dir() -> None:
-                try:
-                    shutil.rmtree(temp_dir, ignore_errors=True)
-                    logger.info(f"Cleaned up temp directory: {temp_dir}")
-                except Exception as e:
-                    logger.error(f"Error cleaning up temp directory: {e}")
-
-            background_tasks = BackgroundTasks()
-            background_tasks.add_task(cleanup_temp_dir)
-            return FileResponse(
-                path=str(actual_zip_path),
-                filename=zip_filename,
-                media_type="application/zip",
-                background=background_tasks,
-            )
-
-        except Exception as e:
-            shutil.rmtree(temp_dir, ignore_errors=True)
-            logger.error(f"Error creating zip file: {e}")
-            raise HTTPException(status_code=500, detail=f"Error creating zip file: {e!s}")
-
-    def _archive_directory(self, zf: zipfile.ZipFile, root: Path) -> None:
-        """Archive ``root`` with paths relative to it, never leaving the config tree.
-
-        The tree is walked without following symbolic links, so a directory link
-        cannot pull in outside content or create a cycle. A file link is archived
-        only when its target resolves to a regular file inside the config tree;
-        every other link and every special file is skipped and logged.
-        """
         base_path = self._base_path.resolve()
-        pending: list[tuple[Path, str]] = [(root, "")]
-        while pending:
-            directory, prefix = pending.pop()
-            with os.scandir(directory) as scan:
-                entries = sorted(scan, key=lambda entry: entry.name)
-            for entry in entries:
-                entry_path = Path(entry.path)
-                arcname = f"{prefix}{entry.name}"
-                if entry.is_symlink():
-                    target = entry_path.resolve()
-                    if not target.is_relative_to(base_path):
-                        logger.warning("Skipping link outside config directory: %s", entry_path)
-                    elif target.is_file():
-                        self._archive_file(zf, target, arcname)
-                    else:
-                        logger.warning("Skipping link to a non-file: %s", entry_path)
-                elif entry.is_dir(follow_symlinks=False):
-                    zf.write(entry_path, f"{arcname}/")
-                    pending.append((entry_path, f"{arcname}/"))
-                elif entry.is_file(follow_symlinks=False):
-                    self._archive_file(zf, entry_path, arcname)
-                else:
-                    logger.warning("Skipping special file: %s", entry_path)
+        source_path = self._resolve_download_path(path)
+        source_parts = source_path.relative_to(base_path).parts
+        try:
+            tree = ConfinedTree(base_path)
+        except OSError:
+            raise HTTPException(status_code=404, detail=f"Path not found: {path}") from None
 
-    @staticmethod
-    def _archive_file(zf: zipfile.ZipFile, file_path: Path, arcname: str) -> None:
-        """Add one regular file, refusing a link swapped in after it was checked."""
+        with tree:
+            # The resolved path is opened again below without following links, so a
+            # component swapped for a link after resolution is refused here.
+            try:
+                source_mode = tree.lstat(source_parts).st_mode
+            except OSError:
+                source_mode = 0
+            if not (stat.S_ISDIR(source_mode) or stat.S_ISREG(source_mode)):
+                raise HTTPException(status_code=404, detail=f"Path not found: {path}")
+
+            temp_dir = tempfile.mkdtemp()
+            temp_dir_path = Path(temp_dir)
+            timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d_%H%M%S")
+            zip_filename = f"{source_path.name}_{timestamp}.zip"
+
+            try:
+                actual_zip_path = temp_dir_path / zip_filename
+                with zipfile.ZipFile(actual_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                    if stat.S_ISDIR(source_mode):
+                        self._archive_directory(zf, tree, source_parts)
+                    else:
+                        fd = tree.open_file(source_parts)
+                        try:
+                            self._archive_file(zf, fd, source_path.name)
+                        finally:
+                            os.close(fd)
+
+                if not actual_zip_path.is_file():
+                    raise Exception(f"Failed to create zip file at {actual_zip_path}")
+
+                logger.info(f"Created zip file: {actual_zip_path}")
+
+                def cleanup_temp_dir() -> None:
+                    try:
+                        shutil.rmtree(temp_dir, ignore_errors=True)
+                        logger.info(f"Cleaned up temp directory: {temp_dir}")
+                    except Exception as e:
+                        logger.error(f"Error cleaning up temp directory: {e}")
+
+                background_tasks = BackgroundTasks()
+                background_tasks.add_task(cleanup_temp_dir)
+                return FileResponse(
+                    path=str(actual_zip_path),
+                    filename=zip_filename,
+                    media_type="application/zip",
+                    background=background_tasks,
+                )
+
+            except Exception as e:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                logger.error(f"Error creating zip file: {e}")
+                raise HTTPException(status_code=500, detail=f"Error creating zip file: {e!s}")
+
+    def _archive_directory(
+        self, zf: zipfile.ZipFile, tree: ConfinedTree, start: tuple[str, ...]
+    ) -> None:
+        """Archive the directory ``start`` of ``tree`` with paths relative to it.
+
+        ``ConfinedTree`` walks without following directory links and reads every
+        file from a descriptor opened without following links, so neither a link
+        nor a directory swapped for a link during the walk can add content from
+        outside the config tree. A file link is archived only when its target is a
+        regular file inside the config tree; other links, link loops, and special
+        files are skipped and logged.
+        """
+        for entry in tree.walk(start):
+            arcname = "/".join(entry.parts)
+            if entry.fd is None:
+                info = zipfile.ZipInfo(f"{arcname}/", date_time=self._zip_date_time(entry.stat))
+                info.external_attr = ((entry.stat.st_mode & 0xFFFF) << 16) | 0x10
+                # ZipFile.mkdir() leaves these unset for a caller-built ZipInfo.
+                info.file_size = info.compress_size = info.CRC = 0
+                zf.mkdir(info)
+            else:
+                self._archive_file(zf, entry.fd, arcname)
+
+    @classmethod
+    def _archive_file(cls, zf: zipfile.ZipFile, fd: int, arcname: str) -> None:
+        """Add the regular file open as ``fd``; the caller keeps ownership of ``fd``."""
         import shutil
         import stat
+
+        file_stat = os.fstat(fd)
+        if not stat.S_ISREG(file_stat.st_mode):
+            raise OSError(f"Not a regular file: {arcname}")
+        info = zipfile.ZipInfo(arcname, date_time=cls._zip_date_time(file_stat))
+        info.compress_type = zipfile.ZIP_DEFLATED
+        info.external_attr = (file_stat.st_mode & 0xFFFF) << 16
+        info.file_size = file_stat.st_size
+        with open(fd, "rb", closefd=False) as source, zf.open(info, "w") as target:
+            shutil.copyfileobj(source, target)
+
+    @staticmethod
+    def _zip_date_time(file_stat: os.stat_result) -> tuple[int, int, int, int, int, int]:
+        """Return the ZIP timestamp of ``file_stat``, clamped as ZipInfo.from_file does."""
         import time
 
-        fd = os.open(file_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-        with os.fdopen(fd, "rb") as source:
-            file_stat = os.fstat(source.fileno())
-            if not stat.S_ISREG(file_stat.st_mode):
-                raise OSError(f"Not a regular file: {arcname}")
-            # ZIP timestamps start in 1980; clamp older times as ZipInfo.from_file does.
-            modified = time.localtime(file_stat.st_mtime)[:6]
-            if modified[0] < 1980:
-                modified = (1980, 1, 1, 0, 0, 0)
-            info = zipfile.ZipInfo(arcname, date_time=modified)
-            info.compress_type = zipfile.ZIP_DEFLATED
-            info.external_attr = (file_stat.st_mode & 0xFFFF) << 16
-            info.file_size = file_stat.st_size
-            with zf.open(info, "w") as target:
-                shutil.copyfileobj(source, target)
+        year, month, day, hour, minute, second = time.localtime(file_stat.st_mtime)[:6]
+        if year < 1980:
+            return (1980, 1, 1, 0, 0, 0)
+        return (year, month, day, hour, minute, second)
 
     def _resolve_download_path(self, path: str) -> Path:
         """Resolve a download path to the configured qubex-config tree."""
         base_path = self._base_path.resolve()
         requested_path = Path(path).expanduser()
 
-        if not requested_path.is_absolute():
-            return validate_relative_path(path, base_path)
+        try:
+            if not requested_path.is_absolute():
+                return validate_relative_path(path, base_path)
+            resolved_path = requested_path.resolve()
+        except RuntimeError:
+            # Path.resolve() raises RuntimeError for a link loop on Python < 3.13.
+            raise HTTPException(status_code=404, detail=f"Path not found: {path}") from None
 
-        resolved_path = requested_path.resolve()
         if resolved_path == base_path.parent:
             return base_path
 

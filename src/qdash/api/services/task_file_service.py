@@ -8,6 +8,7 @@ import json
 import logging
 import math
 import operator
+import os
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -15,6 +16,7 @@ from typing import TYPE_CHECKING, Any, cast
 from fastapi import HTTPException
 from pydantic import ValidationError
 
+from qdash.api.lib.confined_tree import ConfinedTree
 from qdash.api.schemas.task_file import (
     BackendConfigResponse,
     ListTaskFileBackendsResponse,
@@ -38,10 +40,13 @@ from qdash.datamodel.task import TaskDocumentation
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable, Generator
+
+    from qdash.api.lib.confined_tree import TreeEntry
 
 TASK_METADATA_CACHE_VERSION = 5
 TASK_CATALOG_FILENAME = "task_catalog.json"
+MAX_TASK_SOURCE_BYTES = 1_000_000
 RABI_NORMALIZATION_INPUT_UNITS = {
     "control_amplitude": "a.u.",
     "rabi_amplitude": "a.u.",
@@ -258,36 +263,43 @@ class TaskFileService:
             raise HTTPException(status_code=400, detail=f"Not a directory: {backend}")
         return resolved
 
-    @staticmethod
-    def _iter_python_files(directory: Path) -> Iterator[Path]:
-        """Yield the Python files under ``directory`` without leaving it.
+    def _iter_python_files(self, directory: Path) -> Generator[TreeEntry, None, None]:
+        """Yield the Python files under ``directory`` opened for reading.
 
-        Directory links are never followed, so discovery cannot escape the
-        directory or loop. A file link is yielded only when its target is a file
-        inside ``directory``. Hidden entries and ``__pycache__`` are skipped.
+        The walk goes through ``ConfinedTree``: directory links are never
+        followed, every component is opened without following links, and a file
+        link is yielded only when its target is a regular file inside
+        ``directory``. Each entry carries the descriptor that was checked, valid
+        until the iteration advances. Hidden entries and ``__pycache__`` are
+        skipped; entries that cannot be read are skipped and logged.
         """
-        root = directory.resolve()
-        pending = [directory]
-        while pending:
-            current = pending.pop()
-            try:
-                entries = sorted(current.iterdir())
-            except PermissionError:
-                logger.warning(f"Permission denied accessing directory: {current}")
-                continue
-            for item in entries:
-                if item.name.startswith(".") or item.name == "__pycache__":
-                    continue
-                if item.is_symlink():
-                    target = item.resolve()
-                    if item.suffix == ".py" and target.is_relative_to(root) and target.is_file():
-                        yield item
-                    else:
-                        logger.warning("Skipping task link outside %s: %s", root, item)
-                elif item.is_dir():
-                    pending.append(item)
-                elif item.suffix == ".py" and item.is_file():
-                    yield item
+        try:
+            tree = self._open_task_tree(directory)
+        except OSError as exc:
+            logger.warning("Cannot open task directory %s: %s", directory, exc)
+            return
+        with tree:
+            for entry in tree.walk(include=self._is_task_entry, skip_unreadable=True):
+                if not entry.is_dir:
+                    yield entry
+
+    def _open_task_tree(self, directory: Path) -> ConfinedTree:
+        """Open ``directory``, reaching it from the base directory without following links."""
+        base_path = Path(os.path.realpath(self._base_path))
+        target = Path(os.path.abspath(directory))
+        # Preserve the checked directory name: resolving it again could turn a
+        # replaced backend into a new, outside trusted root.
+        lexical_base = Path(os.path.abspath(self._base_path))
+        for base in (lexical_base, base_path):
+            if target.is_relative_to(base):
+                return ConfinedTree(base_path, target.relative_to(base).parts)
+        raise OSError(f"Task directory outside configured base: {directory}")
+
+    @staticmethod
+    def _is_task_entry(name: str, is_dir: bool) -> bool:
+        if name.startswith(".") or name == "__pycache__":
+            return False
+        return is_dir or name.endswith(".py")
 
     def _load_catalog_tasks(self, backend: str) -> list[TaskInfo] | None:
         """Load generated metadata when a catalog is available for this backend."""
@@ -304,18 +316,28 @@ class TaskFileService:
             logger.warning("Failed to load task catalog %s: %s", catalog_path, exc)
             return None
 
-    def _extract_task_info_from_file(self, file_path: Path, relative_path: str) -> list[TaskInfo]:
-        """Extract task information from a Python file using AST parsing."""
-        tasks: list[TaskInfo] = []
-
-        if not self._is_valid_python_file(file_path):
-            return tasks
-
+    @staticmethod
+    def _read_task_source(entry: TreeEntry, relative_path: str) -> str | None:
+        """Read a task file from the descriptor the walk opened and checked."""
+        if entry.fd is None:
+            return None
+        if entry.stat.st_size > MAX_TASK_SOURCE_BYTES:
+            logger.warning(f"Skipping large file: {relative_path}")
+            return None
         try:
-            content = file_path.read_text(encoding="utf-8")
+            with open(entry.fd, "rb", closefd=False) as source:
+                data = source.read(MAX_TASK_SOURCE_BYTES + 1)
+            if len(data) > MAX_TASK_SOURCE_BYTES:
+                logger.warning(f"Skipping large file: {relative_path}")
+                return None
+            return data.decode("utf-8")
         except (OSError, UnicodeDecodeError):
             logger.warning(f"Failed to read file: {relative_path}")
-            return tasks
+            return None
+
+    def _extract_task_info_from_source(self, content: str, relative_path: str) -> list[TaskInfo]:
+        """Extract task information from Python source using AST parsing."""
+        tasks: list[TaskInfo] = []
 
         try:
             tree = ast.parse(content)
@@ -817,23 +839,29 @@ class TaskFileService:
         return constants
 
     def _collect_tasks_from_directory(self, directory: Path, base_path: Path) -> list[TaskInfo]:
-        """Collect task info from the Python files under a directory."""
-        tasks: list[TaskInfo] = []
-        files = sorted(
-            (item for item in self._iter_python_files(directory) if item.name != "__init__.py"),
-            key=lambda item: item.relative_to(base_path).parts,
-        )
-        for item in files:
-            relative_path = str(item.relative_to(base_path))
-            tasks.extend(self._extract_task_info_from_file(item, relative_path))
-        return tasks
+        """Collect task info from the Python files under a directory.
+
+        Each file is parsed from the descriptor the confined walk opened, never
+        reopened by path.
+        """
+        prefix = directory.relative_to(base_path)
+        tasks_by_file: list[tuple[tuple[str, ...], list[TaskInfo]]] = []
+        for entry in self._iter_python_files(directory):
+            if entry.parts[-1] == "__init__.py":
+                continue
+            relative = prefix.joinpath(*entry.parts)
+            relative_path = str(relative)
+            content = self._read_task_source(entry, relative_path)
+            if content is not None:
+                tasks_by_file.append(
+                    (relative.parts, self._extract_task_info_from_source(content, relative_path))
+                )
+        tasks_by_file.sort(key=lambda item: item[0])
+        return [task for _, file_tasks in tasks_by_file for task in file_tasks]
 
     def _get_directory_mtime_sum(self, directory: Path) -> float:
         """Calculate sum of modification times for all Python files in directory."""
-        mtime_sum = 0.0
-        for item in self._iter_python_files(directory):
-            with contextlib.suppress(OSError):
-                mtime_sum += item.stat().st_mtime
+        mtime_sum = sum(entry.stat.st_mtime for entry in self._iter_python_files(directory))
         catalog_path = self._base_path / TASK_CATALOG_FILENAME
         with contextlib.suppress(OSError):
             mtime_sum += catalog_path.stat().st_mtime
@@ -847,16 +875,3 @@ class TaskFileService:
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             return node.value
         return None
-
-    @staticmethod
-    def _is_valid_python_file(file_path: Path) -> bool:
-        """Check if a file is a valid Python file that can be parsed."""
-        if not file_path.exists() or not file_path.is_file() or file_path.suffix != ".py":
-            return False
-        try:
-            if file_path.stat().st_size > 1_000_000:
-                logger.warning(f"Skipping large file: {file_path}")
-                return False
-        except OSError:
-            return False
-        return True
