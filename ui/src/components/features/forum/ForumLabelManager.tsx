@@ -15,6 +15,7 @@ import {
   useUpdateForumLabel,
 } from "@/client/forum/forum";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import type { ForumLabelUpdate } from "@/schemas";
 
 import {
   getForumLabelErrorMessage,
@@ -217,7 +218,7 @@ function ForumLabelEditForm({ label, onCancel, onSaved }: ForumLabelEditFormProp
     register,
     control,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, dirtyFields },
   } = useForm<ForumLabelFormValues>({
     resolver: zodResolver(forumLabelSchema),
     // Follow refetched label values, such as an earlier save, without discarding the user's edits.
@@ -229,17 +230,20 @@ function ForumLabelEditForm({ label, onCancel, onSaved }: ForumLabelEditFormProp
     resetOptions: { keepDirtyValues: true },
   });
 
-  /** Saves the edited label, then closes the form and refreshes the label list. */
+  /** Saves the edited fields, then closes the form and refreshes the label list. */
   const submit = async (values: ForumLabelFormValues) => {
+    // Send only edited fields, so a reopened form cannot resend a value that an earlier save replaced.
+    const data: ForumLabelUpdate = {
+      ...(dirtyFields.name && { name: values.name }),
+      ...(dirtyFields.description && { description: values.description }),
+      ...(dirtyFields.color && { color: values.color }),
+    };
+    if (Object.keys(data).length === 0) {
+      onCancel();
+      return;
+    }
     try {
-      await updateMutation.mutateAsync({
-        labelKey: label.id,
-        data: {
-          name: values.name,
-          description: values.description,
-          color: values.color,
-        },
-      });
+      await updateMutation.mutateAsync({ labelKey: label.id, data });
       onSaved();
     } catch (error) {
       toast.error(getForumLabelErrorMessage(error, "Failed to update label"));

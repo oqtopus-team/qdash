@@ -133,7 +133,7 @@ describe("ForumLabelManager", () => {
     await waitFor(() =>
       expect(mocks.updateLabel).toHaveBeenCalledWith({
         labelKey: "bug",
-        data: { name: "Defect", description: "", color: "#ff0000" },
+        data: { name: "Defect", description: "" },
       }),
     );
     await waitFor(() => expect(screen.queryByRole("form", { name: "Edit label Bug" })).toBeNull());
@@ -146,6 +146,7 @@ describe("ForumLabelManager", () => {
     fireEvent.click(screen.getByRole("button", { name: "Edit label" }));
     const form = within(screen.getByRole("form", { name: "Edit label Bug" }));
 
+    fireEvent.change(form.getByLabelText("Name"), { target: { value: "Defect" } });
     fireEvent.click(form.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith("Failed to update label"));
@@ -178,8 +179,46 @@ describe("ForumLabelManager", () => {
     await waitFor(() => expect(mocks.updateLabel).toHaveBeenCalledTimes(2));
     expect(mocks.updateLabel.mock.calls[1][0]).toEqual({
       labelKey: "bug",
-      data: { name: "Second", description: "Something broke", color: "#ff0000" },
+      data: { name: "Second" },
     });
+  });
+
+  it("sends only the edited fields so a reopened form keeps an earlier rename", async () => {
+    let resolveFirst: (value: unknown) => void = () => {};
+    mocks.updateLabel
+      .mockImplementationOnce(() => new Promise((resolve) => (resolveFirst = resolve)))
+      .mockResolvedValueOnce({});
+    render(<ForumLabelManager labels={LABELS} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit label" }));
+    let form = within(screen.getByRole("form", { name: "Edit label Bug" }));
+    fireEvent.change(form.getByLabelText("Name"), { target: { value: "Renamed" } });
+    fireEvent.click(form.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(mocks.updateLabel).toHaveBeenCalledTimes(1));
+    fireEvent.click(form.getByRole("button", { name: "Cancel" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit label" }));
+    form = within(screen.getByRole("form", { name: "Edit label Bug" }));
+    fireEvent.change(form.getByLabelText("Description"), { target: { value: "New text" } });
+    fireEvent.click(form.getByRole("button", { name: "Save" }));
+
+    resolveFirst({});
+    await waitFor(() => expect(mocks.updateLabel).toHaveBeenCalledTimes(2));
+    expect(mocks.updateLabel.mock.calls[1][0]).toEqual({
+      labelKey: "bug",
+      data: { description: "New text" },
+    });
+  });
+
+  it("closes the edit form without a request when nothing was edited", async () => {
+    render(<ForumLabelManager labels={LABELS} />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit label" }));
+    const form = within(screen.getByRole("form", { name: "Edit label Bug" }));
+
+    fireEvent.click(form.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(screen.queryByRole("form", { name: "Edit label Bug" })).toBeNull());
+    expect(mocks.updateLabel).not.toHaveBeenCalled();
   });
 
   it("keeps another label's edit form open when an earlier save finishes", async () => {
@@ -191,6 +230,7 @@ describe("ForumLabelManager", () => {
 
     fireEvent.click(screen.getAllByRole("button", { name: "Edit label" })[0]);
     const bugForm = within(screen.getByRole("form", { name: "Edit label Bug" }));
+    fireEvent.change(bugForm.getByLabelText("Name"), { target: { value: "Defect" } });
     fireEvent.click(bugForm.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(mocks.updateLabel).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole("button", { name: "Edit label" }));
@@ -210,6 +250,7 @@ describe("ForumLabelManager", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Edit label" }));
     const form = within(screen.getByRole("form", { name: "Edit label Bug" }));
+    fireEvent.change(form.getByLabelText("Name"), { target: { value: "Defect" } });
     fireEvent.click(form.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(mocks.updateLabel).toHaveBeenCalledTimes(1));
     fireEvent.click(form.getByRole("button", { name: "Cancel" }));
