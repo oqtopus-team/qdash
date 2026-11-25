@@ -186,9 +186,8 @@ function PipelineRunItem({
       </div>
       {run.dispatch_status === "unknown" ? (
         <p className="text-xs text-warning">
-          QDash could not confirm whether this run started. It was admitted, so it may be running or
-          may still start, even after the session is closed. Check the Execution list before
-          starting it again.
+          Start not confirmed: it may be running or may still start, even after close. Check the
+          Execution list before starting it again.
         </p>
       ) : null}
       {run.dispatch_status === "rejected" && run.error ? (
@@ -440,10 +439,9 @@ export function CalibrationSessionPageContent({
               </div>
             ) : null}
             <p className="text-xs text-base-content/60 sm:col-span-2 md:col-span-4">
-              It grants nothing: each run is approved on its own, and each agent session keeps its
-              own policy.
+              It grants nothing: runs and agent sessions keep their own approvals.
               {isAutomatic
-                ? " QDash created it for a run started without a session. Runs started with its ID join it while it is open, and QDash closes it when everything in it has ended."
+                ? " QDash created it for a run started without a session and closes it when everything in it has ended."
                 : ""}
             </p>
             {isOpen && projectId && username === data.created_by ? (
@@ -490,7 +488,7 @@ export function CalibrationSessionPageContent({
             {runs.length === 0 ? (
               <EmptyState
                 title="No runs"
-                description="Workflows, pipelines, and tasks started with this session's ID appear here, each with all of its step executions"
+                description="Runs started with this session's ID appear here"
                 emoji="empty"
               />
             ) : (
@@ -515,7 +513,7 @@ export function CalibrationSessionPageContent({
             {agents.length === 0 ? (
               <EmptyState
                 title="No agent sessions"
-                description="Agent sessions created with this session's ID appear here with the executions they ran"
+                description="Agent sessions created with this session's ID appear here"
                 emoji="robot"
               />
             ) : (

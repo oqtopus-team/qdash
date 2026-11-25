@@ -132,6 +132,89 @@ describe("AuditTimeline", () => {
   });
 });
 
+describe("AuditTimeline event disclosure", () => {
+  function renderEvents(events: AgentAuditEvent[]) {
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <AuditTimeline
+          title="Audit"
+          source={{
+            queryKey: ["audit-disclosure", events[0]!.event_id],
+            fetchPage: async () => ({ ...page(events, null), total_events: events.length }),
+            exportAll: async () => page(events, null),
+            filename: "audit.json",
+            sessionId: "ses-1",
+          }}
+        />
+      </QueryClientProvider>,
+    );
+  }
+
+  it("keeps summary, source, warnings, and links visible and folds payload and metadata", async () => {
+    renderEvents([
+      event(0, {
+        kind: "measurement",
+        summary: "CheckRabi on Q00: completed",
+        provenance: "server_record",
+        actor: "alice",
+        execution_id: "exec-1",
+        task_id: "task-1",
+        status: "completed",
+        status_is_current: true,
+        missing: ["decision"],
+        data: {
+          outputs: { control_amplitude: { value: 0.05, unit: "a.u." } },
+          gate: [
+            { parameter_name: "control_amplitude", accepted: false, rejection: "quality_gate" },
+            { parameter_name: "t1", accepted: false, rejection: "not_in_scope" },
+          ],
+        },
+      }),
+    ]);
+    expect(await screen.findByText("CheckRabi on Q00: completed")).toBeTruthy();
+    // Source, live status, failed gates, unrecorded facts, and navigation stay in view.
+    expect(screen.getByText("QDash record").closest("details")).toBeNull();
+    expect(screen.getByText("now completed").closest("details")).toBeNull();
+    // An out-of-scope output is reference only and is not counted as a failed check.
+    expect(screen.getByText("1 gate check failed").closest("details")).toBeNull();
+    expect(screen.getByText("Not recorded: decision").closest("details")).toBeNull();
+    expect(screen.getByRole("link", { name: "Execution" }).closest("details")).toBeNull();
+    expect(screen.getByRole("link", { name: "Result and figures" }).closest("details")).toBeNull();
+
+    // Who recorded it and the payload sit in a closed per-event disclosure named for the event.
+    const details = screen.getByTestId("audit-event-details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    const summary = details.querySelector("summary")!;
+    expect(summary.textContent).toMatch(/^Details: Measurement, /);
+    expect(screen.getByText("alice").closest("details")).toBe(details);
+    expect(screen.getByText("control_amplitude 0.05 a.u.").closest("details")).toBe(details);
+    expect(
+      screen
+        .getByText(
+          "control_amplitude rejected: quality gate, t1 not in session scope (reference only)",
+        )
+        .closest("details"),
+    ).toBe(details);
+    fireEvent.click(summary);
+    expect(details.open).toBe(true);
+  });
+
+  it("marks a superseded decision and renders no disclosure for an event with nothing more", async () => {
+    renderEvents([
+      event(0, {
+        summary: "Assessed pass",
+        data: { interpretation: "Passes", superseded_by_decision_id: "cd-2" },
+      }),
+      event(1, { kind: "session_closed", summary: "alice closed cs-1" }),
+    ]);
+    expect(await screen.findByText("Superseded")).toBeTruthy();
+    expect(screen.getByText("cd-2").closest("details")).toBeTruthy();
+    expect(screen.getAllByTestId("audit-event-details")).toHaveLength(1);
+  });
+});
+
 describe("audit labels", () => {
   it("names kinds and sources in plain words", () => {
     expect(auditKindLabel("intervention_response")).toBe("Expert answered");

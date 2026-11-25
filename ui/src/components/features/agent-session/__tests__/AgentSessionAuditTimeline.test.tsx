@@ -200,12 +200,13 @@ describe("AgentSessionAuditTimeline", () => {
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
     expect(await screen.findByText("R2 0.98 passes the criterion.")).toBeTruthy();
     expect(screen.getByText("Agent statement")).toBeTruthy();
-    // Each event names the model its own record reported, and who reported it.
-    const model = screen.getByText("model vllm/qwen3:32b");
+    // Each event names the model its own record reported, and who reported it, in its details.
+    const model = screen.getByText("vllm/qwen3:32b");
     expect(model.getAttribute("title")).toBe(
       "Reported by qdash-web-agent; QDash does not verify it",
     );
-    expect(screen.getAllByText(/^model /)).toHaveLength(1);
+    expect(model.closest("details")).toBeTruthy();
+    expect(screen.getAllByText(/qwen3:32b$/)).toHaveLength(1);
     expect(screen.getByText(/Showing 3 of 3 events/)).toBeTruthy();
     expect(screen.getByText("End of the timeline")).toBeTruthy();
     expect(audits[audits.length - 1]).toEqual({ cursor: "snap-1:2", project: "lab-a" });
