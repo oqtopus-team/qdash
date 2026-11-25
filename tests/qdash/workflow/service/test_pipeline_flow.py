@@ -234,7 +234,7 @@ def test_python_steps_share_the_configure_call_policy(step_class: Any) -> None:
 
 def test_configure_all_call_reaches_the_plan_and_the_task(monkeypatch: Any) -> None:
     """A spec ConfigureAll call runs with its settings; the targets' MUXes replace run.mux_ids."""
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
     from qdash.workflow.service.steps import StepContext
 
     call = {"name": "ConfigureAll", "run": {"configuration_mode": "ge-ef-cr", "mux_ids": [9]}}
@@ -253,7 +253,7 @@ def test_configure_all_call_reaches_the_plan_and_the_task(monkeypatch: Any) -> N
     session._initialized = True
     session.task_parameters = {}
     session.default_run_parameters = {}
-    plan = CalibSession.calibration_plan(session, [built])
+    plan = ExecutionRuntime.calibration_plan(session, [built])
     assert plan["steps"][0]["calls"] == [
         {
             "name": "ConfigureAll",
@@ -339,6 +339,7 @@ def test_pipeline_note_lists_the_plan_with_step_kinds() -> None:
             "name": "coarse-then-coherence",
             "spec_version": 2,
             "spec_digest": parsed.plan_digest(),
+            "records_transform_steps": True,
             "steps": [
                 {
                     "index": 1,

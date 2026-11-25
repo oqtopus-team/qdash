@@ -3,7 +3,7 @@
 import type * as QDashApi from "../index.js";
 
 /**
- * One CalibService.run call of the entrypoint.
+ * One CalibrationSession.run (or legacy CalibService.run) call of the entrypoint.
  */
 export interface ExecutionPlanRun {
     /** Literal targets of the call; null when computed at run time */

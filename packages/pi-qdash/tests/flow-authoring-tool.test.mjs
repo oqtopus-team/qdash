@@ -47,8 +47,24 @@ test("code that QDash would reject is reported before anyone is asked to approve
   const problems = flowCodeProblems("1bad", "def x():\n    pass\n", "x");
   assert.equal(problems.length, 3);
   assert.match(problems[0], /name '1bad'/);
-  assert.match(problems[1], /@flow/);
+  assert.match(problems[1], /@calibration_flow/);
   assert.match(problems[2], /import prefect/);
+});
+
+test("a calibration_flow needs its import from qdash.workflow, not prefect", () => {
+  const code = [
+    "from qdash.calibration import CustomOneQubit, QubitTargets, TaskCall",
+    "from qdash.workflow import CalibrationSession, calibration_flow, resolve_calib_context",
+    "",
+    '@calibration_flow(session_name="T1 check")',
+    "def my_check(username: str, chip_id: str, project_id: str | None = None):",
+    "    context = resolve_calib_context(username, chip_id, project_id=project_id)",
+    "    return CalibrationSession.from_context(context).run(targets=QubitTargets([\"0\"]), steps=[])",
+    "",
+  ].join("\n");
+  assert.deepEqual(flowCodeProblems("my_check", code, "my_check"), []);
+  const missing = flowCodeProblems("my_check", code.replace("calibration_flow, ", ""), "my_check");
+  assert.deepEqual(missing, ["the code uses `@calibration_flow` but does not import it from qdash.workflow"]);
 });
 
 test("a save sends QDash's request shape and reports the registered flow", async () => {

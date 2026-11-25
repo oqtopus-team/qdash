@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import atexit
 import os
 import threading
-from contextlib import contextmanager
+import weakref
+from contextlib import contextmanager, suppress
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -56,9 +58,47 @@ def common_headers(config: QDashConfig) -> dict[str, str]:
     return headers
 
 
+# HTTP clients the SDK created and has not closed yet. The set holds them weakly, so a client
+# that nothing uses any more is not kept alive until the interpreter exits.
+_owned_clients: weakref.WeakSet[httpx.Client] = weakref.WeakSet()
+_owned_clients_lock = threading.Lock()
+
+
 def owned_http_client(config: QDashConfig) -> httpx.Client:
-    """The HTTP client a session creates, and closes, for ``config``."""
-    return httpx.Client(timeout=config.timeout_sec, verify=config.verify_tls, proxy=config.proxy)
+    """The HTTP client a session creates for ``config``.
+
+    The client is closed by :func:`close_owned_http_client`, or at normal interpreter exit if it
+    is still open and still referenced then.
+    """
+    client = httpx.Client(timeout=config.timeout_sec, verify=config.verify_tls, proxy=config.proxy)
+    with _owned_clients_lock:
+        _owned_clients.add(client)
+    return client
+
+
+def close_owned_http_client(client: httpx.Client) -> None:
+    """Close a client from :func:`owned_http_client` now; closing again does nothing."""
+    with _owned_clients_lock:
+        _owned_clients.discard(client)
+    client.close()
+
+
+def _close_owned_http_clients() -> None:
+    """Close every SDK-owned client still open; runs once at normal interpreter exit.
+
+    Only local connections are released: no request is sent. A client that fails to close does
+    not stop the others from closing.
+    """
+    with _owned_clients_lock:
+        clients = list(_owned_clients)
+        _owned_clients.clear()
+    for client in clients:
+        # Best effort while the interpreter exits.
+        with suppress(Exception):
+            client.close()
+
+
+atexit.register(_close_owned_http_clients)
 
 
 def token_provider(config: QDashConfig, http_client: httpx.Client) -> str | Callable[[], str]:

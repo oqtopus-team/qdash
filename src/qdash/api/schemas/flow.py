@@ -164,7 +164,7 @@ class ExecutionPlanRound(BaseModel):
 
 
 class ExecutionPlanStep(BaseModel):
-    """One step of a CalibService run, as stated in the saved source."""
+    """One step of a CalibrationSession.run call, as the saved source states it."""
 
     index: int = Field(..., description="1-based position within its run")
     type: str = Field(..., description="Step class, e.g. CustomOneQubit")
@@ -194,7 +194,7 @@ class ExecutionPlanStep(BaseModel):
 
 
 class ExecutionPlanRun(BaseModel):
-    """One CalibService.run call of the entrypoint."""
+    """One CalibrationSession.run (or legacy CalibService.run) call of the entrypoint."""
 
     targets: FlowTargetOverride | None = Field(
         None, description="Literal targets of the call; null when computed at run time"
@@ -252,7 +252,10 @@ class ExecuteFlowRequest(BaseModel):
 
     target_override: FlowTargetOverride | None = Field(
         None,
-        description="Targets for this run, overriding direct CalibService and pipeline targets",
+        description=(
+            "Targets for this run, overriding the initial targets of every CalibrationSession.run "
+            "(or legacy CalibService.run) and pipeline"
+        ),
     )
     parameters: dict[str, Any] = Field(
         default_factory=dict, description="Execution parameters (overrides default_parameters)"

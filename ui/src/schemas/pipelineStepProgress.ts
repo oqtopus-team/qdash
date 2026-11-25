@@ -7,9 +7,12 @@
  */
 import type { PipelineStepProgressExecutionId } from './pipelineStepProgressExecutionId';
 import type { PipelineStepProgressStepId } from './pipelineStepProgressStepId';
+import type { PipelineStepProgressTransform } from './pipelineStepProgressTransform';
 
 /**
  * One planned step of a pipeline run and how far its execution got.
+ *
+ * Every step the run reaches, calibration or transform, has its own execution.
  */
 export interface PipelineStepProgress {
   /** 1-based position in the pipeline spec */
@@ -17,13 +20,17 @@ export interface PipelineStepProgress {
   name: string;
   /** Plan-scoped step id; null for transforms and older runs */
   step_id?: PipelineStepProgressStepId;
+  /** Identifier of this step occurrence in the plan: the step_id of a calibration step; a transform's name, suffixed with its index when the name repeats */
+  key?: string;
   type?: string;
   /** "calibration" or "transform" */
   kind?: string;
   /** The step's own execution, once it has started */
   execution_id?: PipelineStepProgressExecutionId;
-  /** The execution status, "skipped" for transforms, or "pending" before it starts */
+  /** The execution status; "pending" before the step starts while the run may still reach it; "skipped" when the run ended without reaching it; "not_recorded" for a transform of a run recorded before transform steps had executions */
   status: string;
+  /** A transform step's recorded outcome: candidates kept and excluded with reasons, or the CR groups planned; null for calibration steps and unfinished transforms */
+  transform?: PipelineStepProgressTransform;
   task_total?: number;
   task_finished?: number;
   task_failed?: number;

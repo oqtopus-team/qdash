@@ -1,27 +1,24 @@
 from __future__ import annotations
 
 import importlib
-from typing import Any
 
 import pytest
 
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
+from tests.qdash.workflow.calibration_session_fake import (
+    fake_session_class,
+    install_fake_session,
+)
 from tests.qdash.workflow.task_call_helpers import call_ids, effective_settings, names, settings
 
 one_qubit_module = importlib.import_module("qdash.workflow.templates.one_qubit")
 
 
-class FakeCalibService:
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.args = args
-        self.kwargs = kwargs
-
-    def run(self, targets: Any, *, steps: list[Any]) -> dict[str, Any]:
-        return {"targets": targets, "steps": steps, "kwargs": self.kwargs}
+FakeCalibService = fake_session_class()
 
 
 def test_one_qubit_template_uses_explicit_qids(monkeypatch) -> None:
-    monkeypatch.setattr(one_qubit_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, one_qubit_module, FakeCalibService)
 
     result = one_qubit_module.one_qubit(
         username="alice",
@@ -34,7 +31,7 @@ def test_one_qubit_template_uses_explicit_qids(monkeypatch) -> None:
 
 
 def test_one_qubit_template_prefers_mux_ids(monkeypatch) -> None:
-    monkeypatch.setattr(one_qubit_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, one_qubit_module, FakeCalibService)
 
     result = one_qubit_module.one_qubit(
         username="alice",
@@ -48,7 +45,7 @@ def test_one_qubit_template_prefers_mux_ids(monkeypatch) -> None:
 
 
 def test_one_qubit_template_requires_explicit_targets(monkeypatch) -> None:
-    monkeypatch.setattr(one_qubit_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, one_qubit_module, FakeCalibService)
 
     with pytest.raises(ValueError, match="mux_ids or qids is required"):
         one_qubit_module.one_qubit(username="alice", chip_id="64Q")
@@ -60,7 +57,7 @@ def test_one_qubit_template_passes_template_task_lists(monkeypatch) -> None:
     coarse_one_module = importlib.import_module("qdash.workflow.templates.coarse_one")
     fine_one_module = importlib.import_module("qdash.workflow.templates.fine_one")
     for module in (one_qubit_module, coarse_one_module, fine_one_module):
-        monkeypatch.setattr(module, "CalibService", FakeCalibService)
+        install_fake_session(monkeypatch, module, FakeCalibService)
 
     result = one_qubit_module.one_qubit(username="alice", chip_id="64Q", mux_ids=[0])
     coarse_step = coarse_one_module.coarse_one(username="alice", chip_id="64Q", mux_ids=[0])[
@@ -87,7 +84,7 @@ PULSE_DURATIONS = {
 
 @pytest.mark.parametrize("check_only", [False, True])
 def test_one_qubit_template_sets_durations_on_every_pulse_call(monkeypatch, check_only) -> None:
-    monkeypatch.setattr(one_qubit_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, one_qubit_module, FakeCalibService)
 
     result = one_qubit_module.one_qubit(
         username="alice", chip_id="64Q", mux_ids=[0], check_only=check_only
@@ -105,7 +102,7 @@ def test_one_qubit_template_sets_durations_on_every_pulse_call(monkeypatch, chec
 
 @pytest.mark.parametrize("check_only", [False, True])
 def test_one_qubit_template_check_calibrates_and_checks_all_pulses(monkeypatch, check_only) -> None:
-    monkeypatch.setattr(one_qubit_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, one_qubit_module, FakeCalibService)
 
     result = one_qubit_module.one_qubit(
         username="alice", chip_id="64Q", mux_ids=[0], check_only=check_only
@@ -139,8 +136,8 @@ def test_fine_one_optimizes_readout_before_classification_in_fine_tune_stage(
     from qdash.workflow.service.steps import OneQubitFineTune
 
     fine_one_module = importlib.import_module("qdash.workflow.templates.fine_one")
-    monkeypatch.setattr(fine_one_module, "CalibService", FakeCalibService)
-    monkeypatch.setattr(one_qubit_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, fine_one_module, FakeCalibService)
+    install_fake_session(monkeypatch, one_qubit_module, FakeCalibService)
     result = fine_one_module.fine_one(
         username="alice",
         chip_id="64Q",
@@ -215,7 +212,8 @@ def test_fine_one_optimizes_readout_before_classification_in_fine_tune_stage(
     assert result["kwargs"]["default_run_parameters"] == full["kwargs"]["default_run_parameters"]
     assert "task_parameters" not in result["kwargs"]
     assert effective_settings(step.tasks) == effective_settings(full["steps"][2].tasks)
-    assert result["kwargs"]["flow_name"] == "fine-check"
+    # The run is named from the launch; the template does not pass flow_name on.
+    assert result["kwargs"]["flow_name"] is None
     assert result["kwargs"]["project_id"] == "project-1"
     assert result["kwargs"]["tags"] == ["fine"]
     assert "skip_execution" not in result["kwargs"]
@@ -223,14 +221,14 @@ def test_fine_one_optimizes_readout_before_classification_in_fine_tune_stage(
 
 def test_fine_one_requires_explicit_targets(monkeypatch) -> None:
     fine_one_module = importlib.import_module("qdash.workflow.templates.fine_one")
-    monkeypatch.setattr(fine_one_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, fine_one_module, FakeCalibService)
     with pytest.raises(ValueError, match="mux_ids or qids is required"):
         fine_one_module.fine_one(username="alice", chip_id="64Q")
 
 
 def test_fine_one_names_every_call_after_its_round(monkeypatch) -> None:
     fine_one_module = importlib.import_module("qdash.workflow.templates.fine_one")
-    monkeypatch.setattr(fine_one_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, fine_one_module, FakeCalibService)
 
     result = fine_one_module.fine_one(username="alice", chip_id="64Q", qids=["0"])
 

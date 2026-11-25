@@ -14,7 +14,7 @@ from qdash.workflow.service.targets import MuxTargets
 
 if TYPE_CHECKING:
     from qdash.datamodel.task_call import TaskCall
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
     from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
 
@@ -49,7 +49,7 @@ class ConfigureAll(CalibrationStep):
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -74,7 +74,7 @@ class ConfigureAll(CalibrationStep):
         logger.info(f"[{self.name}] Completed")
         return ctx
 
-    def _resolve_mux_ids(self, session: CalibSession, targets: Target) -> list[int]:
+    def _resolve_mux_ids(self, session: ExecutionRuntime, targets: Target) -> list[int]:
         """The MUXes to configure: the step's own, or the targets'."""
         if self.mux_ids is not None:
             return list(self.mux_ids)

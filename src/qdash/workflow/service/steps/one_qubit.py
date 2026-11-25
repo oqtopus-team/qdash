@@ -48,13 +48,13 @@ from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.tasks import CHECK_1Q_TASKS, FULL_1Q_TASKS_AFTER_CHECK
 
 if TYPE_CHECKING:
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
     from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
 
 
 def _execute_direct_one_qubit(
-    session: CalibSession,
+    session: ExecutionRuntime,
     *,
     qids: list[str],
     plan: StepCalls,
@@ -79,7 +79,7 @@ def _execute_direct_one_qubit(
 
 
 def _execute_scheduled_one_qubit(
-    session: CalibSession,
+    session: ExecutionRuntime,
     *,
     qids: list[str],
     plan: StepCalls,
@@ -107,7 +107,7 @@ def _execute_scheduled_one_qubit(
 
 
 def _execute_mux_one_qubit(
-    session: CalibSession,
+    session: ExecutionRuntime,
     *,
     targets: Any,
     plan: StepCalls,
@@ -143,7 +143,7 @@ def _scheduled_mode(step: Any) -> OneQubitExecutionMode:
     return validate_one_qubit_execution_mode(step.execution_mode)
 
 
-def _preflight_manual(step: Any, session: CalibSession) -> None:
+def _preflight_manual(step: Any, session: ExecutionRuntime) -> None:
     """Check manual rounds against the chip before any step of the pipeline runs."""
     if step._rounds is not None:
         from qdash.workflow.service.manual_rounds import check_qubit_rounds
@@ -152,7 +152,7 @@ def _preflight_manual(step: Any, session: CalibSession) -> None:
 
 
 def _execute_manual_one_qubit(
-    step: Any, session: CalibSession, candidates: list[str], plan: StepCalls
+    step: Any, session: ExecutionRuntime, candidates: list[str], plan: StepCalls
 ) -> dict[str, Any]:
     """Run the step's manual rounds after checking them against its current qubits."""
     from qdash.workflow.service.manual_rounds import run_qubit_rounds
@@ -217,7 +217,7 @@ class CustomOneQubit(CalibrationStep):
         """parallel_by_round and manual qubit tasks connect in isolated workers."""
         return self.execution_mode not in ("parallel_by_round", "manual")
 
-    def preflight(self, session: CalibSession) -> None:
+    def preflight(self, session: ExecutionRuntime) -> None:
         """Check manual rounds against the chip before the pipeline starts."""
         _preflight_manual(self, session)
 
@@ -226,7 +226,7 @@ class CustomOneQubit(CalibrationStep):
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -285,7 +285,7 @@ class CustomOneQubit(CalibrationStep):
 
     def _execute_scheduled(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         qids: list[str],
         plan: StepCalls | None = None,
     ) -> dict[str, Any]:
@@ -300,7 +300,7 @@ class CustomOneQubit(CalibrationStep):
 
     def _execute_direct(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         qids: list[str],
     ) -> dict[str, Any]:
         """Direct execution for tests and callers that explicitly need unscheduled qid parallelism."""
@@ -358,7 +358,7 @@ class OneQubitCheck(CalibrationStep):
     def provides(self) -> set[str]:
         return {"one_qubit_check", "candidate_qids"}
 
-    def preflight(self, session: CalibSession) -> None:
+    def preflight(self, session: ExecutionRuntime) -> None:
         """Check manual rounds against the chip before the pipeline starts."""
         _preflight_manual(self, session)
 
@@ -367,7 +367,7 @@ class OneQubitCheck(CalibrationStep):
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -414,7 +414,7 @@ class OneQubitCheck(CalibrationStep):
 
     def _execute_scheduled(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         qids: list[str],
         plan: StepCalls | None = None,
     ) -> dict[str, Any]:
@@ -429,7 +429,7 @@ class OneQubitCheck(CalibrationStep):
 
     def _execute_direct(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         qids: list[str],
     ) -> dict[str, Any]:
         """Direct execution for tests and callers that explicitly need unscheduled qid parallelism."""
@@ -487,7 +487,7 @@ class OneQubitFineTune(CalibrationStep):
     def provides(self) -> set[str]:
         return {"one_qubit_fine_tune", "candidate_qids"}
 
-    def preflight(self, session: CalibSession) -> None:
+    def preflight(self, session: ExecutionRuntime) -> None:
         """Check manual rounds against the chip before the pipeline starts."""
         _preflight_manual(self, session)
 
@@ -496,7 +496,7 @@ class OneQubitFineTune(CalibrationStep):
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -548,7 +548,7 @@ class OneQubitFineTune(CalibrationStep):
 
     def _execute_with_qids(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         qids: list[str],
         plan: StepCalls | None = None,
     ) -> dict[str, Any]:
@@ -563,7 +563,7 @@ class OneQubitFineTune(CalibrationStep):
 
     def _execute_direct(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         qids: list[str],
     ) -> dict[str, Any]:
         """Direct execution for QubitTargets using multiprocess parallelism."""

@@ -417,6 +417,40 @@ def test_load_edit_run_sends_the_call_once() -> None:
     assert run.call == call
 
 
+def test_integral_float_default_of_an_int_run_parameter_is_sent_as_an_int() -> None:
+    # The qubex catalog serves interval as 153600.0 (qubex's DEFAULT_INTERVAL is a float)
+    # while declaring it "int"; the server rejects 153600.0 as "run.interval must be int".
+    definition = t1_info()
+    definition["run_parameters"] = {
+        "time_range": {"value_type": "np.logspace", "value": [2.0, 5.698970004336019, 51]},
+        "shots": {"value_type": "int", "value": 1024},
+        "interval": {"value_type": "int", "value": 153600.0},
+        "readout_duration": {"value_type": "float", "value": 1024},
+        "fraction": {"value_type": "int", "value": 0.5},
+    }
+    server = Server(
+        {
+            CATALOG: catalog(definition),
+            QUBIT_0: qubit("0", {"qubit_frequency": {"value": 5.2}}),
+            EXECUTE: [httpx.Response(200, json=execute_response())],
+        }
+    )
+    with server.session() as qdash:
+        params = qdash.tasks.load_parameters("CheckT1", chip_id=CHIP, qid="0", backend_name="qubex")
+        params.run["time_range"] = sweep.linspace(300, 500_000, 51)
+        qdash.tasks.run(params.to_call(), chip_id=CHIP, qid="0", backend_name="qubex")
+    overrides = json.loads(server.requests[-1].content)["run_parameter_overrides"]
+    assert overrides == {
+        "time_range": {"value": [300, 500_000, 51], "value_type": "np.linspace"},
+        "shots": 1024,
+        "interval": 153600,
+        "readout_duration": 1024,
+        # A non-integral default is left for the server to reject rather than rounded.
+        "fraction": 0.5,
+    }
+    assert type(overrides["interval"]) is int
+
+
 @pytest.mark.parametrize("resolution", ["database_required", "database_or_default"])
 @pytest.mark.parametrize("override", ["allowed", "forbidden"])
 def test_explicit_stored_null_does_not_use_a_default(resolution: str, override: str) -> None:

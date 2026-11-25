@@ -1,7 +1,7 @@
 """Workflow Engine - Core infrastructure for calibration workflow execution.
 
 This module provides the internal engine components for calibration workflows.
-Most users should use the high-level `CalibService` API instead of these components directly.
+Most users should use the high-level `CalibrationSession` API instead of these components directly.
 
 Architecture Overview
 ---------------------
@@ -39,7 +39,7 @@ Component Relationships
 -----------------------
 ::
 
-    CalibService (high-level API)
+    CalibrationSession (high-level API)
            │
            ▼
     CalibOrchestrator
@@ -59,7 +59,7 @@ Component Relationships
 
 Usage Example
 -------------
-Most users should use CalibService. Direct engine usage:
+Most users should use CalibrationSession. Direct engine usage:
 
 >>> from qdash.workflow.engine import CalibOrchestrator, CalibConfig
 >>> config = CalibConfig(
@@ -77,7 +77,7 @@ Most users should use CalibService. Direct engine usage:
 See Also
 --------
 - docs/development/workflow/engine-architecture.md for detailed architecture
-- qdash.workflow.CalibService for high-level API
+- qdash.workflow.CalibrationSession for the high-level API
 """
 
 # Orchestration components

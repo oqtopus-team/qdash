@@ -12,7 +12,7 @@ from .execution_plan_step_scope import ExecutionPlanStepScope
 
 class ExecutionPlanStep(UniversalBaseModel):
     """
-    One step of a CalibService run, as stated in the saved source.
+    One step of a CalibrationSession.run call, as the saved source states it.
     """
 
     index: int = pydantic.Field()

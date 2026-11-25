@@ -989,7 +989,7 @@ class RawFlowClient:
         name : str
 
         target_override : typing.Optional[FlowTargetOverride]
-            Targets for this run, overriding direct CalibService and pipeline targets
+            Targets for this run, overriding the initial targets of every CalibrationSession.run (or legacy CalibService.run) and pipeline
 
         parameters : typing.Optional[typing.Dict[str, typing.Any]]
             Execution parameters (overrides default_parameters)
@@ -2234,7 +2234,7 @@ class AsyncRawFlowClient:
         name : str
 
         target_override : typing.Optional[FlowTargetOverride]
-            Targets for this run, overriding direct CalibService and pipeline targets
+            Targets for this run, overriding the initial targets of every CalibrationSession.run (or legacy CalibService.run) and pipeline
 
         parameters : typing.Optional[typing.Dict[str, typing.Any]]
             Execution parameters (overrides default_parameters)

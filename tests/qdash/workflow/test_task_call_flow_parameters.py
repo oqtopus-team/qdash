@@ -70,7 +70,9 @@ def test_structured_calls_reach_the_step_unchanged(contract: dict[str, Any], tem
             "on_failure": "continue",
         },
     ]
-    assert result["validated"] == expected
+    # The flow parameter is the shared qdash.calibration.TaskCall, which keeps the calls as
+    # written; the worker's step normalizes them exactly as before.
+    assert result["validated"] == contract["calls"]
     # The same task twice in one step, each call with its own id and settings.
     assert result["step_type"] in {"CustomOneQubit", "CustomTwoQubit"}
     assert result["step_calls"] == expected

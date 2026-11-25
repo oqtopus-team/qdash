@@ -63,6 +63,8 @@ import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateW
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
 import { ExecutionRunSummary } from "@/components/features/execution/ExecutionRunSummary";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
+import { TransformStepOutcome } from "@/components/features/execution/TransformStepOutcome";
+import { isTransformExecution } from "@/lib/transformStep";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -754,6 +756,12 @@ export function ExecutionPageContent() {
                       surface="mini"
                     />
                   }
+                />
+              )}
+              {executionDetailData && isTransformExecution(executionDetailData.data.note) && (
+                <TransformStepOutcome
+                  note={executionDetailData.data.note}
+                  status={executionDetailData.data.status}
                 />
               )}
               {executionDetailData &&

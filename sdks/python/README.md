@@ -21,8 +21,10 @@ result = workflow.run(parameters={"qids": ["0", "1"]}).wait()
 print(result.status)
 ```
 
-Reuse `qdash` across notebook cells or script operations. Call `qdash.close()` when you finish
-using the connection. To select a profile explicitly, use `QDash.from_profile("local")`.
+Reuse `qdash` across notebook cells or script operations. The SDK closes its remaining owned
+connections at normal Python process shutdown. Use `qdash.close()` or a `with` block only
+when you want to release the connection earlier.
+To select a profile explicitly, use `QDash.from_profile("local")`.
 Use `QDash.from_env()` for environment-based configuration.
 
 Keep the handle from `workflow.run()` to request cancellation with `run.cancel()`;
@@ -42,6 +44,7 @@ With the `local` TOML profile configured above, open:
 4. [Run a task and inspect results](examples/04_task_workbench.ipynb)
 5. [Investigate results](examples/05_investigate_results.ipynb)
 6. [Export device gateway files](examples/06_device_gateway.ipynb)
+7. [Cancel a running workflow](examples/07_cancel_workflow.ipynb)
 
 The investigation example uses optional `pandas` for tables. Install it in your notebook
 environment. Table operations apply

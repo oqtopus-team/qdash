@@ -46,6 +46,28 @@ For HTTP schemas, use [OpenAPI](./openapi.md).
 | `evaluation` | `EvaluationDocument` | `evaluation.py` |
 | `evaluation_asset` | `EvaluationAssetDocument` | `evaluation_asset.py` |
 
+### Step Execution Metadata
+
+New step executions add optional fields to `execution_history.note`. Existing documents, IDs,
+indexes and task/artifact references remain valid; no migration or backfill is required.
+Single-task executions can lack this step metadata. `step_record.py` under
+`src/qdash/datamodel/` defines transform results and step keys.
+
+| Note field | Meaning |
+| --- | --- |
+| `step_index` | One-based position within the step sequence |
+| `step_key` | Plan-scoped occurrence key: calibration `step_id`, or transform name made unique with its position |
+| `step_kind` | `calibration` or `transform` |
+| `step_type` | Runtime step class name |
+| `step_id` | Calibration step identity used by filter references; absent on transforms |
+| `transform_result` | Copied input/output candidates, filter decisions or generated schedule |
+| `pipeline.records_transform_steps` | System pipeline plan records transforms; absent in old plans |
+
+A transform Execution has no task results or measurement artifacts. Its `calib_data_path` is
+retained for schema compatibility but the directory is not created. Readers must not require
+that path to exist. Saved workflows can run several sequences in one Run; step keys and indices
+identify occurrences within a sequence, not globally across the Run.
+
 ## Notes, Forum, and Notifications
 
 | Collection | Document | Module |

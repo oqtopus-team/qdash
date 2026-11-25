@@ -14,6 +14,7 @@ import { useGetExecution } from "@/client/execution/execution";
 import { FigureStrip } from "@/components/features/chat/ChatFigures";
 import { ChatLink } from "@/components/features/chat/ChatPreviewLink";
 import { chatLinkPagePath } from "@/lib/chatLinks";
+import { isTransformExecution, transformRecordOf, transformSummary } from "@/lib/transformStep";
 import type { PipelineProgress, PipelineStepProgress, Task } from "@/schemas";
 
 const POLL_MS = 5000;
@@ -69,6 +70,7 @@ function StatusIcon({ status }: { status: string | undefined }) {
     case "cancelled":
       return <Ban className={`${common} text-base-content/50`} aria-hidden="true" />;
     case "skipped":
+    case "not_recorded":
       return <MinusCircle className={`${common} text-base-content/30`} aria-hidden="true" />;
     default:
       return <Circle className={`${common} text-base-content/30`} aria-hidden="true" />;
@@ -183,6 +185,24 @@ export function ExecutionProgress({ executionId }: { executionId: string }) {
     return <PipelineCard pipeline={execution.pipeline} chipId={execution.chip_id} />;
   }
 
+  if (isTransformExecution(execution.note)) {
+    // A filter or schedule step: its recorded decision is the result, there are no tasks.
+    const record = transformRecordOf(execution.note);
+    return (
+      <div className="chat-execution-progress" data-testid="execution-progress">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+          <StatusIcon status={execution.status} />
+          <span className="min-w-0 truncate font-medium">{execution.name || executionId}</span>
+          <span className="text-base-content/50">
+            · {execution.status}
+            {record ? ` · ${transformSummary(record)}` : ""}
+          </span>
+          <OpenExecutionLink href={executionPagePath(executionId, execution.chip_id)} />
+        </div>
+      </div>
+    );
+  }
+
   const failed = finished.filter((t) => t.status === "failed").length;
   const running = isActive(execution.status);
   const earlier = finished.slice(0, Math.max(0, finished.length - RECENT_TASKS));
@@ -240,10 +260,15 @@ export function ExecutionProgress({ executionId }: { executionId: string }) {
   );
 }
 
+/** A planned step without an execution: not reached yet, never reached, or not recorded. */
+function isUnstarted(status: string): boolean {
+  return status === "pending" || status === "skipped" || status === "not_recorded";
+}
+
 function StepName({ step, chipId }: { step: PipelineStepProgress; chipId?: string }) {
   const label = `${step.index}. ${step.name}`;
-  const muted = step.status === "pending" || step.status === "skipped";
-  if (step.kind !== "transform" && step.execution_id) {
+  const muted = isUnstarted(step.status);
+  if (step.execution_id) {
     // A step's own execution also reports the whole pipeline, so it opens as
     // a page (with that step's tasks) rather than as the same card again.
     return (
@@ -264,19 +289,47 @@ function StepName({ step, chipId }: { step: PipelineStepProgress; chipId?: strin
   );
 }
 
+/** What a step reports on the right: task counts, a transform's decision, or why it has none. */
+function StepDetail({ step }: { step: PipelineStepProgress }) {
+  if (step.status === "not_recorded") {
+    return <span className="ml-auto shrink-0 text-base-content/40">not recorded</span>;
+  }
+  if (step.status === "skipped") {
+    return <span className="ml-auto shrink-0 text-base-content/40">not reached</span>;
+  }
+  if (!step.execution_id) return null;
+  if (step.kind === "transform") {
+    // No tasks run in a transform step; its recorded decision is its result.
+    const record = step.transform ?? null;
+    return record ? (
+      <span className="ml-auto min-w-0 truncate text-base-content/50">
+        {transformSummary(record)}
+      </span>
+    ) : null;
+  }
+  return (
+    <span className="ml-auto shrink-0 tabular-nums text-base-content/50">
+      {step.task_finished ?? 0}/{step.task_total ?? 0}
+      {step.task_failed ? <span className="text-error"> · {step.task_failed} failed</span> : null}
+    </span>
+  );
+}
+
 /**
  * A pipeline run: every planned step with its own progress and a link to its
  * execution once it has one, and the figures of all finished tasks so far.
- * Steps that only filter are listed but do not run hardware.
+ * Every step the run reaches has an execution; filters and schedules run no
+ * hardware and show what they decided instead of task counts.
  */
 function PipelineCard({ pipeline, chipId }: { pipeline: PipelineProgress; chipId?: string }) {
   const running = isActive(pipeline.status);
   const figures = pipeline.steps.flatMap((step) => step.figure_paths ?? []);
-  const calibrationSteps = pipeline.steps.filter((s) => s.kind !== "transform");
-  const finishedSteps = calibrationSteps.filter(
+  // Transforms of runs recorded before they had executions are listed but not counted.
+  const countedSteps = pipeline.steps.filter((s) => s.status !== "not_recorded");
+  const finishedSteps = countedSteps.filter(
     (s) => s.status === "completed" || s.status === "failed",
   ).length;
-  const failedTasks = calibrationSteps.reduce((sum, s) => sum + (s.task_failed ?? 0), 0);
+  const failedTasks = countedSteps.reduce((sum, s) => sum + (s.task_failed ?? 0), 0);
 
   return (
     <div className="chat-execution-progress" data-testid="execution-progress">
@@ -284,7 +337,7 @@ function PipelineCard({ pipeline, chipId }: { pipeline: PipelineProgress; chipId
         <StatusIcon status={pipeline.status} />
         <span className="min-w-0 truncate font-medium">{pipeline.name}</span>
         <span className="text-base-content/50">
-          · {pipeline.status} · {finishedSteps}/{calibrationSteps.length} steps
+          · {pipeline.status} · {finishedSteps}/{countedSteps.length} steps
           {failedTasks > 0 ? ` · ${failedTasks} failed tasks` : ""}
         </span>
         <OpenExecutionLink href={executionPagePath(pipeline.root_execution_id, chipId)} />
@@ -292,18 +345,11 @@ function PipelineCard({ pipeline, chipId }: { pipeline: PipelineProgress; chipId
 
       <ol className="mt-1.5 space-y-0.5 text-xs" aria-label="Pipeline steps">
         {pipeline.steps.map((step) => (
-          <li key={step.index} className="flex min-w-0 items-center gap-1.5">
+          <li key={step.key || step.index} className="flex min-w-0 items-center gap-1.5">
             <StatusIcon status={step.status} />
             <StepName step={step} chipId={chipId} />
             <span className="sr-only">{step.status}</span>
-            {step.kind !== "transform" && step.execution_id && (
-              <span className="ml-auto shrink-0 tabular-nums text-base-content/50">
-                {step.task_finished ?? 0}/{step.task_total ?? 0}
-                {step.task_failed ? (
-                  <span className="text-error"> · {step.task_failed} failed</span>
-                ) : null}
-              </span>
-            )}
+            <StepDetail step={step} />
           </li>
         ))}
       </ol>

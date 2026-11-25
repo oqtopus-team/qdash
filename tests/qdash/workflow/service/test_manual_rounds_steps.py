@@ -29,7 +29,7 @@ from qdash.workflow.service.steps.pipeline import StepContext
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
 
 if TYPE_CHECKING:
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
 
 RABI = [TaskCall(name="CheckRabi")]
 CR = [TaskCall(name="CheckCrossResonance")]
@@ -79,7 +79,7 @@ def recorder(monkeypatch: pytest.MonkeyPatch) -> Recorder:
     return record
 
 
-def _session() -> CalibSession:
+def _session() -> ExecutionRuntime:
     session = SimpleNamespace(
         chip_id="chip",
         project_id="project",
@@ -90,7 +90,7 @@ def _session() -> CalibSession:
         mux_mapping=MuxMapping.legacy(),
     )
     session.record_stage_result = lambda name, result: session.stages.append(name)
-    return cast("CalibSession", session)
+    return cast("ExecutionRuntime", session)
 
 
 # ---------------------------------------------------------------------------
@@ -268,7 +268,7 @@ def test_automatic_steps_keep_the_default_group_cap(monkeypatch: pytest.MonkeyPa
     logger = SimpleNamespace(info=lambda *_: None, warning=lambda *_: None)
     monkeypatch.setattr("qdash.workflow.service.steps.two_qubit.get_run_logger", lambda: logger)
     session = cast(
-        "CalibSession",
+        "ExecutionRuntime",
         SimpleNamespace(
             chip_id="c", username="u", project_id="p", plan_digest=None, mux_mapping=pinned
         ),

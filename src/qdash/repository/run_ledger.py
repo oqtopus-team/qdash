@@ -261,8 +261,13 @@ def record_worker_run(
     flow_name: str | None,
     run_name: str,
     auto_scheduled: bool,
+    session_name: str | None = None,
 ) -> RunIdentity:
     """Record a flow run QDash did not launch, in an automatic session of its own.
+
+    ``session_name`` names that session (the flow's ``@calibration_flow(session_name=...)``)
+    instead of the default named after the run; a session already recorded for the flow run
+    keeps its name.
 
     ``username`` is the user the flow run's parameters name, which QDash wrote into the
     deployment when the schedule was saved; it is never taken from a model or a client. The
@@ -287,7 +292,7 @@ def record_worker_run(
         project_id=project_id,
         chip_id=chip_id,
         username=username,
-        objective=automatic_objective(kind, run_name),
+        objective=session_name or automatic_objective(kind, run_name),
         child_count=1,
     ).calibration_session_id
     timestamp = now()

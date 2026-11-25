@@ -2369,6 +2369,21 @@ class EvaluatorModel(BaseModel):
     """
 
 
+class ExcludedTarget(BaseModel):
+    """
+    A candidate a filter left out, and why.
+    """
+
+    target: Annotated[str, Field(title="Target")]
+    """
+    Qubit ID the filter removed from the candidates
+    """
+    reason: Annotated[str, Field(title="Reason")]
+    """
+    Why it did not pass, read from the source result
+    """
+
+
 class SourceExecutionId1(RootModel[str]):
     root: Annotated[str, Field(max_length=200, min_length=1, title="Source Execution Id")]
     """
@@ -2700,7 +2715,7 @@ class Schedule(StrEnum):
 
 class ExecutionPlanStep(BaseModel):
     """
-    One step of a CalibService run, as stated in the saved source.
+    One step of a CalibrationSession.run call, as the saved source states it.
     """
 
     index: Annotated[int, Field(title="Index")]
@@ -4793,42 +4808,6 @@ class PipelineProblem(BaseModel):
     message: Annotated[str, Field(title="Message")]
 
 
-class PipelineStepProgress(BaseModel):
-    """
-    One planned step of a pipeline run and how far its execution got.
-    """
-
-    index: Annotated[int, Field(title="Index")]
-    """
-    1-based position in the pipeline spec
-    """
-    name: Annotated[str, Field(title="Name")]
-    step_id: Annotated[str | None, Field(title="Step Id")] = None
-    """
-    Plan-scoped step id; null for transforms and older runs
-    """
-    type: Annotated[str, Field(title="Type")] = ""
-    kind: Annotated[str, Field(title="Kind")] = "calibration"
-    """
-    "calibration" or "transform"
-    """
-    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
-    """
-    The step's own execution, once it has started
-    """
-    status: Annotated[str, Field(title="Status")]
-    """
-    The execution status, "skipped" for transforms, or "pending" before it starts
-    """
-    task_total: Annotated[int, Field(title="Task Total")] = 0
-    task_finished: Annotated[int, Field(title="Task Finished")] = 0
-    task_failed: Annotated[int, Field(title="Task Failed")] = 0
-    figure_paths: Annotated[list[str] | None, Field(title="Figure Paths")] = None
-    """
-    Figures of the step's finished tasks, in task order
-    """
-
-
 class Position(BaseModel):
     """
     Position of the qubit on the device.
@@ -5496,10 +5475,14 @@ class ResolvedPipelineTargets(BaseModel):
 
     qids: Annotated[list[str], Field(title="Qids")]
     """
-    Explicit qids, or empty when targeting MUXes.
+    Explicit qids, the qubits of the pairs, or empty when targeting MUXes.
     """
     mux_ids: Annotated[list[int] | None, Field(title="Mux Ids")] = None
     exclude_qids: Annotated[list[str] | None, Field(title="Exclude Qids")] = None
+    pairs: Annotated[list[list[str]] | None, Field(title="Pairs")] = None
+    """
+    Directed [control, target] coupling pairs, or empty without pair targets.
+    """
 
 
 class ResolvedTaskCall(BaseModel):
@@ -6637,6 +6620,90 @@ class TokenResponse(BaseModel):
     must_change_password: Annotated[bool, Field(title="Must Change Password")] = False
 
 
+class Kind6(StrEnum):
+    """
+    "filter", "cr_schedule", or "transform" for a custom transform step
+    """
+
+    filter = "filter"
+    cr_schedule = "cr_schedule"
+    transform = "transform"
+
+
+class TransformStepRecord(BaseModel):
+    """
+    The outcome of one transform step, copied when the step ended.
+
+    Lists are snapshots: later steps never change a recorded outcome. Fields that do not
+    apply to a kind stay at their defaults (``None`` or empty).
+    """
+
+    kind: Annotated[Kind6, Field(title="Kind")]
+    """
+    "filter", "cr_schedule", or "transform" for a custom transform step
+    """
+    input_qids: Annotated[list[str] | None, Field(title="Input Qids")] = None
+    """
+    Candidates before the step
+    """
+    output_qids: Annotated[list[str] | None, Field(title="Output Qids")] = None
+    """
+    Candidates after the step
+    """
+    input_couplings: Annotated[list[str] | None, Field(title="Input Couplings")] = None
+    """
+    Candidate couplings before the step
+    """
+    output_couplings: Annotated[list[str] | None, Field(title="Output Couplings")] = None
+    """
+    Candidate couplings after the step
+    """
+    excluded: Annotated[list[ExcludedTarget] | None, Field(title="Excluded")] = None
+    """
+    Filters: each removed candidate with its reason
+    """
+    criteria: Annotated[str | None, Field(title="Criteria")] = None
+    """
+    Filters: the condition applied
+    """
+    source_step: Annotated[str | None, Field(title="Source Step")] = None
+    """
+    Filters: step_id read; null for the latest one-qubit result
+    """
+    source_call_id: Annotated[str | None, Field(title="Source Call Id")] = None
+    """
+    Filters: call_id read
+    """
+    metric: Annotated[str | None, Field(title="Metric")] = None
+    """
+    FilterByMetric: the metric compared
+    """
+    threshold: Annotated[float | None, Field(title="Threshold")] = None
+    """
+    FilterByMetric: minimum kept
+    """
+    source_found: Annotated[bool | None, Field(title="Source Found")] = None
+    """
+    Filters: false when no one-qubit result existed, so every candidate was kept unfiltered
+    """
+    groups: Annotated[list[list[str]] | None, Field(title="Groups")] = None
+    """
+    cr_schedule: parallel groups of control-target couplings, in order
+    """
+    max_parallel_ops: Annotated[int | None, Field(title="Max Parallel Ops")] = None
+    """
+    cr_schedule: group cap
+    """
+    direction: Annotated[str | None, Field(title="Direction")] = None
+    """
+    cr_schedule: "forward", "reverse" or "as listed"
+    """
+    message: Annotated[str | None, Field(title="Message")] = None
+    """
+    Why the step produced nothing, when it did not
+    """
+
+
 class UITaskFilesSettings(BaseModel):
     """
     Task files editor settings.
@@ -6959,6 +7026,17 @@ class StepId(RootModel[str]):
     """
 
 
+class ExecutionMode(StrEnum):
+    """
+    How MUX targets run; explicit qubit targets run directly in parallel. parallel_by_mux (default): MUXes run in parallel and the qubits of one MUX run one after another. parallel_by_round: rounds of qubits from different MUXes. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. Bring-up has no manual rounds.
+    """
+
+    parallel_by_round = "parallel_by_round"
+    parallel_by_mux = "parallel_by_mux"
+    simultaneous_spectroscopy = "simultaneous_spectroscopy"
+    sequential = "sequential"
+
+
 class BringUpStep(BaseModel):
     """
     Initial characterization: resonator and qubit spectroscopy, chevron.
@@ -6975,6 +7053,12 @@ class BringUpStep(BaseModel):
     tasks: Annotated[list[TaskCall] | None, Field(title="Tasks")] = None
     """
     Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to BRINGUP_TASKS.
+    """
+    execution_mode: Annotated[ExecutionMode, Field(title="Execution Mode")] = (
+        ExecutionMode.parallel_by_mux
+    )
+    """
+    How MUX targets run; explicit qubit targets run directly in parallel. parallel_by_mux (default): MUXes run in parallel and the qubits of one MUX run one after another. parallel_by_round: rounds of qubits from different MUXes. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. Bring-up has no manual rounds.
     """
 
 
@@ -7002,7 +7086,7 @@ class ConfigureAllStep(BaseModel):
     """
 
 
-class ExecutionMode(StrEnum):
+class ExecutionMode1(StrEnum):
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
     """
@@ -7033,8 +7117,8 @@ class CustomOneQubitStep(BaseModel):
     """
     Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id.
     """
-    execution_mode: Annotated[ExecutionMode, Field(title="Execution Mode")] = (
-        ExecutionMode.parallel_by_round
+    execution_mode: Annotated[ExecutionMode1, Field(title="Execution Mode")] = (
+        ExecutionMode1.parallel_by_round
     )
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
@@ -7049,7 +7133,7 @@ class CustomOneQubitStep(BaseModel):
     """
 
 
-class ExecutionMode1(StrEnum):
+class ExecutionMode2(StrEnum):
     """
     automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
     """
@@ -7088,8 +7172,8 @@ class CustomTwoQubitStep(BaseModel):
     """
     Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id.
     """
-    execution_mode: Annotated[ExecutionMode1, Field(title="Execution Mode")] = (
-        ExecutionMode1.automatic
+    execution_mode: Annotated[ExecutionMode2, Field(title="Execution Mode")] = (
+        ExecutionMode2.automatic
     )
     """
     automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
@@ -7256,7 +7340,7 @@ class StepId2(RootModel[str]):
     """
 
 
-class ExecutionMode2(StrEnum):
+class ExecutionMode3(StrEnum):
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
     """
@@ -7281,8 +7365,8 @@ class OneQubitCheckStep(BaseModel):
     """
     Identifier of this step, unique within the pipeline; filters reference it. Defaults to the step's name. Set it when a pipeline runs the same step type twice.
     """
-    execution_mode: Annotated[ExecutionMode2, Field(title="Execution Mode")] = (
-        ExecutionMode2.parallel_by_round
+    execution_mode: Annotated[ExecutionMode3, Field(title="Execution Mode")] = (
+        ExecutionMode3.parallel_by_round
     )
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
@@ -7314,8 +7398,8 @@ class OneQubitFineTuneStep(BaseModel):
     """
     Identifier of this step, unique within the pipeline; filters reference it. Defaults to the step's name. Set it when a pipeline runs the same step type twice.
     """
-    execution_mode: Annotated[ExecutionMode2, Field(title="Execution Mode")] = (
-        ExecutionMode2.parallel_by_round
+    execution_mode: Annotated[ExecutionMode3, Field(title="Execution Mode")] = (
+        ExecutionMode3.parallel_by_round
     )
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
@@ -7334,11 +7418,15 @@ class OneQubitFineTuneStep(BaseModel):
     """
 
 
+class Pair(RootModel[list[str]]):
+    root: Annotated[list[str], Field(max_length=2, min_length=2)]
+
+
 class PipelineTargets(BaseModel):
     """
-    Which qubits the pipeline starts from: explicit qids or whole MUXes.
+    Which qubits or couplings the pipeline starts from.
 
-    Set exactly one of qids and mux_ids to a nonempty list without duplicates.
+    Set exactly one of qids, mux_ids and pairs to a nonempty list without duplicates.
     exclude_qids may be nonempty only with mux_ids.
     """
 
@@ -7347,15 +7435,19 @@ class PipelineTargets(BaseModel):
     )
     qids: Annotated[list[str] | None, Field(title="Qids")] = None
     """
-    Qubit ids as QDash lists them, e.g. ["0", "1"]. Set exactly one of qids and mux_ids, as a nonempty list without duplicates.
+    Qubit ids as QDash lists them, e.g. ["0", "1"]. Set exactly one of qids, mux_ids and pairs, as a nonempty list without duplicates.
     """
     mux_ids: Annotated[list[int] | None, Field(title="Mux Ids")] = None
     """
-    MUX ids; every qubit of each MUX is a target. Set exactly one of qids and mux_ids, as a nonempty list without duplicates.
+    MUX ids; every qubit of each MUX is a target. Set exactly one of qids, mux_ids and pairs, as a nonempty list without duplicates.
+    """
+    pairs: Annotated[list[Pair] | None, Field(title="Pairs")] = None
+    """
+    Directed coupling pairs [control, target], e.g. [["0", "1"], ["4", "5"]]; the candidate qubits are their qubits and the candidate couplings the pairs, in that direction. Set exactly one of qids, mux_ids and pairs.
     """
     exclude_qids: Annotated[list[str], Field(title="Exclude Qids")] = []
     """
-    Qubits to leave out of the MUX targets. Must be empty with qids.
+    Qubits to leave out of the MUX targets. Must be empty with qids or pairs.
     """
 
 
@@ -7387,7 +7479,7 @@ class TaskSettings(BaseModel):
     """
 
 
-class ExecutionMode4(StrEnum):
+class ExecutionMode5(StrEnum):
     """
     automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
     """
@@ -7413,8 +7505,8 @@ class TwoQubitCalibrationStep(BaseModel):
     """
     Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to FULL_2Q_TASKS.
     """
-    execution_mode: Annotated[ExecutionMode4, Field(title="Execution Mode")] = (
-        ExecutionMode4.automatic
+    execution_mode: Annotated[ExecutionMode5, Field(title="Execution Mode")] = (
+        ExecutionMode5.automatic
     )
     """
     automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
@@ -8868,7 +8960,7 @@ class ExecuteFlowRequest(BaseModel):
 
     target_override: FlowTargetOverride | None = None
     """
-    Targets for this run, overriding direct CalibService and pipeline targets
+    Targets for this run, overriding the initial targets of every CalibrationSession.run (or legacy CalibService.run) and pipeline
     """
     parameters: Annotated[dict[str, Any] | None, Field(title="Parameters")] = None
     """
@@ -8950,7 +9042,7 @@ class ExecutionComparisonResponse(BaseModel):
 
 class ExecutionPlanRun(BaseModel):
     """
-    One CalibService.run call of the entrypoint.
+    One CalibrationSession.run (or legacy CalibService.run) call of the entrypoint.
     """
 
     targets: FlowTargetOverride | None = None
@@ -9803,22 +9895,50 @@ class ParameterHistoryResponse(BaseModel):
     total_versions: Annotated[int, Field(title="Total Versions")]
 
 
-class PipelineProgress(BaseModel):
+class PipelineStepProgress(BaseModel):
     """
-    A pipeline run as a whole: one execution per calibration step, same flow run.
+    One planned step of a pipeline run and how far its execution got.
 
-    ``status`` is the whole run's: running while any step runs or the run holds
-    the project lock between steps, otherwise the outcome of the last step.
+    Every step the run reaches, calibration or transform, has its own execution.
     """
 
+    index: Annotated[int, Field(title="Index")]
+    """
+    1-based position in the pipeline spec
+    """
     name: Annotated[str, Field(title="Name")]
-    flow_run_id: Annotated[str, Field(title="Flow Run Id")]
-    root_execution_id: Annotated[str, Field(title="Root Execution Id")]
+    step_id: Annotated[str | None, Field(title="Step Id")] = None
     """
-    The first step's execution, as returned at dispatch
+    Plan-scoped step id; null for transforms and older runs
+    """
+    key: Annotated[str, Field(title="Key")] = ""
+    """
+    Identifier of this step occurrence in the plan: the step_id of a calibration step; a transform's name, suffixed with its index when the name repeats
+    """
+    type: Annotated[str, Field(title="Type")] = ""
+    kind: Annotated[str, Field(title="Kind")] = "calibration"
+    """
+    "calibration" or "transform"
+    """
+    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
+    """
+    The step's own execution, once it has started
     """
     status: Annotated[str, Field(title="Status")]
-    steps: Annotated[list[PipelineStepProgress], Field(title="Steps")]
+    """
+    The execution status; "pending" before the step starts while the run may still reach it; "skipped" when the run ended without reaching it; "not_recorded" for a transform of a run recorded before transform steps had executions
+    """
+    transform: TransformStepRecord | None = None
+    """
+    A transform step's recorded outcome: candidates kept and excluded with reasons, or the CR groups planned; null for calibration steps and unfinished transforms
+    """
+    task_total: Annotated[int, Field(title="Task Total")] = 0
+    task_finished: Annotated[int, Field(title="Task Finished")] = 0
+    task_failed: Annotated[int, Field(title="Task Failed")] = 0
+    figure_paths: Annotated[list[str] | None, Field(title="Figure Paths")] = None
+    """
+    Figures of the step's finished tasks, in task order
+    """
 
 
 class PipelineStepTypeInfo(BaseModel):
@@ -10679,6 +10799,367 @@ class CalibrationGroupPipelineRun(BaseModel):
     executions_in_filter: Annotated[int, Field(title="Executions In Filter")] = 0
 
 
+class CreateEvaluationRunResponse(BaseModel):
+    """
+    The run that was started and what it covers.
+    """
+
+    run: EvaluationRunSummary
+    task_ids: Annotated[list[str], Field(title="Task Ids")]
+    """
+    Task results queued for evaluation
+    """
+    skipped: Annotated[dict[str, str] | None, Field(title="Skipped")] = None
+    """
+    Entities not queued, by id, with the reason
+    """
+
+
+class DashboardCreateRequest(BaseModel):
+    """
+    Body for creating a dashboard.
+    """
+
+    name: Annotated[str, Field(max_length=200, min_length=1, title="Name")]
+    description: Annotated[str, Field(max_length=2000, title="Description")] = ""
+    visibility: Annotated[Visibility, Field(title="Visibility")] = Visibility.private
+    chip_id: Annotated[ChipId | None, Field(title="Chip Id")] = None
+    panels: Annotated[list[DashboardPanelModel] | None, Field(max_length=50, title="Panels")] = None
+    template_id: Annotated[TemplateId | None, Field(title="Template Id")] = None
+    """
+    Template whose panels are copied into the dashboard when panels is empty
+    """
+
+
+class Device(BaseModel):
+    """
+    Device information.
+    """
+
+    name: Annotated[str, Field(title="Name")]
+    device_id: Annotated[str, Field(title="Device Id")]
+    qubits: Annotated[list[Qubit], Field(title="Qubits")]
+    couplings: Annotated[list[Coupling], Field(title="Couplings")]
+    calibrated_at: Annotated[AwareDatetime | str, Field(title="Calibrated At")]
+
+
+class EvaluationRunDetailResponse(BaseModel):
+    """
+    One run with every evaluation in it.
+    """
+
+    run: EvaluationRunSummary
+    evaluations: Annotated[list[EvaluationItem], Field(title="Evaluations")]
+
+
+class ExecutePipelineResponse(BaseModel):
+    """
+    Dispatch result plus the resolved plan that was started.
+    """
+
+    execution_id: Annotated[str, Field(title="Execution Id")]
+    """
+    QDash execution ID (falls back to the Prefect flow run ID when no execution row could be pre-created)
+    """
+    flow_run_id: Annotated[str, Field(title="Flow Run Id")]
+    """
+    Prefect flow run ID
+    """
+    flow_run_url: Annotated[str, Field(title="Flow Run Url")]
+    """
+    Prefect flow run URL
+    """
+    qdash_ui_url: Annotated[str, Field(title="Qdash Ui Url")]
+    """
+    QDash UI URL for execution
+    """
+    message: Annotated[str, Field(title="Message")]
+    """
+    Success message
+    """
+    calibration_session_id: Annotated[str | None, Field(title="Calibration Session Id")] = None
+    """
+    The calibration session the run joined: the one the request named, or an automatic one; null when the run joined none
+    """
+    calibration_run_id: Annotated[str | None, Field(title="Calibration Run Id")] = None
+    """
+    The run QDash recorded for the launch; every step execution carries it. Null only for a run the worker records when it starts (a saved flow with no chip)
+    """
+    replayed: Annotated[bool, Field(title="Replayed")] = False
+    """
+    True when a retry returned the run an earlier request with its key started
+    """
+    steps: Annotated[list[ResolvedPipelineStep] | None, Field(title="Steps")] = None
+    targets: ResolvedPipelineTargets | None = None
+    pipeline_run_id: Annotated[str | None, Field(title="Pipeline Run Id")] = None
+    """
+    The run QDash recorded for the launch (calibration_run_id)
+    """
+    decision_id: Annotated[str | None, Field(title="Decision Id")] = None
+    """
+    The decision the recorded run carries out, as QDash linked it; null when the request named none. A client that sent a decision checks it is echoed here
+    """
+
+
+class ExecutionGroupItem(BaseModel):
+    """
+    One row of the grouped Execution list: an execution, an agent session, or a
+    calibration session with the runs and agent sessions started in it.
+    """
+
+    kind: Annotated[Kind3, Field(title="Kind")]
+    sort_at: Annotated[AwareDatetime | None, Field(title="Sort At")] = None
+    """
+    Time the row is ordered by: the execution start, or the session's latest activity within the day filter
+    """
+    execution: ExecutionResponseSummary | None = None
+    """
+    Set for an execution row
+    """
+    agent_session: AgentSessionGroupSummary | None = None
+    """
+    Set for an agent session row
+    """
+    children: Annotated[list[AgentSessionChildExecution] | None, Field(title="Children")] = None
+    """
+    The session's latest executions in dispatch order; at most children_limit
+    """
+    children_total: Annotated[int, Field(title="Children Total")] = 0
+    """
+    Every execution the session dispatched
+    """
+    children_in_filter: Annotated[int, Field(title="Children In Filter")] = 0
+    """
+    The session's executions that match the day filter
+    """
+    children_omitted: Annotated[int, Field(title="Children Omitted")] = 0
+    """
+    Earlier executions left out of children; the graph lists all
+    """
+    calibration_session: CalibrationSessionGroupSummary | None = None
+    """
+    Set for a calibration session row
+    """
+    pipeline_runs: Annotated[
+        list[CalibrationGroupPipelineRun] | None, Field(title="Pipeline Runs")
+    ] = None
+    """
+    The row's latest pipeline runs (at most 20), oldest first
+    """
+    pipeline_runs_omitted: Annotated[int, Field(title="Pipeline Runs Omitted")] = 0
+    """
+    Earlier runs left out
+    """
+    nested_agent_sessions: Annotated[
+        list[CalibrationGroupAgentSession] | None, Field(title="Nested Agent Sessions")
+    ] = None
+    """
+    The row's latest admitted agent sessions (at most 20), oldest first
+    """
+    nested_agent_sessions_omitted: Annotated[int, Field(title="Nested Agent Sessions Omitted")] = 0
+
+
+class ImpactResponse(BaseModel):
+    """
+    Response model for impact query.
+
+    Attributes
+    ----------
+    origin : LineageNodeResponse
+        The queried entity
+    nodes : list[LineageNodeResponse]
+        All nodes affected by this entity
+    edges : list[LineageEdgeResponse]
+        All edges in the impact graph
+    max_depth : int
+        Maximum depth traversed
+    """
+
+    origin: LineageNodeResponse
+    nodes: Annotated[list[LineageNodeResponse], Field(title="Nodes")]
+    edges: Annotated[list[LineageEdgeResponse], Field(title="Edges")]
+    max_depth: Annotated[int, Field(title="Max Depth")]
+
+
+class ListAgentInterventionsResponse(BaseModel):
+    """
+    Interventions of one session, newest first.
+    """
+
+    items: Annotated[list[AgentInterventionResponse], Field(title="Items")]
+    total: Annotated[int, Field(title="Total")]
+
+
+class ListCalibrationDecisionsResponse(BaseModel):
+    """
+    Decisions of one calibration session, oldest first.
+    """
+
+    items: Annotated[list[CalibrationDecisionResponse], Field(title="Items")]
+    total: Annotated[int, Field(title="Total")]
+
+
+class ListExecutionGroupsResponse(BaseModel):
+    """
+    A page of the Execution list with calibration and agent sessions grouped on the server.
+
+    Grouping happens before pagination, so a session is one row on one page with all its
+    executions, and no execution appears both in a group and as its own row. An agent session
+    admitted to a calibration session is nested in that session's row. ``total`` counts
+    rows; ``total_executions`` counts real executions, the number the ungrouped list reports.
+    """
+
+    items: Annotated[list[ExecutionGroupItem], Field(title="Items")]
+    total: Annotated[int, Field(title="Total")]
+    """
+    Rows: calibration sessions, agent sessions outside one, and executions outside both
+    """
+    total_executions: Annotated[int, Field(title="Total Executions")]
+    """
+    Real executions that match the filter, grouped or not
+    """
+    grouped_executions: Annotated[int, Field(title="Grouped Executions")]
+    """
+    Executions that match the filter and are shown inside a session row
+    """
+    agent_sessions: Annotated[int, Field(title="Agent Sessions")]
+    """
+    Agent session rows that match the filter
+    """
+    calibration_sessions: Annotated[int, Field(title="Calibration Sessions")] = 0
+    """
+    Calibration session rows that match the filter
+    """
+    skip: Annotated[int, Field(title="Skip")]
+    limit: Annotated[int, Field(title="Limit")]
+    children_limit: Annotated[int, Field(title="Children Limit")]
+    """
+    Most executions one session row lists
+    """
+
+
+class ListMetricScriptsResponse(BaseModel):
+    """
+    Scripts visible to the caller.
+    """
+
+    scripts: Annotated[list[MetricScriptSummary], Field(title="Scripts")]
+    total: Annotated[int, Field(title="Total")]
+
+
+class ListMuxResponse(BaseModel):
+    """
+    ListMuxResponse is a Pydantic model that represents the response for fetching the multiplexers.
+    """
+
+    muxes: Annotated[dict[str, MuxDetailResponse], Field(title="Muxes")]
+
+
+class MetricScriptResponse(BaseModel):
+    """
+    A script with its source, last-good source and revision list.
+    """
+
+    script_id: Annotated[str, Field(title="Script Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    name: Annotated[str, Field(title="Name")]
+    description: Annotated[str, Field(title="Description")]
+    visibility: Annotated[Visibility, Field(title="Visibility")]
+    status: Annotated[Status11, Field(title="Status")]
+    revision: Annotated[int, Field(title="Revision")]
+    active_revision: Annotated[int | None, Field(title="Active Revision")]
+    metrics: Annotated[list[MetricInfo], Field(title="Metrics")]
+    template_id: Annotated[str | None, Field(title="Template Id")]
+    owner_username: Annotated[str, Field(title="Owner Username")]
+    owner_user_id: Annotated[str | None, Field(title="Owner User Id")]
+    can_edit: Annotated[bool, Field(title="Can Edit")]
+    """
+    Whether the caller may update or delete it
+    """
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    source: Annotated[str, Field(title="Source")]
+    active_source: Annotated[str | None, Field(title="Active Source")]
+    diagnostics: Annotated[list[ScriptDiagnostic], Field(title="Diagnostics")]
+    revisions: Annotated[list[MetricScriptRevision], Field(title="Revisions")]
+
+
+class PipelineCatalogResponse(BaseModel):
+    """
+    Everything needed to write a spec for this project.
+    """
+
+    backend_name: Annotated[str, Field(title="Backend Name")]
+    step_types: Annotated[list[PipelineStepTypeInfo], Field(title="Step Types")]
+    one_qubit_execution_modes: Annotated[list[str], Field(title="One Qubit Execution Modes")]
+    """
+    Values OneQubitCheck, OneQubitFineTune and CustomOneQubit accept for execution_mode; manual requires rounds.
+    """
+    two_qubit_execution_modes: Annotated[list[str], Field(title="Two Qubit Execution Modes")]
+    """
+    Values TwoQubitCalibration and CustomTwoQubit accept for execution_mode; manual requires rounds.
+    """
+    tasks: Annotated[dict[str, list[str]], Field(title="Tasks")]
+    """
+    Available task names by task_type ("qubit", "coupling", ...).
+    """
+    task_documentation: Annotated[
+        dict[str, TaskDocumentation] | None, Field(title="Task Documentation")
+    ] = None
+    """
+    Guidance declared by available tasks, keyed by task name. Tasks that declare no documentation are omitted.
+    """
+    spec_version: Annotated[int, Field(title="Spec Version")]
+    """
+    The spec version this QDash accepts.
+    """
+    spec_schema: Annotated[dict[str, Any], Field(title="Spec Schema")]
+    """
+    JSON schema of CalibrationPipelineSpec.
+    """
+    example: Annotated[dict[str, Any] | None, Field(title="Example")] = None
+
+
+class PipelineProgress(BaseModel):
+    """
+    A pipeline run as a whole: one execution per step it reached, same flow run.
+
+    ``status`` is the whole run's: running while any step runs or the run holds
+    the project lock between steps, otherwise the outcome of the last step.
+    """
+
+    name: Annotated[str, Field(title="Name")]
+    flow_run_id: Annotated[str, Field(title="Flow Run Id")]
+    root_execution_id: Annotated[str, Field(title="Root Execution Id")]
+    """
+    The first step's execution, as returned at dispatch
+    """
+    status: Annotated[str, Field(title="Status")]
+    steps: Annotated[list[PipelineStepProgress], Field(title="Steps")]
+
+
+class AgentSessionGraphResponse(BaseModel):
+    """
+    One agent session as an experiment graph over its real executions.
+
+    A live read of the session's records, collected one after another: statuses can move while
+    it is read, and it is not a snapshot. The full audit, with its consistency check and export,
+    stays on the session's audit endpoints.
+    """
+
+    generated_at: Annotated[AwareDatetime, Field(title="Generated At")]
+    session: AgentSessionGroupSummary
+    nodes: Annotated[list[AgentSessionGraphNode], Field(title="Nodes")]
+    edges: Annotated[list[AgentSessionGraphEdge], Field(title="Edges")]
+    total_nodes: Annotated[int, Field(title="Total Nodes")]
+    omitted_nodes: Annotated[int, Field(title="Omitted Nodes")]
+    """
+    Earliest nodes left out to bound the response; the audit holds them all
+    """
+    complete: Annotated[bool, Field(title="Complete")]
+    notes: Annotated[list[str], Field(title="Notes")]
+
+
 class CalibrationPipelineRunResponse(BaseModel):
     """
     One run requested in a calibration session, with its step executions.
@@ -10923,166 +11404,6 @@ class CalibrationSessionDetailResponse(BaseModel):
     """
 
 
-class CreateEvaluationRunResponse(BaseModel):
-    """
-    The run that was started and what it covers.
-    """
-
-    run: EvaluationRunSummary
-    task_ids: Annotated[list[str], Field(title="Task Ids")]
-    """
-    Task results queued for evaluation
-    """
-    skipped: Annotated[dict[str, str] | None, Field(title="Skipped")] = None
-    """
-    Entities not queued, by id, with the reason
-    """
-
-
-class DashboardCreateRequest(BaseModel):
-    """
-    Body for creating a dashboard.
-    """
-
-    name: Annotated[str, Field(max_length=200, min_length=1, title="Name")]
-    description: Annotated[str, Field(max_length=2000, title="Description")] = ""
-    visibility: Annotated[Visibility, Field(title="Visibility")] = Visibility.private
-    chip_id: Annotated[ChipId | None, Field(title="Chip Id")] = None
-    panels: Annotated[list[DashboardPanelModel] | None, Field(max_length=50, title="Panels")] = None
-    template_id: Annotated[TemplateId | None, Field(title="Template Id")] = None
-    """
-    Template whose panels are copied into the dashboard when panels is empty
-    """
-
-
-class Device(BaseModel):
-    """
-    Device information.
-    """
-
-    name: Annotated[str, Field(title="Name")]
-    device_id: Annotated[str, Field(title="Device Id")]
-    qubits: Annotated[list[Qubit], Field(title="Qubits")]
-    couplings: Annotated[list[Coupling], Field(title="Couplings")]
-    calibrated_at: Annotated[AwareDatetime | str, Field(title="Calibrated At")]
-
-
-class EvaluationRunDetailResponse(BaseModel):
-    """
-    One run with every evaluation in it.
-    """
-
-    run: EvaluationRunSummary
-    evaluations: Annotated[list[EvaluationItem], Field(title="Evaluations")]
-
-
-class ExecutePipelineResponse(BaseModel):
-    """
-    Dispatch result plus the resolved plan that was started.
-    """
-
-    execution_id: Annotated[str, Field(title="Execution Id")]
-    """
-    QDash execution ID (falls back to the Prefect flow run ID when no execution row could be pre-created)
-    """
-    flow_run_id: Annotated[str, Field(title="Flow Run Id")]
-    """
-    Prefect flow run ID
-    """
-    flow_run_url: Annotated[str, Field(title="Flow Run Url")]
-    """
-    Prefect flow run URL
-    """
-    qdash_ui_url: Annotated[str, Field(title="Qdash Ui Url")]
-    """
-    QDash UI URL for execution
-    """
-    message: Annotated[str, Field(title="Message")]
-    """
-    Success message
-    """
-    calibration_session_id: Annotated[str | None, Field(title="Calibration Session Id")] = None
-    """
-    The calibration session the run joined: the one the request named, or an automatic one; null when the run joined none
-    """
-    calibration_run_id: Annotated[str | None, Field(title="Calibration Run Id")] = None
-    """
-    The run QDash recorded for the launch; every step execution carries it. Null only for a run the worker records when it starts (a saved flow with no chip)
-    """
-    replayed: Annotated[bool, Field(title="Replayed")] = False
-    """
-    True when a retry returned the run an earlier request with its key started
-    """
-    steps: Annotated[list[ResolvedPipelineStep] | None, Field(title="Steps")] = None
-    targets: ResolvedPipelineTargets | None = None
-    pipeline_run_id: Annotated[str | None, Field(title="Pipeline Run Id")] = None
-    """
-    The run QDash recorded for the launch (calibration_run_id)
-    """
-    decision_id: Annotated[str | None, Field(title="Decision Id")] = None
-    """
-    The decision the recorded run carries out, as QDash linked it; null when the request named none. A client that sent a decision checks it is echoed here
-    """
-
-
-class ExecutionGroupItem(BaseModel):
-    """
-    One row of the grouped Execution list: an execution, an agent session, or a
-    calibration session with the runs and agent sessions started in it.
-    """
-
-    kind: Annotated[Kind3, Field(title="Kind")]
-    sort_at: Annotated[AwareDatetime | None, Field(title="Sort At")] = None
-    """
-    Time the row is ordered by: the execution start, or the session's latest activity within the day filter
-    """
-    execution: ExecutionResponseSummary | None = None
-    """
-    Set for an execution row
-    """
-    agent_session: AgentSessionGroupSummary | None = None
-    """
-    Set for an agent session row
-    """
-    children: Annotated[list[AgentSessionChildExecution] | None, Field(title="Children")] = None
-    """
-    The session's latest executions in dispatch order; at most children_limit
-    """
-    children_total: Annotated[int, Field(title="Children Total")] = 0
-    """
-    Every execution the session dispatched
-    """
-    children_in_filter: Annotated[int, Field(title="Children In Filter")] = 0
-    """
-    The session's executions that match the day filter
-    """
-    children_omitted: Annotated[int, Field(title="Children Omitted")] = 0
-    """
-    Earlier executions left out of children; the graph lists all
-    """
-    calibration_session: CalibrationSessionGroupSummary | None = None
-    """
-    Set for a calibration session row
-    """
-    pipeline_runs: Annotated[
-        list[CalibrationGroupPipelineRun] | None, Field(title="Pipeline Runs")
-    ] = None
-    """
-    The row's latest pipeline runs (at most 20), oldest first
-    """
-    pipeline_runs_omitted: Annotated[int, Field(title="Pipeline Runs Omitted")] = 0
-    """
-    Earlier runs left out
-    """
-    nested_agent_sessions: Annotated[
-        list[CalibrationGroupAgentSession] | None, Field(title="Nested Agent Sessions")
-    ] = None
-    """
-    The row's latest admitted agent sessions (at most 20), oldest first
-    """
-    nested_agent_sessions_omitted: Annotated[int, Field(title="Nested Agent Sessions Omitted")] = 0
-
-
 class ExecutionResponseDetail(BaseModel):
     """
     ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.
@@ -11131,189 +11452,6 @@ class ExecutionResponseDetail(BaseModel):
     """
     How the caller that launched this execution's pipeline said it was started, such as an agent tool. Client reported, not verified by QDash; null when nothing was reported. The recorded user is still the one whose sign-in started it
     """
-
-
-class ImpactResponse(BaseModel):
-    """
-    Response model for impact query.
-
-    Attributes
-    ----------
-    origin : LineageNodeResponse
-        The queried entity
-    nodes : list[LineageNodeResponse]
-        All nodes affected by this entity
-    edges : list[LineageEdgeResponse]
-        All edges in the impact graph
-    max_depth : int
-        Maximum depth traversed
-    """
-
-    origin: LineageNodeResponse
-    nodes: Annotated[list[LineageNodeResponse], Field(title="Nodes")]
-    edges: Annotated[list[LineageEdgeResponse], Field(title="Edges")]
-    max_depth: Annotated[int, Field(title="Max Depth")]
-
-
-class ListAgentInterventionsResponse(BaseModel):
-    """
-    Interventions of one session, newest first.
-    """
-
-    items: Annotated[list[AgentInterventionResponse], Field(title="Items")]
-    total: Annotated[int, Field(title="Total")]
-
-
-class ListCalibrationDecisionsResponse(BaseModel):
-    """
-    Decisions of one calibration session, oldest first.
-    """
-
-    items: Annotated[list[CalibrationDecisionResponse], Field(title="Items")]
-    total: Annotated[int, Field(title="Total")]
-
-
-class ListExecutionGroupsResponse(BaseModel):
-    """
-    A page of the Execution list with calibration and agent sessions grouped on the server.
-
-    Grouping happens before pagination, so a session is one row on one page with all its
-    executions, and no execution appears both in a group and as its own row. An agent session
-    admitted to a calibration session is nested in that session's row. ``total`` counts
-    rows; ``total_executions`` counts real executions, the number the ungrouped list reports.
-    """
-
-    items: Annotated[list[ExecutionGroupItem], Field(title="Items")]
-    total: Annotated[int, Field(title="Total")]
-    """
-    Rows: calibration sessions, agent sessions outside one, and executions outside both
-    """
-    total_executions: Annotated[int, Field(title="Total Executions")]
-    """
-    Real executions that match the filter, grouped or not
-    """
-    grouped_executions: Annotated[int, Field(title="Grouped Executions")]
-    """
-    Executions that match the filter and are shown inside a session row
-    """
-    agent_sessions: Annotated[int, Field(title="Agent Sessions")]
-    """
-    Agent session rows that match the filter
-    """
-    calibration_sessions: Annotated[int, Field(title="Calibration Sessions")] = 0
-    """
-    Calibration session rows that match the filter
-    """
-    skip: Annotated[int, Field(title="Skip")]
-    limit: Annotated[int, Field(title="Limit")]
-    children_limit: Annotated[int, Field(title="Children Limit")]
-    """
-    Most executions one session row lists
-    """
-
-
-class ListMetricScriptsResponse(BaseModel):
-    """
-    Scripts visible to the caller.
-    """
-
-    scripts: Annotated[list[MetricScriptSummary], Field(title="Scripts")]
-    total: Annotated[int, Field(title="Total")]
-
-
-class ListMuxResponse(BaseModel):
-    """
-    ListMuxResponse is a Pydantic model that represents the response for fetching the multiplexers.
-    """
-
-    muxes: Annotated[dict[str, MuxDetailResponse], Field(title="Muxes")]
-
-
-class MetricScriptResponse(BaseModel):
-    """
-    A script with its source, last-good source and revision list.
-    """
-
-    script_id: Annotated[str, Field(title="Script Id")]
-    project_id: Annotated[str, Field(title="Project Id")]
-    name: Annotated[str, Field(title="Name")]
-    description: Annotated[str, Field(title="Description")]
-    visibility: Annotated[Visibility, Field(title="Visibility")]
-    status: Annotated[Status11, Field(title="Status")]
-    revision: Annotated[int, Field(title="Revision")]
-    active_revision: Annotated[int | None, Field(title="Active Revision")]
-    metrics: Annotated[list[MetricInfo], Field(title="Metrics")]
-    template_id: Annotated[str | None, Field(title="Template Id")]
-    owner_username: Annotated[str, Field(title="Owner Username")]
-    owner_user_id: Annotated[str | None, Field(title="Owner User Id")]
-    can_edit: Annotated[bool, Field(title="Can Edit")]
-    """
-    Whether the caller may update or delete it
-    """
-    created_at: Annotated[AwareDatetime, Field(title="Created At")]
-    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
-    source: Annotated[str, Field(title="Source")]
-    active_source: Annotated[str | None, Field(title="Active Source")]
-    diagnostics: Annotated[list[ScriptDiagnostic], Field(title="Diagnostics")]
-    revisions: Annotated[list[MetricScriptRevision], Field(title="Revisions")]
-
-
-class PipelineCatalogResponse(BaseModel):
-    """
-    Everything needed to write a spec for this project.
-    """
-
-    backend_name: Annotated[str, Field(title="Backend Name")]
-    step_types: Annotated[list[PipelineStepTypeInfo], Field(title="Step Types")]
-    one_qubit_execution_modes: Annotated[list[str], Field(title="One Qubit Execution Modes")]
-    """
-    Values OneQubitCheck, OneQubitFineTune and CustomOneQubit accept for execution_mode; manual requires rounds.
-    """
-    two_qubit_execution_modes: Annotated[list[str], Field(title="Two Qubit Execution Modes")]
-    """
-    Values TwoQubitCalibration and CustomTwoQubit accept for execution_mode; manual requires rounds.
-    """
-    tasks: Annotated[dict[str, list[str]], Field(title="Tasks")]
-    """
-    Available task names by task_type ("qubit", "coupling", ...).
-    """
-    task_documentation: Annotated[
-        dict[str, TaskDocumentation] | None, Field(title="Task Documentation")
-    ] = None
-    """
-    Guidance declared by available tasks, keyed by task name. Tasks that declare no documentation are omitted.
-    """
-    spec_version: Annotated[int, Field(title="Spec Version")]
-    """
-    The spec version this QDash accepts.
-    """
-    spec_schema: Annotated[dict[str, Any], Field(title="Spec Schema")]
-    """
-    JSON schema of CalibrationPipelineSpec.
-    """
-    example: Annotated[dict[str, Any] | None, Field(title="Example")] = None
-
-
-class AgentSessionGraphResponse(BaseModel):
-    """
-    One agent session as an experiment graph over its real executions.
-
-    A live read of the session's records, collected one after another: statuses can move while
-    it is read, and it is not a snapshot. The full audit, with its consistency check and export,
-    stays on the session's audit endpoints.
-    """
-
-    generated_at: Annotated[AwareDatetime, Field(title="Generated At")]
-    session: AgentSessionGroupSummary
-    nodes: Annotated[list[AgentSessionGraphNode], Field(title="Nodes")]
-    edges: Annotated[list[AgentSessionGraphEdge], Field(title="Edges")]
-    total_nodes: Annotated[int, Field(title="Total Nodes")]
-    omitted_nodes: Annotated[int, Field(title="Omitted Nodes")]
-    """
-    Earliest nodes left out to bound the response; the audit holds them all
-    """
-    complete: Annotated[bool, Field(title="Complete")]
-    notes: Annotated[list[str], Field(title="Notes")]
 
 
 FileTreeNode.model_rebuild()

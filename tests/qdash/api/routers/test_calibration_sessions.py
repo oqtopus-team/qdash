@@ -345,7 +345,9 @@ class TestPipelineRuns:
         assert [e["execution_id"] for e in run["executions"]] == [first_execution, "step-3-exec"]
         steps = {step["index"]: step for step in run["pipeline"]["steps"]}
         assert steps[1]["execution_id"] == first_execution
-        assert steps[2]["status"] == "skipped"
+        # The plan carries no transform-recording marker, as in runs recorded before
+        # transforms had executions: its filter is reported as not recorded, never pending.
+        assert steps[2]["status"] == "not_recorded"
         assert steps[3]["execution_id"] == "step-3-exec"
         assert run["pipeline"]["status"] == "running"
         assert detail["close_blockers"] == [f"pipeline run {run['run_id']} is running"]

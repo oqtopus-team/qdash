@@ -6,39 +6,72 @@ existing applications. The server owns permissions and hardware validation.
 
 ## Define, check, run
 
+Use `qdash.sdk.CalibrationSession` to create or open a named calibration objective and run
+trials in it. `qdash.calibration` supplies the same targets, built-in steps, task calls, and
+sweeps that workflows use. Definitions do not import the worker or contact the server.
+
 | Operation | Effect |
 | --- | --- |
-| Construct a `Pipeline`, target, step, or `Chip` | Local definition only |
-| `qdash.chips.list()` / `qdash.chips.get(chip_id)` | Read chip metadata |
-| `chip.validate_calibration(...)` | Server validation, no execution |
-| `chip.calibrate(...)` | Dispatch a calibration pipeline |
-| `qdash.workflows.get(...)` | Read a registered workflow |
-| `workflow.run(...)` | Dispatch its saved deployment |
-| `run.wait()` | Poll the whole run to a terminal state |
+| Construct targets, steps, or task calls | Local definition only |
+| `CalibrationSession.create(client, chip_id=..., name=...)` | Create an objective record; no hardware reservation |
+| `CalibrationSession.open(client, session_id=...)` | Read the existing objective, including closed ones |
+| `session.validate(targets, steps)` | Server validation, no execution |
+| `session.submit(targets, steps)` | Dispatch into the objective and return `CalibrationLaunch` |
+| `session.run(targets, steps)` | Dispatch, wait, and return `CalibrationResult` on completion |
+| `session.close()` | Request closure; no cancellation or HTTP-client cleanup |
 
-No phase implicitly starts the next. The SDK never imports or executes workflow source locally.
-Python dispatch requires an explicit project. Validation does not reserve hardware; the server
-validates again at execution.
+`run()` and `CalibrationLaunch.wait()` raise `CalibrationRunError` for unsuccessful terminal
+runs and `TimeoutError` without cancellation on timeout. `CalibrationLaunch.get()` returns a
+snapshot, including nonterminal states. The handle follows the recorded session/run IDs, so
+failure before the first execution is observable. Explicit objectives stay open for more trials.
+See [usage and recovery](../../reference/clients/python.md#run-a-calibration).
 
-Pass a `Pipeline` directly to `chip.validate_calibration(pipeline)` and
-`chip.calibrate(pipeline)`, or use the existing targets-and-steps arguments. Direct pipelines
-retain all spec fields; authoring overrides alongside them raise `TypeError`.
+`qdash.workflow.CalibrationSession` executes those same definitions in the current flow run;
+several calls share the enclosing run identity. Its `run()` returns the same `CalibrationResult`
+type, with typed runtime step results; SDK step details are server progress records. Completion
+means the steps finished, not that every target passed calibration. Workflow execution errors
+propagate to Prefect; SDK failures include the remote result in `CalibrationRunError.result`.
+Workflow `validate()` checks structure and dependency order locally; SDK `validate()` also
+performs the server's chip/data preflight. Neither reserves hardware.
 
-## Session and client ownership
+The existing `chip.calibrate(...)`, `qdash.pipelines.execute(...)`, and workflow helpers retain
+their asynchronous handles and failure-result behavior. `Pipeline` remains available from
+`qdash.sdk.pipeline` for stored specs. The SDK never executes saved workflow source locally.
+Python dispatch requires an explicit project; the server validates again before executing.
 
-Create one `QDash` session and reuse it across operations or notebook cells.
-`QDash()`, `QDash(config)`, `from_env()`, and `from_profile()` own their HTTP connection; call `close()`
-when the session is no longer needed. A `with` block is an optional way to close it on exit. `QDash(config, http_client=...)` borrows an `httpx.Client` and never
-closes it. The supplied client's TLS and proxy settings apply. `with_project()` creates a
-session on the same connection without taking ownership. Close the owning session last.
+### Definitions and Step Results
 
-`qdash.api` exposes generated resources with the session's authentication and project header.
+`qdash.calibration.ExecutionStep` is the common base of built-in step definitions;
+`CalibrationStepDefinition` is an alias. Concrete names such as `CustomOneQubit` and
+`FilterByStatus` stay unchanged. Every reached step records an Execution, including transforms
+that perform no measurements. The SDK keys step progress by its plan occurrence key so repeated
+filters remain distinct. Transform progress carries the copied outcome in `transform`.
+Workflow results retain typed calibration steps in `steps` and transform snapshots under
+`details["transforms"]`. Unrecorded historical transforms are not inferred or backfilled.
+
+## Client ownership
+
+Create one `QDash` client and reuse it across operations or notebook cells.
+`QDash()`, `QDash(config)`, `from_env()`, and `from_profile()` own their HTTP connection. No explicit
+cleanup is needed for a client reused until normal process shutdown; `close()` and `with`
+remain available for earlier release. `QDash(config, http_client=...)` borrows an
+`httpx.Client` and never closes it. The supplied client's TLS and proxy settings apply.
+`with_project()`, generated resources, and helpers keep the shared connection usable even
+when the original client variable is discarded. Explicitly closing the owner closes it for all.
+
+`_http.py` tracks owned transports in a weak registry and closes those still referenced at
+normal interpreter exit through one `atexit` handler. A close failure does not prevent cleanup
+of the others. The registry does not retain unused clients; garbage collection does not guarantee
+an explicit transport close. Abrupt termination bypasses the handler, leaving connections to
+OS cleanup. The handler sends no requests and never closes a `CalibrationSession`.
+
+`qdash.api` exposes generated resources with the client's authentication and project header.
 Generated calls disable retries by default. Helper reads may retry transient failures according
 to `QDashConfig.read_attempts`; helper writes send once, including on 409, 5xx, and timeouts.
 Helpers translate HTTP errors to SDK errors; direct generated calls retain generated exceptions
 and httpx errors. Password authentication caches a token without refreshing on 401; create a
-new session after expiry, or use API tokens. Read helpers retry connection and remote protocol
-errors, but not read timeouts. Writes retain a single attempt. A session snapshots its
+new client after expiry, or use API tokens. Read helpers retry connection and remote protocol
+errors, but not read timeouts. Writes retain a single attempt. A client snapshots its
 configuration; `config` returns a copy, and `with_project()` explicitly changes scope.
 
 `QDash()` loads the default profile; `QDash(config)` uses explicit settings without reading
@@ -113,7 +146,7 @@ See [the usage examples](../../reference/clients/python.md#run-a-task-from-the-w
 
 ## Metric scripts and dashboards
 
-`Script` and `Dashboard` are authoring objects; save them through the session. Script source is
+`Script` and `Dashboard` are authoring objects; save them through the client. Script source is
 text written for the worker's `qdash_metrics` API, not code imported by the SDK. A saved script
 handle binds its revision, and dashboard panels pin that revision. Updates send expected revisions
 or versions so concurrent edits fail with `QDashConflictError`.
@@ -133,12 +166,18 @@ See [the export procedure](../../user-guide/device-gateway-export.md).
 
 ## Shared models
 
-`docs/oas/openapi.json` is the source for both generated API resources and authoring models.
-Fern generates `_generated/`; `types.py` exposes response types. `_generated/_authoring.py`
-is generated with datamodel-code-generator from the request schemas used by the helpers.
-It preserves schema constraints that the pinned Fern generator omits, including pipeline
-patterns, constants, and defaults. Unknown fields are rejected only where the schema closes
-an object. Response models tolerate extra fields for compatibility with server additions.
+`qdash.calibration` lives in `sdks/python/src/qdash/calibration` and ships in `qdash-sdk`.
+The server depends on that workspace package and imports the same definitions. The module
+requires neither Prefect nor a database. Worker adapters in `service/definitions.py` convert
+shared targets and steps into runtime executors. Runtime custom steps remain worker-only.
+Docker Compose mounts the shared sources for API, deployment, and workflow services.
+
+`docs/oas/openapi.json` remains the source for generated API resources and wire authoring
+models. Fern generates `_generated/`; `types.py` exposes response types.
+`_generated/_authoring.py` preserves request-schema constraints for the compatibility pipeline
+API. Shared authoring definitions serialize to spec version 2; the server validates that wire
+spec. Tests compare shared definitions against server validation and verify isolated SDK wheels.
+Response models tolerate extra fields for compatibility with server additions.
 
 To extend the API, update the server schemas and run `task generate`. For SDK-only generation,
 run `task generate-python-sdk`. Both need Node.js (`npx`) and a running Docker daemon. The
@@ -161,7 +200,9 @@ common release pipeline. Usage examples live in the [Python client reference](..
 
 | File | Responsibility |
 | --- | --- |
-| `sdks/python/src/qdash/sdk/_session.py` | Session and connection ownership |
+| `sdks/python/src/qdash/sdk/_session.py` | Client and connection ownership |
+| `sdks/python/src/qdash/sdk/_calibration_session.py` | Objective lifecycle and recorded-run dispatch/wait |
+| `sdks/python/src/qdash/calibration/` | Shared authoring definitions and results |
 | `sdks/python/src/qdash/sdk/_config.py` | Environment and profile settings |
 | `sdks/python/src/qdash/sdk/_cli.py` | Configuration initialization CLI |
 | `sdks/python/src/qdash/sdk/_http.py` | Authentication, HTTP configuration, error translation |

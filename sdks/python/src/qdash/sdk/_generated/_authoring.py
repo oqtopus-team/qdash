@@ -26,11 +26,22 @@ class StepId(RootModel[str]):
     """
 
 
+class ExecutionMode(StrEnum):
+    """
+    How MUX targets run; explicit qubit targets run directly in parallel. parallel_by_mux (default): MUXes run in parallel and the qubits of one MUX run one after another. parallel_by_round: rounds of qubits from different MUXes. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. Bring-up has no manual rounds.
+    """
+
+    parallel_by_round = 'parallel_by_round'
+    parallel_by_mux = 'parallel_by_mux'
+    simultaneous_spectroscopy = 'simultaneous_spectroscopy'
+    sequential = 'sequential'
+
+
 class StepId1(RootModel[str]):
     root: Annotated[str, Field(pattern='^[a-z][a-z0-9_]{0,63}$', title='Step Id')]
 
 
-class ExecutionMode(StrEnum):
+class ExecutionMode1(StrEnum):
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
     """
@@ -42,7 +53,7 @@ class ExecutionMode(StrEnum):
     manual = 'manual'
 
 
-class ExecutionMode1(StrEnum):
+class ExecutionMode2(StrEnum):
     """
     automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
     """
@@ -291,7 +302,7 @@ class StepId2(RootModel[str]):
     """
 
 
-class ExecutionMode2(StrEnum):
+class ExecutionMode3(StrEnum):
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
     """
@@ -326,11 +337,15 @@ class PanelLayoutModel(BaseModel):
     """
 
 
+class Pair(RootModel[list[str]]):
+    root: Annotated[list[str], Field(max_length=2, min_length=2)]
+
+
 class PipelineTargets(BaseModel):
     """
-    Which qubits the pipeline starts from: explicit qids or whole MUXes.
+    Which qubits or couplings the pipeline starts from.
 
-    Set exactly one of qids and mux_ids to a nonempty list without duplicates.
+    Set exactly one of qids, mux_ids and pairs to a nonempty list without duplicates.
     exclude_qids may be nonempty only with mux_ids.
     """
 
@@ -339,15 +354,19 @@ class PipelineTargets(BaseModel):
     )
     qids: Annotated[list[str] | None, Field(title='Qids')] = None
     """
-    Qubit ids as QDash lists them, e.g. ["0", "1"]. Set exactly one of qids and mux_ids, as a nonempty list without duplicates.
+    Qubit ids as QDash lists them, e.g. ["0", "1"]. Set exactly one of qids, mux_ids and pairs, as a nonempty list without duplicates.
     """
     mux_ids: Annotated[list[int] | None, Field(title='Mux Ids')] = None
     """
-    MUX ids; every qubit of each MUX is a target. Set exactly one of qids and mux_ids, as a nonempty list without duplicates.
+    MUX ids; every qubit of each MUX is a target. Set exactly one of qids, mux_ids and pairs, as a nonempty list without duplicates.
+    """
+    pairs: Annotated[list[Pair] | None, Field(title='Pairs')] = None
+    """
+    Directed coupling pairs [control, target], e.g. [["0", "1"], ["4", "5"]]; the candidate qubits are their qubits and the candidate couplings the pairs, in that direction. Set exactly one of qids, mux_ids and pairs.
     """
     exclude_qids: Annotated[list[str], Field(title='Exclude Qids')] = []
     """
-    Qubits to leave out of the MUX targets. Must be empty with qids.
+    Qubits to leave out of the MUX targets. Must be empty with qids or pairs.
     """
 
 
@@ -442,7 +461,7 @@ class TaskSettings(BaseModel):
     """
 
 
-class ExecutionMode4(StrEnum):
+class ExecutionMode5(StrEnum):
     """
     automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
     """
@@ -468,8 +487,8 @@ class TwoQubitCalibrationStep(BaseModel):
     """
     Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to FULL_2Q_TASKS.
     """
-    execution_mode: Annotated[ExecutionMode4, Field(title='Execution Mode')] = (
-        ExecutionMode4.automatic
+    execution_mode: Annotated[ExecutionMode5, Field(title='Execution Mode')] = (
+        ExecutionMode5.automatic
     )
     """
     automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
@@ -502,6 +521,12 @@ class BringUpStep(BaseModel):
     tasks: Annotated[list[TaskCall] | None, Field(title='Tasks')] = None
     """
     Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to BRINGUP_TASKS.
+    """
+    execution_mode: Annotated[ExecutionMode, Field(title='Execution Mode')] = (
+        ExecutionMode.parallel_by_mux
+    )
+    """
+    How MUX targets run; explicit qubit targets run directly in parallel. parallel_by_mux (default): MUXes run in parallel and the qubits of one MUX run one after another. parallel_by_round: rounds of qubits from different MUXes. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. Bring-up has no manual rounds.
     """
 
 
@@ -544,8 +569,8 @@ class CustomOneQubitStep(BaseModel):
     """
     Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id.
     """
-    execution_mode: Annotated[ExecutionMode, Field(title='Execution Mode')] = (
-        ExecutionMode.parallel_by_round
+    execution_mode: Annotated[ExecutionMode1, Field(title='Execution Mode')] = (
+        ExecutionMode1.parallel_by_round
     )
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
@@ -579,8 +604,8 @@ class CustomTwoQubitStep(BaseModel):
     """
     Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id.
     """
-    execution_mode: Annotated[ExecutionMode1, Field(title='Execution Mode')] = (
-        ExecutionMode1.automatic
+    execution_mode: Annotated[ExecutionMode2, Field(title='Execution Mode')] = (
+        ExecutionMode2.automatic
     )
     """
     automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
@@ -736,8 +761,8 @@ class OneQubitCheckStep(BaseModel):
     """
     Identifier of this step, unique within the pipeline; filters reference it. Defaults to the step's name. Set it when a pipeline runs the same step type twice.
     """
-    execution_mode: Annotated[ExecutionMode2, Field(title='Execution Mode')] = (
-        ExecutionMode2.parallel_by_round
+    execution_mode: Annotated[ExecutionMode3, Field(title='Execution Mode')] = (
+        ExecutionMode3.parallel_by_round
     )
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
@@ -769,8 +794,8 @@ class OneQubitFineTuneStep(BaseModel):
     """
     Identifier of this step, unique within the pipeline; filters reference it. Defaults to the step's name. Set it when a pipeline runs the same step type twice.
     """
-    execution_mode: Annotated[ExecutionMode2, Field(title='Execution Mode')] = (
-        ExecutionMode2.parallel_by_round
+    execution_mode: Annotated[ExecutionMode3, Field(title='Execution Mode')] = (
+        ExecutionMode3.parallel_by_round
     )
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.

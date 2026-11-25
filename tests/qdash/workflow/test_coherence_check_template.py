@@ -6,7 +6,6 @@ import importlib
 import json
 import math
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -14,6 +13,10 @@ from qdash.workflow import sweep
 from qdash.workflow.calibtasks.qubex import CheckChevron
 from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
+from tests.qdash.workflow.calibration_session_fake import (
+    fake_session_class,
+    install_fake_session,
+)
 from tests.qdash.workflow.task_call_helpers import (
     call_ids,
     effective_settings,
@@ -24,18 +27,12 @@ from tests.qdash.workflow.task_call_helpers import (
 coherence_check_module = importlib.import_module("qdash.workflow.templates.coherence_check")
 
 
-class FakeCalibService:
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.args = args
-        self.kwargs = kwargs
-
-    def run(self, targets: Any, *, steps: list[Any]) -> dict[str, Any]:
-        return {"targets": targets, "steps": steps, "args": self.args, "kwargs": self.kwargs}
+FakeCalibService = fake_session_class()
 
 
 @pytest.fixture(autouse=True)
 def fake_calibration_service(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(coherence_check_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, coherence_check_module, FakeCalibService)
 
 
 def test_coherence_check_runs_expected_calls_in_one_step() -> None:

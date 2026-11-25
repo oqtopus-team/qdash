@@ -4,8 +4,7 @@ A `TaskCall` gives one task occurrence its own settings, identity, and results.
 Python flows and [pipeline specs](./calibration-pipeline.md) use the same model.
 
 ```python
-from qdash.workflow import TaskCall
-from qdash.workflow.service.steps import CustomOneQubit
+from qdash.calibration import CustomOneQubit, TaskCall
 
 CustomOneQubit(
     step_name="ramsey",

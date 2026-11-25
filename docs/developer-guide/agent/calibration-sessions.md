@@ -11,6 +11,35 @@ without an explicit objective creates an automatic session. Older records are no
 Membership is explicit: a run or agent session names `calibration_session_id`, and step executions
 carry `note.calibration_run_id`. Never infer membership from timestamps, names, tags, or chat text.
 
+## Authoring API and group names
+
+SDK callers create or open `qdash.sdk.CalibrationSession`, then pass shared targets and steps
+to `run()` or `submit()`. Workflow authors use `qdash.workflow.CalibrationSession.from_context()`;
+it participates in the enclosing flow run rather than creating a remote launch per call.
+The persisted group, public operation handle, and internal `ExecutionRuntime` have separate
+responsibilities: only the runtime manages hardware reservations.
+
+Templates declare `@calibration_flow(session_name="Coherence check")`. The API reads this
+literal from the saved entrypoint before creating an automatic session. Scheduled/direct flow
+runs use the decorator's metadata when the worker first records their run. Explicit existing
+session membership takes precedence and its objective is never renamed by a template.
+Without the metadata, the existing automatic naming behavior applies.
+
+A name is trimmed and limited to 500 characters. Saving rejects empty, oversized, non-string
+or expression-based `session_name` values with HTTP 400; omitted names and literal `None`
+keep the default. The API never evaluates source expressions. Previously saved invalid
+metadata is still read defensively, so resave with a valid literal to align launch paths. SDK `create(..., name=...)` stores the name as the session
+objective. See the [SDK example](../../reference/clients/python.md#run-a-calibration) and
+[workflow authoring](../workflow/quickstart.md#define-a-flow).
+
+## Step Execution History
+
+All reached steps now have an Execution, including filters and schedules. This adds records
+inside each run without changing its admission, identity or Session membership. Unreached
+steps create no records; historical unrecorded transforms remain unrecorded. No data migration
+or backfill is required. [Pipeline progress](../workflow/calibration-pipeline.md#following-a-run)
+distinguishes pending, skipped and historically unrecorded steps.
+
 ## Agent session admission
 
 A child must belong to the same project and chip, and its creator must own the open session.

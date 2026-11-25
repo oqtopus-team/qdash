@@ -14,29 +14,21 @@ Example:
 import math  # noqa: F401  # used by commented range overrides below
 from typing import Any
 
-from prefect import flow
-
-from qdash.workflow import TaskCall, sweep  # noqa: F401  # used by commented range overrides below
-from qdash.workflow.service import CalibService
-from qdash.workflow.service.calib_service import (
-    on_flow_cancellation,
-    on_flow_crashed,
-    on_flow_failure,
-)
-from qdash.workflow.service.steps import (
+from qdash.calibration import (
+    CalibrationTargets,
+    ExecutionStep,
     FilterByStatus,
+    MuxTargets,
     OneQubitCheck,
     OneQubitFineTune,
-    Step,
+    QubitTargets,
+    TaskCall,
+    sweep,  # noqa: F401  # used by commented range overrides below
 )
-from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
+from qdash.workflow import CalibrationSession, calibration_flow, resolve_calib_context
 
 
-@flow(
-    on_cancellation=[on_flow_cancellation],
-    on_failure=[on_flow_failure],
-    on_crashed=[on_flow_crashed],
-)
+@calibration_flow(session_name="1Q Calibration")
 def one_qubit(
     username: str,
     chip_id: str,
@@ -56,7 +48,8 @@ def one_qubit(
         mux_ids: MUX IDs to calibrate when using MUX-based scheduling
         exclude_qids: Qubit IDs to exclude
         qids: Qubit IDs to calibrate when mux_ids is not set
-        flow_name: Flow name (auto-injected)
+        flow_name: Saved flow name QDash injects at launch; keep it in the signature
+            and do not pass it on (session.run reads the launch name itself)
         project_id: Project ID (auto-injected)
         check_only: If True, run only the coarse stage with all four pulse types
 
@@ -66,7 +59,7 @@ def one_qubit(
     if exclude_qids is None:
         exclude_qids = []
 
-    targets: Target
+    targets: CalibrationTargets
     if mux_ids is not None:
         targets = MuxTargets(mux_ids=mux_ids, exclude_qids=exclude_qids)
     elif qids is not None:
@@ -88,7 +81,7 @@ def one_qubit(
     # parallel, and the chip checks run before any qubit. The rounds must name
     # exactly the step's current qubits, so a manual OneQubitFineTune fails when
     # FilterByStatus drops a qubit it lists. See docs/user-guide/manual-execution-rounds.md.
-    steps: list[Step] = [
+    steps: list[ExecutionStep] = [
         OneQubitCheck(
             execution_mode="parallel_by_round",
             tasks=[
@@ -182,15 +175,14 @@ def one_qubit(
             OneQubitFineTune(execution_mode="parallel_by_round", tasks=fine_tasks),
         ]
 
-    cal = CalibService(
-        username,
-        chip_id,
-        flow_name=flow_name,
-        tags=tags,
-        project_id=project_id,
+    context = resolve_calib_context(username, chip_id, project_id=project_id)
+    session = CalibrationSession.from_context(context)
+    return session.run(
+        targets=targets,
+        steps=steps,
         default_run_parameters={
             "readout_duration": 1024,
             "interval": 150 * 1024,
         },
+        tags=tags,
     )
-    return cal.run(targets, steps=steps)

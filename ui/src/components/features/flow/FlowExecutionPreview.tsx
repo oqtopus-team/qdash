@@ -337,7 +337,7 @@ function PlanBody({ plan }: { plan: FlowExecutionPlanResponse }) {
       {runs.map((run, runIndex) => (
         <div key={runIndex} className="flex flex-col gap-2">
           {runs.length > 1 && (
-            <h4 className="text-sm font-medium">CalibService.run {runIndex + 1}</h4>
+            <h4 className="text-sm font-medium">CalibrationSession.run {runIndex + 1}</h4>
           )}
           <p className="text-sm">
             <span className="text-base-content/60">Targets: </span>

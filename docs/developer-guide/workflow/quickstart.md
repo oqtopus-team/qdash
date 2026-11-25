@@ -20,30 +20,40 @@ source as a new flow, and inspect its run in **Execution**.
 
 ## Define a Flow
 
-A flow has four parts: a Prefect entrypoint, targets, ordered steps, and
-`CalibService.run(targets, steps)`. Keep `username`, `chip_id`, `flow_name`, and `project_id`
-in the signature so QDash can inject the execution context. The service checks project write
-permission and closes its executions; no finish call is needed.
-
-Outside Prefect, use a checked context:
+A flow has an entrypoint, targets, ordered steps, and `CalibrationSession.run(targets, steps)`.
+Keep `username`, `chip_id`, `flow_name`, and `project_id` in the signature so QDash can inject
+execution context. `flow_name` is launch metadata: keep the parameter, but do not forward it
+to `session.run()`. The session derives the display name and saved defaults from the launch.
+Build the context and session explicitly:
 
 ```python
-from qdash.workflow import CalibService, TaskCall, resolve_calib_context
-from qdash.workflow.service.steps import CustomOneQubit
-from qdash.workflow.service.targets import QubitTargets
+from qdash.calibration import CustomOneQubit, QubitTargets, TaskCall
+from qdash.workflow import CalibrationSession, calibration_flow, resolve_calib_context
 
-context = resolve_calib_context("alice", "64Qv3", project_id="my-project")
-steps = [CustomOneQubit(
-    step_name="coherence",
-    tasks=[TaskCall(name="Configure"), TaskCall(name="CheckT1")],
-)]
-CalibService.from_context(context).run(QubitTargets(["0"]), steps)
+
+@calibration_flow(session_name="Coherence check")
+def coherence(username: str, chip_id: str, qids: list[str],
+              flow_name: str | None = None, project_id: str | None = None):
+    context = resolve_calib_context(username, chip_id, project_id=project_id)
+    session = CalibrationSession.from_context(context)
+    return session.run(
+        targets=QubitTargets(qids),
+        steps=[CustomOneQubit(
+            step_name="coherence",
+            tasks=[TaskCall(name="Configure"), TaskCall(name="CheckT1")],
+        )],
+    )
 ```
 
-This is a server-side example: it needs the workflow dependencies, configured database/backend,
-an existing user/chip/project, and CheckT1's required calibration. It starts measurements and
-publishes accepted outputs. For a script connecting to a running deployment over HTTP, use the
-[Python SDK](../../reference/clients/python.md#run-a-calibration) instead.
+This server-side example needs the workflow dependencies, configured database/backend, an existing
+user/chip/project, and CheckT1's required calibration. For a script connecting over HTTP, use the
+[Python SDK](../../reference/clients/python.md#run-a-calibration); both use `qdash.calibration`
+targets, steps, and task calls.
+
+`session_name` is a string literal naming the automatic group created for a launch. A launch
+into an existing CalibrationSession keeps its name. Calls inside one flow run share that
+launch's recorded run and session; they do not start nested remote runs. Each `run()` waits
+for its own steps and returns `CalibrationResult`; step exceptions propagate to Prefect.
 
 ## Choose Targets
 
@@ -60,9 +70,13 @@ A targeted MUX needs wiring; `AllMuxTargets` rejects topologies with no MUXes.
 
 ## Compose Steps
 
-A `CalibrationStep` performs hardware work and creates an execution. A `TransformStep` filters
-or schedules candidates without creating one. `Pipeline` validates dependencies before running.
-Custom steps implement `execute(session, targets, ctx)` and use `self.step_calls(session)`.
+Shared definitions derive from `qdash.calibration.ExecutionStep`. Constructing one performs no
+I/O. Every step the run reaches creates an Execution: calibration steps record measurements;
+transform steps record filtering or scheduling outcomes without connecting hardware or publishing
+calibration data. `StepSequence` validates dependencies before running.
+Runtime custom steps implement `execute(session, targets, ctx)` and use `self.step_calls(session)`;
+that `session` is the internal runtime, not the public CalibrationSession. Custom steps remain
+worker-only and need their own source-preview support.
 Keep task lists visible in templates. Repeated tasks need distinct call IDs; repeated steps need
 distinct step IDs. See [Task Calls](./task-calls.md).
 
@@ -70,7 +84,7 @@ distinct step IDs. See [Task Calls](./task-calls.md).
 
 `StepContext` carries candidates, schedules, and typed results between steps. Accepted calibration
 values persist in MongoDB and are resolved by later task preprocessing. Measurement-only outputs
-do not replace them. Each hardware step opens a new execution; parallel workers borrow its
+do not replace them. Each reached step opens a new execution; parallel measurement workers borrow its
 settings and reservation rather than sharing Python objects.
 
 See [Parameter Resolution](./parameter-resolution.md) and
@@ -78,16 +92,24 @@ See [Parameter Resolution](./parameter-resolution.md) and
 
 ## Set Task Parameters
 
-Set `run`, `input`, and `update_calibration_parameters` on each `TaskCall`. Use
-`default_run_parameters` only for shared run defaults. Sweeps use `sweep.linspace`,
+Set `run`, `input`, and `update_calibration_parameters` on each `TaskCall`. Pass
+`default_run_parameters` to `session.run()` for shared run defaults. Sweeps use `sweep.linspace`,
 `sweep.logspace`, `sweep.arange`, `sweep.range`, or `sweep.values`.
 Removed service arguments must follow the [migration guide](./task-calls.md#migrate-per-task-defaults).
 
 ## Preserve Terminal Handling
 
-Top-level flows register `on_flow_cancellation`, `on_flow_failure`, and `on_flow_crashed` from
-`qdash.workflow.service.calib_service`. They finalize interrupted records and release owned
-reservations. Use `*_keep_lock` hooks only for nested flows borrowing another run's reservation.
+`@calibration_flow` registers cancellation, failure, and crash hooks to finalize interrupted
+records and release owned reservations. Explicit hook options replace those defaults. Nested
+flows borrowing another run's reservation must use the `*_keep_lock` hooks from
+`qdash.workflow.service.calib_service`.
+
+Existing `@flow` and `CalibService` sources remain supported. To migrate, back up the source,
+use shared definitions from `qdash.calibration`, construct `CalibrationSession.from_context`,
+and move defaults and tags to `session.run()`. Existing `name=flow_name` forwarding still works,
+but is unnecessary. Replace the top-level
+hook block with `@calibration_flow(session_name="...")`; preserve custom or borrowing hooks.
+Test the edited source on Fake and inspect **Execution preview** before using hardware.
 
 ## Test the Template
 

@@ -15,6 +15,9 @@ dependencies = [
     "pydantic>=2.8.0",
     "pymongo>=4.18.3",
     "qdash-api",
+    # Ships qdash.calibration, the calibration definitions the datamodel and worker share
+    # with SDK users.
+    "qdash-sdk",
 ]
 
 [build-system]
@@ -210,4 +213,5 @@ members = [
 [tool.uv.sources]
 qdash-api = { workspace = true }
 qdash-client = { workspace = true }
+qdash-sdk = { workspace = true }
 qubex = { git = "https://github.com/amachino/qubex.git", branch = "develop" }

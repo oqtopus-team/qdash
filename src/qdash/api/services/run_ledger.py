@@ -180,8 +180,13 @@ class RunLedger:
         reported_origin: ReportedLaunchOrigin | None = None,
         decision_id: str | None = None,
         preflight: Callable[[Any], None] | None = None,
+        session_name: str | None = None,
     ) -> RunDispatch:
         """Launch one run at most once per idempotency key.
+
+        ``session_name`` is the name (objective) of the automatic session a run without
+        ``calibration_session_id`` creates, instead of the default named after the run; it is
+        applied before the session is created and never renames an existing session.
 
         A retry with the same key is found by the run's own scope (the signed-in user and the
         key), wherever the run was grouped, and gets the recorded answer. Otherwise the run is
@@ -250,7 +255,7 @@ class RunLedger:
                     project_id=project_id,
                     chip_id=chip_id,
                     username=username,
-                    objective=automatic_objective(kind, run_name),
+                    objective=session_name or automatic_objective(kind, run_name),
                 )
             except RunMismatch as exc:
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc

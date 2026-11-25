@@ -11,7 +11,7 @@ from qdash.sdk._config import QDashConfig, _load_config
 from qdash.sdk._dashboards import Dashboards, Scripts
 from qdash.sdk._device_topology import DeviceTopologies
 from qdash.sdk._history import ExecutionHistory, TaskResultHistory
-from qdash.sdk._http import build_api, owned_http_client
+from qdash.sdk._http import build_api, close_owned_http_client, owned_http_client
 from qdash.sdk._pipelines import Pipelines
 from qdash.sdk._qubex import Qubex
 from qdash.sdk._results import Execution
@@ -33,17 +33,22 @@ if TYPE_CHECKING:
 class QDash:
     """Entry point of the QDash SDK.
 
+    Create one session and reuse it for every request of a notebook or script.
     ``QDash()`` reads the default profile of the QDash config file, as
     ``QDash.from_profile()`` does; it does not read ``QDASH_*`` environment variables, which
     :meth:`from_env` reads. ``QDash(config)`` uses the given :class:`QDashConfig` and reads
     no file.
 
     ``QDash()``, ``QDash(config)``, ``QDash.from_env()`` and ``QDash.from_profile()`` create
-    an HTTP connection that the session owns; :meth:`close`, or leaving a ``with`` block,
-    closes it. ``QDash(config, http_client=client)`` uses an ``httpx.Client`` the caller
-    created and closes; the session never closes it, and the client's own TLS and proxy
-    settings apply.
-    :meth:`with_project` returns a session on the same connection that does not close it.
+    an HTTP connection that the session owns. It stays usable while this session, a session
+    from :meth:`with_project`, :attr:`api`, a helper or a handle that uses it is referenced,
+    and is closed at normal interpreter exit if it is still open; no explicit close is
+    needed. :meth:`close`, or leaving a ``with`` block, releases it earlier. If the
+    interpreter is terminated abruptly (for example by ``SIGKILL`` or ``os._exit``), the
+    operating system reclaims the connections instead.
+
+    ``QDash(config, http_client=client)`` uses an ``httpx.Client`` the caller created and
+    closes; the SDK never closes it, and the client's own TLS and proxy settings apply.
 
     ``project_id`` (else ``config.project_id``) is sent as ``X-Project-Id`` with every
     request of the session, including the generated resource calls on :attr:`api`.
@@ -85,20 +90,20 @@ class QDash:
         self._sleep = sleep
         try:
             self._api = build_api(config, self._http_client, project_id=config.project_id)
+            self._executions = Executions(self._api, config, sleep=sleep)
+            self.pipelines = Pipelines(self._api, config, self._executions, config.project_id)
+            self.workflows = Workflows(self._api, config, self._executions, config.project_id)
+            self.tasks = Tasks(self._api, config, self._executions, config.project_id)
+            self.chips = Chips(self._api, config)
+            self.scripts = Scripts(self._api, config)
+            self.dashboards = Dashboards(self._api, config)
+            self.executions = ExecutionHistory(self._api, config)
+            self.task_results = TaskResultHistory(self._api, config)
+            self.device_topology = DeviceTopologies(self._api, config)
+            self.qubex = Qubex(self._api, config)
         except BaseException:
             self.close()
             raise
-        self._executions = Executions(self._api, config, sleep=sleep)
-        self.pipelines = Pipelines(self._api, config, self._executions, config.project_id)
-        self.workflows = Workflows(self._api, config, self._executions, config.project_id)
-        self.tasks = Tasks(self._api, config, self._executions, config.project_id)
-        self.chips = Chips(self._api, config)
-        self.scripts = Scripts(self._api, config)
-        self.dashboards = Dashboards(self._api, config)
-        self.executions = ExecutionHistory(self._api, config)
-        self.task_results = TaskResultHistory(self._api, config)
-        self.device_topology = DeviceTopologies(self._api, config)
-        self.qubex = Qubex(self._api, config)
 
     @classmethod
     def from_env(cls, *, project_id: str | None = None) -> QDash:
@@ -124,8 +129,9 @@ class QDash:
     def with_project(self, project_id: str) -> QDash:
         """A session scoped to ``project_id`` on this session's connection.
 
-        The returned session does not close the connection; close this session when both are
-        done. This session and its configuration are unchanged.
+        The returned session borrows the connection: its :meth:`close` leaves it open, and it
+        keeps working after this session is no longer referenced, until this session is
+        closed or the interpreter exits. This session and its configuration are unchanged.
         """
         return QDash(
             self._config, project_id=project_id, http_client=self._http_client, sleep=self._sleep
@@ -182,9 +188,15 @@ class QDash:
         return self._executions.task_result(task_id)
 
     def close(self) -> None:
-        """Close the connection when the session created it; a borrowed one stays open."""
+        """Release the connection now when the session created it; a borrowed one stays open.
+
+        Optional: an owned connection still open at normal interpreter exit is closed then.
+        Closing sends no request, and closing again does nothing. Sessions from
+        :meth:`with_project`, :attr:`api` and the helpers of this session cannot send requests
+        afterwards.
+        """
         if self._owns_http_client:
-            self._http_client.close()
+            close_owned_http_client(self._http_client)
 
     def __enter__(self) -> QDash:
         return self

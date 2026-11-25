@@ -2,9 +2,13 @@
 
 The SDK is distributed as ``qdash-sdk`` and is self-contained: it does not depend on
 ``qdash-client``. A :class:`QDash` session holds the configuration, authentication and
-connection. ``QDash.api`` is the client of the whole API, generated from its OpenAPI document;
-its response types are in :mod:`qdash.sdk.types`. On top of it, ``QDash.chip(chip_id)``
-validates and starts calibrations defined with :mod:`qdash.sdk.calibration`;
+connection; it is the client, not a calibration session. ``QDash.api`` is the client of the
+whole API, generated from its OpenAPI document; its response types are in
+:mod:`qdash.sdk.types`. :class:`CalibrationSession` creates or opens a named calibration
+session on a chip through a client and runs calibrations defined with :mod:`qdash.calibration`
+(re-exported by :mod:`qdash.sdk.calibration`) in it, returning a
+:class:`~qdash.calibration.CalibrationResult`; ``QDash.chip(chip_id)`` is the earlier
+front door that starts a calibration in an automatic session;
 ``QDash.chips`` lists the project's chips and reads one chip's metadata;
 ``QDash.workflows`` lists, inspects and runs the workflows registered in the project;
 ``QDash.tasks`` reads the task catalog, loads a task's current parameters and runs one task
@@ -19,7 +23,13 @@ topology a device gateway publishes and draws it as a PNG, and ``QDash.qubex`` d
 Qubex configuration tree with the latest calibration note.
 """
 
+from qdash.calibration import CalibrationResult, CalibrationRunError, CalibrationValidation
 from qdash.sdk._calibration import CalibrationRun, Chip
+from qdash.sdk._calibration_session import (
+    CalibrationLaunch,
+    CalibrationSession,
+    CalibrationSessionClosedError,
+)
 from qdash.sdk._chips import Chips
 from qdash.sdk._config import QDashConfig
 from qdash.sdk._dashboards import Dashboards, SavedDashboard, SavedScript, Scripts
@@ -58,7 +68,13 @@ __all__ = [
     "ApiError",
     "Artifact",
     "AsyncQDashApi",
+    "CalibrationLaunch",
+    "CalibrationResult",
     "CalibrationRun",
+    "CalibrationRunError",
+    "CalibrationSession",
+    "CalibrationSessionClosedError",
+    "CalibrationValidation",
     "Chip",
     "Chips",
     "Dashboard",

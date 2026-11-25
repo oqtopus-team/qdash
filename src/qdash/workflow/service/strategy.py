@@ -31,7 +31,7 @@ from qdash.workflow.service._internal.scheduling_tasks import (
 
 if TYPE_CHECKING:
     from qdash.datamodel.task_call import StepCalls
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
 
 
 # =============================================================================
@@ -74,13 +74,13 @@ class OneQubitStrategy(ABC):
     @abstractmethod
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute the 1-qubit calibration strategy.
 
         Args:
-            session: CalibSession instance with username, chip_id, etc.
+            session: ExecutionRuntime instance with username, chip_id, etc.
             config: Configuration for the calibration
 
         Returns:
@@ -131,7 +131,7 @@ class OneQubitParallelByMuxStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Run the MUX groups of each stage in parallel, stages one after another."""
@@ -231,7 +231,7 @@ class OneQubitParallelByRoundStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute the rounds one after another, the qubits of a round in parallel."""
@@ -296,7 +296,7 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute local-index spectroscopy steps as hardware-aware batches."""
@@ -344,7 +344,7 @@ class OneQubitSequentialStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Run the MUX groups one after another in the parent session."""

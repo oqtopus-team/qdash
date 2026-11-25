@@ -1,36 +1,26 @@
-"""CalibService - the workflow author's entry point for calibration runs.
+"""CalibService - the legacy workflow entry point, kept for saved flows.
 
-A workflow describes *what* to calibrate: a validated execution context, run
-metadata, shared run defaults, and ``run(targets, steps)`` with ``TaskCall``
-entries. QDash owns *how* it runs: execution IDs, hardware reservation, worker
-sessions, snapshot restoration, GitHub synchronization and closing every
-Execution on success, failure or cancellation. None of that is configured
-through ``CalibService``.
+New workflows use :class:`qdash.workflow.CalibrationSession` with the definitions of
+:mod:`qdash.calibration` and the :func:`qdash.workflow.calibration_flow` decorator; the
+templates do. ``CalibService`` keeps running every saved flow that uses it, with the same
+meaning: ``run(targets, steps)`` executes in the current flow run, in the launch's
+calibration session, and returns the result dictionary it always returned. It also accepts
+the shared definitions, converted exactly as ``CalibrationSession.run`` converts them.
 
-Example:
+QDash owns *how* a run executes: execution IDs, hardware reservation, worker runtimes,
+snapshot restoration, GitHub synchronization and closing every Execution on success,
+failure or cancellation. None of that is configured through ``CalibService``.
+
+Migration:
     ```python
-    from prefect import flow
-    from qdash.workflow import CalibService, TaskCall
-    from qdash.workflow.service.calib_service import (
-        on_flow_cancellation,
-        on_flow_crashed,
-        on_flow_failure,
-    )
-    from qdash.workflow.service.steps import CustomOneQubit
-    from qdash.workflow.service.targets import MuxTargets
+    # Before
+    cal = CalibService(username, chip_id, project_id=project_id, flow_name=flow_name)
+    return cal.run(targets, steps=steps)
 
-
-    @flow(
-        on_cancellation=[on_flow_cancellation],
-        on_failure=[on_flow_failure],
-        on_crashed=[on_flow_crashed],
-    )
-    def calibration_flow(username, chip_id, flow_name=None, project_id=None):
-        cal = CalibService(username, chip_id, project_id=project_id, flow_name=flow_name)
-        return cal.run(
-            MuxTargets([0, 1, 2, 3]),
-            steps=[CustomOneQubit(tasks=[TaskCall(name="CheckRabi")])],
-        )
+    # After
+    context = resolve_calib_context(username, chip_id, project_id=project_id)
+    session = CalibrationSession.from_context(context)
+    return session.run(targets=targets, steps=steps)
     ```
 """
 
@@ -158,7 +148,9 @@ def _reject_legacy_arguments(args: tuple[Any, ...], options: dict[str, Any]) -> 
 
 
 class CalibService:
-    """Run calibration steps for one validated context.
+    """Run calibration steps for one validated context (legacy entry point).
+
+    Prefer :class:`qdash.workflow.CalibrationSession`; this class remains for saved flows.
 
     ``CalibService(username, chip_id, project_id=..., flow_name=...)`` is the
     entry for Prefect flows: QDash injects these parameters when it starts the
@@ -167,8 +159,8 @@ class CalibService:
     backend, resolve the context yourself and call :meth:`from_context`.
 
     The service has no hardware state of its own. Each :meth:`run` reserves the
-    hardware its targets and steps need, runs every calibration step in its own
-    Execution, and closes each Execution on success, failure or cancellation, so
+    hardware its targets and steps need, records every step it reaches in its own
+    Execution (transform steps without hardware), and closes each Execution on success, failure or cancellation, so
     there is nothing to finish afterwards and the same service can run again.
 
     Example:
@@ -303,18 +295,21 @@ class CalibService:
         return dict(self._default_run_parameters or {})
 
     def run(self, targets: Target, steps: Sequence[Step]) -> dict[str, Any]:
-        """Run the steps on the targets, one Execution per calibration step.
+        """Run the steps on the targets, one Execution per step reached.
 
         Targets selected in the QDash UI for this run replace ``targets``.
 
         Args:
-            targets: ``MuxTargets``, ``QubitTargets`` or another target.
-            steps: Calibration and transform steps, run in order.
+            targets: ``MuxTargets``, ``QubitTargets`` or another target, from
+                :mod:`qdash.calibration` or the runtime classes.
+            steps: Calibration and transform steps, run in order: definitions from
+                :mod:`qdash.calibration` or runtime steps.
 
         Returns:
             Results dictionary with typed results of each step.
         """
         from qdash.workflow.service._internal.runs import run_calibration, workflow_settings
+        from qdash.workflow.service.definitions import runtime_steps, runtime_target
 
         settings = workflow_settings(
             self._context,
@@ -323,4 +318,4 @@ class CalibService:
             note=self._note,
             default_run_parameters=self._default_run_parameters,
         )
-        return run_calibration(settings, targets, steps)
+        return run_calibration(settings, runtime_target(targets), runtime_steps(steps))

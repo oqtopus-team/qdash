@@ -1,8 +1,9 @@
 """Entry points that build typed session settings and run them.
 
-Every route into a calibration goes through here: ``CalibService.run``, the
-declarative pipeline flow and the single-task executor. Each builds one
-:class:`SessionSettings` and hands it to a :class:`CalibSession` that owns the
+Every route into a calibration goes through here: ``CalibrationSession.run`` (and
+the legacy ``CalibService.run``), the declarative pipeline flow and the single-task
+executor. Each builds one :class:`SessionSettings` and hands it to an
+:class:`ExecutionRuntime` that owns the
 whole lifecycle, so no caller finishes, fails or cancels an Execution itself.
 """
 
@@ -15,7 +16,7 @@ from qdash.workflow.engine.task_parameters import (
     UPDATE_CALIBRATION_PARAMETERS,
     normalize_default_run_parameters,
 )
-from qdash.workflow.service._internal.session import CalibSession, SessionRepositories
+from qdash.workflow.service._internal.session import ExecutionRuntime, SessionRepositories
 from qdash.workflow.service._internal.settings import (
     GitHubPolicy,
     SessionSettings,
@@ -24,6 +25,7 @@ from qdash.workflow.service._internal.settings import (
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from types import EllipsisType
 
     from qdash.workflow.service.context import CalibContext
     from qdash.workflow.service.steps import Step
@@ -45,6 +47,58 @@ def read_source_execution_id_from_context() -> str | None:
     except Exception:
         logger.debug("No Prefect run context available for source_execution_id")
     return None
+
+
+def _flow_run_context() -> tuple[Any, Any] | None:
+    """The current Prefect flow run and its flow, or None outside a flow run."""
+    try:
+        from prefect.context import FlowRunContext
+
+        context = FlowRunContext.get()
+    except Exception:
+        logger.debug("No Prefect flow run context available")
+        return None
+    if context is None or context.flow_run is None:
+        return None
+    return context.flow_run, getattr(context, "flow", None)
+
+
+def _text(value: object) -> str | None:
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def read_saved_flow_name_from_context() -> str | None:
+    """The saved QDash flow the current flow run was launched from, or None.
+
+    QDash injects the saved flow's name as the ``flow_name`` parameter of every launch
+    (execute, schedule and preview). A flow run started in Prefect directly, or a call
+    outside a flow run, has no saved flow.
+    """
+    found = _flow_run_context()
+    if found is None:
+        return None
+    parameters = getattr(found[0], "parameters", None) or {}
+    return _text(parameters.get("flow_name")) if isinstance(parameters, dict) else None
+
+
+def resolve_launch_names(name: str | None) -> tuple[str | None, str | None]:
+    """The display name of a ``CalibrationSession.run`` and the saved flow of its defaults.
+
+    The display name is, in order: ``name`` when the flow passes one (legacy flows pass
+    the injected ``flow_name``), the saved QDash flow the launch came from, the Prefect
+    flow's name for a flow run started without QDash, and None outside a flow run (the
+    Execution then falls back to its step name). The saved defaults are read from the
+    launch's saved flow, whatever display name is passed; without one (outside QDash)
+    from ``name``, as before. The Prefect flow name never selects saved defaults.
+    """
+    saved = read_saved_flow_name_from_context()
+    display = name
+    if display is None:
+        display = saved
+    if display is None:
+        found = _flow_run_context()
+        display = _text(getattr(found[1], "name", None)) if found is not None else None
+    return display, saved if saved is not None else name
 
 
 def load_flow_default_run_parameters(project_id: str, flow_name: str | None) -> dict[str, Any]:
@@ -77,6 +131,7 @@ def workflow_settings(
     note: dict[str, Any] | None,
     default_run_parameters: dict[str, Any] | None,
     task_defaults: dict[str, dict[str, Any]] | None = None,
+    saved_flow_name: str | None | EllipsisType = ...,
 ) -> SessionSettings:
     """Settings of a workflow run.
 
@@ -85,10 +140,13 @@ def workflow_settings(
     snapshot parameters from it, in its own sessions and in its workers alike.
     ``task_defaults`` is only set by the declarative pipeline flow, from its
     spec's deprecated ``task_parameters``. GitHub pull and push follow the
-    deployment (:meth:`GitHubPolicy.from_deployment`).
+    deployment (:meth:`GitHubPolicy.from_deployment`). ``saved_flow_name`` names the saved
+    flow whose defaults apply when it differs from the display ``flow_name``
+    (see :func:`resolve_launch_names`); by default it is ``flow_name``.
     """
+    defaults_from = flow_name if saved_flow_name is ... else saved_flow_name
     defaults = default_run_parameters or load_flow_default_run_parameters(
-        context.project_id, flow_name
+        context.project_id, defaults_from
     )
     source_execution_id = read_source_execution_id_from_context()
     return SessionSettings(
@@ -119,11 +177,27 @@ def run_calibration(
     two-qubit steps group them with the session's pinned MUX mapping, the one
     its reservation and workers use.
     """
+    results, _ = run_calibration_with_runtime(settings, targets, steps, repositories=repositories)
+    return results
+
+
+def run_calibration_with_runtime(
+    settings: SessionSettings,
+    targets: Target,
+    steps: Sequence[Step],
+    *,
+    repositories: SessionRepositories | None = None,
+) -> tuple[dict[str, Any], ExecutionRuntime]:
+    """:func:`run_calibration`, also returning the runtime that ran it.
+
+    The runtime's ``run_identity`` and ``run_execution_ids`` name the persisted run and
+    the step Executions; ``CalibrationSession.run`` reports them.
+    """
     from qdash.workflow.service.flow_targets import override_pipeline, read_target_override
 
     targets, pipeline_steps = override_pipeline(targets, steps, read_target_override())
-    session = CalibSession(settings, repositories=repositories)
-    return session.run_pipeline(targets, pipeline_steps)
+    runtime = ExecutionRuntime(settings, repositories=repositories)
+    return runtime.run_pipeline(targets, pipeline_steps), runtime
 
 
 def run_single_task(
@@ -140,7 +214,7 @@ def run_single_task(
     The session reserves ``qid``, and on success, failure or cancellation closes
     the Execution and releases the reservation, exactly as a pipeline step does.
     """
-    session = CalibSession(settings, repositories=repositories)
+    session = ExecutionRuntime(settings, repositories=repositories)
     with session.owned_execution([qid]):
         if reconfigure:
             # Pass the control on the call so a backend without Configure still

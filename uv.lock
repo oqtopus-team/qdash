@@ -3463,6 +3463,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pymongo" },
     { name = "qdash-api" },
+    { name = "qdash-sdk" },
 ]
 
 [package.dev-dependencies]
@@ -3494,6 +3495,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.8.0" },
     { name = "pymongo", specifier = ">=4.18.3" },
     { name = "qdash-api", virtual = "src/qdash/api" },
+    { name = "qdash-sdk", editable = "sdks/python" },
 ]
 
 [package.metadata.requires-dev]
