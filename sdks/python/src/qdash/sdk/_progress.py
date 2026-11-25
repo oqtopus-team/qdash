@@ -230,7 +230,9 @@ def _notebook_display() -> Callable[..., Any] | None:
         from IPython.display import display
     except Exception:
         return None
-    return display
+    # Without IPython installed, mypy types the import as Any; pin the declared type here.
+    notebook_display: Callable[..., Any] = display
+    return notebook_display
 
 
 def _isatty(stream: TextIO) -> bool:
