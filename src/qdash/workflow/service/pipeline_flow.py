@@ -3,7 +3,8 @@
 ``CalibrationPipelineSpec`` (``qdash.datamodel.calibration_pipeline``) is what
 an agent or the UI submits through ``POST /calibration-pipelines/execute``. The
 API validates it; this flow only maps it onto the same Step classes the
-templates use and runs them like ``CalibService.run``. Nothing in the spec can
+templates use and runs them like ``CalibrationSession.run``; a workflow's
+``qdash.calibration`` definitions go through the same mapping. Nothing in the spec can
 reach code outside that mapping.
 
 Registered on worker startup as the ``system-calibration-pipeline`` deployment
@@ -30,10 +31,12 @@ from qdash.datamodel.calibration_pipeline import (
     OneQubitCheckStep,
     OneQubitFineTuneStep,
     PipelineStep,
+    PipelineTargets,
     TwoQubitCalibrationStep,
     migrate_pipeline_spec,
     step_id,
 )
+from qdash.datamodel.step_record import PLAN_RECORDS_TRANSFORMS
 from qdash.workflow.service._internal.runs import run_calibration, workflow_settings
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -54,15 +57,21 @@ from qdash.workflow.service.steps import (
     Step,
     TwoQubitCalibration,
 )
-from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
+from qdash.workflow.service.targets import CouplingTargets, MuxTargets, QubitTargets, Target
 
 
 def build_targets(spec: CalibrationPipelineSpec) -> Target:
     """The Target the spec starts from."""
-    targets = spec.targets
+    return build_target(spec.targets)
+
+
+def build_target(targets: PipelineTargets) -> Target:
+    """The runtime Target of a spec's ``targets``; pairs keep their direction."""
     if targets.mux_ids:
         return MuxTargets(mux_ids=list(targets.mux_ids), exclude_qids=list(targets.exclude_qids))
-    assert targets.qids is not None  # the spec validator guarantees one of the two
+    if targets.pairs:
+        return CouplingTargets(pairs=[(control, target) for control, target in targets.pairs])
+    assert targets.qids is not None  # the spec validator guarantees exactly one kind
     return QubitTargets(qids=list(targets.qids))
 
 
@@ -92,8 +101,10 @@ def build_step(step: PipelineStep) -> Step:
         )
     if isinstance(step, BringUpStep):
         if step.tasks is not None:
-            return BringUp(tasks=list(step.tasks), step_id=step.step_id)
-        return BringUp(step_id=step.step_id)
+            return BringUp(
+                tasks=list(step.tasks), execution_mode=step.execution_mode, step_id=step.step_id
+            )
+        return BringUp(execution_mode=step.execution_mode, step_id=step.step_id)
     if isinstance(step, OneQubitCheckStep):
         return OneQubitCheck(
             execution_mode=step.execution_mode,
@@ -153,16 +164,19 @@ def build_steps(spec: CalibrationPipelineSpec) -> list[Step]:
 def pipeline_note(spec: CalibrationPipelineSpec, steps: list[Step]) -> dict[str, Any]:
     """The plan, stored in every execution's note so the API can follow the run.
 
-    Each calibration step gets its own execution (see ``CalibService.run``);
-    they share ``note.flow_run_id`` and carry ``step_index``. This adds the
-    full step list so a reader of any one execution knows what else is
+    Every step the run reaches gets its own execution (see ``CalibrationSession.run``),
+    transform steps included; they share ``note.flow_run_id`` and carry ``step_index``.
+    This adds the full step list so a reader of any one execution knows what else is
     planned, which steps run hardware, and the spec it came from.
+    ``records_transform_steps`` tells readers that a transform without an execution has
+    not been reached yet, unlike in runs recorded before transforms had executions.
     """
     return {
         "pipeline": {
             "name": spec.name,
             "spec_version": SPEC_VERSION,
             "spec_digest": spec.plan_digest(),
+            PLAN_RECORDS_TRANSFORMS: True,
             "steps": [
                 {
                     "index": index,

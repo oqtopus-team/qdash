@@ -5,29 +5,26 @@ from __future__ import annotations
 import importlib
 import json
 from pathlib import Path
-from typing import Any
 
 import pytest
 
 from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
+from tests.qdash.workflow.calibration_session_fake import (
+    fake_session_class,
+    install_fake_session,
+)
 from tests.qdash.workflow.task_call_helpers import effective_settings, names, settings
 
 ef_calibration_module = importlib.import_module("qdash.workflow.templates.ef_calibration")
 
 
-class FakeCalibService:
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.args = args
-        self.kwargs = kwargs
-
-    def run(self, targets: Any, *, steps: list[Any]) -> dict[str, Any]:
-        return {"targets": targets, "steps": steps, "args": self.args, "kwargs": self.kwargs}
+FakeCalibService = fake_session_class()
 
 
 @pytest.fixture(autouse=True)
 def fake_calibration_service(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(ef_calibration_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, ef_calibration_module, FakeCalibService)
 
 
 def test_ef_calibration_runs_expected_tasks_in_one_synchronized_step() -> None:
@@ -66,7 +63,8 @@ def test_ef_calibration_forwards_context_and_shared_defaults() -> None:
     )
 
     assert result["kwargs"] == {
-        "flow_name": "ef-check",
+        # The run is named from the launch; the template does not pass flow_name on.
+        "flow_name": None,
         "tags": ["ef"],
         "project_id": "project-1",
         "default_run_parameters": {

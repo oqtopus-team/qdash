@@ -4,6 +4,7 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import UniversalBaseModel
+from .bring_up_step_execution_mode import BringUpStepExecutionMode
 from .task_call import TaskCall
 
 
@@ -20,6 +21,11 @@ class BringUpStep(UniversalBaseModel):
     tasks: typing.Optional[typing.List[TaskCall]] = pydantic.Field(default=None)
     """
     Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to BRINGUP_TASKS.
+    """
+
+    execution_mode: typing.Optional[BringUpStepExecutionMode] = pydantic.Field(default=None)
+    """
+    How MUX targets run; explicit qubit targets run directly in parallel. parallel_by_mux (default): MUXes run in parallel and the qubits of one MUX run one after another. parallel_by_round: rounds of qubits from different MUXes. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. Bring-up has no manual rounds.
     """
 
     model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)

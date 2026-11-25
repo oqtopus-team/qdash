@@ -3,7 +3,7 @@
 import type * as QDashApi from "../index.js";
 
 /**
- * One step of a CalibService run, as stated in the saved source.
+ * One step of a CalibrationSession.run call, as the saved source states it.
  */
 export interface ExecutionPlanStep {
     /** 1-based position within its run */

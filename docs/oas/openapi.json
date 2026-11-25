@@ -31773,6 +31773,27 @@
         "title": "EvaluatorModel",
         "description": "The extension that produced the evaluation."
       },
+      "ExcludedTarget": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "title": "Target",
+            "description": "Qubit ID the filter removed from the candidates"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Why it did not pass, read from the source result"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target",
+          "reason"
+        ],
+        "title": "ExcludedTarget",
+        "description": "A candidate a filter left out, and why."
+      },
       "ExecuteAgentActionRequest": {
         "properties": {
           "source_execution_id": {
@@ -31821,7 +31842,7 @@
                 "type": "null"
               }
             ],
-            "description": "Targets for this run, overriding direct CalibService and pipeline targets"
+            "description": "Targets for this run, overriding the initial targets of every CalibrationSession.run (or legacy CalibService.run) and pipeline"
           },
           "parameters": {
             "additionalProperties": true,
@@ -32845,7 +32866,7 @@
           "steps"
         ],
         "title": "ExecutionPlanRun",
-        "description": "One CalibService.run call of the entrypoint."
+        "description": "One CalibrationSession.run (or legacy CalibService.run) call of the entrypoint."
       },
       "ExecutionPlanStep": {
         "properties": {
@@ -32948,7 +32969,7 @@
           "summary"
         ],
         "title": "ExecutionPlanStep",
-        "description": "One step of a CalibService run, as stated in the saved source."
+        "description": "One step of a CalibrationSession.run call, as the saved source states it."
       },
       "ExecutionResponseDetail": {
         "properties": {
@@ -40066,7 +40087,7 @@
           "steps"
         ],
         "title": "PipelineProgress",
-        "description": "A pipeline run as a whole: one execution per calibration step, same flow run.\n\n``status`` is the whole run's: running while any step runs or the run holds\nthe project lock between steps, otherwise the outcome of the last step."
+        "description": "A pipeline run as a whole: one execution per step it reached, same flow run.\n\n``status`` is the whole run's: running while any step runs or the run holds\nthe project lock between steps, otherwise the outcome of the last step."
       },
       "PipelineStepProgress": {
         "properties": {
@@ -40090,6 +40111,12 @@
             ],
             "title": "Step Id",
             "description": "Plan-scoped step id; null for transforms and older runs"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Identifier of this step occurrence in the plan: the step_id of a calibration step; a transform's name, suffixed with its index when the name repeats",
+            "default": ""
           },
           "type": {
             "type": "string",
@@ -40117,7 +40144,18 @@
           "status": {
             "type": "string",
             "title": "Status",
-            "description": "The execution status, \"skipped\" for transforms, or \"pending\" before it starts"
+            "description": "The execution status; \"pending\" before the step starts while the run may still reach it; \"skipped\" when the run ended without reaching it; \"not_recorded\" for a transform of a run recorded before transform steps had executions"
+          },
+          "transform": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformStepRecord"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A transform step's recorded outcome: candidates kept and excluded with reasons, or the CR groups planned; null for calibration steps and unfinished transforms"
           },
           "task_total": {
             "type": "integer",
@@ -40150,7 +40188,7 @@
           "status"
         ],
         "title": "PipelineStepProgress",
-        "description": "One planned step of a pipeline run and how far its execution got."
+        "description": "One planned step of a pipeline run and how far its execution got.\n\nEvery step the run reaches, calibration or transform, has its own execution."
       },
       "PipelineStepTypeInfo": {
         "properties": {
@@ -41778,7 +41816,7 @@
             },
             "type": "array",
             "title": "Qids",
-            "description": "Explicit qids, or empty when targeting MUXes."
+            "description": "Explicit qids, the qubits of the pairs, or empty when targeting MUXes."
           },
           "mux_ids": {
             "items": {
@@ -41793,6 +41831,17 @@
             },
             "type": "array",
             "title": "Exclude Qids"
+          },
+          "pairs": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Pairs",
+            "description": "Directed [control, target] coupling pairs, or empty without pair targets."
           }
         },
         "type": "object",
@@ -45430,6 +45479,192 @@
         "title": "TokenResponse",
         "description": "Token response model for login."
       },
+      "TransformStepRecord": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "filter",
+              "cr_schedule",
+              "transform"
+            ],
+            "title": "Kind",
+            "description": "\"filter\", \"cr_schedule\", or \"transform\" for a custom transform step"
+          },
+          "input_qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Input Qids",
+            "description": "Candidates before the step"
+          },
+          "output_qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Output Qids",
+            "description": "Candidates after the step"
+          },
+          "input_couplings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Input Couplings",
+            "description": "Candidate couplings before the step"
+          },
+          "output_couplings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Output Couplings",
+            "description": "Candidate couplings after the step"
+          },
+          "excluded": {
+            "items": {
+              "$ref": "#/components/schemas/ExcludedTarget"
+            },
+            "type": "array",
+            "title": "Excluded",
+            "description": "Filters: each removed candidate with its reason"
+          },
+          "criteria": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Criteria",
+            "description": "Filters: the condition applied"
+          },
+          "source_step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Step",
+            "description": "Filters: step_id read; null for the latest one-qubit result"
+          },
+          "source_call_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Call Id",
+            "description": "Filters: call_id read"
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric",
+            "description": "FilterByMetric: the metric compared"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold",
+            "description": "FilterByMetric: minimum kept"
+          },
+          "source_found": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Found",
+            "description": "Filters: false when no one-qubit result existed, so every candidate was kept unfiltered"
+          },
+          "groups": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Groups",
+            "description": "cr_schedule: parallel groups of control-target couplings, in order"
+          },
+          "max_parallel_ops": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Parallel Ops",
+            "description": "cr_schedule: group cap"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction",
+            "description": "cr_schedule: \"forward\", \"reverse\" or \"as listed\""
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "description": "Why the step produced nothing, when it did not"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "TransformStepRecord",
+        "description": "The outcome of one transform step, copied when the step ended.\n\nLists are snapshots: later steps never change a recorded outcome. Fields that do not\napply to a kind stay at their defaults (``None`` or empty)."
+      },
       "UISettings": {
         "properties": {
           "task_files": {
@@ -46678,6 +46913,18 @@
             ],
             "title": "Tasks",
             "description": "Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to BRINGUP_TASKS."
+          },
+          "execution_mode": {
+            "type": "string",
+            "enum": [
+              "parallel_by_round",
+              "parallel_by_mux",
+              "simultaneous_spectroscopy",
+              "sequential"
+            ],
+            "title": "Execution Mode",
+            "description": "How MUX targets run; explicit qubit targets run directly in parallel. parallel_by_mux (default): MUXes run in parallel and the qubits of one MUX run one after another. parallel_by_round: rounds of qubits from different MUXes. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. Bring-up has no manual rounds.",
+            "default": "parallel_by_mux"
           }
         },
         "additionalProperties": false,
@@ -47420,7 +47667,7 @@
               }
             ],
             "title": "Qids",
-            "description": "Qubit ids as QDash lists them, e.g. [\"0\", \"1\"]. Set exactly one of qids and mux_ids, as a nonempty list without duplicates."
+            "description": "Qubit ids as QDash lists them, e.g. [\"0\", \"1\"]. Set exactly one of qids, mux_ids and pairs, as a nonempty list without duplicates."
           },
           "mux_ids": {
             "anyOf": [
@@ -47435,7 +47682,27 @@
               }
             ],
             "title": "Mux Ids",
-            "description": "MUX ids; every qubit of each MUX is a target. Set exactly one of qids and mux_ids, as a nonempty list without duplicates."
+            "description": "MUX ids; every qubit of each MUX is a target. Set exactly one of qids, mux_ids and pairs, as a nonempty list without duplicates."
+          },
+          "pairs": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "maxItems": 2,
+                  "minItems": 2
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pairs",
+            "description": "Directed coupling pairs [control, target], e.g. [[\"0\", \"1\"], [\"4\", \"5\"]]; the candidate qubits are their qubits and the candidate couplings the pairs, in that direction. Set exactly one of qids, mux_ids and pairs."
           },
           "exclude_qids": {
             "items": {
@@ -47443,14 +47710,14 @@
             },
             "type": "array",
             "title": "Exclude Qids",
-            "description": "Qubits to leave out of the MUX targets. Must be empty with qids.",
+            "description": "Qubits to leave out of the MUX targets. Must be empty with qids or pairs.",
             "default": []
           }
         },
         "additionalProperties": false,
         "type": "object",
         "title": "PipelineTargets",
-        "description": "Which qubits the pipeline starts from: explicit qids or whole MUXes.\n\nSet exactly one of qids and mux_ids to a nonempty list without duplicates.\nexclude_qids may be nonempty only with mux_ids."
+        "description": "Which qubits or couplings the pipeline starts from.\n\nSet exactly one of qids, mux_ids and pairs to a nonempty list without duplicates.\nexclude_qids may be nonempty only with mux_ids."
       },
       "TaskSettings": {
         "properties": {

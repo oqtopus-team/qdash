@@ -8,6 +8,6 @@
 import type { FlowTargetOverride } from './flowTargetOverride';
 
 /**
- * Targets for this run, overriding direct CalibService and pipeline targets
+ * Targets for this run, overriding the initial targets of every CalibrationSession.run (or legacy CalibService.run) and pipeline
  */
 export type ExecuteFlowRequestTargetOverride = FlowTargetOverride | null;

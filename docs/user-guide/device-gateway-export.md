@@ -14,7 +14,7 @@ Qubex configuration directory populated. Choose physical qubit IDs from that chi
 
 ## Export Files
 
-1. Open a session and generate the topology. Replace the labels and qubit IDs below.
+1. Create a client and generate the topology. Replace the labels and qubit IDs below.
    The server uses the chip associated with the project's latest master calibration note.
    `device_id` labels the output; it does not select a chip.
 
@@ -46,11 +46,10 @@ Qubex configuration directory populated. Choose physical qubit IDs from that chi
    directories must exist. Existing files raise `FileExistsError`. Use `overwrite=True`
    only when you intend to replace them.
 
-3. Download the configuration and close the connection.
+3. Download the configuration.
 
    ```python
    qdash.qubex.download_config("./qubex-config")
-   qdash.close()
    ```
 
    The directory contains the server's configuration tree, including any `.git` metadata,

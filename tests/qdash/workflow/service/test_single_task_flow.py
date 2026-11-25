@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from qdash.workflow.service._internal.session import CalibSession
+from qdash.workflow.service._internal.session import ExecutionRuntime
 from tests.qdash.workflow.context_helpers import grant_all_contexts
 
 
@@ -23,8 +23,8 @@ class TerminationSignal(ExternalSignal):
     """Stand-in for prefect.exceptions.TerminationSignal."""
 
 
-class RecordingSession(CalibSession):
-    """A real CalibSession lifecycle with hardware, database and handlers stubbed."""
+class RecordingSession(ExecutionRuntime):
+    """A real ExecutionRuntime lifecycle with hardware, database and handlers stubbed."""
 
     instances: list[RecordingSession] = []
     error: BaseException | None = None
@@ -65,7 +65,7 @@ def sessions(monkeypatch: pytest.MonkeyPatch) -> type[RecordingSession]:
     RecordingSession.error = None
     RecordingSession.failing_handler = None
     grant_all_contexts(monkeypatch)
-    monkeypatch.setattr("qdash.workflow.service._internal.runs.CalibSession", RecordingSession)
+    monkeypatch.setattr("qdash.workflow.service._internal.runs.ExecutionRuntime", RecordingSession)
     monkeypatch.setattr("qdash.workflow.service.single_task_flow.get_run_logger", MagicMock)
     return RecordingSession
 
@@ -248,7 +248,7 @@ def test_single_task_executor_rejects_an_unauthorized_context(monkeypatch):
         "qdash.workflow.service.context.MongoProjectAccessDirectory", DenyingDirectory
     )
     opened = MagicMock()
-    monkeypatch.setattr("qdash.workflow.service._internal.runs.CalibSession", opened)
+    monkeypatch.setattr("qdash.workflow.service._internal.runs.ExecutionRuntime", opened)
 
     with pytest.raises(CalibContextError, match="editor or owner"):
         single_task_executor(username="mallory", chip_id="chip-1", qid="0", task_name="CheckRabi")

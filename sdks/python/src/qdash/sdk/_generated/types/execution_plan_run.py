@@ -10,7 +10,7 @@ from .flow_target_override import FlowTargetOverride
 
 class ExecutionPlanRun(UniversalBaseModel):
     """
-    One CalibService.run call of the entrypoint.
+    One CalibrationSession.run (or legacy CalibService.run) call of the entrypoint.
     """
 
     targets: typing.Optional[FlowTargetOverride] = pydantic.Field(default=None)

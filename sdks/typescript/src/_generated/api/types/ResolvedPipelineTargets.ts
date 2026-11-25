@@ -4,8 +4,10 @@
  * The starting targets after chip lookup.
  */
 export interface ResolvedPipelineTargets {
-    /** Explicit qids, or empty when targeting MUXes. */
+    /** Explicit qids, the qubits of the pairs, or empty when targeting MUXes. */
     qids: string[];
     mux_ids?: number[] | undefined;
     exclude_qids?: string[] | undefined;
+    /** Directed [control, target] coupling pairs, or empty without pair targets. */
+    pairs?: string[][] | undefined;
 }

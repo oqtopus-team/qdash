@@ -20,6 +20,7 @@ from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.user import UserDocument
 from qdash.workflow.templates.fake_backend import FAKE_CALIBRATION_TASKS
+from tests.qdash.workflow.calibration_session_fake import install_fake_session
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -214,7 +215,7 @@ def test_qubex_fits_never_open_a_browser_during_tests(monkeypatch: pytest.Monkey
 
 
 class _RecordingStageSession:
-    """The parts of CalibSession the scheduled one-qubit strategy reads."""
+    """The parts of ExecutionRuntime the scheduled one-qubit strategy reads."""
 
     def __init__(self) -> None:
         self.username = USERNAME
@@ -242,13 +243,13 @@ class _RecordingStageSession:
                 username=USERNAME, chip_id=CHIP_ID, project_id=PROJECT_ID, backend_name="fake"
             ).for_worker(),
             lease=WorkerLease(execution_id=self.execution_id),
-            # Pinned from the owner, as CalibSession.worker_spec does.
+            # Pinned from the owner, as ExecutionRuntime.worker_spec does.
             mux_mapping=MuxMappingSnapshot.of(self.mux_mapping),
         )
 
     @property
     def mux_mapping(self) -> Any:
-        """The created chip's topology mapping, resolved as CalibSession does."""
+        """The created chip's topology mapping, resolved as ExecutionRuntime does."""
         from qdash.common.mux_mapping import resolve_chip_mux_mapping
 
         return resolve_chip_mux_mapping(self.project_id, self.chip_id)
@@ -261,22 +262,15 @@ def _template_run(monkeypatch: pytest.MonkeyPatch, **params: Any) -> tuple[Any, 
     """The targets and the single step the Fake Backend Calibration template builds."""
     from qdash.workflow.templates import fake_backend
 
-    class _Recorder:
-        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
-            pass
+    fake = install_fake_session(monkeypatch, fake_backend)
+    original_run = fake.run
 
-        @classmethod
-        def from_context(cls, *_args: Any, **_kwargs: Any) -> Any:
-            return cls()
+    def run_one_step(self: Any, *args: Any, **kwargs: Any) -> tuple[Any, Any]:
+        recorded = original_run(self, *args, **kwargs)
+        [step] = recorded["steps"]
+        return recorded["targets"], step
 
-        def run(self, targets: Any, *, steps: list[Any]) -> tuple[Any, Any]:
-            [step] = steps
-            return targets, step
-
-        backend = None
-
-    monkeypatch.setattr(fake_backend, "CalibService", _Recorder)
-    monkeypatch.setattr(fake_backend, "resolve_calib_context", lambda *_a, **_k: None)
+    monkeypatch.setattr(fake, "run", run_one_step)
     result: tuple[Any, Any] = fake_backend.fake_calibration(
         username=USERNAME, chip_id=CHIP_ID, **params
     )

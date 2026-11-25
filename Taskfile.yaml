@@ -566,7 +566,7 @@ tasks:
   ci-typecheck:
     desc: Run mypy type checking
     cmds:
-      - uv run mypy src/qdash/common src/qdash/datamodel src/qdash/dbmodel src/qdash/repository src/qdash/api src/qdash/workflow clients/python/src/qdash/client sdks/python/src/qdash/sdk clients/python/tests sdks/python/tests tests
+      - uv run mypy src/qdash/common src/qdash/datamodel src/qdash/dbmodel src/qdash/repository src/qdash/api src/qdash/workflow clients/python/src/qdash/client sdks/python/src/qdash/sdk sdks/python/src/qdash/calibration clients/python/tests sdks/python/tests tests
 
   ci-test:
     desc: Run all tests with coverage

@@ -17,7 +17,7 @@ from qdash.workflow.service._internal.scheduling_tasks import (
 from qdash.workflow.service.targets import AllMuxTargets, MuxTargets, QubitTargets
 
 if TYPE_CHECKING:
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
 
 GROUPS = {9: ["0", "17", "5", "2"], 4: ["12", "3", "30", "7"]}
 
@@ -42,7 +42,7 @@ def test_representative_is_local_slot_zero() -> None:
 
 
 def test_mux_task_skip_uses_the_session_mapping() -> None:
-    session = cast("CalibSession", SimpleNamespace(mux_mapping=_mapping()))
+    session = cast("ExecutionRuntime", SimpleNamespace(mux_mapping=_mapping()))
 
     with patch(
         "qdash.workflow.calibtasks.active_protocols.is_mux_task", return_value=True
@@ -138,11 +138,11 @@ def test_pipeline_plan_reserves_the_chip_for_unresolvable_targets() -> None:
     assert planned.exclusive
 
 
-def _session() -> CalibSession:
-    from qdash.workflow.service._internal.session import CalibSession
+def _session() -> ExecutionRuntime:
+    from qdash.workflow.service._internal.session import ExecutionRuntime
     from qdash.workflow.service._internal.settings import GitHubPolicy, SessionSettings
 
-    return CalibSession(
+    return ExecutionRuntime(
         SessionSettings(
             username="alice",
             chip_id="chip-x",

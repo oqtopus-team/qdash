@@ -2,8 +2,8 @@
 
 ``task_parameters`` maps a task name to the settings that apply to every call of
 that task (per-task defaults). Workflows set these settings on each ``TaskCall``;
-``CalibService`` does not accept per-task defaults. The mapping is the internal
-form that carries defaults QDash resolves itself (a pipeline spec's deprecated
+``CalibrationSession.run`` (and the legacy ``CalibService``) accept no per-task
+defaults. The mapping is the internal form that carries defaults QDash resolves itself (a pipeline spec's deprecated
 ``task_parameters`` and single-task request overrides) to owner and worker
 sessions::
 

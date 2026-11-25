@@ -1,7 +1,9 @@
-"""Step context and pipeline classes.
+"""Step context and step sequence validation.
 
-This module defines StepContext for sharing state between steps,
-and Pipeline for validating step sequences.
+This module defines StepContext for sharing state between steps, and the
+internal StepSequence that validates the order of a run's steps. A calibration
+is described by targets and steps passed to ``CalibrationSession.run``; there
+is no separate pipeline object to build.
 """
 
 from __future__ import annotations
@@ -76,14 +78,15 @@ class StepContext:
 
 
 @dataclass
-class Pipeline:
-    """A validated sequence of calibration steps.
+class StepSequence:
+    """A validated sequence of runtime calibration steps (internal).
 
-    Pipeline validates step dependencies at construction time,
+    StepSequence validates step dependencies at construction time,
     ensuring all required context keys are available before each step runs.
+    ``ExecutionRuntime.run_pipeline`` builds one for every run.
 
     Example:
-        pipeline = Pipeline([
+        sequence = StepSequence([
             OneQubitCheck(),
             FilterByMetric(metric="t1", threshold=30.0),
             TwoQubitCalibration(),
@@ -151,3 +154,25 @@ class Pipeline:
     def __len__(self) -> int:
         """Return number of steps."""
         return len(self.steps)
+
+
+def plan_step_keys(steps: Sequence[Step]) -> list[str]:
+    """The identifier of each step occurrence, as recorded in its Execution's ``step_key``.
+
+    A calibration step keeps its ``step_id``; a transform step is named after itself, with
+    its 1-based position appended when the name repeats (see
+    :func:`qdash.datamodel.step_record.step_keys`).
+    """
+    from qdash.datamodel.step_record import step_keys
+    from qdash.workflow.service.steps.base import CalibrationStep
+
+    return step_keys(
+        [
+            (step.name, step.resolved_step_id if isinstance(step, CalibrationStep) else None)
+            for step in steps
+        ]
+    )
+
+
+Pipeline = StepSequence
+"""Deprecated name of :class:`StepSequence`; a calibration needs no pipeline object."""

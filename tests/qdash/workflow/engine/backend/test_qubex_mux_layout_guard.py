@@ -388,7 +388,7 @@ def test_orchestrator_checks_a_resolved_mapping_before_saving_notes(
     experiment.assert_not_called()
 
 
-# ------------------------------------------------------------- CalibSession
+# ------------------------------------------------------------- ExecutionRuntime
 
 SESSION = "qdash.workflow.service._internal.session"
 
@@ -400,7 +400,7 @@ def _calib_session(
     lock_repo: MagicMock | None = None,
 ) -> tuple[Any, MagicMock]:
     """An owner session whose chip topology resolves to ``mapping``."""
-    from qdash.workflow.service._internal.session import CalibSession, SessionRepositories
+    from qdash.workflow.service._internal.session import ExecutionRuntime, SessionRepositories
     from qdash.workflow.service._internal.settings import GitHubPolicy, SessionSettings
 
     orchestrator = MagicMock()
@@ -410,7 +410,7 @@ def _calib_session(
     monkeypatch.setattr(f"{SESSION}.CalibOrchestrator", orchestrator)
     monkeypatch.setattr(f"{SESSION}.GitHubIntegration", MagicMock())
     monkeypatch.setattr(f"{SESSION}.resolve_chip_mux_mapping", lambda project_id, chip_id: mapping)
-    session = CalibSession(
+    session = ExecutionRuntime(
         SessionSettings(
             username="alice",
             chip_id="chip-1",

@@ -17,7 +17,7 @@ import type * as QDashApi from "../../../../index.js";
  */
 export interface ExecuteFlowRequest {
     name: string;
-    /** Targets for this run, overriding direct CalibService and pipeline targets */
+    /** Targets for this run, overriding the initial targets of every CalibrationSession.run (or legacy CalibService.run) and pipeline */
     target_override?: QDashApi.FlowTargetOverride | null;
     /** Execution parameters (overrides default_parameters) */
     parameters?: Record<string, unknown>;

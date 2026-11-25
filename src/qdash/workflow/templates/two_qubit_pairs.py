@@ -23,17 +23,8 @@ Example:
 
 from typing import Any
 
-from prefect import flow
-
-from qdash.workflow import TaskCall
-from qdash.workflow.service import CalibService
-from qdash.workflow.service.calib_service import (
-    on_flow_cancellation,
-    on_flow_crashed,
-    on_flow_failure,
-)
-from qdash.workflow.service.steps import CustomTwoQubit, TwoQubitCalibration
-from qdash.workflow.service.targets import CouplingTargets
+from qdash.calibration import CouplingTargets, CustomTwoQubit, TaskCall, TwoQubitCalibration
+from qdash.workflow import CalibrationSession, calibration_flow, resolve_calib_context
 
 TWO_QUBIT_PAIRS_TASKS: list[TaskCall] = [
     TaskCall(
@@ -54,11 +45,7 @@ TWO_QUBIT_PAIRS_TASKS: list[TaskCall] = [
 ]
 
 
-@flow(
-    on_cancellation=[on_flow_cancellation],
-    on_failure=[on_flow_failure],
-    on_crashed=[on_flow_crashed],
-)
+@calibration_flow(session_name="2Q Automatic Pairs")
 def two_qubit_pairs(
     username: str,
     chip_id: str,
@@ -87,7 +74,8 @@ def two_qubit_pairs(
             - ZX90InterleavedRandomizedBenchmarking
         max_parallel_ops: Maximum number of pairs in one parallel group.
             Default: 10.
-        flow_name: Flow name (auto-injected)
+        flow_name: Saved flow name QDash injects at launch; keep it in the signature
+            and do not pass it on (session.run reads the launch name itself)
         project_id: Project ID (auto-injected)
 
     Returns:
@@ -134,15 +122,14 @@ def two_qubit_pairs(
     # Execute Pipeline
     # =========================================================================
 
-    cal = CalibService(
-        username,
-        chip_id,
-        flow_name=flow_name,
-        tags=tags,
-        project_id=project_id,
+    context = resolve_calib_context(username, chip_id, project_id=project_id)
+    session = CalibrationSession.from_context(context)
+    return session.run(
+        targets=targets,
+        steps=[step],
         default_run_parameters={
             "readout_duration": 1024,
             "interval": 150 * 1024,
         },
+        tags=tags,
     )
-    return cal.run(targets, steps=[step])

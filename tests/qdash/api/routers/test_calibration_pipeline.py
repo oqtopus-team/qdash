@@ -209,13 +209,74 @@ class TestValidate:
         ]
         assert calls[0]["settings"]["run"] == {"shots": {"value": 2048}}
         assert calls[1]["settings"]["run"] == {"shots": {"value": 4096}}
-        assert data["targets"] == {"qids": ["0", "1"], "mux_ids": [], "exclude_qids": []}
+        assert data["targets"] == {
+            "qids": ["0", "1"],
+            "mux_ids": [],
+            "exclude_qids": [],
+            "pairs": [],
+        }
         assert data["task_run_count"] == 6
         assert data["spec_version"] == 2
         assert isinstance(data["plan_digest"], str)
         assert data["warnings"] == []
         # The normalized spec carries the defaults the worker will use.
         assert data["spec"]["steps"][0]["configure"] is False
+
+    def test_pair_targets_resolve_to_their_qubits_and_check_couplings(
+        self, test_client, chip, auth_headers
+    ):
+        from qdash.dbmodel.coupling import CouplingDocument
+
+        for coupling in ("0-1", "4-5"):
+            CouplingDocument(
+                project_id="test_project",
+                username="test_user",
+                qid=coupling,
+                chip_id=CHIP,
+                data={},
+                system_info={},
+            ).insert()
+        spec = {
+            "spec_version": 2,
+            "targets": {"pairs": [["0", "1"], ["5", "4"]]},
+            "steps": [
+                {
+                    "type": "TwoQubitCalibration",
+                    "execution_mode": "manual",
+                    "rounds": [[["0", "1"]], [["5", "4"]]],
+                }
+            ],
+        }
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data["targets"]["pairs"] == [["0", "1"], ["5", "4"]]
+        assert data["targets"]["qids"] == ["0", "1", "4", "5"]
+        # The direction is the pair's own: 5-4 is not a coupling of the chip.
+        assert {
+            (problem["path"], problem["message"])
+            for problem in data["problems"]
+            if problem["path"].startswith("targets")
+        } == {("targets.pairs[1]", "5-4 is not a coupling of chip 64Qv3")}
+
+    def test_bring_up_on_pair_targets_is_reported(self, test_client, chip, auth_headers):
+        spec = {
+            "spec_version": 2,
+            "targets": {"pairs": [["0", "1"]]},
+            "steps": [{"type": "BringUp", "execution_mode": "sequential"}],
+        }
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        assert response.status_code == 200, response.text
+        paths = [problem["path"] for problem in response.json()["problems"]]
+        assert "steps[0]" in paths
 
     def test_version_1_spec_is_rejected_with_a_converted_spec(
         self, test_client, chip, auth_headers

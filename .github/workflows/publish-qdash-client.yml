@@ -148,7 +148,7 @@ jobs:
           uv run --package qdash-client ruff check clients/python sdks/python
           uv run --package qdash-client ruff format --check clients/python sdks/python
           uv run --package qdash-client mypy clients/python/src/qdash/client clients/python/tests
-          uv run --package qdash-sdk mypy sdks/python/src/qdash/sdk sdks/python/tests
+          uv run --package qdash-sdk mypy sdks/python/src/qdash/sdk sdks/python/src/qdash/calibration sdks/python/tests
 
       # One artifact per package, so each publish job uploads only its own files.
       - name: Upload qdash-client artifact

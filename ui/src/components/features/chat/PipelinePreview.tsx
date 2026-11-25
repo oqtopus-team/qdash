@@ -252,7 +252,7 @@ export function PipelinePreview({
                   )}
                   {step.kind === "transform" && (
                     <span className="text-base-content/45">
-                      · filter
+                      · {step.type === "GenerateCRSchedule" ? "schedule" : "filter"}
                       {referenceLabel(step) && <> · reads {referenceLabel(step)}</>}
                     </span>
                   )}

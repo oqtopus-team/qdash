@@ -61,10 +61,13 @@ def calibrate(chip: Chip) -> Any:
     )
 
 
-def test_calibration_reexports_the_pipeline_definitions() -> None:
+def test_calibration_reexports_the_shared_definitions() -> None:
+    import qdash.calibration as shared
+
     for name in ("CustomOneQubit", "MuxTargets", "QubitTargets", "TaskCall", "sweep"):
-        assert getattr(calibration, name) is getattr(pipeline, name)
-    assert pipeline.Qubits is QubitTargets
+        assert getattr(calibration, name) is getattr(shared, name)
+    # qdash.sdk.sweep is the shared module's helpers, so both write the same JSON.
+    assert pipeline.sweep.linspace is shared.sweep.linspace
 
 
 def test_targets_serialize_like_the_workflow_targets() -> None:

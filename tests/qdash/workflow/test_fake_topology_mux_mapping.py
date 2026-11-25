@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from fastapi.testclient import TestClient
 
     from qdash.datamodel.one_qubit_execution_mode import OneQubitStepExecutionMode
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PUBLIC_TOPOLOGIES = REPO_ROOT / "config" / "domain" / "topologies"
@@ -128,11 +128,11 @@ def _fake_chip(client: TestClient, topology_id: str, *, size: int = 64) -> None:
     assert response.json()["topology_id"] == topology_id
 
 
-def _session() -> CalibSession:
-    from qdash.workflow.service._internal.session import CalibSession
+def _session() -> ExecutionRuntime:
+    from qdash.workflow.service._internal.session import ExecutionRuntime
     from qdash.workflow.service._internal.settings import GitHubPolicy, SessionSettings
 
-    return CalibSession(
+    return ExecutionRuntime(
         SessionSettings(
             username=USERNAME,
             chip_id=CHIP,

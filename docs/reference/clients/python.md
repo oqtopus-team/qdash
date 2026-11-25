@@ -48,7 +48,7 @@ Stable versions follow QDash releases. Use `pip install --pre qdash-sdk` for a p
 ### Profiles
 
 `QDash.from_profile("local")` selects the named profile. `QDash.from_profile()` selects
-`default_profile`, or `"default"` when that key is absent. Reuse the returned session across
+`default_profile`, or `"default"` when that key is absent. Reuse the returned client across
 operations. `QDash.from_profile("local", path="/path/to/config.toml")` reads only that file.
 For configuration without a file, pass `qdash.sdk.QDashConfig(...)` to `QDash(...)`.
 
@@ -110,29 +110,31 @@ for chip in chips:
     print(chip.chip_id, chip.qubit_count)
 ```
 
-Create one session and reuse `qdash` across notebook cells or script operations. Each example
-below includes initialization so it can run on its own; skip that line when reusing your session.
-Call `qdash.close()` when you finish using the connection. For a short script that needs
-automatic cleanup, `with QDash.from_profile("local") as qdash:` is also supported.
+Create one client and reuse `qdash` across notebook cells or script operations. Each example
+below includes initialization so it can run on its own; skip that line when reusing your client.
+No `with` block or explicit `close()` is needed for this usage: the SDK closes its remaining
+owned connections at normal Python process shutdown. To release a connection earlier, use
+`qdash.close()` or a `with` block.
 Closing the connection does not cancel work already dispatched to the server.
 
 `qdash.chips.list()` returns chip metadata as a list; `qdash.chips.get(chip_id)` reads one
 chip. `qdash.chip(chip_id)` creates a calibration handle without contacting the server.
 
 `qdash.api` exposes the generated resources, grouped by API tags. Response types are available
-from `qdash.sdk.types`. These calls use the session's authentication and project header,
+from `qdash.sdk.types`. These calls use the client's authentication and project header,
 perform no automatic retries by default, and raise generated `ApiError` subclasses or httpx
 exceptions. SDK helpers such as `qdash.workflows.run()` translate failures to SDK errors;
 HTTP 409 becomes `QDashConflictError`. Helper reads use `QDASH_RETRY_MAX_ATTEMPTS`; helper
 writes are sent once. Do not enable retries on execution writes without reconciling their effects.
 
-`qdash.with_project(project_id)` shares the connection; close the original session after both
-are done. Token authentication is preferred. Password authentication caches a login token;
-create a new session if that token expires.
+`qdash.with_project(project_id)` shares the connection and remains usable after the original
+client variable is discarded. Explicitly closing the original owner closes the shared connection.
+An externally supplied `httpx.Client` remains the caller’s responsibility. Token authentication
+is preferred. Password authentication caches a login token; create a new client if it expires.
 
-`QDash` sessions and helpers are synchronous. The exported `AsyncQDashApi` is a separate
+`QDash` clients and helpers are synchronous. The exported `AsyncQDashApi` is a separate
 generated client: configure its base URL, authentication, and project explicitly; it does not
-inherit a `QDash` session's configuration.
+inherit a `QDash` client's configuration.
 
 ## Call the Existing Client's High-Level API
 
@@ -176,11 +178,12 @@ settings appropriate for your hardware. Validation checks the spec, not physical
 
 ```python
 import math
-from qdash.sdk import QDash
-from qdash.sdk.calibration import CustomOneQubit, Pipeline, QubitTargets, TaskCall, sweep
+from qdash.sdk import CalibrationSession, QDash
+from qdash.calibration import CustomOneQubit, QubitTargets, TaskCall, sweep
 
-qdash = QDash.from_profile("local")
-chip = qdash.chip("64Qv3")
+client = QDash.from_profile("local")
+session = CalibrationSession.create(client, chip_id="64Qv3", name="Coherence check")
+print(session.session_id)  # Keep this ID to continue the same objective later.
 
 time_range = sweep.logspace(math.log10(300), math.log10(500_000), 51)
 targets = QubitTargets(["0", "1"])
@@ -195,32 +198,60 @@ steps = [
     ),
 ]
 run_parameters = {"readout_duration": 1024, "interval": 262_144}
+check = session.validate(targets, steps, default_run_parameters=run_parameters)
+if not check.valid:
+    raise SystemExit(check.problems)
 
-pipeline = Pipeline(
-    name="coherence",
+result = session.run(  # Measures and waits for completion.
     targets=targets,
     steps=steps,
     default_run_parameters=run_parameters,
+    timeout_seconds=3600,
 )
-check = chip.validate_calibration(pipeline)
-if not check.valid:
-    raise SystemExit([f"{p.path}: {p.message}" for p in check.problems or []])
-
-run = chip.calibrate(pipeline)  # measures
-result = run.wait(timeout_seconds=3600)
-print(result.status)
+print(result.status, result.execution_ids)
 ```
 
-`validate_calibration()` dispatches nothing. `calibrate()` dispatches and returns a run;
-`run.wait()` returns its whole-calibration status, including failure or cancellation.
-A timeout leaves the run active. Keep the session to inspect or follow the run later.
-`result.succeeded` is true only on completion; `result.done` also includes failure and
-cancellation. Both describe the whole run at the time it was read, without another request.
+`CalibrationSession` groups runs toward one objective on one chip. Creating it writes a record;
+it neither reserves hardware nor starts measurements. Reuse `session` for additional trials.
+`CalibrationSession.open(client, session_id="...")` reads an existing session without reopening
+it if closed. `session.refresh()` reads its current record and runs.
 
-The existing `chip.validate_calibration(targets, steps, ...)` and
-`chip.calibrate(targets, steps, ...)` forms remain supported. When passing a `Pipeline`,
-set its name, tags, and run parameters on the pipeline itself; passing those overrides or
-`steps` alongside it raises `TypeError`. You can still pass `backend_name`.
+`validate()` dispatches nothing. `run()` returns a `CalibrationResult` when the run completes;
+a failed, cancelled, crashed, or unlaunched run raises `qdash.calibration.CalibrationRunError`
+with the observed result in `error.result`. Completion does not mean every measured target
+passed: inspect the executions and task results. A timeout raises `TimeoutError` without
+cancelling the run or closing the session.
+
+To keep a handle while work runs, use `launch = session.submit(targets, steps, ...)`, then
+`launch.wait()`. `launch.get()` reads the current status and `launch.executions()` reads the
+step executions. Keep the returned `run_id` and session ID to reconcile an interrupted wait.
+Writes are sent once. Pass an `idempotency_key` to `run()` or `submit()` when a launch may need
+to be retried; reconcile an uncertain response before starting another run.
+
+Call `session.close()` when the objective is finished. Closing prevents new launches and does
+not cancel work; the server can refuse closure while work remains. HTTP connection cleanup
+does not close this group. Explicit sessions remain open until closed; automatic sessions
+created by other launch APIs follow the [automatic closing rules](../../developer-guide/agent/calibration-sessions.md#closing).
+
+Existing `chip.calibrate(targets, steps, ...)` and `chip.calibrate(pipeline)` remain available
+and return their existing asynchronous handles. For a stored `Pipeline` from
+`qdash.sdk.pipeline`, keep its name, tags, and defaults on that object; passing authoring
+arguments alongside it raises `TypeError`. These older handles keep their existing failure-result
+behavior; `CalibrationSession.run()` raises on an unsuccessful run.
+
+### Inspect Step Outcomes
+
+Targets, task calls and step classes come from `qdash.calibration`; their shared base is
+`ExecutionStep` (the earlier `CalibrationStepDefinition` name remains an alias). Creating a
+step only defines work; it sends no request.
+
+`CalibrationResult.execution_ids` includes every reached step, including filters and schedules.
+SDK `result.steps` maps each planned step's occurrence key to progress; a transform's
+`transform` field contains its outcome. Keys use the calibration step ID or a unique transform
+name, adding its plan position on collisions. An empty task list is normal for a transform.
+In a workflow, typed calibration results stay in `result.steps`; transform snapshots are in
+`result.details["transforms"]`, keyed by occurrence. Full per-step progress is available for
+system pipeline runs; saved-workflow run handles list executions instead.
 
 ### Run a Whole Pipeline Spec
 
@@ -368,7 +399,7 @@ settings; `qdash.tasks.list(enabled_only=True)` lists runnable definitions. Pass
 
 ```python
 from qdash.sdk import QDash
-from qdash.sdk.calibration import TaskCall, sweep
+from qdash.calibration import TaskCall, sweep
 
 qdash = QDash.from_profile("local")
 definition = qdash.tasks.get("CheckT1")

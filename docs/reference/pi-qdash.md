@@ -50,6 +50,9 @@ saved-workflow tools do not report such responses as successfully started.
 
 Lists are paginated: task results and executions accept `skip` and `limit` (1–100).
 Executions require one chip and support `date` (`YYYYMMDD`) and `timezone`, not flow/status filters.
+Execution history includes filter and schedule steps without task results or figures. Pipeline
+progress exposes their `transform` outcome and occurrence `key`; `not_recorded` means an older
+run did not record that transform, not that it failed. `skipped` means the run never reached it.
 Task history has no date filter; use task results with `startFrom` and `startTo` for a period.
 See [client contracts](./clients/typescript.md#high-level-client) for response shapes.
 

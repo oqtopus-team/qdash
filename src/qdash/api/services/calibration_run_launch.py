@@ -37,8 +37,13 @@ async def launch_run(
     validate: Callable[[], Any],
     dispatch: Callable[[Any, RunIdentity | None], Awaitable[ExecuteFlowResponse]],
     preflight: Callable[[Any], None] | None = None,
+    session_name: str | None = None,
 ) -> ExecuteFlowResponse:
     """Record and launch one run, returning the launch response with its run and session.
+
+    ``session_name`` names the automatic session a run without ``calibration_session_id``
+    gets (a saved flow's ``@calibration_flow(session_name=...)``); a named session keeps
+    its own name.
 
     A request whose chip QDash cannot tell before the launch (a saved flow with no
     ``chip_id`` parameter and no saved chip) cannot be recorded against one. Without
@@ -78,6 +83,7 @@ async def launch_run(
         dispatch=dispatch,
         response=lambda _validated, dispatched: dispatched.model_dump(mode="json"),
         preflight=preflight,
+        session_name=session_name,
     )
     return ExecuteFlowResponse.model_validate(
         {

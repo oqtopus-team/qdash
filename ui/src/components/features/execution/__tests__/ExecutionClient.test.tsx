@@ -91,6 +91,36 @@ describe("ExecutionDetailClient parameter changes", () => {
   });
 });
 
+describe("ExecutionDetailClient transform step", () => {
+  it("shows the recorded decision instead of measurement-only panels", () => {
+    execution = {
+      name: "nightly_filter_by_status",
+      status: "completed",
+      chip_id: "64Q",
+      task: [],
+      note: {
+        step_kind: "transform",
+        step_type: "FilterByStatus",
+        transform_result: {
+          kind: "filter",
+          input_qids: ["0", "1"],
+          output_qids: ["0"],
+          excluded: [{ target: "1", reason: "step check failed" }],
+          source_found: true,
+        },
+      },
+    };
+    render(<ExecutionDetailClient chipId="64Q" executionId="exec-2" />);
+
+    expect(screen.getByRole("heading", { name: "Step outcome" })).toBeTruthy();
+    expect(screen.getByText("Kept 1 of 2 qubits")).toBeTruthy();
+    expect(screen.getByText("step check failed")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Execution Flow" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Parameter changes" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Task Topology" })).toBeNull();
+  });
+});
+
 describe("ExecutionDetailClient agent session link", () => {
   afterEach(() => cleanup());
 

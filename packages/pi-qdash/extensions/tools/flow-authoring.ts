@@ -8,12 +8,16 @@ import { requireWriteApproval } from "../lib/write-approval.js";
 import { isResultUnknown, resultUnknownToolError, sdkSession, type SdkSessionFactory } from "../lib/sdk-session.js";
 
 /**
- * Flow authoring: saving a Prefect flow the agent wrote.
+ * Flow authoring: saving a calibration flow the agent wrote.
  *
  * A flow is Python that runs on the QDash workflow worker with hardware and
  * database access, so saving one is a confirmation-gated write, and running one
- * (`qdash_execute_flow`) is another. QDash owns the
- * real validation (`POST /flows`: the `@flow` function must exist, the file is
+ * (`qdash_execute_flow`) is another. A flow is decorated with
+ * `@calibration_flow(session_name=...)` from `qdash.workflow` (or Prefect's `@flow` in older
+ * flows) and runs its calibrations with
+ * `CalibrationSession.from_context(resolve_calib_context(...)).run(targets=..., steps=...)`,
+ * using the targets and steps of `qdash.calibration`. QDash owns the
+ * real validation (`POST /flows`: the decorated function must exist, the file is
  * formatted with ruff, and a Prefect deployment is registered); these checks
  * only catch what would certainly be rejected, so the user is not asked to
  * approve a save that cannot succeed. Templates and helpers are read through
@@ -81,11 +85,20 @@ export function flowCodeProblems(name: string, code: string, functionName: strin
   const problems: string[] = [];
   if (!FLOW_NAME.test(name)) problems.push(`name '${name}' must be letters, digits and underscores, not starting with a digit`);
   if (!FLOW_NAME.test(functionName)) problems.push(`flowFunctionName '${functionName}' is not a Python identifier`);
-  if (!/^\s*@flow\b/m.test(code)) problems.push("the code has no `@flow` decorator (import it with `from prefect import flow`)");
+  const calibrationFlow = /^\s*@calibration_flow\b/m.test(code);
+  if (!calibrationFlow && !/^\s*@flow\b/m.test(code)) {
+    problems.push("the code has no `@calibration_flow` decorator (import it with `from qdash.workflow import calibration_flow`) or `@flow`");
+  }
   if (!new RegExp(`^\\s*(?:async\\s+)?def\\s+${functionName}\\s*\\(`, "m").test(code)) {
     problems.push(`the code defines no function named '${functionName}'`);
   }
-  if (!/^\s*(?:from|import)\s+prefect\b/m.test(code)) problems.push("the code does not import prefect");
+  if (calibrationFlow) {
+    if (!/^\s*from\s+qdash\.workflow\s+import\s+[^\n]*\bcalibration_flow\b/m.test(code) && !/^\s*from\s+qdash\.workflow\s+import\s+\([^)]*\bcalibration_flow\b/m.test(code)) {
+      problems.push("the code uses `@calibration_flow` but does not import it from qdash.workflow");
+    }
+  } else if (!/^\s*(?:from|import)\s+prefect\b/m.test(code)) {
+    problems.push("the code does not import prefect");
+  }
   return problems;
 }
 
@@ -132,20 +145,20 @@ export function registerFlowAuthoringTools(pi: Pick<ExtensionAPI, "registerTool"
     name: "qdash_save_flow",
     label: "QDash Save Flow",
     description:
-      "Save a Prefect flow (Python) as a QDash workflow: writes the file, formats it, registers its Prefect deployment, and records it in the project. Saving an existing name replaces that flow. Confirmation-gated write operation: the flow runs later on the workflow worker with hardware access. Start from a template (qdash_query flow_templates / flow_template) or an existing flow (qdash_get_flow).",
-    promptSnippet: "Save a Prefect flow the user asked you to write as a QDash workflow",
+      "Save a calibration flow (Python, decorated with @calibration_flow) as a QDash workflow: writes the file, formats it, registers its Prefect deployment, and records it in the project. Saving an existing name replaces that flow. Confirmation-gated write operation: the flow runs later on the workflow worker with hardware access. Start from a template (qdash_query flow_templates / flow_template) or an existing flow (qdash_get_flow).",
+    promptSnippet: "Save a calibration flow the user asked you to write as a QDash workflow",
     promptGuidelines: [
-      "Before qdash_save_flow, read a template or the existing flow and keep its structure: the @flow function, the helper imports, and the terminal handling.",
+      "Before qdash_save_flow, read a template or the existing flow and keep its structure: the @calibration_flow function (with a literal session_name), the explicit resolve_calib_context and CalibrationSession.from_context, and session.run(targets=..., steps=...) with qdash.calibration targets and steps. Do not write CalibService in new flows.",
       "Show the user the whole code and say which chip it is for; the save is confirmation-gated and replaces a flow of the same name.",
       "Saving does not run the flow. Do not run it unless the user asks.",
     ],
     parameters: Type.Object({
       ...connectionParams,
-      name: Type.String({ description: "Flow name: letters, digits and underscores. Also the file name and, by default, the @flow function name." }),
+      name: Type.String({ description: "Flow name: letters, digits and underscores. Also the file name and, by default, the decorated flow function name." }),
       code: Type.String({ description: "The complete Python source of the flow module." }),
       description: Type.Optional(Type.String({ description: "One line shown on the Workflow page." })),
       chipId: Type.Optional(Type.String({ description: "Chip the flow is for. Defaults to the session/default chip." })),
-      flowFunctionName: Type.Optional(Type.String({ description: "The @flow function to deploy when it is not named like the flow." })),
+      flowFunctionName: Type.Optional(Type.String({ description: "The decorated flow function to deploy when it is not named like the flow." })),
       defaultParameters: Type.Optional(Type.Object({}, { additionalProperties: true, description: "Default values of the flow function's parameters." })),
       defaultRunParameters: Type.Optional(Type.Object({}, { additionalProperties: true, description: "Run parameters applied to every task, such as shots or interval." })),
       tags: Type.Optional(Type.Array(Type.String())),

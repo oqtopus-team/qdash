@@ -1,5 +1,9 @@
 """Calibration on one chip: ``Chip.validate_calibration``, ``Chip.calibrate`` and the run.
 
+The primary entry point is :class:`qdash.sdk.CalibrationSession`, which runs calibrations in a
+named session and returns a :class:`~qdash.calibration.CalibrationResult`. ``Chip`` remains as
+the earlier front door: each call starts a calibration in an automatic session of its own.
+
 These are a front door over :class:`~qdash.sdk.Pipelines`: a
 :class:`~qdash.sdk.pipeline.Pipeline` is sent as it is, or ``targets`` and ``steps`` become
 one, and validation, dispatch and waiting are the pipeline operations' own.
@@ -17,6 +21,7 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
+    from qdash.calibration import CalibrationTargets
     from qdash.sdk._generated.types.execute_pipeline_response import ExecutePipelineResponse
     from qdash.sdk._generated.types.validate_pipeline_response import ValidatePipelineResponse
     from qdash.sdk._pipelines import Pipelines
@@ -66,7 +71,7 @@ class Chip:
     @overload
     def validate_calibration(
         self,
-        targets: PipelineTargets | Mapping[str, Any],
+        targets: PipelineTargets | CalibrationTargets | Mapping[str, Any],
         steps: Sequence[BaseModel | Mapping[str, Any]],
         *,
         name: str | None = None,
@@ -77,7 +82,7 @@ class Chip:
 
     def validate_calibration(
         self,
-        targets: CalibrationPipelineSpec | PipelineTargets | Mapping[str, Any],
+        targets: CalibrationPipelineSpec | PipelineTargets | CalibrationTargets | Mapping[str, Any],
         steps: Sequence[BaseModel | Mapping[str, Any]] | None = None,
         *,
         name: str | None = None,
@@ -102,7 +107,7 @@ class Chip:
     @overload
     def calibrate(
         self,
-        targets: PipelineTargets | Mapping[str, Any],
+        targets: PipelineTargets | CalibrationTargets | Mapping[str, Any],
         steps: Sequence[BaseModel | Mapping[str, Any]],
         *,
         name: str | None = None,
@@ -113,7 +118,7 @@ class Chip:
 
     def calibrate(
         self,
-        targets: CalibrationPipelineSpec | PipelineTargets | Mapping[str, Any],
+        targets: CalibrationPipelineSpec | PipelineTargets | CalibrationTargets | Mapping[str, Any],
         steps: Sequence[BaseModel | Mapping[str, Any]] | None = None,
         *,
         name: str | None = None,
@@ -145,7 +150,7 @@ class Chip:
 
 
 def _pipeline(
-    targets: CalibrationPipelineSpec | PipelineTargets | Mapping[str, Any],
+    targets: CalibrationPipelineSpec | PipelineTargets | CalibrationTargets | Mapping[str, Any],
     steps: Sequence[BaseModel | Mapping[str, Any]] | None,
     name: str | None,
     default_run_parameters: Mapping[str, Any] | None,

@@ -62,13 +62,13 @@ except Exception as exc:
 
 if TYPE_CHECKING:
     from qdash.common.mux_mapping import MuxMapping
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
 
 # Module-level logger for subprocess execution (Prefect logger not available in subprocesses)
 _logger = logging.getLogger(__name__)
 
 
-def _get_session() -> CalibSession:
+def _get_session() -> ExecutionRuntime:
     """Get the current session from global context (internal use)."""
     from qdash.workflow.service.session_context import get_current_session
 
@@ -179,7 +179,7 @@ def _should_skip_task_for_qid(
     task_name: str,
     qid: str,
     backend_name: str,
-    session: CalibSession | None = None,
+    session: ExecutionRuntime | None = None,
 ) -> bool:
     """Check if a task should be skipped for the given qubit.
 
@@ -213,7 +213,7 @@ def _should_skip_task_for_qid(
     return False
 
 
-def _mux_skip(session: CalibSession) -> Any:
+def _mux_skip(session: ExecutionRuntime) -> Any:
     """A ``skip_call`` that skips MUX tasks on non-representative qubits.
 
     The session's MUX mapping decides the representative; a MUX task on a
@@ -263,7 +263,7 @@ def _coupling_task_run_name() -> str:
 
 
 def _execute_mux_qubits_with_session(
-    session: CalibSession,
+    session: ExecutionRuntime,
     qids: list[str],
     plan: StepCalls,
     logger: Any,
@@ -314,7 +314,7 @@ def calibrate_mux_qubits(
 
 
 def _execute_single_qubit_with_session(
-    session: CalibSession,
+    session: ExecutionRuntime,
     qid: str,
     plan: StepCalls,
     logger: Any,
@@ -395,7 +395,7 @@ def calibrate_round_qubits_parallel(
 
 
 def _execute_coupling_pair_with_session(
-    session: CalibSession,
+    session: ExecutionRuntime,
     coupling_qid: str,
     plan: StepCalls,
     logger: Any,
