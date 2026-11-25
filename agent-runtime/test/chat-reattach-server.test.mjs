@@ -44,7 +44,7 @@ const preamble = (dir) => `
     replay: "safe",
     execute: async (_args, api) => {
       polls++;
-      if (expertAnswer === undefined) return { sleep: { checkpoint: {}, until: api.now() + 20 } };
+      if (expertAnswer === undefined) return { kind: "sleep", checkpoint: {}, until: api.now() + 20 };
       return { output: [{ type: "text", text: "expert: " + expertAnswer }] };
     },
   });

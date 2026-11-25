@@ -217,7 +217,7 @@ test("a stored summary is placed again without asking the model", async () => {
     models: { completeSimple: async () => assert.fail("no request") },
   };
   const result = await beforeCompact({ entries: [{ id: 3 }], firstKept: 9, messages: [] }, api, context);
-  assert.deepEqual(result, { summary: "## Goal\n- stored" });
+  assert.deepEqual(result, { kind: "summary", summary: "## Goal\n- stored" });
 });
 
 test("a transcript too large to send whole sends no QDash request and falls back, logged", async () => {
