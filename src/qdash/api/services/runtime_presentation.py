@@ -18,6 +18,7 @@ from qdash.agent.contracts.presentation import (
     PRESENTATION_MEDIA_TYPE,
     PRESENTATION_VERSION,
     TERMINAL_EVENTS,
+    PresentationEnvelope,
     PresentationError,
     parse_envelope,
 )
@@ -95,6 +96,43 @@ def _refuse(step: str, detail: str) -> str:
     return sse_event("error", {"step": step, "detail": detail})
 
 
+def _chat_data(
+    envelope: PresentationEnvelope,
+    *,
+    step: str,
+    extra_result: dict[str, Any] | None,
+    recorder: EvaluationRecorder | None,
+) -> dict[str, Any]:
+    """The SSE payload of one envelope: its ``data`` with what the API owns.
+
+    Runs the API's side effects of ``internal`` first, in this order: an
+    evaluation record is stored and its ids replace it in the shown evaluation,
+    then the turn's answer reaches the recorder. Then an error gets its ``step``
+    and the final result a task chat's ``extra_result``.
+    """
+    event = envelope.event
+    data: dict[str, Any] = dict(envelope.data)
+    internal = envelope.internal
+    if internal is not None:
+        stored = internal.evaluation_record
+        if event == "tool_end" and stored is not None:
+            # A result committed before this turn's message is an earlier turn's (a
+            # run recovered after the runtime restarted): this turn never files it.
+            data["evaluation"] = evaluation_for_chat(
+                data["evaluation"],
+                stored.record,
+                None if stored.before_turn else recorder,
+                call=f"entry:{stored.entry_id}" if stored.entry_id else None,
+            )
+        if internal.answer is not None and recorder is not None:
+            recorder.finish(internal.answer)
+    if event == "error":
+        return {"step": step, **data}
+    if event == "result":
+        return {**data, **(extra_result or {})}
+    return data
+
+
 async def relay(
     lines: AsyncIterable[str],
     *,
@@ -118,32 +156,14 @@ async def relay(
                 logger.warning("Refused a runtime presentation envelope: %s", exc.detail)
                 yield _refuse(step, exc.detail)
                 return
-            event = envelope.event
-            if event == "keepalive":
+            if envelope.event == "keepalive":
                 # An SSE comment keeps every proxy on the way to the browser from
                 # timing out an idle stream.
                 yield ":\n\n"
                 continue
-            data: dict[str, Any] = dict(envelope.data)
-            internal = envelope.internal
-            if event == "tool_end" and internal is not None and internal.evaluation_record:
-                stored = internal.evaluation_record
-                # A result committed before this turn's message is an earlier turn's (a
-                # run recovered after the runtime restarted): this turn never files it.
-                data["evaluation"] = evaluation_for_chat(
-                    data["evaluation"],
-                    stored.record,
-                    None if stored.before_turn else recorder,
-                    call=f"entry:{stored.entry_id}" if stored.entry_id else None,
-                )
-            if internal is not None and internal.answer is not None and recorder is not None:
-                recorder.finish(internal.answer)
-            if event == "error":
-                data = {"step": step, **data}
-            elif event == "result":
-                data = {**data, **(extra_result or {})}
-            yield sse_event(event, data)
-            if event in TERMINAL_EVENTS:
+            data = _chat_data(envelope, step=step, extra_result=extra_result, recorder=recorder)
+            yield sse_event(envelope.event, data)
+            if envelope.event in TERMINAL_EVENTS:
                 return
     except EnvelopeTooLargeError:
         logger.warning("Refused a runtime presentation envelope over the size limit")

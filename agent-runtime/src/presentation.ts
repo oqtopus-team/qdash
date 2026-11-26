@@ -1,25 +1,13 @@
 /**
- * The runtime-owned presentation contract: what QDash's chat shows of a turn.
+ * The runtime-owned presentation contract: maps a chat turn's events
+ * (`NdjsonEvent`) to the envelopes the API validates
+ * (`qdash.agent.contracts.presentation`) and relays to the chat as SSE. An
+ * envelope's `data` is the SSE payload; its `internal` is for the API's own side
+ * effects and is never relayed. See docs/developer-guide/agent/chat-streaming.md.
  *
- * A chat turn's events (`NdjsonEvent`, kept in its `TurnFeed`) describe what the
- * agent did. This module maps them to what the chat displays: tool labels,
- * status lines, the blocks of an answer (charts, composed UIs, the answer text,
- * and the cards a turn ends on), and the segments a placed steer or a turn's own
- * start closes. The API validates each envelope against the same contract
- * (`qdash.agent.contracts.presentation`) and relays its `data` to the browser as
- * the SSE event `event`; it adds only what it owns: the error's `step`, a task
- * chat's `images_sent`, and the ids of the evaluations it stores.
- *
- * `internal` carries what the API needs for its own side effects and never
- * relays: the evaluation record an evaluation tool made (the API stores it and
- * shows its ids), and the turn's answer text (attached to those evaluations).
- *
- * A stream asks for this contract with `Accept: PRESENTATION_MEDIA_TYPE`; one
- * that does not still gets the turn's raw NDJSON events.
- *
- * The mapping is stateful per stream, not per turn: every subscriber of a feed
- * (the turn's own response, and each reattached stream that is replayed the turn
- * from its start) maps the events it reads with its own `PresentationStream`.
+ * A request opts in with `Accept: PRESENTATION_MEDIA_TYPE`; otherwise it gets
+ * the raw NDJSON events. Each subscriber of a turn (its own response, and every
+ * reattached replay) maps with its own `PresentationStream`.
  */
 
 import type { NdjsonEvent } from "./events.ts";
@@ -47,16 +35,18 @@ export type PresentationEventName =
   | "error"
   | "result";
 
+/** An evaluation tool's record, for the API to store (`tool_end` only). */
+export interface InternalEvaluationRecord {
+  record: Record<string, unknown>;
+  /** The result's durable entry, which names the call the same way in every stream of the turn. */
+  entry_id?: string;
+  /** The result belongs to an earlier turn: the API does not file it with this one. */
+  before_turn?: true;
+}
+
 /** What the API uses for its own side effects; never shown. */
 export interface PresentationInternal {
-  /** An evaluation tool's record, for the API to store (`tool_end` only). */
-  evaluation_record?: {
-    record: Record<string, unknown>;
-    /** The result's durable entry, which names the call the same way in every stream of the turn. */
-    entry_id?: string;
-    /** The result belongs to an earlier turn: the API does not file it with this one. */
-    before_turn?: true;
-  };
+  evaluation_record?: InternalEvaluationRecord;
   /** The turn's final answer text (`result`, or the `error` of an empty answer). */
   answer?: string;
 }
@@ -134,13 +124,15 @@ export function blocksResult(
   visuals: readonly PresentationBlock[],
   interactions: readonly PresentationBlock[] = [],
 ): { blocks: PresentationBlock[]; assessment: null } {
-  return {
-    blocks: [...visuals, ...(text ? [{ type: "text", content: text, chart: null }] : []), ...interactions],
-    assessment: null,
-  };
+  const blocks = [...visuals];
+  if (text) blocks.push({ type: "text", content: text, chart: null });
+  blocks.push(...interactions);
+  return { blocks, assessment: null };
 }
 
 const TERMINAL = new Set<NdjsonEvent["type"]>(["done", "noop", "error"]);
+
+type Emit = (name: PresentationEventName, data: Record<string, unknown>, internal?: PresentationInternal) => void;
 
 /** Maps one stream's turn events to presentation envelopes; see the module comment. */
 export class PresentationStream {
@@ -155,8 +147,11 @@ export class PresentationStream {
     if (this.#ended) return [];
     if (TERMINAL.has(event.type)) this.#ended = true;
     const out: PresentationEnvelope[] = [];
-    const emit = (name: PresentationEventName, data: Record<string, unknown>, internal?: PresentationInternal) =>
-      out.push({ v: PRESENTATION_VERSION, event: name, data, ...(internal ? { internal } : {}) });
+    const emit: Emit = (name, data, internal) => {
+      const envelope: PresentationEnvelope = { v: PRESENTATION_VERSION, event: name, data };
+      if (internal) envelope.internal = internal;
+      out.push(envelope);
+    };
 
     switch (event.type) {
       case "ping":
@@ -211,15 +206,16 @@ export class PresentationStream {
         if (event.status === "applied") {
           // The user's message landed here in the transcript: what streamed before it is
           // the answer so far, with the answer it follows when it came after the last tool round.
-          emit("steer", {
+          const applied: Record<string, unknown> = {
             request_id: event.request_id,
             status: "applied",
             entry_id: event.entry_id ?? null,
             text: event.text ?? "",
             result: this.#closeSegment(event.answer ?? ""),
-            // A run recovered after the runtime died placed it before this turn's message.
-            ...(event.before_turn ? { before_turn: true } : {}),
-          });
+          };
+          // A run recovered after the runtime died placed it before this turn's message.
+          if (event.before_turn) applied.before_turn = true;
+          emit("steer", applied);
         } else {
           // Settled without being placed: the run failed or was stopped first.
           emit("steer", { request_id: event.request_id, status: "withdrawn", reason: event.reason ?? "" });
@@ -234,12 +230,12 @@ export class PresentationStream {
         // A continue found the last answer complete: nothing was asked or added.
         emit("noop", { reason: event.reason || "nothing_to_answer" });
         break;
-      case "error":
-        emit("error", {
-          detail: event.message ?? "Agent failed",
-          ...(typeof event.code === "string" ? { code: event.code } : {}),
-        });
+      case "error": {
+        const error: Record<string, unknown> = { detail: event.message ?? "Agent failed" };
+        if (typeof event.code === "string") error.code = event.code;
+        emit("error", error);
         break;
+      }
       case "done": {
         const answer = event.text ?? "";
         const result = this.#closeSegment(answer);
@@ -249,12 +245,10 @@ export class PresentationStream {
           emit("error", { detail: "The model returned an empty response" }, { answer });
           break;
         }
+        const data: Record<string, unknown> = { ...result };
+        if (typeof event.entry_id === "string" && event.entry_id) data.entry_id = event.entry_id;
         emit("status", { step: "complete", message: "Done" });
-        emit(
-          "result",
-          { ...result, ...(typeof event.entry_id === "string" && event.entry_id ? { entry_id: event.entry_id } : {}) },
-          { answer },
-        );
+        emit("result", data, { answer });
         break;
       }
     }
@@ -268,56 +262,49 @@ export class PresentationStream {
     return segment;
   }
 
-  #toolEnd(
-    event: Extract<NdjsonEvent, { type: "tool_end" }>,
-    emit: (name: PresentationEventName, data: Record<string, unknown>, internal?: PresentationInternal) => void,
-  ): void {
+  #toolEnd(event: Extract<NdjsonEvent, { type: "tool_end" }>, emit: Emit): void {
     const label = toolLabel(event.name);
     this.#completedTools.push(label);
+    const data: Record<string, unknown> = {
+      id: event.id ?? null,
+      tool: event.name,
+      label,
+      is_error: event.isError === true,
+    };
+    // Optional fields follow, each present only when it has something to show.
+    // Figure paths the tool fetched; the chat renders them inline.
+    if (Array.isArray(event.figures) && event.figures.length) data.figures = event.figures;
+
+    // What an evaluation tool sent its model; the chat shows it on request. Its record
+    // is split off for the API to store and never reaches the chat.
     let internal: PresentationInternal | undefined;
-    let evaluation: Record<string, unknown> | undefined;
     if (isRecord(event.evaluation)) {
-      const { record, ...shown } = event.evaluation as unknown as Record<string, unknown>;
-      evaluation = shown;
+      const { record, ...shown } = event.evaluation;
+      data.evaluation = shown;
       if (isRecord(record)) {
-        internal = {
-          evaluation_record: {
-            record,
-            ...(typeof event.entry_id === "string" && event.entry_id ? { entry_id: event.entry_id } : {}),
-            ...(event.before_turn ? { before_turn: true as const } : {}),
-          },
-        };
+        const evaluationRecord: InternalEvaluationRecord = { record };
+        if (typeof event.entry_id === "string" && event.entry_id) evaluationRecord.entry_id = event.entry_id;
+        if (event.before_turn) evaluationRecord.before_turn = true;
+        internal = { evaluation_record: evaluationRecord };
       }
     }
+
+    // What the classifier decided for a `classify` call (bounded by events.ts).
+    if (event.classification) data.classification = event.classification;
+
+    // The calibration session a successful create call made, for the chat to show.
     const created = event.calibrationSession;
-    emit(
-      "tool_end",
-      {
-        id: event.id ?? null,
-        tool: event.name,
-        label,
-        is_error: event.isError === true,
-        // Figure paths the tool fetched; the chat renders them inline.
-        ...(Array.isArray(event.figures) && event.figures.length ? { figures: event.figures } : {}),
-        // What an evaluation tool sent its model; the chat shows it on request.
-        ...(evaluation ? { evaluation } : {}),
-        // What the classifier decided for a `classify` call (bounded by events.ts).
-        ...(event.classification ? { classification: event.classification } : {}),
-        // The calibration session a successful create call made, for the chat to show.
-        ...(created && !event.isError
-          ? {
-              calibration_session: {
-                calibration_session_id: created.calibrationSessionId,
-                ...(created.chipId ? { chip_id: created.chipId } : {}),
-              },
-            }
-          : {}),
-        // What a workspace tool (bash, read, write, edit) answered.
-        ...(typeof event.output === "string" && event.output ? { output: event.output } : {}),
-        ...(Number.isInteger(event.exitCode) ? { exit_code: event.exitCode } : {}),
-      },
-      internal,
-    );
+    if (created && !event.isError) {
+      const session: Record<string, unknown> = { calibration_session_id: created.calibrationSessionId };
+      if (created.chipId) session.chip_id = created.chipId;
+      data.calibration_session = session;
+    }
+
+    // What a workspace tool (bash, read, write, edit) answered.
+    if (typeof event.output === "string" && event.output) data.output = event.output;
+    if (Number.isInteger(event.exitCode)) data.exit_code = event.exitCode;
+
+    emit("tool_end", data, internal);
     emit("status", { step: "thinking", message: "AI is thinking...", completed_tools: [...this.#completedTools] });
   }
 }

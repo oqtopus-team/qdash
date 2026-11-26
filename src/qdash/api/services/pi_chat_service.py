@@ -832,18 +832,18 @@ async def stream_payload(
                     },
                 )
                 return
-            events = (
-                translate(
+            if version is None:
+                # An older runtime ignored the Accept header and sent plain NDJSON.
+                events = translate(
                     response.aiter_lines(), extra_result=extra_result, step=step, recorder=recorder
                 )
-                if version is None
-                else relay(
+            else:
+                events = relay(
                     bounded_lines(response.aiter_text()),
                     extra_result=extra_result,
                     step=step,
                     recorder=recorder,
                 )
-            )
             async for event in events:
                 yield event
     except httpx.HTTPError as exc:
