@@ -7,7 +7,8 @@ import { BRANCH_REFUSAL_STATUS, BranchError, parseDurableId } from "./branch.ts"
 import { ActiveChat, type ChatTarget, type SteerOutcome } from "./chat-control.ts";
 import { runChatTurn, toImageContent, type ImageBody, type TurnResponse } from "./chat-turn.ts";
 import { parsePageContext } from "./page-context.ts";
-import { encodeLine } from "./events.ts";
+import { encodeLine, type NdjsonEvent } from "./events.ts";
+import { acceptsPresentation, PRESENTATION_CONTENT_TYPE, streamEncoder } from "./presentation.ts";
 import { hasBearerToken, readJsonBody, RequestError, runtimeToken } from "./http.ts";
 import { EvaluationError } from "./evaluate.ts";
 import { TurnFeed } from "./turn-feed.ts";
@@ -383,7 +384,7 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
       sendJson(res, 403, { error: "the running answer belongs to another project" });
       return;
     }
-    await attachTurn(res, hold.feed);
+    await attachTurn(res, hold.feed, acceptsPresentation(req.headers.accept));
     return;
   }
   if (hold) {
@@ -463,23 +464,32 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
       timing: { wrapUpMs: CHAT_WRAP_UP_MS, timeoutMs: CHAT_TIMEOUT_MS, pingMs: CHAT_PING_MS },
       expandSkillCommand: (message) => runtime.expandSkillCommand(message),
     },
-    chatResponse(res),
+    chatResponse(res, acceptsPresentation(req.headers.accept)),
   );
 }
 
-/** The transport of a chat turn: a JSON refusal, or the turn's NDJSON stream. */
-function chatResponse(res: ServerResponse): TurnResponse {
+/**
+ * Start a turn's stream: the presentation contract when the request asked for it
+ * (see presentation.ts), else the turn's raw NDJSON events.
+ */
+function writeStreamHead(res: ServerResponse, presentation: boolean): (event: NdjsonEvent) => string {
+  res.writeHead(200, {
+    "Content-Type": presentation ? PRESENTATION_CONTENT_TYPE : "application/x-ndjson",
+    "Cache-Control": "no-cache",
+    "X-Accel-Buffering": "no",
+  });
+  return streamEncoder(presentation, encodeLine);
+}
+
+/** The transport of a chat turn: a JSON refusal, or the turn's stream. */
+function chatResponse(res: ServerResponse, presentation: boolean): TurnResponse {
   return {
     refuse: (status, body) => sendJson(res, status, body),
     stream: (feed) => {
-      res.writeHead(200, {
-        "Content-Type": "application/x-ndjson",
-        "Cache-Control": "no-cache",
-        "X-Accel-Buffering": "no",
-      });
+      const encode = writeStreamHead(res, presentation);
       let connected = true;
       const detach = feed.subscribe((event) => {
-        if (connected && !res.writableEnded) res.write(encodeLine(event));
+        if (connected && !res.writableEnded) res.write(encode(event));
       });
       res.on("close", () => {
         connected = false;
@@ -498,15 +508,12 @@ function chatResponse(res: ServerResponse): TurnResponse {
  * written a terminal event refused its request before streaming (it submitted
  * nothing); the reattached stream says so.
  */
-async function attachTurn(res: ServerResponse, feed: TurnFeed): Promise<void> {
-  res.writeHead(200, {
-    "Content-Type": "application/x-ndjson",
-    "Cache-Control": "no-cache",
-    "X-Accel-Buffering": "no",
-  });
+async function attachTurn(res: ServerResponse, feed: TurnFeed, presentation: boolean): Promise<void> {
+  // Its own mapping state: the replay maps the turn from its start, as the original stream did.
+  const encode = writeStreamHead(res, presentation);
   let connected = true;
   const detach = feed.subscribe((event) => {
-    if (connected && !res.writableEnded) res.write(encodeLine(event));
+    if (connected && !res.writableEnded) res.write(encode(event));
   });
   res.on("close", () => {
     connected = false;
@@ -515,7 +522,7 @@ async function attachTurn(res: ServerResponse, feed: TurnFeed): Promise<void> {
   await feed.closed;
   if (!feed.terminal && connected && !res.writableEnded) {
     res.write(
-      encodeLine({
+      encode({
         type: "error",
         code: "turn_not_started",
         message: "The message was refused before the assistant started on it; send it again.",

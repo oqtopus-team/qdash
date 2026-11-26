@@ -414,3 +414,48 @@ test("a turn sent without a well-formed start is reported without one", { timeou
     await original.rest();
   `);
 });
+
+test("a stream that asks for the presentation contract gets it live, on a reattach, and after the turn", { timeout: 90_000 }, () => {
+  runScenario(`
+    const presentation = { ...headers(), Accept: "application/vnd.qdash.agent-presentation+x-ndjson; version=1" };
+    const shown = (lines, event) => lines.filter((l) => l.event === event).map((l) => l.data);
+    const dropped = new AbortController();
+    const response = await post("/chat", { ...turn, request_id: "t1", message: "calibrate Q0" }, presentation, dropped.signal);
+    assert.equal(response.headers.get("content-type"), "application/vnd.qdash.agent-presentation+x-ndjson; version=1");
+    const first = lineReader(response);
+    const started = await first.until((l) => l.event === "tool_start" && l.data.tool === "wait_expert");
+    assert.deepEqual(started, { v: 1, event: "tool_start", data: { id: started.data.id, tool: "wait_expert", label: "Wait expert", args: {} } });
+    await until(() => polls >= 2);
+    dropped.abort();
+
+    // The reattached stream is mapped from the turn's start, in the same contract.
+    const again = lineReader(await post("/chat", { ...turn, request_id: "t1", reattach: true }, presentation));
+    await again.until((l) => l.event === "tool_start" && l.data.tool === "wait_expert");
+    assert.equal(shown(again.seen, "delta").map((d) => d.text).join(""), "Asking the expert.");
+    expertAnswer = "use 5.1 GHz";
+    const out = await again.rest();
+    assert.ok(out.every((l) => l.v === 1 && typeof l.event === "string"), JSON.stringify(out));
+    assert.deepEqual(shown(out, "tool_end").map((d) => [d.tool, d.label, d.is_error]), [
+      ["wait_expert", "Wait expert", false],
+      ["run_step", "Run step", false],
+    ]);
+    assert.deepEqual(shown(out, "status").map((d) => d.step), ["tool_call", "thinking", "tool_call", "thinking", "complete"]);
+    const [result] = shown(out, "result");
+    assert.deepEqual(result.blocks, [{ type: "text", content: "Resumed after expert: use 5.1 GHz, step 1 done", chart: null }]);
+    assert.match(result.entry_id, /^\\d+$/);
+    assert.equal(out.at(-1).event, "result");
+    assert.deepEqual(out.at(-1).internal, { answer: "Resumed after expert: use 5.1 GHz, step 1 done" });
+    assert.equal(stepRuns, 1);
+
+    // After the turn, the store's replay is mapped the same way; a plain request still gets NDJSON.
+    const late = await lineReader(await post("/chat", { ...turn, request_id: "t1", reattach: true }, presentation)).rest();
+    assert.deepEqual(shown(late, "result"), [result]);
+    assert.deepEqual(shown(late, "tool_end"), shown(out, "tool_end"));
+    const legacy = await post("/chat", { ...turn, request_id: "t1", reattach: true });
+    assert.equal(legacy.headers.get("content-type"), "application/x-ndjson");
+    const raw = await lineReader(legacy).rest();
+    assert.equal(raw.at(-1).type, "done");
+    assert.equal(stepRuns, 1);
+    assert.equal(modelCalls, 3);
+  `);
+});

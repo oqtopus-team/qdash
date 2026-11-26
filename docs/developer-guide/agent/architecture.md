@@ -72,6 +72,8 @@ See [Pi Extension Design](./extensions.md) before adding tools.
 | --- | --- |
 | `src/qdash/api/routers/agent.py` | Authenticated chat routes |
 | `src/qdash/api/services/pi_chat_service.py` | API-to-runtime bridge |
+| `src/qdash/api/services/runtime_presentation.py` | Validated presentation relay and evaluation recording |
+| `agent-runtime/src/presentation.ts` | Chat presentation events and answer blocks |
 | `agent-runtime/src/runtime.ts` | Durable sessions and runtime lifecycle |
 | `agent-runtime/src/chat-registry.ts` | Per-chat tools, context, and policy |
 | `agent-runtime/src/page-context.ts` | Page context and edit proposals |

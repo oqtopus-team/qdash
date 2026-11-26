@@ -1,0 +1,297 @@
+{
+  "description": "Agent presentation contract v1 cases shared by the runtime (agent-runtime/src/presentation.ts), the API relay (qdash.api.services.runtime_presentation) and the chat (ui). runtime_events: the turn events a runtime stream reads. presentation: the envelopes the runtime sends for them. sse: the SSE events the API relays to the chat for them (step run_chat, no evaluation recorder, no extra result); the legacy NDJSON adapter yields the same SSE from runtime_events. ':' is an SSE comment (keepalive).",
+  "version": 1,
+  "cases": [
+    {
+      "name": "tool_round_then_answer",
+      "description": "Thinking, a tool call written and run (figures, output, exit code), a keepalive, then the answer with its entry.",
+      "runtime_events": [
+        {"type": "thinking_delta", "delta": "Look at the fit."},
+        {"type": "tool_draft", "name": "bash", "index": 1, "id": "c1"},
+        {"type": "tool_args_delta", "index": 1, "path": ["command"], "delta": "ls"},
+        {"type": "tool_start", "name": "bash", "id": "c1", "args": {"command": "ls"}},
+        {"type": "ping"},
+        {"type": "tool_end", "name": "bash", "id": "c1", "isError": false, "output": "fit.py", "exitCode": 0, "entry_id": "7"},
+        {"type": "tool_draft", "name": "qdash_get_task_figures", "index": 2},
+        {"type": "tool_start", "name": "qdash_get_task_figures"},
+        {"type": "tool_end", "name": "qdash_get_task_figures", "isError": true, "figures": ["exec/1/CheckRabi_0.png"]},
+        {"type": "tool_start", "name": "codemode", "id": "c3", "args": {"code": "1"}},
+        {"type": "tool_end", "name": "codemode", "id": "c3", "isError": false},
+        {"type": "text_delta", "delta": "The fit "},
+        {"type": "text_delta", "delta": "is good."},
+        {"type": "done", "text": "The fit is good.", "entry_id": "12"}
+      ],
+      "presentation": [
+        {"v": 1, "event": "thinking", "data": {"text": "Look at the fit."}},
+        {"v": 1, "event": "tool_draft", "data": {"index": 1, "id": "c1", "tool": "bash", "label": "Bash"}},
+        {"v": 1, "event": "tool_args_delta", "data": {"index": 1, "path": ["command"], "delta": "ls"}},
+        {"v": 1, "event": "tool_start", "data": {"id": "c1", "tool": "bash", "label": "Bash", "args": {"command": "ls"}}},
+        {"v": 1, "event": "status", "data": {"step": "tool_call", "tool": "bash", "message": "Bash..."}},
+        {"v": 1, "event": "keepalive", "data": {}},
+        {"v": 1, "event": "tool_end", "data": {"id": "c1", "tool": "bash", "label": "Bash", "is_error": false, "output": "fit.py", "exit_code": 0}},
+        {"v": 1, "event": "status", "data": {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Bash"]}},
+        {"v": 1, "event": "tool_draft", "data": {"index": 2, "id": null, "tool": "qdash_get_task_figures", "label": "Get task figures"}},
+        {"v": 1, "event": "tool_start", "data": {"id": null, "tool": "qdash_get_task_figures", "label": "Get task figures", "args": null}},
+        {"v": 1, "event": "status", "data": {"step": "tool_call", "tool": "qdash_get_task_figures", "message": "Get task figures..."}},
+        {"v": 1, "event": "tool_end", "data": {"id": null, "tool": "qdash_get_task_figures", "label": "Get task figures", "is_error": true, "figures": ["exec/1/CheckRabi_0.png"]}},
+        {"v": 1, "event": "status", "data": {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Bash", "Get task figures"]}},
+        {"v": 1, "event": "tool_start", "data": {"id": "c3", "tool": "codemode", "label": "Code mode script", "args": {"code": "1"}}},
+        {"v": 1, "event": "status", "data": {"step": "tool_call", "tool": "codemode", "message": "Code mode script..."}},
+        {"v": 1, "event": "tool_end", "data": {"id": "c3", "tool": "codemode", "label": "Code mode script", "is_error": false}},
+        {"v": 1, "event": "status", "data": {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Bash", "Get task figures", "Code mode script"]}},
+        {"v": 1, "event": "delta", "data": {"text": "The fit "}},
+        {"v": 1, "event": "delta", "data": {"text": "is good."}},
+        {"v": 1, "event": "status", "data": {"step": "complete", "message": "Done"}},
+        {"v": 1, "event": "result", "data": {"blocks": [{"type": "text", "content": "The fit is good.", "chart": null}], "assessment": null, "entry_id": "12"}, "internal": {"answer": "The fit is good."}}
+      ],
+      "sse": [
+        ["thinking", {"text": "Look at the fit."}],
+        ["tool_draft", {"index": 1, "id": "c1", "tool": "bash", "label": "Bash"}],
+        ["tool_args_delta", {"index": 1, "path": ["command"], "delta": "ls"}],
+        ["tool_start", {"id": "c1", "tool": "bash", "label": "Bash", "args": {"command": "ls"}}],
+        ["status", {"step": "tool_call", "tool": "bash", "message": "Bash..."}],
+        ":",
+        ["tool_end", {"id": "c1", "tool": "bash", "label": "Bash", "is_error": false, "output": "fit.py", "exit_code": 0}],
+        ["status", {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Bash"]}],
+        ["tool_draft", {"index": 2, "id": null, "tool": "qdash_get_task_figures", "label": "Get task figures"}],
+        ["tool_start", {"id": null, "tool": "qdash_get_task_figures", "label": "Get task figures", "args": null}],
+        ["status", {"step": "tool_call", "tool": "qdash_get_task_figures", "message": "Get task figures..."}],
+        ["tool_end", {"id": null, "tool": "qdash_get_task_figures", "label": "Get task figures", "is_error": true, "figures": ["exec/1/CheckRabi_0.png"]}],
+        ["status", {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Bash", "Get task figures"]}],
+        ["tool_start", {"id": "c3", "tool": "codemode", "label": "Code mode script", "args": {"code": "1"}}],
+        ["status", {"step": "tool_call", "tool": "codemode", "message": "Code mode script..."}],
+        ["tool_end", {"id": "c3", "tool": "codemode", "label": "Code mode script", "is_error": false}],
+        ["status", {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Bash", "Get task figures", "Code mode script"]}],
+        ["delta", {"text": "The fit "}],
+        ["delta", {"text": "is good."}],
+        ["status", {"step": "complete", "message": "Done"}],
+        ["result", {"blocks": [{"type": "text", "content": "The fit is good.", "chart": null}], "assessment": null, "entry_id": "12"}]
+      ]
+    },
+    {
+      "name": "visuals_and_cards",
+      "description": "Charts and composed UIs precede the answer text; a malformed UI keeps its fallback; questions, approvals and edits follow it.",
+      "runtime_events": [
+        {"type": "tool_start", "name": "render_chart", "id": "v1"},
+        {"type": "chart", "chart": {"data": [{"x": [1, 2], "y": [3, 4]}], "layout": {"title": "T1"}}},
+        {"type": "tool_end", "name": "render_chart", "id": "v1", "isError": false},
+        {"type": "tool_start", "name": "render_ui", "id": "v2"},
+        {"type": "ui", "ui": {"version": 1, "spec": {"root": "card", "elements": {"card": {"type": "Card", "props": {"title": "Q0"}, "children": []}}}, "fallback": "- T1: 42"}},
+        {"type": "tool_end", "name": "render_ui", "id": "v2", "isError": false},
+        {"type": "ui", "ui": {"version": "1", "spec": {}, "fallback": "plain fallback"}},
+        {"type": "ui", "ui": {"version": 1, "spec": []}},
+        {"type": "ask", "ask": {"question": "Which qubit?", "options": ["Q0", "Q1"]}},
+        {"type": "approval", "approval": {"id": "w1", "tool": "qdash_update_parameter", "args": {"qid": "0"}}},
+        {"type": "edit", "edit": {"target": "flow", "code": "print(1)"}},
+        {"type": "done", "text": "Here is the summary.", "entry_id": "20"}
+      ],
+      "presentation": [
+        {"v": 1, "event": "tool_start", "data": {"id": "v1", "tool": "render_chart", "label": "Render chart", "args": null}},
+        {"v": 1, "event": "status", "data": {"step": "tool_call", "tool": "render_chart", "message": "Render chart..."}},
+        {"v": 1, "event": "tool_end", "data": {"id": "v1", "tool": "render_chart", "label": "Render chart", "is_error": false}},
+        {"v": 1, "event": "status", "data": {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Render chart"]}},
+        {"v": 1, "event": "tool_start", "data": {"id": "v2", "tool": "render_ui", "label": "Render ui", "args": null}},
+        {"v": 1, "event": "status", "data": {"step": "tool_call", "tool": "render_ui", "message": "Render ui..."}},
+        {"v": 1, "event": "ui", "data": {"type": "ui", "content": "- T1: 42", "chart": null, "ui": {"version": 1, "spec": {"root": "card", "elements": {"card": {"type": "Card", "props": {"title": "Q0"}, "children": []}}}, "fallback": "- T1: 42"}}},
+        {"v": 1, "event": "tool_end", "data": {"id": "v2", "tool": "render_ui", "label": "Render ui", "is_error": false}},
+        {"v": 1, "event": "status", "data": {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Render chart", "Render ui"]}},
+        {"v": 1, "event": "ui", "data": {"type": "text", "content": "plain fallback", "chart": null}},
+        {"v": 1, "event": "status", "data": {"step": "complete", "message": "Done"}},
+        {"v": 1, "event": "result", "data": {"blocks": [{"type": "chart", "content": null, "chart": {"data": [{"x": [1, 2], "y": [3, 4]}], "layout": {"title": "T1"}}}, {"type": "ui", "content": "- T1: 42", "chart": null, "ui": {"version": 1, "spec": {"root": "card", "elements": {"card": {"type": "Card", "props": {"title": "Q0"}, "children": []}}}, "fallback": "- T1: 42"}}, {"type": "text", "content": "plain fallback", "chart": null}, {"type": "text", "content": "Here is the summary.", "chart": null}, {"type": "ask", "content": null, "chart": null, "ask": {"question": "Which qubit?", "options": ["Q0", "Q1"]}}, {"type": "approval", "content": null, "chart": null, "approval": {"id": "w1", "tool": "qdash_update_parameter", "args": {"qid": "0"}}}, {"type": "edit", "content": null, "chart": null, "edit": {"target": "flow", "code": "print(1)"}}], "assessment": null, "entry_id": "20"}, "internal": {"answer": "Here is the summary."}}
+      ],
+      "sse": [
+        ["tool_start", {"id": "v1", "tool": "render_chart", "label": "Render chart", "args": null}],
+        ["status", {"step": "tool_call", "tool": "render_chart", "message": "Render chart..."}],
+        ["tool_end", {"id": "v1", "tool": "render_chart", "label": "Render chart", "is_error": false}],
+        ["status", {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Render chart"]}],
+        ["tool_start", {"id": "v2", "tool": "render_ui", "label": "Render ui", "args": null}],
+        ["status", {"step": "tool_call", "tool": "render_ui", "message": "Render ui..."}],
+        ["ui", {"type": "ui", "content": "- T1: 42", "chart": null, "ui": {"version": 1, "spec": {"root": "card", "elements": {"card": {"type": "Card", "props": {"title": "Q0"}, "children": []}}}, "fallback": "- T1: 42"}}],
+        ["tool_end", {"id": "v2", "tool": "render_ui", "label": "Render ui", "is_error": false}],
+        ["status", {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Render chart", "Render ui"]}],
+        ["ui", {"type": "text", "content": "plain fallback", "chart": null}],
+        ["status", {"step": "complete", "message": "Done"}],
+        ["result", {"blocks": [{"type": "chart", "content": null, "chart": {"data": [{"x": [1, 2], "y": [3, 4]}], "layout": {"title": "T1"}}}, {"type": "ui", "content": "- T1: 42", "chart": null, "ui": {"version": 1, "spec": {"root": "card", "elements": {"card": {"type": "Card", "props": {"title": "Q0"}, "children": []}}}, "fallback": "- T1: 42"}}, {"type": "text", "content": "plain fallback", "chart": null}, {"type": "text", "content": "Here is the summary.", "chart": null}, {"type": "ask", "content": null, "chart": null, "ask": {"question": "Which qubit?", "options": ["Q0", "Q1"]}}, {"type": "approval", "content": null, "chart": null, "approval": {"id": "w1", "tool": "qdash_update_parameter", "args": {"qid": "0"}}}, {"type": "edit", "content": null, "chart": null, "edit": {"target": "flow", "code": "print(1)"}}], "assessment": null, "entry_id": "20"}]
+      ]
+    },
+    {
+      "name": "steers_and_recovered_turn_start",
+      "description": "A recovered run answers an earlier turn's steer (before_turn), the turn's own message starts, a steer is placed mid-turn, another is withdrawn.",
+      "runtime_events": [
+        {"type": "tool_start", "name": "qcal_evaluate", "id": "r1"},
+        {"type": "chart", "chart": {"data": [], "layout": {}}},
+        {"type": "tool_end", "name": "qcal_evaluate", "id": "r1", "isError": false, "entry_id": "3", "before_turn": true},
+        {"type": "steer", "request_id": "s-old", "status": "applied", "entry_id": "4", "text": "and Q1?", "answer": "Q0 is fine.", "before_turn": true},
+        {"type": "text_delta", "delta": "Q1 too."},
+        {"type": "turn_start", "answer": "Q1 too."},
+        {"type": "tool_start", "name": "qdash_get_timeseries", "id": "t1"},
+        {"type": "ui", "ui": {"version": 1, "spec": {"root": "a", "elements": {"a": {"type": "Text", "props": {"text": "x"}, "children": []}}}, "fallback": ""}},
+        {"type": "tool_end", "name": "qdash_get_timeseries", "id": "t1", "isError": false},
+        {"type": "steer", "request_id": "s-new", "status": "applied", "entry_id": "9", "text": "use T2 instead", "answer": ""},
+        {"type": "steer", "request_id": "s-late", "status": "withdrawn", "reason": "aborted"},
+        {"type": "done", "text": "T2 trend attached.", "entry_id": "11"}
+      ],
+      "presentation": [
+        {"v": 1, "event": "tool_start", "data": {"id": "r1", "tool": "qcal_evaluate", "label": "Qcal evaluate", "args": null}},
+        {"v": 1, "event": "status", "data": {"step": "tool_call", "tool": "qcal_evaluate", "message": "Qcal evaluate..."}},
+        {"v": 1, "event": "tool_end", "data": {"id": "r1", "tool": "qcal_evaluate", "label": "Qcal evaluate", "is_error": false}},
+        {"v": 1, "event": "status", "data": {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Qcal evaluate"]}},
+        {"v": 1, "event": "steer", "data": {"request_id": "s-old", "status": "applied", "entry_id": "4", "text": "and Q1?", "result": {"blocks": [{"type": "chart", "content": null, "chart": {"data": [], "layout": {}}}, {"type": "text", "content": "Q0 is fine.", "chart": null}], "assessment": null}, "before_turn": true}},
+        {"v": 1, "event": "delta", "data": {"text": "Q1 too."}},
+        {"v": 1, "event": "turn_start", "data": {"result": {"blocks": [{"type": "text", "content": "Q1 too.", "chart": null}], "assessment": null}}},
+        {"v": 1, "event": "tool_start", "data": {"id": "t1", "tool": "qdash_get_timeseries", "label": "Get timeseries", "args": null}},
+        {"v": 1, "event": "status", "data": {"step": "tool_call", "tool": "qdash_get_timeseries", "message": "Get timeseries..."}},
+        {"v": 1, "event": "ui", "data": {"type": "ui", "content": null, "chart": null, "ui": {"version": 1, "spec": {"root": "a", "elements": {"a": {"type": "Text", "props": {"text": "x"}, "children": []}}}, "fallback": ""}}},
+        {"v": 1, "event": "tool_end", "data": {"id": "t1", "tool": "qdash_get_timeseries", "label": "Get timeseries", "is_error": false}},
+        {"v": 1, "event": "status", "data": {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Qcal evaluate", "Get timeseries"]}},
+        {"v": 1, "event": "steer", "data": {"request_id": "s-new", "status": "applied", "entry_id": "9", "text": "use T2 instead", "result": {"blocks": [{"type": "ui", "content": null, "chart": null, "ui": {"version": 1, "spec": {"root": "a", "elements": {"a": {"type": "Text", "props": {"text": "x"}, "children": []}}}, "fallback": ""}}], "assessment": null}}},
+        {"v": 1, "event": "steer", "data": {"request_id": "s-late", "status": "withdrawn", "reason": "aborted"}},
+        {"v": 1, "event": "status", "data": {"step": "complete", "message": "Done"}},
+        {"v": 1, "event": "result", "data": {"blocks": [{"type": "text", "content": "T2 trend attached.", "chart": null}], "assessment": null, "entry_id": "11"}, "internal": {"answer": "T2 trend attached."}}
+      ],
+      "sse": [
+        ["tool_start", {"id": "r1", "tool": "qcal_evaluate", "label": "Qcal evaluate", "args": null}],
+        ["status", {"step": "tool_call", "tool": "qcal_evaluate", "message": "Qcal evaluate..."}],
+        ["tool_end", {"id": "r1", "tool": "qcal_evaluate", "label": "Qcal evaluate", "is_error": false}],
+        ["status", {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Qcal evaluate"]}],
+        ["steer", {"request_id": "s-old", "status": "applied", "entry_id": "4", "text": "and Q1?", "result": {"blocks": [{"type": "chart", "content": null, "chart": {"data": [], "layout": {}}}, {"type": "text", "content": "Q0 is fine.", "chart": null}], "assessment": null}, "before_turn": true}],
+        ["delta", {"text": "Q1 too."}],
+        ["turn_start", {"result": {"blocks": [{"type": "text", "content": "Q1 too.", "chart": null}], "assessment": null}}],
+        ["tool_start", {"id": "t1", "tool": "qdash_get_timeseries", "label": "Get timeseries", "args": null}],
+        ["status", {"step": "tool_call", "tool": "qdash_get_timeseries", "message": "Get timeseries..."}],
+        ["ui", {"type": "ui", "content": null, "chart": null, "ui": {"version": 1, "spec": {"root": "a", "elements": {"a": {"type": "Text", "props": {"text": "x"}, "children": []}}}, "fallback": ""}}],
+        ["tool_end", {"id": "t1", "tool": "qdash_get_timeseries", "label": "Get timeseries", "is_error": false}],
+        ["status", {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Qcal evaluate", "Get timeseries"]}],
+        ["steer", {"request_id": "s-new", "status": "applied", "entry_id": "9", "text": "use T2 instead", "result": {"blocks": [{"type": "ui", "content": null, "chart": null, "ui": {"version": 1, "spec": {"root": "a", "elements": {"a": {"type": "Text", "props": {"text": "x"}, "children": []}}}, "fallback": ""}}], "assessment": null}}],
+        ["steer", {"request_id": "s-late", "status": "withdrawn", "reason": "aborted"}],
+        ["status", {"step": "complete", "message": "Done"}],
+        ["result", {"blocks": [{"type": "text", "content": "T2 trend attached.", "chart": null}], "assessment": null, "entry_id": "11"}]
+      ]
+    },
+    {
+      "name": "evaluation_classification_session",
+      "description": "An evaluation tool's summary (its record goes to the API only), a classify decision, and a created calibration session.",
+      "runtime_events": [
+        {"type": "tool_start", "name": "qcal_evaluate", "id": "e1"},
+        {"type": "tool_end", "name": "qcal_evaluate", "id": "e1", "isError": false, "entry_id": "5", "evaluation": {"prompt": "Reference for CheckRabi", "model": "vllm/ising", "fallback": true, "record": {"task_id": "task-1", "verdict": "good"}}},
+        {"type": "tool_start", "name": "classify", "id": "k1"},
+        {"type": "tool_end", "name": "classify", "id": "k1", "isError": false, "classification": {"classifier": "system-one/Open-Jev", "outcome": "classified", "category": "readout_problem", "probability": 0.8, "margin": 0.65, "probabilities": [{"category": "readout_problem", "probability": 0.8}, {"category": "drive_problem", "probability": 0.2}]}},
+        {"type": "tool_start", "name": "qdash_create_calibration_session", "id": "cs1"},
+        {"type": "tool_end", "name": "qdash_create_calibration_session", "id": "cs1", "isError": false, "calibrationSession": {"calibrationSessionId": "sess-1", "chipId": "64Qv3"}},
+        {"type": "done", "text": "Evaluated.", "entry_id": "8"}
+      ],
+      "presentation": [
+        {"v": 1, "event": "tool_start", "data": {"id": "e1", "tool": "qcal_evaluate", "label": "Qcal evaluate", "args": null}},
+        {"v": 1, "event": "status", "data": {"step": "tool_call", "tool": "qcal_evaluate", "message": "Qcal evaluate..."}},
+        {"v": 1, "event": "tool_end", "data": {"id": "e1", "tool": "qcal_evaluate", "label": "Qcal evaluate", "is_error": false, "evaluation": {"prompt": "Reference for CheckRabi", "model": "vllm/ising", "fallback": true}}, "internal": {"evaluation_record": {"record": {"task_id": "task-1", "verdict": "good"}, "entry_id": "5"}}},
+        {"v": 1, "event": "status", "data": {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Qcal evaluate"]}},
+        {"v": 1, "event": "tool_start", "data": {"id": "k1", "tool": "classify", "label": "Classify", "args": null}},
+        {"v": 1, "event": "status", "data": {"step": "tool_call", "tool": "classify", "message": "Classify..."}},
+        {"v": 1, "event": "tool_end", "data": {"id": "k1", "tool": "classify", "label": "Classify", "is_error": false, "classification": {"classifier": "system-one/Open-Jev", "outcome": "classified", "category": "readout_problem", "probability": 0.8, "margin": 0.65, "probabilities": [{"category": "readout_problem", "probability": 0.8}, {"category": "drive_problem", "probability": 0.2}]}}},
+        {"v": 1, "event": "status", "data": {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Qcal evaluate", "Classify"]}},
+        {"v": 1, "event": "tool_start", "data": {"id": "cs1", "tool": "qdash_create_calibration_session", "label": "Create calibration session", "args": null}},
+        {"v": 1, "event": "status", "data": {"step": "tool_call", "tool": "qdash_create_calibration_session", "message": "Create calibration session..."}},
+        {"v": 1, "event": "tool_end", "data": {"id": "cs1", "tool": "qdash_create_calibration_session", "label": "Create calibration session", "is_error": false, "calibration_session": {"calibration_session_id": "sess-1", "chip_id": "64Qv3"}}},
+        {"v": 1, "event": "status", "data": {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Qcal evaluate", "Classify", "Create calibration session"]}},
+        {"v": 1, "event": "status", "data": {"step": "complete", "message": "Done"}},
+        {"v": 1, "event": "result", "data": {"blocks": [{"type": "text", "content": "Evaluated.", "chart": null}], "assessment": null, "entry_id": "8"}, "internal": {"answer": "Evaluated."}}
+      ],
+      "sse": [
+        ["tool_start", {"id": "e1", "tool": "qcal_evaluate", "label": "Qcal evaluate", "args": null}],
+        ["status", {"step": "tool_call", "tool": "qcal_evaluate", "message": "Qcal evaluate..."}],
+        ["tool_end", {"id": "e1", "tool": "qcal_evaluate", "label": "Qcal evaluate", "is_error": false, "evaluation": {"prompt": "Reference for CheckRabi", "model": "vllm/ising", "fallback": true}}],
+        ["status", {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Qcal evaluate"]}],
+        ["tool_start", {"id": "k1", "tool": "classify", "label": "Classify", "args": null}],
+        ["status", {"step": "tool_call", "tool": "classify", "message": "Classify..."}],
+        ["tool_end", {"id": "k1", "tool": "classify", "label": "Classify", "is_error": false, "classification": {"classifier": "system-one/Open-Jev", "outcome": "classified", "category": "readout_problem", "probability": 0.8, "margin": 0.65, "probabilities": [{"category": "readout_problem", "probability": 0.8}, {"category": "drive_problem", "probability": 0.2}]}}],
+        ["status", {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Qcal evaluate", "Classify"]}],
+        ["tool_start", {"id": "cs1", "tool": "qdash_create_calibration_session", "label": "Create calibration session", "args": null}],
+        ["status", {"step": "tool_call", "tool": "qdash_create_calibration_session", "message": "Create calibration session..."}],
+        ["tool_end", {"id": "cs1", "tool": "qdash_create_calibration_session", "label": "Create calibration session", "is_error": false, "calibration_session": {"calibration_session_id": "sess-1", "chip_id": "64Qv3"}}],
+        ["status", {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Qcal evaluate", "Classify", "Create calibration session"]}],
+        ["status", {"step": "complete", "message": "Done"}],
+        ["result", {"blocks": [{"type": "text", "content": "Evaluated.", "chart": null}], "assessment": null, "entry_id": "8"}]
+      ]
+    },
+    {
+      "name": "noop",
+      "description": "A continue found the last answer complete.",
+      "runtime_events": [
+        {"type": "noop", "reason": "nothing_to_answer"}
+      ],
+      "presentation": [
+        {"v": 1, "event": "noop", "data": {"reason": "nothing_to_answer"}}
+      ],
+      "sse": [
+        ["noop", {"reason": "nothing_to_answer"}]
+      ]
+    },
+    {
+      "name": "runtime_error_with_code",
+      "description": "A partial answer, then the runtime's own error with its code; nothing after the terminal event is shown.",
+      "runtime_events": [
+        {"type": "text_delta", "delta": "Partial"},
+        {"type": "error", "message": "The conversation could not be compacted.", "code": "compaction_failed"},
+        {"type": "text_delta", "delta": "ignored"}
+      ],
+      "presentation": [
+        {"v": 1, "event": "delta", "data": {"text": "Partial"}},
+        {"v": 1, "event": "error", "data": {"detail": "The conversation could not be compacted.", "code": "compaction_failed"}}
+      ],
+      "sse": [
+        ["delta", {"text": "Partial"}],
+        ["error", {"step": "run_chat", "detail": "The conversation could not be compacted.", "code": "compaction_failed"}]
+      ]
+    },
+    {
+      "name": "turn_not_started",
+      "description": "A reattached stream whose turn was refused before it streamed.",
+      "runtime_events": [
+        {"type": "error", "code": "turn_not_started", "message": "The message was refused before the assistant started on it; send it again."}
+      ],
+      "presentation": [
+        {"v": 1, "event": "error", "data": {"detail": "The message was refused before the assistant started on it; send it again.", "code": "turn_not_started"}}
+      ],
+      "sse": [
+        ["error", {"step": "run_chat", "detail": "The message was refused before the assistant started on it; send it again.", "code": "turn_not_started"}]
+      ]
+    },
+    {
+      "name": "empty_answer",
+      "description": "No text and no block: an explicit error instead of a silent empty reply.",
+      "runtime_events": [
+        {"type": "tool_start", "name": "bash", "id": "b"},
+        {"type": "tool_end", "name": "bash", "id": "b", "isError": false},
+        {"type": "done", "text": ""}
+      ],
+      "presentation": [
+        {"v": 1, "event": "tool_start", "data": {"id": "b", "tool": "bash", "label": "Bash", "args": null}},
+        {"v": 1, "event": "status", "data": {"step": "tool_call", "tool": "bash", "message": "Bash..."}},
+        {"v": 1, "event": "tool_end", "data": {"id": "b", "tool": "bash", "label": "Bash", "is_error": false}},
+        {"v": 1, "event": "status", "data": {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Bash"]}},
+        {"v": 1, "event": "error", "data": {"detail": "The model returned an empty response"}, "internal": {"answer": ""}}
+      ],
+      "sse": [
+        ["tool_start", {"id": "b", "tool": "bash", "label": "Bash", "args": null}],
+        ["status", {"step": "tool_call", "tool": "bash", "message": "Bash..."}],
+        ["tool_end", {"id": "b", "tool": "bash", "label": "Bash", "is_error": false}],
+        ["status", {"step": "thinking", "message": "AI is thinking...", "completed_tools": ["Bash"]}],
+        ["error", {"step": "run_chat", "detail": "The model returned an empty response"}]
+      ]
+    },
+    {
+      "name": "stream_ends_without_terminal",
+      "description": "The runtime stream closes mid-turn: the API reports it lost so the chat reattaches.",
+      "runtime_events": [
+        {"type": "text_delta", "delta": "Working"}
+      ],
+      "presentation": [
+        {"v": 1, "event": "delta", "data": {"text": "Working"}}
+      ],
+      "sse": [
+        ["delta", {"text": "Working"}],
+        ["error", {"step": "run_chat", "detail": "Agent runtime closed the stream without a result", "code": "stream_lost"}]
+      ]
+    }
+  ]
+}

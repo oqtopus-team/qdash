@@ -74,7 +74,7 @@
 
     <line x1="490" y1="206" x2="490" y2="288" class="qd-edge" marker-end="url(#qd-agent-arrow)"/>
     <text x="480" y="244" class="qd-label" text-anchor="end">POST /chat</text>
-    <text x="480" y="260" class="qd-label" text-anchor="end">NDJSON events back</text>
+    <text x="480" y="260" class="qd-label" text-anchor="end">presentation envelopes</text>
 
     <line x1="550" y1="290" x2="550" y2="208" class="qd-edge" marker-end="url(#qd-agent-arrow)"/>
     <text x="560" y="244" class="qd-label">tools · Python sandbox</text>

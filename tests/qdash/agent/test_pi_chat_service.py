@@ -7,13 +7,8 @@ from typing import Any
 
 import pytest
 
-from qdash.api.services.pi_chat_service import (
-    approval_payload,
-    build_blocks_result,
-    tool_label,
-    translate,
-    ui_block,
-)
+from qdash.api.services.pi_chat_service import approval_payload, translate
+from qdash.api.services.pi_runtime_legacy import build_blocks_result, tool_label, ui_block
 
 
 async def _lines(*events: dict[str, Any]):
