@@ -300,6 +300,7 @@ export const QDASH_TOOL_NAMESPACE = {
     "A tool resolves to the response data its text answer summarizes, not truncated, as a JavaScript value (an object or array, already parsed): read its fields directly and do not call JSON.parse on it. Print a small sample with JSON.stringify first when you do not know its shape.",
     `One call may hand a script at most ${MAX_NESTED_DATA_BYTES} bytes of JSON; a larger response fails the call. Narrow it with a chip, qubit, task, time range, or limit, or split it into several calls.`,
     "Deferred read tools can be called from a script without loading them with tool_search first.",
+    "qdash.calibration holds pure builders for calibration pipeline specs, the same as @oqtopus-team/qdash-sdk/calibration: taskCall, qubitTargets, muxTargets, couplingTargets, one builder per step type (configureAll, bringUp, oneQubitCheck, oneQubitFineTune, customOneQubit, filterByStatus, filterByMetric, generateCRSchedule, twoQubitCalibration, customTwoQubit), calibrationStep(type, fields), sweep.{values, linspace, logspace, arange, range}, and calibrationSpec(targets, steps, { name, default_run_parameters, tags }). Fields use the spec's snake_case names; a field left undefined is left out. They call no tool: validate the result with tools.qdash_plan_pipeline({ spec }).",
   ].join("\n"),
 } as const;
 

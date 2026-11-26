@@ -40,6 +40,16 @@ for shared Python/TypeScript TOML profiles, workflows, metrics, and dashboards.
 INI profiles remain readable with a deprecation warning. Reuse the session across operations;
 there is no connection to close.
 
+## Build Calibration Definitions
+
+Import pure targets, task calls, all built-in steps, and sweeps from
+`@oqtopus-team/qdash-sdk/calibration`, or from the package root. The subpath has no HTTP,
+authentication, or Node.js runtime imports. Fields use Python's snake_case names; omitted
+fields stay omitted, and valid explicit defaults and `null` are preserved. Builders reject
+invalid local inputs; server validation still checks the chip, task catalog, and dependencies.
+See the [definition reference](https://oqtopus-team.github.io/qdash/reference/clients/typescript#define-a-calibration)
+for Python mappings and serialization rules.
+
 ## Summarize Task Results
 
 Reuse a configured `qdash` session to aggregate multiple pages:

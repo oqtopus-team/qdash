@@ -162,6 +162,14 @@ not the objective itself.
 
 A calibration pipeline spec is a JSON description of one calibration run: `spec_version: 2`, targets, an ordered list of steps, and the settings of each task call. QDash validates it against the chip, backend, and task catalog and records an execution for each step it reaches. The spec can only name the step types and tasks QDash exposes; it cannot contain code.
 
+When composing several steps in Code Mode, use the pure `qdash.calibration` builders
+(`taskCall`, `customOneQubit`, `filterByStatus`, targets, and sweeps). Load
+`qdash_plan_pipeline` first, build the spec, call `tools.qdash_plan_pipeline({ chipId, spec })`,
+and print both spec and plan. Resolve validation problems before calling `qdash_run_pipeline`
+directly with the same spec and chip for approval. Scripts cannot execute pipelines or agent
+session steps. Within an agent session, continue through its step tools instead of substituting
+an ordinary pipeline.
+
 A step's `tasks` are calls, not names: `{"name": "CheckRamsey", "call_id": "ramsey_fine", "run": {"detuning": 0.0002}}`. Put `run`, `input`, and `update_calibration_parameters` on the call itself; to share a value such as `shots`, repeat it on each call that needs it, or use `default_run_parameters` for run values every task shares. The top-level `task_parameters` (per-task defaults) is deprecated: QDash still applies it, under each call's own settings, and planning reports a warning. Do not add it to a new spec. One step may run the same task several times (a coarse and a fine Ramsey, two Configure/Rabi rounds) when every occurrence has its own `call_id`; a task that appears once may omit it. Each call on each target gets its own `task_id` in the results.
 
 Workflow:

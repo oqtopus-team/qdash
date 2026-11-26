@@ -16,6 +16,19 @@ supported. The server owns authorization and execution.
 Constructing a session, chip, or definition sends no request. Validation does not execute;
 execution does not silently call a separate validation request first.
 
+## Calibration definitions
+
+`src/calibration.ts` owns pure definitions, exported through the package root and `/calibration`.
+The subpath has no runtime imports. Builders cover Python's built-in calibration steps, targets,
+task calls, and sweeps; see the [definition contract](../../reference/clients/typescript.md#define-a-calibration).
+`src/definitions.ts` preserves the existing exports.
+
+`calibrationDefinitionsSource()` serializes the self-contained builder factory for Code Mode.
+Keep that factory independent of module variables and transpiler helpers. Both hosts evaluate
+this same implementation; do not add a separate sandbox copy. Shared cases in
+`sdks/testdata/calibration_definitions.json` exercise Python, TypeScript, sandbox serialization,
+and server validation. Package tests check the built subpath outside the workspace.
+
 ## Project scope
 
 `new QDash(config, options)` captures a frozen configuration snapshot. `withProject(projectId)`

@@ -58,6 +58,7 @@ import {
   deferredToolsGuideline,
   QDASH_SCRIPT_GUIDELINE,
 } from "@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts";
+import { prepareScriptSource } from "@oqtopus-team/pi-qdash/extensions/lib/script-prelude.ts";
 import {
   boundScriptData,
   DEFAULT_SCRIPT_TIMEOUT_MS,
@@ -134,6 +135,14 @@ export function createCodemodeSandbox(): CodemodeSandbox {
 /** The script source with a bounded deadline (shared with the pi CLI). */
 export function withScriptDeadline(source: string): string {
   return sharedScriptDeadline(source, CODEMODE_OPTIONS_PREFIX);
+}
+
+/**
+ * The source a script runs with: a bounded deadline, and the pure `qdash.calibration` builders
+ * when it names `qdash` (shared with the pi CLI, pi-qdash extensions/lib/script-prelude.ts).
+ */
+export function prepareScript(source: string): string {
+  return prepareScriptSource(source, CODEMODE_OPTIONS_PREFIX);
 }
 
 /** The same tool, callable by the model only, unless it already says who may call it. */
@@ -274,15 +283,17 @@ function forScripts(agent: Agent, scriptTools: ReadonlySet<string>): Agent {
 }
 
 /**
- * The Code Mode tool with every script's deadline bounded, and with only the
- * tools in `scriptTools` in the script's `tools`.
+ * The Code Mode tool with every script's deadline bounded and the calibration
+ * builders available, and with only the tools in `scriptTools` in the
+ * script's `tools`. The prepared source exists only for this run: the model's
+ * call keeps the code it wrote, and a replay prepares it again the same way.
  */
 function boundedCodemode(tool: ToolRegistration, scriptTools: ReadonlySet<string>): ToolRegistration {
   return {
     ...tool,
     execute: (args: unknown, api, context: Context) => {
       const code = (args as { code?: unknown }).code;
-      const bounded = typeof code === "string" ? { ...(args as object), code: withScriptDeadline(code) } : args;
+      const bounded = typeof code === "string" ? { ...(args as object), code: prepareScript(code) } : args;
       const scriptApi = { ...api, agent: async (inner: Context) => forScripts(await api.agent(inner), scriptTools) };
       return tool.execute(bounded as never, scriptApi, context);
     },
