@@ -5,7 +5,16 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from qdash.common.config.metrics import ColorRange, MetricMetadata, MetricsConfig
+from qdash.common.config.loader import ConfigLoader
+from qdash.common.config.metrics import (
+    ColorRange,
+    MetricMetadata,
+    MetricsConfig,
+    ThresholdConfig,
+    ThresholdRange,
+    clear_metrics_config_cache,
+    load_metrics_config,
+)
 
 
 def _metric(**extra: object) -> dict[str, object]:
@@ -43,3 +52,19 @@ def test_color_scale_requires_at_least_two_colors() -> None:
         MetricsConfig.model_validate(
             {"qubit_metrics": {}, "coupling_metrics": {}, "color_scale": {"colors": ["#000000"]}}
         )
+
+
+def test_average_readout_fidelity_threshold_range_reaches_one(monkeypatch) -> None:
+    """The histogram threshold slider can select 100% fidelity (0% error), see issue #594."""
+    monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", ConfigLoader.LOCAL_CONFIG_DIR)
+    ConfigLoader.clear_cache()
+    clear_metrics_config_cache()
+    try:
+        metadata = load_metrics_config().qubit_metrics["average_readout_fidelity"]
+    finally:
+        ConfigLoader.clear_cache()
+        clear_metrics_config_cache()
+
+    assert metadata.threshold == ThresholdConfig(
+        value=0.99, range=ThresholdRange(min=0.9, max=1.0, step=0.001)
+    )

@@ -185,7 +185,7 @@ qubit_metrics:
       value: 0.99 # Raw value (99%)
       range:
         min: 0.9
-        max: 0.999
+        max: 1.0
         step: 0.001
     error_rate_range:
       min: 0.001
