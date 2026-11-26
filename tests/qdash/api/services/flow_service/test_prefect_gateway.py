@@ -20,7 +20,9 @@ class _FakeClient:
         deployment_id: str = "deployment-1",
         read_failure: Exception | None = None,
         delete_failure: Exception | None = None,
+        parameter_schema: Any = None,
     ) -> None:
+        self.parameter_schema = parameter_schema
         self.flow_run_id = flow_run_id
         self.deployment_id = deployment_id
         self.read_failure = read_failure
@@ -42,7 +44,11 @@ class _FakeClient:
         """Return a stub deployment or raise the configured failure."""
         if self.read_failure is not None:
             raise self.read_failure
-        return type("Deployment", (), {"id": self.deployment_id})()
+        return type(
+            "Deployment",
+            (),
+            {"id": self.deployment_id, "parameter_openapi_schema": self.parameter_schema},
+        )()
 
     async def delete_deployment(self, deployment_id: Any) -> None:
         """Record the deletion or raise the configured failure."""
@@ -145,3 +151,29 @@ async def test_create_flow_run_forwards_context_separately_from_parameters():
     client.create_flow_run_from_deployment.assert_awaited_once_with(
         deployment_id="deployment-1", parameters={}, context=context
     )
+
+
+@pytest.mark.asyncio
+async def test_read_deployment_returns_its_id_and_recorded_schema() -> None:
+    """A system deployment is read with the parameter schema it was registered with."""
+    schema = {"properties": {"approved_plan": {"x-contract": 1}}}
+    deployment = await _gateway(
+        _FakeClient(deployment_id="deployment-7", parameter_schema=schema)
+    ).read_deployment("calibration-pipeline/system-calibration-pipeline")
+    assert deployment.id == "deployment-7"
+    assert deployment.parameter_schema == schema
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("recorded", [None, "not a schema", ["approved_plan"]])
+async def test_read_deployment_without_a_readable_schema_reports_none(recorded: Any) -> None:
+    """A deployment with no schema, or one that is not an object, reports none."""
+    deployment = await _gateway(_FakeClient(parameter_schema=recorded)).read_deployment("x/y")
+    assert deployment.parameter_schema is None
+
+
+@pytest.mark.asyncio
+async def test_read_deployment_reports_a_missing_deployment() -> None:
+    """A deployment that cannot be read is unavailable."""
+    with pytest.raises(SystemDeploymentUnavailable):
+        await _gateway(_FakeClient(read_failure=RuntimeError("404"))).read_deployment("x/y")

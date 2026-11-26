@@ -29,6 +29,7 @@ export type MetricValue = QDashApi.MetricValue;
 export type PanelLayoutModel = QDashApi.PanelLayoutModel;
 export type ParameterModel = QDashApi.ParameterModel;
 export type PipelineCatalogResponse = QDashApi.PipelineCatalogResponse;
+export type PipelinePlanResponse = QDashApi.PipelinePlanResponse;
 export type PipelineProblem = QDashApi.PipelineProblem;
 export type PipelineTargets = QDashApi.PipelineTargets;
 export type QubitResponse = QDashApi.QubitResponse;

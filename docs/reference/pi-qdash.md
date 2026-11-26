@@ -162,7 +162,8 @@ reported reasoning; they do not establish the current hardware state.
 | --- | --- |
 | `qdash_get_pipeline_catalog` | Get step types, task documentation, and spec schema |
 | `qdash_plan_pipeline` | Validate a version 2 spec without running it |
-| `qdash_run_pipeline` | Start a validated pipeline after confirmation |
+| `qdash_create_pipeline_plan` | Validate and persist an expiring proposal; available in scripts, starts nothing |
+| `qdash_run_pipeline` | Start a spec or stored `planId` after confirmation; supply exactly one |
 | `qdash_save_flow` | Validate, save, and register a workflow after confirmation |
 | `qdash_execute_flow` | Run a saved workflow after confirmation |
 
@@ -211,12 +212,13 @@ cancelled turn invalidate approval. Session-granted writes remain limited to the
 
 ## Scripts and deferred tools
 
-`tool_search` loads specialist tools. `codemode` batches audited reads as JSON; writes, figures,
-shell tools, and unaudited calls are blocked. Call them directly. A script result is limited to
+`tool_search` loads specialist tools. `codemode` batches audited reads as JSON and can persist
+pipeline proposals with `qdash_create_pipeline_plan`. Execution, other writes, figures, shell
+tools, and unaudited calls are blocked. Call them directly. A script result is limited to
 512 KiB; the default timeout is 120 seconds, capped at 300.
 
 Scripts can build calibration specs with `qdash.calibration`, the same pure builders as the
-[TypeScript SDK](./clients/typescript.md#define-a-calibration). Load `qdash_plan_pipeline` with
+[TypeScript SDK](./clients/typescript.md#define-a-calibration). Load `qdash_create_pipeline_plan` with
 `tool_search` first. Replace the chip and targets with values from your deployment:
 
 ```js
@@ -225,14 +227,20 @@ const spec = c.calibrationSpec(c.qubitTargets(["0", "1"]), [
   c.customOneQubit({ step_name: "t1", tasks: [c.taskCall("CheckT1")] }),
   c.filterByStatus({ step: "t1" }),
 ]);
-const plan = await tools.qdash_plan_pipeline({ chipId: "64Qv3", spec });
-text({ spec, plan });
+const plan = await tools.qdash_create_pipeline_plan({ chipId: "64Qv3", spec });
+text(plan);
 ```
 
-This only defines and validates a plan. Inspect `plan.valid` and resolve reported problems before
-calling `qdash_run_pipeline` directly with the same spec and chip for approval. That call runs
-an ordinary pipeline; agent-session measurements must use the session's own step tools.
-The helpers do not enable script writes or waits. Use the literal `qdash.calibration` reference;
+Resolve any validation problems, then use the returned `plan_id` as `planId` in a direct
+`qdash_run_pipeline({ chipId: "64Qv3", planId })` call. The host retrieves the stored content for
+approval; the model does not copy its spec or supply an approval digest. Plans expire after
+24 hours. If expired or changed state invalidates the proposal, build and approve a new plan.
+For validation without storage, use `qdash_plan_pipeline`; its valid spec can still be passed
+directly to `qdash_run_pipeline`.
+
+This runs an ordinary pipeline; agent-session measurements must use the session's own step
+tools. Proposal storage does not enable measurements, other writes, or waits inside scripts.
+Use the literal `qdash.calibration` reference;
 helpers are installed when the source names `qdash`, not through dynamically assembled names.
 
 Classified deferred tools include a `Request type` line in their searchable descriptions.

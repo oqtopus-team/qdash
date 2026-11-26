@@ -14,6 +14,8 @@
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 
+import { runPipelineArgumentProblem } from "./pipeline-plan-preview.js";
+
 // Written as `{ type, enum }`: a union of literals compiles to anyOf/const,
 // which vLLM's guided decoding ignores.
 const actionType = Type.Unsafe<"run_task" | "request_human" | "complete_session">({
@@ -163,6 +165,8 @@ function scopeProblems(policy: AgentSessionPolicyInput): string | null {
  * card), so a user is never asked to approve a session policy QDash would refuse.
  */
 export function preApprovalProblems(toolName: string, args: unknown): string | null {
+  // Exactly one of a spec and a stored plan: an approval never has to cover both.
+  if (toolName === "qdash_run_pipeline") return runPipelineArgumentProblem(args);
   if (toolName !== "qdash_create_agent_session") return null;
   const policy = args !== null && typeof args === "object" ? (args as { policy?: unknown }).policy : undefined;
   // A missing policy is a shape error the tool's schema and execute report.

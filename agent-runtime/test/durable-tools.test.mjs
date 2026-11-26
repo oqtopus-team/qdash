@@ -271,9 +271,11 @@ for (const name of REVIEWED_WRITE_TOOL_NAMES) {
     const writeTool = extension.tools.find((tool) => tool.name === name);
     const context = { abortSignal: new AbortController().signal };
 
-    // Even a model that sets confirmWrite only gets an approval request.
+    // Even a model that sets confirmWrite only gets an approval request. A pipeline run
+    // names exactly one source, so it is given a spec.
+    const base = name === "qdash_run_pipeline" ? { spec: {} } : {};
     const requested = await writeTool.execute(
-      { title: "T1 drop", confirmWrite: true, profile: "default" },
+      { ...base, title: "T1 drop", confirmWrite: true, profile: "default" },
       { callId: "call-1" },
       context,
     );
@@ -284,7 +286,7 @@ for (const name of REVIEWED_WRITE_TOOL_NAMES) {
       id: "call-1",
       tool: name,
       label: name,
-      args: { title: "T1 drop" },
+      args: { ...base, title: "T1 drop" },
     });
 
     await writeTools.runApproved(requested.details.approval);
@@ -479,4 +481,46 @@ test("a cancelled turn does not wait for a tool that ignores the signal", async 
   await assert.rejects(call, (error) => error instanceof ToolCancelled && /keeps running in QDash/.test(error.message));
   await assert.rejects(untilAborted(new Promise(() => {}), controller.signal, "x"), ToolCancelled);
   assert.equal(await untilAborted(Promise.resolve(3), new AbortController().signal, "x"), 3);
+});
+
+test("a pipeline run by plan shows the fetched plan on its card and runs with it, or gets no card", async () => {
+  const name = "qdash_run_pipeline";
+  const write = registered(name);
+  const preview = {
+    kind: "calibration_pipeline_plan",
+    planId: "cpp-1",
+    reviewDigest: `sha256:v1:${"d".repeat(64)}`,
+    chipId: "64Qv3",
+    backendName: "qubex",
+    expiresAt: "2999-01-01T00:00:00Z",
+    targetQids: ["0", "1"],
+    plan: { plan_id: "cpp-1", steps: [] },
+  };
+  const fetched = [];
+  let answer = async () => preview;
+  const { extension, writeTools } = buildQDashExtension([{ tools: new Map([[name, write]]) }], {}, "/tmp/work", connection, [], {
+    resolvePreview: (toolName, args, conn) => {
+      fetched.push([toolName, args, conn]);
+      return answer();
+    },
+  });
+  const writeTool = extension.tools.find((tool) => tool.name === name);
+  const context = { abortSignal: new AbortController().signal };
+  const requested = await writeTool.execute({ chipId: "64Qv3", planId: "cpp-1", profile: "x" }, { callId: "call-p" }, context);
+  // Fetched as the runtime's connection, with the arguments the card shows.
+  assert.deepEqual(fetched, [[name, { chipId: "64Qv3", planId: "cpp-1" }, connection]]);
+  assert.deepEqual(requested.details.approval.preview, preview);
+  await writeTools.runApproved(requested.details.approval);
+  const [run] = write.seen;
+  assert.deepEqual(run.ctx[HOST_WRITE_APPROVAL_KEY], { toolCallId: "call-p", toolName: name, preview });
+  assert.ok(Object.isFrozen(run.ctx[HOST_WRITE_APPROVAL_KEY].preview));
+  // A spec run fetches nothing and its card has no preview.
+  const spec = await writeTool.execute({ chipId: "64Qv3", spec: {} }, { callId: "call-s" }, context);
+  assert.equal(spec.details.approval.preview, undefined);
+  assert.equal(fetched.length, 1);
+  // A plan that cannot be shown gets no card at all, and neither does a call naming both.
+  answer = async () => { throw new Error("Plan cpp-1 expired"); };
+  await assert.rejects(writeTool.execute({ chipId: "64Qv3", planId: "cpp-1" }, { callId: "call-e" }, context), /expired/);
+  await assert.rejects(writeTool.execute({ chipId: "64Qv3", planId: "cpp-1", spec: {} }, { callId: "call-b" }, context), /exactly one/);
+  assert.equal(write.calls(), 1);
 });

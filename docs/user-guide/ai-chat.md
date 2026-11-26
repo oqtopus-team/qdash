@@ -118,7 +118,10 @@ Choosing a method does not approve its session, runs, or saved values.
 ## Run a Calibration Pipeline from Chat
 
 Describe the targets and procedure. The assistant validates a plan and shows its exact steps
-and tasks on an approval card. Nothing starts before approval. The run appears on **Execution**.
+and tasks on an approval card. For a saved plan, review the expanded target qubits, task settings,
+and warnings before approving. Saving a proposal starts no measurement. Plans expire after
+24 hours; ask the assistant to prepare a new one if it expires or QDash rejects changed inputs.
+Nothing starts before approval. The run appears on **Execution**.
 
 ## Calibrate Qubits Step by Step
 

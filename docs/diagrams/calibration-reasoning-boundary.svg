@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480" role="img" aria-label="The agent uses read-only Code Mode and pure calibration builders to prepare proposals. Direct tools submit operations to QDash authorization and execution. Recorded evidence feeds the next agent decision; Code Mode cannot dispatch measurements or commits.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480" role="img" aria-label="The agent uses Code Mode reads, proposal storage, and pure calibration builders to prepare proposals. Direct tools submit operations to QDash authorization and execution. Recorded evidence feeds the next agent decision; Code Mode cannot dispatch measurements or commits.">
 <style>
 .cd-reasoning { font-family: var(--vp-font-family-base, -apple-system, "Segoe UI", sans-serif); }
 .cd-reasoning .box { fill: var(--vp-c-bg-soft, #f6f6f7); stroke: var(--vp-c-divider, #c2c2c4); stroke-width: 1.5; }
@@ -16,7 +16,7 @@
 <text x="230.0" y="107" class="">Choose the next experiment</text>
 <rect x="540" y="25" width="380" height="112" rx="10" class="box"/>
 <text x="730.0" y="56" class="title">Code Mode</text>
-<text x="730.0" y="83" class="">Read, compute, build, validate</text>
+<text x="730.0" y="83" class="">Read, build, validate, save proposal</text>
 <text x="730.0" y="107" class="">Pure qdash.calibration builders</text>
 <path d="M420 63 H540" class="edge"/>
 <text x="480" y="52" class="note">prepare</text>

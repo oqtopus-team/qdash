@@ -47,6 +47,7 @@ if TYPE_CHECKING:
     )
     from qdash.workflow.engine.backend.base import BaseBackend
     from qdash.workflow.engine.task.context import TaskContext
+    from qdash.workflow.service.plan_approval import ApprovedPlanCheck
     from qdash.workflow.service.steps import Step, StepContext
     from qdash.workflow.service.steps.base import TransformStep
     from qdash.workflow.service.targets import Target
@@ -1523,8 +1524,17 @@ class ExecutionRuntime:
         self.execution_id = None
         self.settings = settings
 
-    def run_pipeline(self, targets: Target, steps: Sequence[Step]) -> dict[str, Any]:
+    def run_pipeline(
+        self,
+        targets: Target,
+        steps: Sequence[Step],
+        *,
+        approved_plan: ApprovedPlanCheck | None = None,
+    ) -> dict[str, Any]:
         """Reserve the whole plan, then run every step it reaches in its own Execution.
+
+        ``approved_plan`` checks a run started from a stored plan against that plan once its
+        targets and steps are resolved, before anything is reserved or measured.
 
         Calibration steps open their Execution with :meth:`owned_execution`;
         transform steps with :meth:`transform_execution`, which records the
@@ -1566,6 +1576,14 @@ class ExecutionRuntime:
             # reserved or measured, so a bad round fails the run up front.
             for step in pipeline:
                 step.preflight(self)
+            if approved_plan is not None:
+                approved_plan(
+                    targets=targets,
+                    qids=qids,
+                    steps=list(pipeline),
+                    default_run_parameters=self.default_run_parameters,
+                    task_parameters=self.task_parameters,
+                )
             calibration_plan = self.calibration_plan(list(pipeline))
             self.plan_digest = calibration_plan["digest"]
             # Resolved before anything is reserved, named after the whole pipeline.

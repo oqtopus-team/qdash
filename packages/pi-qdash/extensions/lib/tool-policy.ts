@@ -7,7 +7,8 @@
  *
  * - whether it writes to QDash, so every call needs the user's approval;
  * - whether a code mode script may call it: only audited read-only tools,
- *   which read the QDash API as the user and return data, not images;
+ *   which read the QDash API as the user and return data, not images, and
+ *   the audited proposal tools, which store a proposal that grants nothing;
  * - whether it is deferred: not offered to the model until it is loaded with
  *   `tool_search`, because it covers a narrower workflow.
  *
@@ -150,6 +151,21 @@ export const NESTED_READ_TOOL_NAMES = [
 ] as const;
 
 /**
+ * pi-qdash tools that persist a proposal and nothing else, which code mode
+ * scripts may call.
+ *
+ * `qdash_create_pipeline_plan` stores a validated calibration pipeline spec
+ * as an immutable, expiring plan of the signed-in user. It is not a read (it
+ * writes a record, so it is never `readOnlyHint`), but it has no operational
+ * authority: it starts no run, reserves no hardware, joins no calibration
+ * session, and approves nothing. Running a plan stays a direct, reviewed
+ * `qdash_run_pipeline` call whose approval shows the plan the host fetched.
+ * Each call's idempotency key derives from its tool call id, so a replayed
+ * call returns the plan it stored instead of storing another.
+ */
+export const NESTED_PROPOSAL_TOOL_NAMES = ["qdash_create_pipeline_plan"] as const;
+
+/**
  * pi-qdash tools the model is not offered until it loads them with
  * `tool_search`. The common chip, result, execution, figure, and overview
  * tools stay offered directly; these cover narrower workflows. Scripts may
@@ -168,6 +184,7 @@ export const DEFERRED_TOOL_NAMES = [
   // Pipelines, execution comparison and waiting, provenance.
   "qdash_get_pipeline_catalog",
   "qdash_plan_pipeline",
+  "qdash_create_pipeline_plan",
   "qdash_run_pipeline",
   "qdash_wait_execution",
   "qdash_compare_executions",
@@ -241,6 +258,7 @@ export const EVALUATION_TOOL_NAMES = ["qcal_evaluate"] as const;
 const WRITE_TOOLS = new Set<string>(REVIEWED_WRITE_TOOL_NAMES);
 const SESSION_GRANTED_WRITE_TOOLS = new Set<string>(SESSION_GRANTED_WRITE_TOOL_NAMES);
 const NESTED_READ_TOOLS = new Set<string>(NESTED_READ_TOOL_NAMES);
+const NESTED_PROPOSAL_TOOLS = new Set<string>(NESTED_PROPOSAL_TOOL_NAMES);
 const DEFERRED_TOOLS = new Set<string>(DEFERRED_TOOL_NAMES);
 const EVALUATION_TOOLS = new Set<string>(EVALUATION_TOOL_NAMES);
 
@@ -254,6 +272,16 @@ export function isSessionGrantedWriteTool(name: string): boolean {
 
 export function isNestedReadTool(name: string): boolean {
   return NESTED_READ_TOOLS.has(name);
+}
+
+/** Whether `name` only persists a proposal (see `NESTED_PROPOSAL_TOOL_NAMES`). */
+export function isNestedProposalTool(name: string): boolean {
+  return NESTED_PROPOSAL_TOOLS.has(name);
+}
+
+/** Whether a code mode script may call `name`: an audited read or proposal tool. */
+export function isScriptCallableTool(name: string): boolean {
+  return NESTED_READ_TOOLS.has(name) || NESTED_PROPOSAL_TOOLS.has(name);
 }
 
 export function isDeferredTool(name: string): boolean {
@@ -273,7 +301,7 @@ export const MAX_NESTED_DATA_BYTES = 512 * 1024;
 
 /** What the model reads when a script tried a tool it may not call. */
 export function nestedBlockMessage(name: string): string {
-  return `${name} cannot be called from a code mode script: scripts may only call QDash's read-only tools. Call ${name} directly instead; write tools then ask the user for approval.`;
+  return `${name} cannot be called from a code mode script: scripts may only call QDash's read-only tools and qdash_create_pipeline_plan. Call ${name} directly instead; write tools then ask the user for approval.`;
 }
 
 /**
@@ -296,11 +324,11 @@ export const QDASH_TOOL_NAMESPACE = {
   description:
     "QDash calibration data read as the signed-in user: chips, qubits, couplings, executions, task results, metrics, time series, flows, forum posts, and source. Each tool resolves to its redacted response data as an already parsed JavaScript value.",
   instructions: [
-    "Scripts can call only QDash's audited read-only tools. Write tools, figures, charts, and evaluation tools are called directly, outside a script; write tools then ask the user for approval.",
+    "Scripts can call only QDash's audited read-only tools and qdash_create_pipeline_plan, which stores a validated pipeline spec as an expiring plan and returns it with its plan_id; it runs nothing and approves nothing. Write tools (qdash_run_pipeline included), waits, figures, charts, and evaluation tools are called directly, outside a script; write tools then ask the user for approval.",
     "A tool resolves to the response data its text answer summarizes, not truncated, as a JavaScript value (an object or array, already parsed): read its fields directly and do not call JSON.parse on it. Print a small sample with JSON.stringify first when you do not know its shape.",
     `One call may hand a script at most ${MAX_NESTED_DATA_BYTES} bytes of JSON; a larger response fails the call. Narrow it with a chip, qubit, task, time range, or limit, or split it into several calls.`,
     "Deferred read tools can be called from a script without loading them with tool_search first.",
-    "qdash.calibration holds pure builders for calibration pipeline specs, the same as @oqtopus-team/qdash-sdk/calibration: taskCall, qubitTargets, muxTargets, couplingTargets, one builder per step type (configureAll, bringUp, oneQubitCheck, oneQubitFineTune, customOneQubit, filterByStatus, filterByMetric, generateCRSchedule, twoQubitCalibration, customTwoQubit), calibrationStep(type, fields), sweep.{values, linspace, logspace, arange, range}, and calibrationSpec(targets, steps, { name, default_run_parameters, tags }). Fields use the spec's snake_case names; a field left undefined is left out. They call no tool: validate the result with tools.qdash_plan_pipeline({ spec }).",
+    "qdash.calibration holds pure builders for calibration pipeline specs, the same as @oqtopus-team/qdash-sdk/calibration: taskCall, qubitTargets, muxTargets, couplingTargets, one builder per step type (configureAll, bringUp, oneQubitCheck, oneQubitFineTune, customOneQubit, filterByStatus, filterByMetric, generateCRSchedule, twoQubitCalibration, customTwoQubit), calibrationStep(type, fields), sweep.{values, linspace, logspace, arange, range}, and calibrationSpec(targets, steps, { name, default_run_parameters, tags }). Fields use the spec's snake_case names; a field left undefined is left out. They call no tool: validate the result with tools.qdash_plan_pipeline({ spec }), store it with tools.qdash_create_pipeline_plan({ spec }), and print its plan_id so a direct qdash_run_pipeline({ chipId, planId }) runs it after the user approves the plan the host shows.",
   ].join("\n"),
 } as const;
 

@@ -1,4 +1,4 @@
-"""Pipeline operations of a QDash session: catalog, validate, execute, wait."""
+"""Pipeline operations of a QDash session: catalog, validate, execute, plans, wait."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from qdash.sdk._generated.types.execute_pipeline_response import ExecutePipelineResponse
     from qdash.sdk._generated.types.execution_response_detail import ExecutionResponseDetail
     from qdash.sdk._generated.types.pipeline_catalog_response import PipelineCatalogResponse
+    from qdash.sdk._generated.types.pipeline_plan_response import PipelinePlanResponse
     from qdash.sdk._generated.types.validate_pipeline_response import ValidatePipelineResponse
     from qdash.sdk._results import ExecutionResult
     from qdash.sdk._runs import Executions
@@ -186,6 +187,124 @@ class Pipelines:
             if decision_id is not None and response.decision_id != decision_id:
                 raise RuntimeError(
                     "Pipeline result unknown: the run may have been recorded without its "
+                    f"decision {decision_id!r}. Do not retry automatically or use a new key; "
+                    "reconcile the run in the calibration session audit first."
+                )
+        return PipelineRun(self._executions, response)
+
+    def create_plan(
+        self,
+        pipeline: PipelineSpecInput,
+        *,
+        chip_id: str,
+        idempotency_key: str,
+        backend_name: str | None = None,
+    ) -> PipelinePlanResponse:
+        """Validate a pipeline and store it as a plan to approve and run by reference.
+
+        Nothing is run, reserved or recorded in a session; an invalid spec raises
+        ``QDashValidationError`` with its problems and stores nothing. The spec is checked as
+        :meth:`validate` checks it, after every default task list is written out, so a spec
+        that omits ``tasks`` can be refused here although :meth:`validate` accepts it (for
+        example when the backend lacks a default task). The plan holds the normalized spec
+        with those task lists, the qubits its targets resolve to, the resolved calls, and its
+        ``review_digest``; it expires after 24 hours and is never renewed.
+
+        ``idempotency_key`` names this creation while the plan is stored (until seven days
+        after it expires): repeating it with the same request returns the same plan
+        (``replayed``), with another request raises ``QDashConflictError``, and once the plan
+        expired raises an error (410). After the plan is deleted, the same key creates a new
+        plan with a new ID that needs its own approval. Sent once; after a transport error,
+        repeating the call with the same key is safe.
+        """
+        if not idempotency_key or not idempotency_key.strip():
+            raise ValueError("idempotency_key must be non-empty")
+        with api_errors():
+            return self._api.calibration_pipeline.create_calibration_pipeline_plan(
+                chip_id=chip_id,
+                spec=to_spec(pipeline),
+                idempotency_key=idempotency_key,
+                **given(backend_name=backend_name),
+            )
+
+    def get_plan(self, plan_id: str) -> PipelinePlanResponse:
+        """A stored plan of the signed-in user; ``expired`` says whether it can still run.
+
+        Another user's plan raises ``QDashNotFoundError``.
+        """
+        _non_empty("plan_id", plan_id)
+        with api_errors():
+            return self._api.calibration_pipeline.get_calibration_pipeline_plan(
+                plan_id, request_options=read_options(self._config)
+            )
+
+    def execute_plan(
+        self,
+        plan_id: str,
+        *,
+        chip_id: str,
+        expected_review_digest: str,
+        backend_name: str | None = None,
+        calibration_session_id: str | None = None,
+        idempotency_key: str | None = None,
+        decision_id: str | None = None,
+    ) -> PipelineRun:
+        """Run a stored plan exactly as it was approved.
+
+        ``expected_review_digest`` is the ``review_digest`` of the plan the person approved.
+        The server refuses the plan when it expired, is for another chip or backend, no
+        longer has that digest, or resolves to other content now. Recording, retries and
+        errors are those of :meth:`execute`; a retry with the same key returns the recorded
+        run even after the plan expired. A response that does not echo the plan and its
+        review digest (or the session, run and decision asked for) raises ``RuntimeError``:
+        the run may have started, so reconcile it instead of retrying.
+        """
+        _non_empty("plan_id", plan_id)
+        if not expected_review_digest or not expected_review_digest.strip():
+            raise ValueError("expected_review_digest must be non-empty")
+        if decision_id is not None and calibration_session_id is None:
+            raise ValueError("decision_id needs calibration_session_id")
+        _non_empty("decision_id", decision_id)
+        _non_empty("idempotency_key", idempotency_key)
+        _non_empty("calibration_session_id", calibration_session_id)
+        if not self._project_id:
+            raise QDashConfigError(
+                "running a calibration pipeline needs a project: set QDASH_PROJECT_ID, "
+                "project_id in the profile, or QDash(..., project_id=...)"
+            )
+        if calibration_session_id is not None:
+            self._preflight_session(calibration_session_id, chip_id)
+        with api_errors():
+            response = self._api.calibration_pipeline.execute_calibration_pipeline_plan(
+                plan_id,
+                chip_id=chip_id,
+                expected_review_digest=expected_review_digest,
+                **given(
+                    backend_name=backend_name,
+                    calibration_session_id=calibration_session_id,
+                    idempotency_key=idempotency_key,
+                    decision_id=decision_id,
+                ),
+            )
+        if response.plan_id != plan_id or response.review_digest != expected_review_digest:
+            raise RuntimeError(
+                f"Pipeline plan result unknown: the response does not confirm plan {plan_id!r} "
+                f"with review digest {expected_review_digest!r}. Do not retry automatically or "
+                "use a new key; reconcile the execution first."
+            )
+        if calibration_session_id is not None:
+            run_id = response.pipeline_run_id
+            if response.calibration_session_id != calibration_session_id or not (
+                isinstance(run_id, str) and run_id.strip()
+            ):
+                raise RuntimeError(
+                    "Pipeline plan result unknown: the execution may have started without its "
+                    "association. Do not retry automatically or use a new key; "
+                    "reconcile the execution first."
+                )
+            if decision_id is not None and response.decision_id != decision_id:
+                raise RuntimeError(
+                    "Pipeline plan result unknown: the run may have been recorded without its "
                     f"decision {decision_id!r}. Do not retry automatically or use a new key; "
                     "reconcile the run in the calibration session audit first."
                 )

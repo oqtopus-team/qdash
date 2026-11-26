@@ -15,6 +15,9 @@ export function sdkOver(client) {
     ["GET", /^\/calibration-pipelines\/catalog$/, (_m, url) => api.getCalibrationPipelineCatalog(url.searchParams.has("backend_name") ? { backend_name: url.searchParams.get("backend_name") } : undefined)],
     ["POST", /^\/calibration-pipelines\/validate$/, (_m, _u, body) => api.validateCalibrationPipeline(body)],
     ["POST", /^\/calibration-pipelines\/execute$/, (_m, _u, body) => api.executeCalibrationPipeline(body)],
+    ["POST", /^\/calibration-pipelines\/plans$/, (_m, _u, body) => api.createCalibrationPipelinePlan(body)],
+    ["GET", /^\/calibration-pipelines\/plans\/([^/]+)$/, ([, id]) => api.getCalibrationPipelinePlan(id)],
+    ["POST", /^\/calibration-pipelines\/plans\/([^/]+)\/execute$/, ([, id], _u, body) => api.executeCalibrationPipelinePlan(id, body)],
     ["GET", /^\/calibration-sessions$/, (_m, url) => api.listCalibrationSessions(Object.fromEntries(url.searchParams))],
     ["GET", /^\/calibration-sessions\/([^/]+)$/, ([, id]) => api.getCalibrationSession(id)],
     ["POST", /^\/flows\/([^/]+)\/execute$/, ([, name], _u, body) => client.executeFlow(name, body.parameters, {

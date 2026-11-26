@@ -164,9 +164,13 @@ A calibration pipeline spec is a JSON description of one calibration run: `spec_
 
 When composing several steps in Code Mode, use the pure `qdash.calibration` builders
 (`taskCall`, `customOneQubit`, `filterByStatus`, targets, and sweeps). Load
-`qdash_plan_pipeline` first, build the spec, call `tools.qdash_plan_pipeline({ chipId, spec })`,
-and print both spec and plan. Resolve validation problems before calling `qdash_run_pipeline`
-directly with the same spec and chip for approval. Scripts cannot execute pipelines or agent
+`qdash_create_pipeline_plan` first, build the spec, and call
+`tools.qdash_create_pipeline_plan({ chipId, spec })`. This persists a validated proposal but
+starts nothing. Resolve reported problems, then pass its `plan_id` as `planId` to a direct
+`qdash_run_pipeline` call with the same chip. The host fetches and preserves the content for
+approval; do not copy the spec or supply an approval digest. Expired or stale plans require a
+new proposal and approval. `qdash_plan_pipeline` remains available for validation without
+storage, followed by direct execution with the same spec. Scripts cannot execute pipelines or agent
 session steps. Within an agent session, continue through its step tools instead of substituting
 an ordinary pipeline.
 
@@ -177,7 +181,7 @@ Workflow:
 1. `qdash_get_pipeline_catalog` — read the step types (with what each needs from an earlier step and its default task list), the one-qubit modes, the task names by type, and a one-line description of each documented task. Use only names from this catalog. Before choosing a task for a custom step, call it again with `taskNames` to read when to use the task and its prerequisites; the prerequisites explain, and `qdash_plan_pipeline` reports what is actually missing.
 2. Turn the request into steps. Start from the catalog defaults and the flow templates (`qdash_query` with `flow_templates`, then `flow_template` for one template's task list): `OneQubitCheck` and `OneQubitFineTune` carry the standard one-qubit sequences, `TwoQubitCalibration` the two-qubit chain. Use `CustomOneQubit` / `CustomTwoQubit` only where the user wants a different task list, and keep the task order the templates use.
 3. `qdash_plan_pipeline` — validate. A result with problems is not an error: each problem carries a path into the spec (`steps[2].tasks[0]`, `targets.qids[1]`); fix it and plan again until it is valid. Warnings do not make a spec invalid but usually mean a filter reads a different step than intended. A result with `migrated_spec` means the spec used the version 1 shape; plan the migrated spec.
-4. Show the user the resolved steps, each call's `call_id` and effective settings from the plan, then `qdash_run_pipeline` with the same `chipId` and `spec`, and the objective's `calibrationSessionId` (see Calibration sessions). The execution is confirmation-gated. Say that completed tasks write their calibrated parameters to QDash directly; there is no candidate gate, so inside an agent calibration session use the session's actions instead.
+4. Store the proposal with `qdash_create_pipeline_plan` and show its resolved targets, steps, settings, and warnings. Call `qdash_run_pipeline` directly with the same `chipId`, returned `plan_id` as `planId`, and the objective's `calibrationSessionId` (see Calibration sessions). The host binds approval to the fetched content. Alternatively, use the validated `spec` path; never supply both `spec` and `planId`. The execution is confirmation-gated. Say that completed tasks write their calibrated parameters to QDash directly; there is no candidate gate, so inside an agent calibration session use the session's actions instead.
 5. `qdash_wait_execution` with the returned `execution_id`. It returns when the whole run has finished, not just its first step. Then summarize which targets passed and which failed, fetch the figures of failed tasks with `qdash_get_task_figures` so the user sees them, and read `qdash_get_task_knowledge` for any task whose result needs interpretation.
 
 Rules:

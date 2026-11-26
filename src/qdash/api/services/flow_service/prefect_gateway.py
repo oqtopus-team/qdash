@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
 from prefect.client.orchestration import get_client
@@ -20,6 +21,20 @@ class SystemDeploymentUnavailable(LookupError):
     def __init__(self, deployment_name: str) -> None:
         super().__init__(deployment_name)
         self.deployment_name = deployment_name
+
+
+@dataclass(frozen=True, slots=True)
+class SystemDeployment:
+    """A registered system deployment and the parameter schema recorded with it.
+
+    ``parameter_schema`` is the OpenAPI schema of the flow's parameters as registered, or
+    ``None`` when the deployment recorded none (one registered before schemas were recorded).
+    It describes the signature that was registered; it does not attest which code a worker
+    runs.
+    """
+
+    id: UUID
+    parameter_schema: dict[str, Any] | None
 
 
 class PrefectGateway:
@@ -54,6 +69,20 @@ class PrefectGateway:
             logger.error(f"System deployment '{deployment_name}' not found")
             raise SystemDeploymentUnavailable(deployment_name) from exc
         return cast("UUID", deployment.id)
+
+    async def read_deployment(self, deployment_name: str) -> SystemDeployment:
+        """Return a system deployment's ID with its recorded parameter schema, in one read."""
+        try:
+            async with self._client_factory() as client:
+                deployment = await client.read_deployment_by_name(deployment_name)
+        except Exception as exc:
+            logger.error(f"System deployment '{deployment_name}' not found")
+            raise SystemDeploymentUnavailable(deployment_name) from exc
+        schema = getattr(deployment, "parameter_openapi_schema", None)
+        return SystemDeployment(
+            id=cast("UUID", deployment.id),
+            parameter_schema=schema if isinstance(schema, dict) else None,
+        )
 
     async def delete_deployment(self, deployment_id: str) -> None:
         """Delete a deployment, tolerating one that no longer exists."""

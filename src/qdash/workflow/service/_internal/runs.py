@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from types import EllipsisType
 
     from qdash.workflow.service.context import CalibContext
+    from qdash.workflow.service.plan_approval import ApprovedPlanCheck
     from qdash.workflow.service.steps import Step
     from qdash.workflow.service.targets import Target
 
@@ -170,14 +171,24 @@ def run_calibration(
     steps: Sequence[Step],
     *,
     repositories: SessionRepositories | None = None,
+    approved_plan: ApprovedPlanCheck | None = None,
 ) -> dict[str, Any]:
     """Run a pipeline under one owner session, applying the run's target override.
 
     Selected pairs replace the initial ``CouplingTargets``; the automatic
     two-qubit steps group them with the session's pinned MUX mapping, the one
-    its reservation and workers use.
+    its reservation and workers use. ``approved_plan`` holds a run started from a stored
+    plan to that plan (see :mod:`qdash.workflow.service.plan_approval`); an override that
+    changes its targets then stops the run before anything is reserved.
     """
-    results, _ = run_calibration_with_runtime(settings, targets, steps, repositories=repositories)
+    if approved_plan is None:
+        results, _ = run_calibration_with_runtime(
+            settings, targets, steps, repositories=repositories
+        )
+    else:
+        results, _ = run_calibration_with_runtime(
+            settings, targets, steps, repositories=repositories, approved_plan=approved_plan
+        )
     return results
 
 
@@ -187,6 +198,7 @@ def run_calibration_with_runtime(
     steps: Sequence[Step],
     *,
     repositories: SessionRepositories | None = None,
+    approved_plan: ApprovedPlanCheck | None = None,
 ) -> tuple[dict[str, Any], ExecutionRuntime]:
     """:func:`run_calibration`, also returning the runtime that ran it.
 
@@ -197,7 +209,9 @@ def run_calibration_with_runtime(
 
     targets, pipeline_steps = override_pipeline(targets, steps, read_target_override())
     runtime = ExecutionRuntime(settings, repositories=repositories)
-    return runtime.run_pipeline(targets, pipeline_steps), runtime
+    if approved_plan is None:
+        return runtime.run_pipeline(targets, pipeline_steps), runtime
+    return runtime.run_pipeline(targets, pipeline_steps, approved_plan=approved_plan), runtime
 
 
 def run_single_task(

@@ -27,6 +27,7 @@ import { executionPagePath, forumPostPagePath, qdashObjectLinks, qdashWebBaseUrl
 import { arrayFromPayload, compactItems, firstNumber, firstString, formatItem, payloadTotal, shortId, statusIcon } from "./lib/payload.js";
 import { toFigureToolResult, toTextToolResult, toToolResult } from "./lib/results.js";
 import { ansi, boxLinesToWidth, boxed, formatNumber, textComponent } from "./lib/render.js";
+import { resolvePipelinePlanPreview } from "./lib/pipeline-plan-preview.js";
 import { installQDashWriteGate } from "./lib/write-gate.js";
 import { requireWriteApproval } from "./lib/write-approval.js";
 import { installQDashGuidance } from "./lib/guidance-hook.js";
@@ -1577,7 +1578,13 @@ export default function qdashExtension(host: ExtensionAPI) {
   // Every tool registers through the policy: deferred loading, script data,
   // and model-only exposure for tools scripts must not reach.
   const pi = installQDashToolPolicy(host, { entry: import.meta.url });
-  installQDashWriteGate(pi);
+  // The gate shows a stored plan as QDash returns it, fetched as the call's own connection.
+  installQDashWriteGate(pi, {
+    resolvePreview: async (_toolName, args) => {
+      const client = await makeClient(args as { useEnv?: boolean; profile?: string; configPath?: string });
+      return resolvePipelinePlanPreview(client.qdash.pipelines, args);
+    },
+  });
   installQDashGuidance(pi);
   installQcalHydration(pi, { loadTaskKnowledge });
   registerCurrentTimeTool(pi);
