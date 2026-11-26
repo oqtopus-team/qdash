@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException
 
-from qdash.api.services.flow_service.prefect_gateway import PrefectGateway
+from qdash.api.services.flow_service.prefect_gateway import PrefectGateway, SystemDeployment
 from qdash.common.config.path_resolver import execution_calib_data_dir
 from qdash.common.execution_resources import (
     resolve_execution_resource_scope,
@@ -188,6 +188,10 @@ class ExecutionCoordinator:
     async def read_deployment_id(self, deployment_name: str) -> UUID:
         """Resolve the deployment ID of a system deployment."""
         return await self._prefect.read_deployment_id(deployment_name)
+
+    async def read_deployment(self, deployment_name: str) -> SystemDeployment:
+        """Resolve a system deployment with the parameter schema it was registered with."""
+        return await self._prefect.read_deployment(deployment_name)
 
     async def delete_deployment(self, deployment_id: str) -> None:
         """Drop the Prefect deployment of a flow that is being deleted."""

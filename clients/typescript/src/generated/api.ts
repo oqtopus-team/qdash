@@ -74,6 +74,7 @@ import type {
   CreateCouplingNoteCommentParams,
   CreateEvaluationRunRequest,
   CreateEvaluationRunResponse,
+  CreatePipelinePlanRequest,
   CreateQubitNoteCommentParams,
   CryostatCreateRequest,
   CryostatResponse,
@@ -111,6 +112,7 @@ import type {
   ExecuteAgentActionRequest,
   ExecuteFlowRequest,
   ExecuteFlowResponse,
+  ExecutePipelinePlanRequest,
   ExecutePipelineRequest,
   ExecutePipelineResponse,
   ExecutionActivityResponse,
@@ -277,6 +279,7 @@ import type {
   PasswordReset,
   PasswordResetResponse,
   PipelineCatalogResponse,
+  PipelinePlanResponse,
   PreviewArtifactByPathParams,
   ProjectCreate,
   ProjectResponse,
@@ -1972,6 +1975,66 @@ const executeCalibrationPipeline = (
       {url: `/calibration-pipelines/execute`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: executePipelineRequest
+    },
+      options);
+    }
+
+/**
+ * Validate the spec and store it, with its review content and review digest.
+ *
+ * A plan is a proposal: it starts no run, reserves no hardware, joins no calibration
+ * session, and grants nothing. An invalid spec returns 422 with the same problems as
+ * /validate and stores nothing. Default task lists are written into the stored spec and
+ * MUX targets are expanded, so what is reviewed is what runs. The plan expires after 24
+ * hours and is never renewed. ``idempotency_key`` names this creation: repeating it
+ * returns the same plan (409 for another request, 410 once it expired).
+ * @summary Store a validated calibration pipeline spec as a plan to approve by reference
+ */
+const createCalibrationPipelinePlan = (
+    createPipelinePlanRequest: CreatePipelinePlanRequest,
+ options?: SecondParameter<typeof qdashRequest<PipelinePlanResponse>>,) => {
+      return qdashRequest<PipelinePlanResponse>(
+      {url: `/calibration-pipelines/plans`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: createPipelinePlanRequest
+    },
+      options);
+    }
+
+/**
+ * The plan with its review content; ``expired`` says whether it can still run. Only
+ * its creator reads it: another user's plan, or one of another project, is not found.
+ * @summary Read a stored calibration pipeline plan
+ */
+const getCalibrationPipelinePlan = (
+    planId: string,
+ options?: SecondParameter<typeof qdashRequest<PipelinePlanResponse>>,) => {
+      return qdashRequest<PipelinePlanResponse>(
+      {url: `/calibration-pipelines/plans/${planId}`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Dispatch the plan's spec as one pipeline run, recorded like /execute.
+ *
+ * A retry with the same ``idempotency_key`` and request returns the recorded run first,
+ * even after the plan expired or was deleted. Otherwise the plan is read again and must be
+ * the user's, unexpired, for ``chip_id`` (and ``backend_name`` when given), and have
+ * ``expected_review_digest``; its spec is validated again, and its review content resolved
+ * now must still have that digest. Then the hardware, session, and decision checks of
+ * /execute apply. The worker receives the approved review content and refuses to measure
+ * when what it would run differs.
+ * @summary Run a stored calibration pipeline plan exactly as it was approved
+ */
+const executeCalibrationPipelinePlan = (
+    planId: string,
+    executePipelinePlanRequest: ExecutePipelinePlanRequest,
+ options?: SecondParameter<typeof qdashRequest<ExecutePipelineResponse>>,) => {
+      return qdashRequest<ExecutePipelineResponse>(
+      {url: `/calibration-pipelines/plans/${planId}/execute`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: executePipelinePlanRequest
     },
       options);
     }
@@ -5812,7 +5875,7 @@ const listUserAvatars = (
       options);
     }
 
-return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,listExecutionGroups,getAgentSessionGraph,getExecutionActivity,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,listAgentSessions,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,stopAgentSession,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,createAgentIntervention,listAgentInterventions,getAgentIntervention,respondAgentIntervention,claimAgentInterventionResume,recordAgentResumeOutcome,retryAgentInterventionNotification,recordAgentDecision,listAgentDecisions,getAgentSessionAudit,exportAgentSessionAudit,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,createCalibrationSession,listCalibrationSessions,getCalibrationSession,getCalibrationSessionRun,closeCalibrationSession,recordCalibrationDecision,listCalibrationDecisions,getCalibrationSessionAudit,exportCalibrationSessionAudit,getAgentConfig,listAgentChatSessions,createAgentChatSession,getAgentChatSession,updateAgentChatSession,deleteAgentChatSession,branchAgentChatSession,getAgentChatShareStatus,publishAgentChatShare,getAgentChatShare,revokeAgentChatShare,listAgentSourceRoots,searchAgentSource,getAgentSourceFile,getAgentPreferences,updateAgentPreferences,getAgentSystemPrompt,listAgentSkills,getSettings,listChips,createChip,listChipConfigSources,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,formatFlowSource,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,getFlowExecutionPlan,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listDashboards,createDashboard,listDashboardTemplates,previewDashboardTemplate,getDashboard,updateDashboard,deleteDashboard,duplicateDashboard,listMetricScripts,createMetricScript,listMetricScriptTemplates,getMetricScriptCatalog,validateMetricScript,formatMetricScriptSource,evaluateMetricScriptDraft,getMetricScript,updateMetricScript,deleteMetricScript,copyMetricScript,evaluateMetricScript,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations,getCurrentUserAvatar,updateCurrentUserAvatar,listUserAvatars}};
+return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,listExecutionGroups,getAgentSessionGraph,getExecutionActivity,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,listAgentSessions,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,stopAgentSession,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,createAgentIntervention,listAgentInterventions,getAgentIntervention,respondAgentIntervention,claimAgentInterventionResume,recordAgentResumeOutcome,retryAgentInterventionNotification,recordAgentDecision,listAgentDecisions,getAgentSessionAudit,exportAgentSessionAudit,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,createCalibrationPipelinePlan,getCalibrationPipelinePlan,executeCalibrationPipelinePlan,createCalibrationSession,listCalibrationSessions,getCalibrationSession,getCalibrationSessionRun,closeCalibrationSession,recordCalibrationDecision,listCalibrationDecisions,getCalibrationSessionAudit,exportCalibrationSessionAudit,getAgentConfig,listAgentChatSessions,createAgentChatSession,getAgentChatSession,updateAgentChatSession,deleteAgentChatSession,branchAgentChatSession,getAgentChatShareStatus,publishAgentChatShare,getAgentChatShare,revokeAgentChatShare,listAgentSourceRoots,searchAgentSource,getAgentSourceFile,getAgentPreferences,updateAgentPreferences,getAgentSystemPrompt,listAgentSkills,getSettings,listChips,createChip,listChipConfigSources,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,formatFlowSource,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,getFlowExecutionPlan,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listDashboards,createDashboard,listDashboardTemplates,previewDashboardTemplate,getDashboard,updateDashboard,deleteDashboard,duplicateDashboard,listMetricScripts,createMetricScript,listMetricScriptTemplates,getMetricScriptCatalog,validateMetricScript,formatMetricScriptSource,evaluateMetricScriptDraft,getMetricScript,updateMetricScript,deleteMetricScript,copyMetricScript,evaluateMetricScript,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations,getCurrentUserAvatar,updateCurrentUserAvatar,listUserAvatars}};
 export type LoginResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['login']>>>
 export type RegisterUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['registerUser']>>>
 export type GetCurrentUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCurrentUser']>>>
@@ -5901,6 +5964,9 @@ export type GetManualEditsResult = NonNullable<Awaited<ReturnType<ReturnType<typ
 export type GetCalibrationPipelineCatalogResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCalibrationPipelineCatalog']>>>
 export type ValidateCalibrationPipelineResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['validateCalibrationPipeline']>>>
 export type ExecuteCalibrationPipelineResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['executeCalibrationPipeline']>>>
+export type CreateCalibrationPipelinePlanResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createCalibrationPipelinePlan']>>>
+export type GetCalibrationPipelinePlanResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCalibrationPipelinePlan']>>>
+export type ExecuteCalibrationPipelinePlanResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['executeCalibrationPipelinePlan']>>>
 export type CreateCalibrationSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createCalibrationSession']>>>
 export type ListCalibrationSessionsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listCalibrationSessions']>>>
 export type GetCalibrationSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCalibrationSession']>>>

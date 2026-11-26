@@ -103,6 +103,7 @@ identify occurrences within a sequence, not globally across the Run.
 | `agent_interventions` | `AgentInterventionDocument` | `agent_session.py` |
 | `agent_decisions` | `AgentDecisionDocument` | `agent_session.py` |
 | `calibration_sessions` | `CalibrationSessionDocument` | `calibration_session.py` |
+| `calibration_pipeline_plans` | `CalibrationPipelinePlanDocument` | `calibration_pipeline_plan.py` |
 | `calibration_pipeline_runs` | `RunDocument` (alias `CalibrationPipelineRunDocument`) | `run.py` |
 | `calibration_decisions` | `CalibrationDecisionDocument` | `calibration_session.py` |
 | `pipeline_launches` | `PipelineLaunchDocument` | `pipeline_launch.py` |
@@ -115,6 +116,12 @@ are defined in `src/qdash/api/services/agent_chat_session_service.py`.
 See [calibration data](../developer-guide/workflow/calibration-data-lifecycle.md),
 [session records](../developer-guide/agent/calibration-sessions.md), and
 [provenance](../developer-guide/architecture/provenance.md) for lifecycle rules.
+
+Stored pipeline plans are creator-scoped and immutable. `expires_at` enforces a 24-hour
+execution window; the TTL index on `delete_after` schedules cleanup seven days later.
+`creation_scope` uniquely identifies the creator's idempotent request within the project.
+Run fields `plan_id`, `review_digest`, and `approved_plan` retain the approved content after
+cleanup. See [stored plans](../developer-guide/workflow/calibration-pipeline.md#stored-plans).
 
 Automatic session lifecycle fields:
 

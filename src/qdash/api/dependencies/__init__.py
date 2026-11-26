@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from qdash.api.schemas.task_file import TaskInfo
+    from qdash.api.services.calibration_pipeline_plan_service import PipelinePlanService
     from qdash.api.services.calibration_pipeline_service import CalibrationPipelineService
     from qdash.api.services.calibration_session_service import CalibrationSessionService
     from qdash.api.services.flow_schedule_service import FlowScheduleService
@@ -657,6 +658,13 @@ def get_calibration_pipeline_service() -> "CalibrationPipelineService":
         qubit_data=qubit_data,
         source_run_parameters=source_run_parameters,
     )
+
+
+def get_pipeline_plan_service() -> "PipelinePlanService":
+    """Get the stored calibration pipeline plan service instance."""
+    from qdash.api.services.calibration_pipeline_plan_service import PipelinePlanService
+
+    return PipelinePlanService(get_calibration_pipeline_service())
 
 
 @cached_dependency_provider

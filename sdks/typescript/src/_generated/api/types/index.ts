@@ -398,6 +398,7 @@ export * from "./ParameterVersionResponse.js";
 export * from "./ParameterVersionResponseValue.js";
 export * from "./PasswordResetResponse.js";
 export * from "./PipelineCatalogResponse.js";
+export * from "./PipelinePlanResponse.js";
 export * from "./PipelineProblem.js";
 export * from "./PipelineProgress.js";
 export * from "./PipelineStepProgress.js";

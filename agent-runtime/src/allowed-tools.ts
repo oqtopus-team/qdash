@@ -57,6 +57,7 @@ export const ALLOWED_TOOL_NAMES = [
   "qdash_list_task_results",
   "qdash_plan_calibration",
   "qdash_plan_pipeline",
+  "qdash_create_pipeline_plan",
   "qdash_preview_metric_script",
   "qdash_preview_forum_evidence_reply",
   "qdash_preview_forum_image_reply",
@@ -89,17 +90,21 @@ export const ALLOWED_TOOL_NAMES = [
  */
 export {
   DEFERRED_TOOL_NAMES,
+  NESTED_PROPOSAL_TOOL_NAMES,
   NESTED_READ_TOOL_NAMES,
   REVIEWED_WRITE_TOOL_NAMES,
   SESSION_GRANTED_WRITE_TOOL_NAMES,
   isDeferredTool,
+  isNestedProposalTool,
   isNestedReadTool,
   isReviewedWriteTool,
+  isScriptCallableTool,
   isSessionGrantedWriteTool,
 } from "@oqtopus-team/pi-qdash/extensions/lib/tool-policy.ts";
 
 import {
   DEFERRED_TOOL_NAMES as SHARED_DEFERRED,
+  NESTED_PROPOSAL_TOOL_NAMES as SHARED_PROPOSALS,
   NESTED_READ_TOOL_NAMES as SHARED_NESTED,
   REVIEWED_WRITE_TOOL_NAMES as SHARED_WRITES,
   SESSION_GRANTED_WRITE_TOOL_NAMES as SHARED_SESSION_WRITES,
@@ -108,12 +113,15 @@ import {
 // Compile-time checks: scripts reach only allowlisted reads, and every
 // deferred tool is an allowlisted read or a reviewed or session-granted write.
 const _nestedAreAllowed: ReadonlyArray<(typeof ALLOWED_TOOL_NAMES)[number]> = SHARED_NESTED;
+// The proposal tools scripts may call are allowlisted too; they are neither reads nor reviewed writes.
+const _proposalsAreAllowed: ReadonlyArray<(typeof ALLOWED_TOOL_NAMES)[number]> = SHARED_PROPOSALS;
 const _deferredAreReviewed: ReadonlyArray<
   | (typeof ALLOWED_TOOL_NAMES)[number]
   | (typeof SHARED_WRITES)[number]
   | (typeof SHARED_SESSION_WRITES)[number]
 > = SHARED_DEFERRED;
 void _nestedAreAllowed;
+void _proposalsAreAllowed;
 void _deferredAreReviewed;
 
 /**

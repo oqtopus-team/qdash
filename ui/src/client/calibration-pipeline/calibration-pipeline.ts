@@ -25,11 +25,14 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CreatePipelinePlanRequest,
+  ExecutePipelinePlanRequest,
   ExecutePipelineRequest,
   ExecutePipelineResponse,
   GetCalibrationPipelineCatalogParams,
   HTTPValidationError,
   PipelineCatalogResponse,
+  PipelinePlanResponse,
   ValidatePipelineRequest,
   ValidatePipelineResponse
 } from '../../schemas';
@@ -289,4 +292,244 @@ export const useExecuteCalibrationPipeline = <TError = HTTPValidationError,
         TContext
       > => {
       return useMutation(getExecuteCalibrationPipelineMutationOptions(options), queryClient);
+    }
+    /**
+ * Validate the spec and store it, with its review content and review digest.
+ *
+ * A plan is a proposal: it starts no run, reserves no hardware, joins no calibration
+ * session, and grants nothing. An invalid spec returns 422 with the same problems as
+ * /validate and stores nothing. Default task lists are written into the stored spec and
+ * MUX targets are expanded, so what is reviewed is what runs. The plan expires after 24
+ * hours and is never renewed. ``idempotency_key`` names this creation: repeating it
+ * returns the same plan (409 for another request, 410 once it expired).
+ * @summary Store a validated calibration pipeline spec as a plan to approve by reference
+ */
+export const createCalibrationPipelinePlan = (
+    createPipelinePlanRequest: CreatePipelinePlanRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<PipelinePlanResponse>(
+      {url: `/calibration-pipelines/plans`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: createPipelinePlanRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getCreateCalibrationPipelinePlanMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCalibrationPipelinePlan>>, TError,{data: CreatePipelinePlanRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCalibrationPipelinePlan>>, TError,{data: CreatePipelinePlanRequest}, TContext> => {
+
+const mutationKey = ['createCalibrationPipelinePlan'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCalibrationPipelinePlan>>, {data: CreatePipelinePlanRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCalibrationPipelinePlan(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCalibrationPipelinePlanMutationResult = NonNullable<Awaited<ReturnType<typeof createCalibrationPipelinePlan>>>
+    export type CreateCalibrationPipelinePlanMutationBody = CreatePipelinePlanRequest
+    export type CreateCalibrationPipelinePlanMutationError = HTTPValidationError
+
+    /**
+ * @summary Store a validated calibration pipeline spec as a plan to approve by reference
+ */
+export const useCreateCalibrationPipelinePlan = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCalibrationPipelinePlan>>, TError,{data: CreatePipelinePlanRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createCalibrationPipelinePlan>>,
+        TError,
+        {data: CreatePipelinePlanRequest},
+        TContext
+      > => {
+      return useMutation(getCreateCalibrationPipelinePlanMutationOptions(options), queryClient);
+    }
+    /**
+ * The plan with its review content; ``expired`` says whether it can still run. Only
+ * its creator reads it: another user's plan, or one of another project, is not found.
+ * @summary Read a stored calibration pipeline plan
+ */
+export const getCalibrationPipelinePlan = (
+    planId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<PipelinePlanResponse>(
+      {url: `/calibration-pipelines/plans/${planId}`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetCalibrationPipelinePlanQueryKey = (planId: string,) => {
+    return [
+    `/calibration-pipelines/plans/${planId}`
+    ] as const;
+    }
+
+
+export const getGetCalibrationPipelinePlanQueryOptions = <TData = Awaited<ReturnType<typeof getCalibrationPipelinePlan>>, TError = HTTPValidationError>(planId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationPipelinePlan>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCalibrationPipelinePlanQueryKey(planId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCalibrationPipelinePlan>>> = ({ signal }) => getCalibrationPipelinePlan(planId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: planId !== null && planId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCalibrationPipelinePlan>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCalibrationPipelinePlanQueryResult = NonNullable<Awaited<ReturnType<typeof getCalibrationPipelinePlan>>>
+export type GetCalibrationPipelinePlanQueryError = HTTPValidationError
+
+
+export function useGetCalibrationPipelinePlan<TData = Awaited<ReturnType<typeof getCalibrationPipelinePlan>>, TError = HTTPValidationError>(
+ planId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationPipelinePlan>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCalibrationPipelinePlan>>,
+          TError,
+          Awaited<ReturnType<typeof getCalibrationPipelinePlan>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCalibrationPipelinePlan<TData = Awaited<ReturnType<typeof getCalibrationPipelinePlan>>, TError = HTTPValidationError>(
+ planId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationPipelinePlan>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCalibrationPipelinePlan>>,
+          TError,
+          Awaited<ReturnType<typeof getCalibrationPipelinePlan>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCalibrationPipelinePlan<TData = Awaited<ReturnType<typeof getCalibrationPipelinePlan>>, TError = HTTPValidationError>(
+ planId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationPipelinePlan>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Read a stored calibration pipeline plan
+ */
+
+export function useGetCalibrationPipelinePlan<TData = Awaited<ReturnType<typeof getCalibrationPipelinePlan>>, TError = HTTPValidationError>(
+ planId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationPipelinePlan>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCalibrationPipelinePlanQueryOptions(planId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Dispatch the plan's spec as one pipeline run, recorded like /execute.
+ *
+ * A retry with the same ``idempotency_key`` and request returns the recorded run first,
+ * even after the plan expired or was deleted. Otherwise the plan is read again and must be
+ * the user's, unexpired, for ``chip_id`` (and ``backend_name`` when given), and have
+ * ``expected_review_digest``; its spec is validated again, and its review content resolved
+ * now must still have that digest. Then the hardware, session, and decision checks of
+ * /execute apply. The worker receives the approved review content and refuses to measure
+ * when what it would run differs.
+ * @summary Run a stored calibration pipeline plan exactly as it was approved
+ */
+export const executeCalibrationPipelinePlan = (
+    planId: string,
+    executePipelinePlanRequest: ExecutePipelinePlanRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ExecutePipelineResponse>(
+      {url: `/calibration-pipelines/plans/${planId}/execute`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: executePipelinePlanRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getExecuteCalibrationPipelinePlanMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof executeCalibrationPipelinePlan>>, TError,{planId: string;data: ExecutePipelinePlanRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof executeCalibrationPipelinePlan>>, TError,{planId: string;data: ExecutePipelinePlanRequest}, TContext> => {
+
+const mutationKey = ['executeCalibrationPipelinePlan'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof executeCalibrationPipelinePlan>>, {planId: string;data: ExecutePipelinePlanRequest}> = (props) => {
+          const {planId,data} = props ?? {};
+
+          return  executeCalibrationPipelinePlan(planId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ExecuteCalibrationPipelinePlanMutationResult = NonNullable<Awaited<ReturnType<typeof executeCalibrationPipelinePlan>>>
+    export type ExecuteCalibrationPipelinePlanMutationBody = ExecutePipelinePlanRequest
+    export type ExecuteCalibrationPipelinePlanMutationError = HTTPValidationError
+
+    /**
+ * @summary Run a stored calibration pipeline plan exactly as it was approved
+ */
+export const useExecuteCalibrationPipelinePlan = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof executeCalibrationPipelinePlan>>, TError,{planId: string;data: ExecutePipelinePlanRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof executeCalibrationPipelinePlan>>,
+        TError,
+        {planId: string;data: ExecutePipelinePlanRequest},
+        TContext
+      > => {
+      return useMutation(getExecuteCalibrationPipelinePlanMutationOptions(options), queryClient);
     }

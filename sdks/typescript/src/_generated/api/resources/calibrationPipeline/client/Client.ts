@@ -390,4 +390,309 @@ export class CalibrationPipelineClient {
             "/calibration-pipelines/execute",
         );
     }
+
+    /**
+     * Validate the spec and store it, with its review content and review digest.
+     *
+     * A plan is a proposal: it starts no run, reserves no hardware, joins no calibration
+     * session, and grants nothing. An invalid spec returns 422 with the same problems as
+     * /validate and stores nothing. Default task lists are written into the stored spec and
+     * MUX targets are expanded, so what is reviewed is what runs. The plan expires after 24
+     * hours and is never renewed. ``idempotency_key`` names this creation: repeating it
+     * returns the same plan (409 for another request, 410 once it expired).
+     *
+     * @param {QDashApi.CreatePipelinePlanRequest} request
+     * @param {CalibrationPipelineClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link QDashApi.UnprocessableEntityError}
+     * @throws {@link errors.ApiError}
+     * @throws {@link errors.ApiTimeoutError}
+     *
+     * @example
+     *     await client.calibrationPipeline.createCalibrationPipelinePlan({
+     *         chip_id: "64Qv3",
+     *         spec: {
+     *             "default_run_parameters": {
+     *                 "interval": 153600
+     *             },
+     *             "name": "coarse-then-two-pass-ramsey",
+     *             "spec_version": 2,
+     *             "steps": [
+     *                 {
+     *                     "execution_mode": "parallel_by_mux",
+     *                     "type": "OneQubitCheck"
+     *                 },
+     *                 {
+     *                     "type": "FilterByStatus"
+     *                 },
+     *                 {
+     *                     "continue_on_failure": true,
+     *                     "execution_mode": "parallel_by_mux",
+     *                     "step_name": "coherence",
+     *                     "tasks": [
+     *                         {
+     *                             "name": "CheckT1"
+     *                         },
+     *                         {
+     *                             "call_id": "ramsey_coarse",
+     *                             "name": "CheckRamsey",
+     *                             "run": {
+     *                                 "detuning": 0.001,
+     *                                 "shots": 1024
+     *                             }
+     *                         },
+     *                         {
+     *                             "call_id": "ramsey_fine",
+     *                             "name": "CheckRamsey",
+     *                             "run": {
+     *                                 "detuning": 0.0002,
+     *                                 "shots": 1024,
+     *                                 "time_range": {
+     *                                     "value": [
+     *                                         0,
+     *                                         50001,
+     *                                         500
+     *                                     ],
+     *                                     "value_type": "np.arange"
+     *                                 }
+     *                             }
+     *                         }
+     *                     ],
+     *                     "type": "CustomOneQubit"
+     *                 },
+     *                 {
+     *                     "call_id": "ramsey_fine",
+     *                     "metric": "t2_star",
+     *                     "step": "coherence",
+     *                     "threshold": 10,
+     *                     "type": "FilterByMetric"
+     *                 }
+     *             ],
+     *             "targets": {
+     *                 "qids": [
+     *                     "0",
+     *                     "1"
+     *                 ]
+     *             }
+     *         },
+     *         idempotency_key: "idempotency_key"
+     *     })
+     */
+    public createCalibrationPipelinePlan(
+        request: QDashApi.CreatePipelinePlanRequest,
+        requestOptions?: CalibrationPipelineClient.RequestOptions,
+    ): core.HttpResponsePromise<QDashApi.PipelinePlanResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__createCalibrationPipelinePlan(request, requestOptions));
+    }
+
+    private async __createCalibrationPipelinePlan(
+        request: QDashApi.CreatePipelinePlanRequest,
+        requestOptions?: CalibrationPipelineClient.RequestOptions,
+    ): Promise<core.WithRawResponse<QDashApi.PipelinePlanResponse>> {
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "X-Project-Id": requestOptions?.projectId ?? this._options?.projectId }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                "calibration-pipelines/plans",
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: mergeAdditionalBodyParameters(request, requestOptions?.additionalBodyParameters),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as QDashApi.PipelinePlanResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 422:
+                    throw new QDashApi.UnprocessableEntityError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.ApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "POST", "/calibration-pipelines/plans");
+    }
+
+    /**
+     * The plan with its review content; ``expired`` says whether it can still run. Only
+     * its creator reads it: another user's plan, or one of another project, is not found.
+     *
+     * @param {QDashApi.GetCalibrationPipelinePlanRequest} request
+     * @param {CalibrationPipelineClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link QDashApi.UnprocessableEntityError}
+     * @throws {@link errors.ApiError}
+     * @throws {@link errors.ApiTimeoutError}
+     *
+     * @example
+     *     await client.calibrationPipeline.getCalibrationPipelinePlan({
+     *         plan_id: "plan_id"
+     *     })
+     */
+    public getCalibrationPipelinePlan(
+        request: QDashApi.GetCalibrationPipelinePlanRequest,
+        requestOptions?: CalibrationPipelineClient.RequestOptions,
+    ): core.HttpResponsePromise<QDashApi.PipelinePlanResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__getCalibrationPipelinePlan(request, requestOptions));
+    }
+
+    private async __getCalibrationPipelinePlan(
+        request: QDashApi.GetCalibrationPipelinePlanRequest,
+        requestOptions?: CalibrationPipelineClient.RequestOptions,
+    ): Promise<core.WithRawResponse<QDashApi.PipelinePlanResponse>> {
+        const { plan_id: planId } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "X-Project-Id": requestOptions?.projectId ?? this._options?.projectId }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `calibration-pipelines/plans/${core.url.encodePathParam(planId, errors.ApiError)}`,
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as QDashApi.PipelinePlanResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 422:
+                    throw new QDashApi.UnprocessableEntityError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.ApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "GET",
+            "/calibration-pipelines/plans/{plan_id}",
+        );
+    }
+
+    /**
+     * Dispatch the plan's spec as one pipeline run, recorded like /execute.
+     *
+     * A retry with the same ``idempotency_key`` and request returns the recorded run first,
+     * even after the plan expired or was deleted. Otherwise the plan is read again and must be
+     * the user's, unexpired, for ``chip_id`` (and ``backend_name`` when given), and have
+     * ``expected_review_digest``; its spec is validated again, and its review content resolved
+     * now must still have that digest. Then the hardware, session, and decision checks of
+     * /execute apply. The worker receives the approved review content and refuses to measure
+     * when what it would run differs.
+     *
+     * @param {QDashApi.ExecutePipelinePlanRequest} request
+     * @param {CalibrationPipelineClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link QDashApi.UnprocessableEntityError}
+     * @throws {@link errors.ApiError}
+     * @throws {@link errors.ApiTimeoutError}
+     *
+     * @example
+     *     await client.calibrationPipeline.executeCalibrationPipelinePlan({
+     *         plan_id: "plan_id",
+     *         chip_id: "chip_id",
+     *         expected_review_digest: "expected_review_digest"
+     *     })
+     */
+    public executeCalibrationPipelinePlan(
+        request: QDashApi.ExecutePipelinePlanRequest,
+        requestOptions?: CalibrationPipelineClient.RequestOptions,
+    ): core.HttpResponsePromise<QDashApi.ExecutePipelineResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__executeCalibrationPipelinePlan(request, requestOptions));
+    }
+
+    private async __executeCalibrationPipelinePlan(
+        request: QDashApi.ExecutePipelinePlanRequest,
+        requestOptions?: CalibrationPipelineClient.RequestOptions,
+    ): Promise<core.WithRawResponse<QDashApi.ExecutePipelineResponse>> {
+        const { plan_id: planId, ..._body } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "X-Project-Id": requestOptions?.projectId ?? this._options?.projectId }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `calibration-pipelines/plans/${core.url.encodePathParam(planId, errors.ApiError)}/execute`,
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: mergeAdditionalBodyParameters(_body, requestOptions?.additionalBodyParameters),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as QDashApi.ExecutePipelineResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 422:
+                    throw new QDashApi.UnprocessableEntityError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.ApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "POST",
+            "/calibration-pipelines/plans/{plan_id}/execute",
+        );
+    }
 }

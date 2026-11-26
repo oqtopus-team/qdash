@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Store validated pipeline proposals from Code Mode and run them by reference with a preserved approval preview.
+
 - Add SDK-backed task-result summaries with bounded pagination and completeness diagnostics.
 
 - Preserve execution reconciliation guidance when an SDK launch outcome is unknown.

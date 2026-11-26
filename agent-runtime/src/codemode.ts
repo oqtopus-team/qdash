@@ -12,7 +12,9 @@
  * tools, which run in this process with the signed-in user's connection.
  * Which tools a script may call is decided three times. Every tool states its
  * `callers` (see `buildQDashExtension` and `modelOnly`); a script is shown
- * and given only the audited read-only tools; and a hook blocks every nested
+ * and given only the audited read-only tools and the audited proposal tool
+ * `qdash_create_pipeline_plan` (which stores an expiring plan and runs or
+ * approves nothing); and a hook blocks every nested
  * call outside that set, so a tool added later without a decision cannot run
  * from a script. Write tools in particular stay model-only: their approval
  * card only exists for a call the model made.
@@ -193,7 +195,7 @@ export type InternalCalls = Readonly<Record<string, readonly string[]>>;
 
 /** What decides which nested calls run. */
 export interface ToolPolicy {
-  /** Tools a Code Mode script may call: the audited read-only ones. */
+  /** Tools a Code Mode script may call: the audited read-only ones and the proposal tool. */
   nestedTools: Iterable<string>;
   /** Tools a model call to which, before they are loaded, loads them. */
   deferredTools: Iterable<string>;

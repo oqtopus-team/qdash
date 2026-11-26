@@ -115,12 +115,14 @@ test("no reviewed write offers confirmWrite or tells the model to set it", () =>
 test("the write gate ignores a model's confirmWrite: without a UI it refuses, with one it always asks", async () => {
   const { toolCall } = loadPi();
   for (const name of REVIEWED_WRITE_TOOL_NAMES) {
+    // A pipeline run names exactly one source; a spec keeps the call well formed.
+    const base = name === "qdash_run_pipeline" ? { spec: {} } : {};
     for (const confirmWrite of FORGED) {
-      const refused = await toolCall({ toolName: name, toolCallId: `m-${name}`, input: { confirmWrite } }, noUi());
+      const refused = await toolCall({ toolName: name, toolCallId: `m-${name}`, input: { ...base, confirmWrite } }, noUi());
       assert.deepEqual(refused, { block: true, reason: noApprovalMessage(name) }, name);
     }
     const asked = [];
-    const declined = await toolCall({ toolName: name, toolCallId: `d-${name}`, input: { confirmWrite: true } }, withUi(false, asked));
+    const declined = await toolCall({ toolName: name, toolCallId: `d-${name}`, input: { ...base, confirmWrite: true } }, withUi(false, asked));
     assert.deepEqual(declined, { block: true, reason: "QDash write operation rejected by user" }, name);
     assert.equal(asked.length, 1, name);
   }

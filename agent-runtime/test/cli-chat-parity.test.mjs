@@ -141,6 +141,32 @@ function timeseries(params) {
 }
 
 /** The read-only QDash fixture both hosts query, with a log of every request. */
+// The plan the fixture stores for any creation: QDash's answer, with MUX 0 and 1 expanded.
+const FIXTURE_PLAN = {
+  plan_id: "cpp-fixture",
+  backend_name: "fake",
+  created_by: "fixture",
+  created_at: "2026-11-26T00:00:00Z",
+  expires_at: "2999-01-01T00:00:00Z",
+  expired: false,
+  review_version: 1,
+  review_digest: `sha256:v1:${"c".repeat(64)}`,
+  target_qids: ["0", "1", "2", "4", "5", "6", "7"],
+  steps: [
+    { index: 1, type: "CustomOneQubit", name: "coherence", step_id: "coherence", kind: "calibration", tasks: ["CheckT1", "CheckT2Echo"], calls: [
+      { call_id: "t1", name: "CheckT1", on_failure: "stop", settings: { run: { time_range: { value: [2, 5, 31], value_type: "np.logspace" } } } },
+      { call_id: "CheckT2Echo", name: "CheckT2Echo", on_failure: "stop", settings: { update_calibration_parameters: false } },
+    ] },
+    { index: 2, type: "FilterByStatus", name: "filter_by_status", step_id: null, kind: "transform", tasks: [], calls: [], reference: { step: "coherence", call_id: "t1" } },
+  ],
+  warnings: [],
+  task_run_count: 2,
+  default_run_parameters: { shots: 1024 },
+  task_parameters: {},
+  replayed: false,
+};
+const plans = new Map();
+
 function startFixture() {
   const requests = [];
   const server = createServer((request, response) => {
@@ -150,18 +176,34 @@ function startFixture() {
       response.writeHead(status, { "content-type": "application/json" });
       response.end(JSON.stringify(body));
     };
-    // Planning a pipeline only validates it: the one POST the fixture answers.
-    if (request.method === "POST" && url.pathname === "/calibration-pipelines/validate") {
+    // Planning a pipeline only validates it; storing a plan and running a stored plan are
+    // the other POSTs the fixture answers, and it records each body.
+    const planRun = /^\/calibration-pipelines\/plans\/([^/]+)\/execute$/.exec(url.pathname);
+    if (request.method === "POST" && (url.pathname === "/calibration-pipelines/validate" || url.pathname === "/calibration-pipelines/plans" || planRun)) {
       const chunks = [];
       request.on("data", (chunk) => chunks.push(chunk));
       request.on("end", () => {
         const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
         requests[requests.length - 1].body = body;
+        if (url.pathname === "/calibration-pipelines/plans") {
+          plans.set(FIXTURE_PLAN.plan_id, { ...FIXTURE_PLAN, chip_id: body.chip_id, spec: body.spec, targets: body.spec.targets });
+          return json(201, plans.get(FIXTURE_PLAN.plan_id));
+        }
+        if (planRun) {
+          const plan = plans.get(planRun[1]);
+          if (!plan) return json(404, { detail: "no plan" });
+          if (body.expected_review_digest !== plan.review_digest) return json(409, { detail: "digest mismatch" });
+          return json(202, { execution_id: "exec-plan", flow_run_id: "flow-plan", flow_run_url: "", qdash_ui_url: "", message: "started", steps: [], calibration_session_id: "cs-auto", pipeline_run_id: "cpr-plan", plan_id: plan.plan_id, review_digest: plan.review_digest });
+        }
         json(200, { valid: true, backend_name: "fake", spec: body.spec, targets: body.spec.targets, task_run_count: 1, problems: [], warnings: [], steps: [] });
       });
       return;
     }
     if (request.method !== "GET") return json(405, { detail: "fixture is read-only" });
+    const storedPlan = /^\/calibration-pipelines\/plans\/([^/]+)$/.exec(url.pathname);
+    if (storedPlan) return plans.has(storedPlan[1]) ? json(200, plans.get(storedPlan[1])) : json(404, { detail: "no plan" });
+    // No agent session is paused for an expert.
+    if (url.pathname === "/agent-sessions") return json(200, { items: [], total: 0, has_more: false });
     if (url.pathname === "/chips") {
       return json(200, { chips: [{ chip_id: "A", size: 16, activity_status: "active" }, { chip_id: "B", size: 64 }] });
     }
@@ -257,7 +299,7 @@ function scriptedModel(steps) {
 }
 
 /** A real pi CLI session with the bundled packages and pi's codemode and tool_search. */
-async function openCli(steps, { capture, before = [] } = {}) {
+async function openCli(steps, { capture, before = [], confirm } = {}) {
   const { faux, offered } = scriptedModel(steps);
   const model = faux.getModel();
   const agentDir = join(workDir, "agent");
@@ -296,7 +338,8 @@ async function openCli(steps, { capture, before = [] } = {}) {
     settingsManager: SettingsManager.inMemory(),
     modelRuntime,
   });
-  await session.bindExtensions({});
+  // `confirm`: a pi client that answers confirmation dialogs (RPC mode, as pi's own clients do).
+  await session.bindExtensions(confirm ? { uiContext: uiAnswering(confirm), mode: "rpc" } : {});
   await session.setModel(modelRuntime.getModel(model.provider, model.id));
   return {
     session,
@@ -314,6 +357,16 @@ async function openCli(steps, { capture, before = [] } = {}) {
       session.dispose();
     },
   };
+}
+
+/** A pi UI context whose confirmation dialogs `confirm(title, message)` answers; the rest do nothing. */
+function uiAnswering(confirm) {
+  return new Proxy({ confirm: async (title, message) => confirm(title, message) }, {
+    get(target, key) {
+      if (key in target) return target[key];
+      return () => undefined;
+    },
+  });
 }
 
 /** The production chat registry on a durable harness, with the same packages. */
@@ -366,6 +419,7 @@ async function openChat(steps, { capture, systemPrompt = "QDash parity test prom
   harness.resume();
   return {
     offered,
+    writeTools: chat.writeTools,
     async ask(text) {
       const submission = await conversation.submit({ type: "input", content: text }, context);
       await submission.wait(context);
@@ -591,6 +645,116 @@ test("a script composes a spec with qdash.calibration and plans it through qdash
     assert.equal(plans[0].body.chip_id, "A", host);
   }
   assert.deepEqual(scriptResult(outputs.cli.script.text), scriptResult(outputs.chat.script.text));
+});
+
+const PLAN_SCRIPT = `// @options: {"timeout_ms": 60000}
+const { taskCall, customOneQubit, filterByStatus, muxTargets, sweep, calibrationSpec } = qdash.calibration;
+const spec = calibrationSpec(
+  muxTargets([0, 1], { exclude_qids: ["3"] }),
+  [
+    customOneQubit({
+      step_name: "coherence",
+      tasks: [
+        taskCall("CheckT1", { call_id: "t1", run: { time_range: sweep.logspace(2, 5, 31) } }),
+        taskCall("CheckT2Echo", { update_calibration_parameters: false }),
+      ],
+    }),
+    filterByStatus({ step: "coherence", call_id: "t1" }),
+  ],
+  { name: "coherence", default_run_parameters: { shots: 1024 } },
+);
+const checked = await tools.qdash_plan_pipeline({ chipId: "A", spec });
+const plan = await tools.qdash_create_pipeline_plan({ chipId: "A", spec });
+const attempt = async (call) => { try { await call(); return "ran"; } catch (error) { return "refused"; } };
+text("RESULT " + JSON.stringify({
+  valid: checked.valid,
+  planId: plan.plan_id,
+  digest: plan.review_digest,
+  run: await attempt(() => tools.qdash_run_pipeline({ chipId: "A", planId: plan.plan_id })),
+  runSpec: await attempt(() => tools.qdash_run_pipeline({ chipId: "A", spec })),
+  wait: await attempt(() => tools.qdash_wait_execution({ executionId: "exec-plan" })),
+  step: await attempt(() => tools.qdash_run_agent_session_step({ sessionId: "s" })),
+}));
+`;
+
+test("a script stores a plan and the model runs it by ID after approving the fetched plan, the same way in the pi CLI and in chat", async () => {
+  const outcomes = {};
+  for (const host of ["cli", "chat"]) {
+    plans.clear();
+    const start = fixture.requests.length;
+    const shown = [];
+    const steps = [
+      fauxAssistantMessage([fauxToolCall("codemode", { code: PLAN_SCRIPT })], { stopReason: "toolUse" }),
+      fauxAssistantMessage([fauxToolCall("tool_search", { query: "qdash_run_pipeline run pipeline" })], { stopReason: "toolUse" }),
+      // The model passes only the plan's ID: no spec, no digest.
+      fauxAssistantMessage([fauxToolCall("qdash_run_pipeline", { chipId: "A", planId: FIXTURE_PLAN.plan_id })], { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxText("done")),
+    ];
+    const run = host === "cli"
+      ? await openCli(steps, { confirm: (title, message) => { shown.push(message); return true; } })
+      : await openChat(steps);
+    try {
+      await run.ask("Store a coherence plan for MUX 0 and 1 and run it");
+      const results = await run.results();
+      const script = results.find((result) => result.name === "codemode");
+      assert.ok(script, `${host}: no codemode result`);
+      assert.equal(script.isError, false, `${host}: ${script.text}`);
+      const pipeline = results.find((result) => result.name === "qdash_run_pipeline");
+      assert.ok(pipeline, `${host}: no qdash_run_pipeline result`);
+      if (host === "chat") {
+        // The card carries the plan the runtime fetched, frozen with the approval.
+        const approval = pipeline.details.approval;
+        assert.deepEqual(approval.args, { chipId: "A", planId: FIXTURE_PLAN.plan_id });
+        assert.equal(approval.preview.reviewDigest, FIXTURE_PLAN.review_digest);
+        assert.deepEqual(approval.preview.targetQids, FIXTURE_PLAN.target_qids);
+        assert.deepEqual(approval.preview.plan.steps, FIXTURE_PLAN.steps);
+        shown.push(JSON.stringify(approval.preview));
+        // The plan expires (or is deleted) after the card was shown: the approved call still
+        // runs from the preview stored with it, without fetching the plan again.
+        plans.set("cpp-gone", plans.get(FIXTURE_PLAN.plan_id));
+        const fetchesBefore = fixture.requests.filter((request) => request.method === "GET" && request.path.startsWith("/calibration-pipelines/plans/")).length;
+        const text = await run.writeTools.runApproved(approval);
+        assert.match(text, new RegExp(`Plan ${FIXTURE_PLAN.plan_id} \\(review digest ${FIXTURE_PLAN.review_digest}\\)`));
+        assert.equal(fixture.requests.filter((request) => request.method === "GET" && request.path.startsWith("/calibration-pipelines/plans/")).length, fetchesBefore);
+        // An approval request that lost its preview, or names another plan, runs nothing.
+        await assert.rejects(run.writeTools.runApproved({ ...approval, preview: undefined }), /does not carry the stored plan/);
+        await assert.rejects(run.writeTools.runApproved({ ...approval, args: { ...approval.args, planId: "cpp-gone" } }), /differs from the one the user approved/);
+      } else {
+        assert.equal(pipeline.isError, false, `${host}: ${pipeline.text}`);
+        assert.equal(pipeline.details.reviewDigest, FIXTURE_PLAN.review_digest);
+      }
+      outcomes[host] = { script: scriptResult(script.text), shown, requests: requestsSince(start) };
+    } finally {
+      await run.close();
+    }
+  }
+  for (const host of ["cli", "chat"]) {
+    const { script, shown, requests } = outcomes[host];
+    assert.deepEqual(script, {
+      valid: true,
+      planId: FIXTURE_PLAN.plan_id,
+      digest: FIXTURE_PLAN.review_digest,
+      run: "refused",
+      runSpec: "refused",
+      wait: "refused",
+      step: "refused",
+    }, host);
+    // What the user approved names the fetched plan's digest and its expanded qubits.
+    assert.ok(shown.some((message) => message.includes(FIXTURE_PLAN.review_digest)), `${host}: ${shown.join("\n")}`);
+    assert.ok(shown.some((message) => message.includes("4") && message.includes("7")), host);
+    const posts = requests.filter((request) => request.method === "POST");
+    assert.deepEqual(posts.map((request) => request.path), [
+      "/calibration-pipelines/validate",
+      "/calibration-pipelines/plans",
+      `/calibration-pipelines/plans/${FIXTURE_PLAN.plan_id}/execute`,
+    ], host);
+    // The script's spec reached the plan store; the run carried only the approved digest.
+    assert.deepEqual(posts[1].body.spec, SPEC_SCRIPT_SPEC, host);
+    assert.match(posts[1].body.idempotency_key, /^qdash_create_pipeline_plan:/, host);
+    assert.equal("spec" in posts[2].body, false, host);
+    assert.equal(posts[2].body.expected_review_digest, FIXTURE_PLAN.review_digest, host);
+    assert.equal(posts[2].body.chip_id, "A", host);
+  }
 });
 
 test("a script error inside or after the builders keeps its own line number in both hosts", async () => {

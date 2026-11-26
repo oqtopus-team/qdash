@@ -428,6 +428,7 @@ from .parameter_version_response import ParameterVersionResponse
 from .parameter_version_response_value import ParameterVersionResponseValue
 from .password_reset_response import PasswordResetResponse
 from .pipeline_catalog_response import PipelineCatalogResponse
+from .pipeline_plan_response import PipelinePlanResponse
 from .pipeline_problem import PipelineProblem
 from .pipeline_progress import PipelineProgress
 from .pipeline_step_progress import PipelineStepProgress
@@ -982,6 +983,7 @@ __all__ = [
     "ParameterVersionResponseValue",
     "PasswordResetResponse",
     "PipelineCatalogResponse",
+    "PipelinePlanResponse",
     "PipelineProblem",
     "PipelineProgress",
     "PipelineStepProgress",

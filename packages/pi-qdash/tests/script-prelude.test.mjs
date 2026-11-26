@@ -197,7 +197,8 @@ test("both hosts' script paths add the helpers: the pi CLI's tool_call hook rewr
 test("the guidance tells scripts about qdash.calibration and keeps runs and agent sessions out of scripts", () => {
   assert.match(QDASH_SCRIPT_GUIDELINE, /`qdash\.calibration`/);
   assert.match(QDASH_SCRIPT_GUIDELINE, /await tools\.qdash_plan_pipeline\(\{ spec \}\)/);
-  assert.match(QDASH_SCRIPT_GUIDELINE, /direct, approved `qdash_run_pipeline` call outside the script/);
+  assert.match(QDASH_SCRIPT_GUIDELINE, /await tools\.qdash_create_pipeline_plan\(\{ spec \}\)/);
+  assert.match(QDASH_SCRIPT_GUIDELINE, /direct, approved `qdash_run_pipeline\(\{ chipId, planId \}\)` call outside the script, without copying the spec/);
   assert.match(QDASH_SCRIPT_GUIDELINE, /`qdash_run_agent_session_step`\); a spec never replaces them/);
   assert.match(QDASH_TOOL_NAMESPACE.instructions, /qdash\.calibration holds pure builders/);
   // Every builder the namespace instructions name exists.

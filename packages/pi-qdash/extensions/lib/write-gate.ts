@@ -2,21 +2,22 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { agentSessionApprovalText } from "./agent-loop.js";
 import { preApprovalProblems } from "./agent-session-policy.js";
+import { needsApprovalPreview, type ApprovalPreview } from "./pipeline-plan-preview.js";
 import { isReviewedWriteTool, nestedBlockMessage } from "./tool-policy.js";
 import {
   cancelledApprovalMessage,
   canonicalArgs,
   changedArgsMessage,
-  approvalReviewText,
   forgetGateApproval,
   noApprovalMessage,
+  previewReviewText,
   recordGateApproval,
   unserializableArgsMessage,
 } from "./write-approval.js";
 import { reviewWrite } from "./write-review.js";
 
 /** What the gate's review shows about a call, built from the snapshot it approves. */
-export function gateDialogMessage(toolName: string, approvedArgs: string): string {
+export function gateDialogMessage(toolName: string, approvedArgs: string, preview?: ApprovalPreview): string {
   const args = JSON.parse(approvedArgs) as Record<string, unknown>;
   const lines = [`${toolName} will create or modify data in QDash.`];
   // A session's grant is what the user approves once for many later steps: show it plainly.
@@ -25,7 +26,16 @@ export function gateDialogMessage(toolName: string, approvedArgs: string): strin
     const expires = typeof args.expiresInSeconds === "number" ? args.expiresInSeconds : undefined;
     lines.push("", agentSessionApprovalText(chipId, args.policy, expires));
   }
-  return approvalReviewText(lines.join("\n"), approvedArgs);
+  return previewReviewText(lines.join("\n"), approvedArgs, preview);
+}
+
+export interface WriteGateOptions {
+  /**
+   * Fetch what a call's approval must show besides its arguments (`needsApprovalPreview`):
+   * the stored plan a `qdash_run_pipeline` call names. A throw blocks the call before the
+   * user is asked. Without it such a call is blocked.
+   */
+  resolvePreview?: (toolName: string, args: Record<string, unknown>, signal?: AbortSignal) => Promise<ApprovalPreview>;
 }
 
 /**
@@ -36,7 +46,8 @@ export function gateDialogMessage(toolName: string, approvedArgs: string): strin
  * 1. `tool_call`: any earlier approval for the id is dropped. A nested call,
  *    a session without a UI, an aborted turn, or arguments that are not plain
  *    JSON data are blocked without a dialog. Otherwise the gate snapshots the
- *    canonical arguments, shows all of them in a review the user can scroll
+ *    canonical arguments, fetches the stored plan a call names (and blocks
+ *    the call when it cannot be shown), shows all of them in a review the user can scroll
  *    to the end (write-review.ts), and waits for the user with pi's abort
  *    signal. It records the snapshot, bound to the tool name, only when the
  *    user accepted, the turn was not aborted meanwhile, and the arguments
@@ -51,7 +62,7 @@ export function gateDialogMessage(toolName: string, approvedArgs: string): strin
  *
  * No argument skips the dialog, so a model cannot approve its own write.
  */
-export function installQDashWriteGate(pi: ExtensionAPI): void {
+export function installQDashWriteGate(pi: ExtensionAPI, options: WriteGateOptions = {}): void {
   const recorded = new Set<string>();
   const forget = (toolCallId: string) => {
     forgetGateApproval(toolCallId);
@@ -80,14 +91,29 @@ export function installQDashWriteGate(pi: ExtensionAPI): void {
     const problems = preApprovalProblems(event.toolName, JSON.parse(approved));
     if (problems) return { block: true, reason: problems };
 
+    // A call that names a stored plan is reviewed with the plan QDash returns now, never
+    // with content the model wrote; one that cannot be shown is not asked about.
+    let preview: ApprovalPreview | undefined;
+    if (needsApprovalPreview(event.toolName, JSON.parse(approved))) {
+      if (!options.resolvePreview) {
+        return { block: true, reason: `${event.toolName} was not run: this pi session cannot fetch the stored plan to show it for approval.` };
+      }
+      try {
+        preview = await options.resolvePreview(event.toolName, JSON.parse(approved) as Record<string, unknown>, signal);
+      } catch (error) {
+        if (signal?.aborted) return { block: true, reason: cancelledApprovalMessage(event.toolName) };
+        return { block: true, reason: `${event.toolName} was not run: ${error instanceof Error ? error.message : String(error)}` };
+      }
+    }
+
     // The whole review text is fixed here from the snapshot (write-review.ts).
-    const ok = await reviewWrite(ctx, "Approve QDash write operation?", gateDialogMessage(event.toolName, approved), signal);
+    const ok = await reviewWrite(ctx, "Approve QDash write operation?", gateDialogMessage(event.toolName, approved, preview), signal);
     if (signal?.aborted) return { block: true, reason: cancelledApprovalMessage(event.toolName) };
     if (!ok) return { block: true, reason: "QDash write operation rejected by user" };
     if (canonicalArgs(event.input) !== approved) {
       return { block: true, reason: changedArgsMessage(event.toolName) };
     }
-    recordGateApproval(event.toolCallId, event.toolName, approved);
+    recordGateApproval(event.toolCallId, event.toolName, approved, preview);
     recorded.add(event.toolCallId);
     return undefined;
   });

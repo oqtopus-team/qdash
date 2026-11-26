@@ -9,6 +9,8 @@ import type { ExecutePipelineResponseCalibrationRunId } from './executePipelineR
 import type { ExecutePipelineResponseCalibrationSessionId } from './executePipelineResponseCalibrationSessionId';
 import type { ExecutePipelineResponseDecisionId } from './executePipelineResponseDecisionId';
 import type { ExecutePipelineResponsePipelineRunId } from './executePipelineResponsePipelineRunId';
+import type { ExecutePipelineResponsePlanId } from './executePipelineResponsePlanId';
+import type { ExecutePipelineResponseReviewDigest } from './executePipelineResponseReviewDigest';
 import type { ExecutePipelineResponseTargets } from './executePipelineResponseTargets';
 import type { ResolvedPipelineStep } from './resolvedPipelineStep';
 
@@ -38,4 +40,8 @@ export interface ExecutePipelineResponse {
   pipeline_run_id?: ExecutePipelineResponsePipelineRunId;
   /** The decision the recorded run carries out, as QDash linked it; null when the request named none. A client that sent a decision checks it is echoed here */
   decision_id?: ExecutePipelineResponseDecisionId;
+  /** For a run of a stored plan: the plan it carries out. A client that ran a plan checks it and review_digest are echoed here */
+  plan_id?: ExecutePipelineResponsePlanId;
+  /** For a run of a stored plan: the review digest it ran. */
+  review_digest?: ExecutePipelineResponseReviewDigest;
 }

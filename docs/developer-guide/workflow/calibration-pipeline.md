@@ -30,15 +30,53 @@ Tags combine the spec's tags and the execute request's tags; `pipeline` is not a
 | `GET /calibration-pipelines/catalog` | Read | Supported steps, tasks, modes, and spec schema |
 | `POST /calibration-pipelines/validate` | Read | Problems, warnings, and resolved plan |
 | `POST /calibration-pipelines/execute` | Edit | Validate and dispatch to the system worker |
+| `POST /calibration-pipelines/plans` | Edit | Validate and save an immutable proposal |
+| `GET /calibration-pipelines/plans/{plan_id}` | Edit, creator | Read the stored preview, including its expiry status |
+| `POST /calibration-pipelines/plans/{plan_id}/execute` | Edit, creator | Recheck and dispatch the approved proposal |
 
 Validation returns `valid: false` with paths into the spec. Execute rejects invalid specs with
-422 and missing worker registration with 503. The plan digest links validation, execution notes,
-and task invocations.
+422 and missing worker registration with 503. Validation's `plan_digest` identifies the spec;
+task invocations carry a separate worker-resolved plan digest.
 
 Execute records intent before launch and joins the supplied calibration session or creates an
 automatic one. Reusing `idempotency_key` replays the recorded request; omitting it starts new work.
 For unknown dispatch outcomes and audit fields, see
 [Calibration Sessions](../agent/calibration-sessions.md).
+
+## Stored plans
+
+Plan creation requires `chip_id`, `spec`, and an `idempotency_key`; `backend_name` is optional.
+It validates and saves at most 256 KiB of submitted spec without creating a run, session, or
+hardware reservation. The stored spec materializes default task lists. The preview includes
+resolved calls, initial MUX-expanded qubits, defaults, warnings, and a versioned SHA-256
+`review_digest`. This differs from the spec's `plan_digest` and the worker's invocation digest.
+
+Plans belong to their creator in one project and expire after 24 hours. GET can display an
+expired plan; new execution and creation-key replay return 410 after expiry. A new plan needs a
+new creation key and ID. Repeating an unexpired creation request with the same key returns the
+same plan; changing its payload returns 409. TTL cleanup removes plans seven days after expiry.
+After cleanup, reusing a creation key can create a new ID; it never revives the old approval.
+
+Reference execution requires `chip_id` and `expected_review_digest` from the reviewed plan.
+The API revalidates the stored definition and compares its resolved content before dispatch.
+It refuses changed content with 409 and invalid inputs with 422. The worker compares the
+approved content against its actual steps, expanded initial targets, and run settings before
+resource acquisition. Filters still select later targets from measured results. Calibration
+values, scientific defaults inside task code, task code, and hardware state are not frozen.
+
+Use matching API and worker releases for this contract. Restart the upgraded worker so it
+registers a deployment whose `approved_plan` parameter advertises
+`x-qdash-approved-plan-contract: 1`. Missing or incompatible schemas return 503 before a new run
+is admitted; QDash checks again immediately before dispatch. Existing spec execution remains
+available. This checks the registered contract, not the code actually running on a worker;
+do not leave old workers serving the same deployment.
+
+Execution idempotency is separate from creation idempotency. Reuse the launch key to recover the
+same recorded request: an already dispatched run can replay even after plan cleanup. An unknown
+dispatch outcome requires reconciliation, not a new launch key. Each new execution still needs
+its own authority. SDK calls do not provide the interactive approval of Agent or pi CLI.
+Run records retain `plan_id`, `review_digest`, and `approved_plan` for audit after plan deletion.
+See [Code Mode and approval](../agent/calibration-design.md#preserve-the-proposal-through-approval-and-execution).
 
 ### Version 1 specs
 

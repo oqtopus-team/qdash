@@ -65,4 +65,14 @@ class ExecutePipelineResponse(UniversalBaseModel):
     The decision the recorded run carries out, as QDash linked it; null when the request named none. A client that sent a decision checks it is echoed here
     """
 
+    plan_id: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    For a run of a stored plan: the plan it carries out. A client that ran a plan checks it and review_digest are echoed here
+    """
+
+    review_digest: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    For a run of a stored plan: the review digest it ran.
+    """
+
     model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)

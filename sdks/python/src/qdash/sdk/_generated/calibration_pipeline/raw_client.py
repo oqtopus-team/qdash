@@ -6,6 +6,7 @@ from json.decoder import JSONDecodeError
 from ..core.api_error import ApiError
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.http_response import AsyncHttpResponse, HttpResponse
+from ..core.jsonable_encoder import quote_path_param
 from ..core.parse_error import ParsingError
 from ..core.pydantic_utilities import parse_obj_as
 from ..core.request_options import RequestOptions
@@ -13,6 +14,7 @@ from ..core.serialization import convert_and_respect_annotation_metadata
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.execute_pipeline_response import ExecutePipelineResponse
 from ..types.pipeline_catalog_response import PipelineCatalogResponse
+from ..types.pipeline_plan_response import PipelinePlanResponse
 from ..types.reported_launch_origin import ReportedLaunchOrigin
 from ..types.validate_pipeline_response import ValidatePipelineResponse
 from pydantic import ValidationError
@@ -259,6 +261,252 @@ class RawCalibrationPipelineClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
+    def create_calibration_pipeline_plan(
+        self,
+        *,
+        chip_id: str,
+        spec: typing.Dict[str, typing.Any],
+        idempotency_key: str,
+        backend_name: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[PipelinePlanResponse]:
+        """
+        Validate the spec and store it, with its review content and review digest.
+
+        A plan is a proposal: it starts no run, reserves no hardware, joins no calibration
+        session, and grants nothing. An invalid spec returns 422 with the same problems as
+        /validate and stores nothing. Default task lists are written into the stored spec and
+        MUX targets are expanded, so what is reviewed is what runs. The plan expires after 24
+        hours and is never renewed. ``idempotency_key`` names this creation: repeating it
+        returns the same plan (409 for another request, 410 once it expired).
+
+        Parameters
+        ----------
+        chip_id : str
+
+        spec : typing.Dict[str, typing.Any]
+            CalibrationPipelineSpec as JSON; see GET /calibration-pipelines/catalog.
+
+        idempotency_key : str
+            Identity of this creation, such as the tool call that asks for it. Repeating it with the same request returns the same plan, or reports it expired; repeating it with another request is a conflict. It never stores a second plan or changes or renews the first.
+
+        backend_name : typing.Optional[str]
+            Defaults to the configured backend.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[PipelinePlanResponse]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            "calibration-pipelines/plans",
+            method="POST",
+            json={
+                "chip_id": chip_id,
+                "spec": spec,
+                "backend_name": backend_name,
+                "idempotency_key": idempotency_key,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    PipelinePlanResponse,
+                    parse_obj_as(
+                        type_=PipelinePlanResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def get_calibration_pipeline_plan(
+        self, plan_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[PipelinePlanResponse]:
+        """
+        The plan with its review content; ``expired`` says whether it can still run. Only
+        its creator reads it: another user's plan, or one of another project, is not found.
+
+        Parameters
+        ----------
+        plan_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[PipelinePlanResponse]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"calibration-pipelines/plans/{quote_path_param(plan_id)}",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    PipelinePlanResponse,
+                    parse_obj_as(
+                        type_=PipelinePlanResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def execute_calibration_pipeline_plan(
+        self,
+        plan_id: str,
+        *,
+        chip_id: str,
+        expected_review_digest: str,
+        backend_name: typing.Optional[str] = OMIT,
+        calibration_session_id: typing.Optional[str] = OMIT,
+        idempotency_key: typing.Optional[str] = OMIT,
+        decision_id: typing.Optional[str] = OMIT,
+        reported_origin: typing.Optional[ReportedLaunchOrigin] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[ExecutePipelineResponse]:
+        """
+        Dispatch the plan's spec as one pipeline run, recorded like /execute.
+
+        A retry with the same ``idempotency_key`` and request returns the recorded run first,
+        even after the plan expired or was deleted. Otherwise the plan is read again and must be
+        the user's, unexpired, for ``chip_id`` (and ``backend_name`` when given), and have
+        ``expected_review_digest``; its spec is validated again, and its review content resolved
+        now must still have that digest. Then the hardware, session, and decision checks of
+        /execute apply. The worker receives the approved review content and refuses to measure
+        when what it would run differs.
+
+        Parameters
+        ----------
+        plan_id : str
+
+        chip_id : str
+            Must be the plan's chip.
+
+        expected_review_digest : str
+            The review digest the person approved. A plan with another digest, or one whose revalidated content no longer has it, is refused.
+
+        backend_name : typing.Optional[str]
+            Must be the plan's backend when given.
+
+        calibration_session_id : typing.Optional[str]
+            Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
+
+        idempotency_key : typing.Optional[str]
+            A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run.
+
+        decision_id : typing.Optional[str]
+            As for POST /calibration-pipelines/execute; grants nothing.
+
+        reported_origin : typing.Optional[ReportedLaunchOrigin]
+            As for POST /calibration-pipelines/execute: stored as reported.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[ExecutePipelineResponse]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"calibration-pipelines/plans/{quote_path_param(plan_id)}/execute",
+            method="POST",
+            json={
+                "chip_id": chip_id,
+                "expected_review_digest": expected_review_digest,
+                "backend_name": backend_name,
+                "calibration_session_id": calibration_session_id,
+                "idempotency_key": idempotency_key,
+                "decision_id": decision_id,
+                "reported_origin": convert_and_respect_annotation_metadata(
+                    object_=reported_origin, annotation=typing.Optional[ReportedLaunchOrigin], direction="write"
+                ),
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    ExecutePipelineResponse,
+                    parse_obj_as(
+                        type_=ExecutePipelineResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
 
 class AsyncRawCalibrationPipelineClient:
     def __init__(self, *, client_wrapper: AsyncClientWrapper):
@@ -454,6 +702,252 @@ class AsyncRawCalibrationPipelineClient:
             json={
                 "chip_id": chip_id,
                 "spec": spec,
+                "backend_name": backend_name,
+                "calibration_session_id": calibration_session_id,
+                "idempotency_key": idempotency_key,
+                "decision_id": decision_id,
+                "reported_origin": convert_and_respect_annotation_metadata(
+                    object_=reported_origin, annotation=typing.Optional[ReportedLaunchOrigin], direction="write"
+                ),
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    ExecutePipelineResponse,
+                    parse_obj_as(
+                        type_=ExecutePipelineResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def create_calibration_pipeline_plan(
+        self,
+        *,
+        chip_id: str,
+        spec: typing.Dict[str, typing.Any],
+        idempotency_key: str,
+        backend_name: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[PipelinePlanResponse]:
+        """
+        Validate the spec and store it, with its review content and review digest.
+
+        A plan is a proposal: it starts no run, reserves no hardware, joins no calibration
+        session, and grants nothing. An invalid spec returns 422 with the same problems as
+        /validate and stores nothing. Default task lists are written into the stored spec and
+        MUX targets are expanded, so what is reviewed is what runs. The plan expires after 24
+        hours and is never renewed. ``idempotency_key`` names this creation: repeating it
+        returns the same plan (409 for another request, 410 once it expired).
+
+        Parameters
+        ----------
+        chip_id : str
+
+        spec : typing.Dict[str, typing.Any]
+            CalibrationPipelineSpec as JSON; see GET /calibration-pipelines/catalog.
+
+        idempotency_key : str
+            Identity of this creation, such as the tool call that asks for it. Repeating it with the same request returns the same plan, or reports it expired; repeating it with another request is a conflict. It never stores a second plan or changes or renews the first.
+
+        backend_name : typing.Optional[str]
+            Defaults to the configured backend.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[PipelinePlanResponse]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            "calibration-pipelines/plans",
+            method="POST",
+            json={
+                "chip_id": chip_id,
+                "spec": spec,
+                "backend_name": backend_name,
+                "idempotency_key": idempotency_key,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    PipelinePlanResponse,
+                    parse_obj_as(
+                        type_=PipelinePlanResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def get_calibration_pipeline_plan(
+        self, plan_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[PipelinePlanResponse]:
+        """
+        The plan with its review content; ``expired`` says whether it can still run. Only
+        its creator reads it: another user's plan, or one of another project, is not found.
+
+        Parameters
+        ----------
+        plan_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[PipelinePlanResponse]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"calibration-pipelines/plans/{quote_path_param(plan_id)}",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    PipelinePlanResponse,
+                    parse_obj_as(
+                        type_=PipelinePlanResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def execute_calibration_pipeline_plan(
+        self,
+        plan_id: str,
+        *,
+        chip_id: str,
+        expected_review_digest: str,
+        backend_name: typing.Optional[str] = OMIT,
+        calibration_session_id: typing.Optional[str] = OMIT,
+        idempotency_key: typing.Optional[str] = OMIT,
+        decision_id: typing.Optional[str] = OMIT,
+        reported_origin: typing.Optional[ReportedLaunchOrigin] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[ExecutePipelineResponse]:
+        """
+        Dispatch the plan's spec as one pipeline run, recorded like /execute.
+
+        A retry with the same ``idempotency_key`` and request returns the recorded run first,
+        even after the plan expired or was deleted. Otherwise the plan is read again and must be
+        the user's, unexpired, for ``chip_id`` (and ``backend_name`` when given), and have
+        ``expected_review_digest``; its spec is validated again, and its review content resolved
+        now must still have that digest. Then the hardware, session, and decision checks of
+        /execute apply. The worker receives the approved review content and refuses to measure
+        when what it would run differs.
+
+        Parameters
+        ----------
+        plan_id : str
+
+        chip_id : str
+            Must be the plan's chip.
+
+        expected_review_digest : str
+            The review digest the person approved. A plan with another digest, or one whose revalidated content no longer has it, is refused.
+
+        backend_name : typing.Optional[str]
+            Must be the plan's backend when given.
+
+        calibration_session_id : typing.Optional[str]
+            Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
+
+        idempotency_key : typing.Optional[str]
+            A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run.
+
+        decision_id : typing.Optional[str]
+            As for POST /calibration-pipelines/execute; grants nothing.
+
+        reported_origin : typing.Optional[ReportedLaunchOrigin]
+            As for POST /calibration-pipelines/execute: stored as reported.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[ExecutePipelineResponse]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"calibration-pipelines/plans/{quote_path_param(plan_id)}/execute",
+            method="POST",
+            json={
+                "chip_id": chip_id,
+                "expected_review_digest": expected_review_digest,
                 "backend_name": backend_name,
                 "calibration_session_id": calibration_session_id,
                 "idempotency_key": idempotency_key,

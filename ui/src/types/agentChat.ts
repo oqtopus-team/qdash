@@ -86,6 +86,24 @@ export interface ApprovalRequest {
   tool: string;
   label: string;
   args: Record<string, unknown>;
+  /**
+   * For a run of a stored pipeline plan: the plan the runtime fetched before asking, frozen
+   * with the request. The card shows it as stored and never asks QDash again.
+   */
+  preview?: PipelinePlanApprovalPreview;
+}
+
+/** The stored plan an approval covers, as the agent runtime fetched it. */
+export interface PipelinePlanApprovalPreview {
+  kind: "calibration_pipeline_plan";
+  planId: string;
+  reviewDigest: string;
+  chipId: string;
+  backendName: string;
+  expiresAt: string;
+  targetQids: string[];
+  /** The plan as QDash returned it (`PipelinePlanResponse`). */
+  plan: Record<string, unknown>;
 }
 
 /**

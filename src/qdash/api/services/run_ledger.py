@@ -121,6 +121,41 @@ def pipeline_request_hash(
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
+@dataclass(frozen=True)
+class RecordedPlan:
+    """The stored plan a run carries out, recorded on the run for its audit."""
+
+    plan_id: str
+    review_digest: str
+    review: dict[str, Any]
+
+
+def plan_request_hash(
+    plan_id: str,
+    expected_review_digest: str,
+    chip_id: str,
+    backend_name: str | None,
+    decision_id: str | None = None,
+) -> str:
+    """Hash of what a retry of a stored plan's run must repeat to reuse its idempotency key.
+
+    It is derived from the request alone, never from the stored plan, so a retry of a run
+    already dispatched is answered after the plan expired or was deleted. The ``request``
+    namespace keeps it apart from every spec request's hash.
+    """
+    fields: dict[str, Any] = {
+        "request": "calibration_pipeline_plan_execute/v1",
+        "plan_id": plan_id,
+        "expected_review_digest": expected_review_digest,
+        "chip_id": chip_id,
+        "backend_name": backend_name,
+    }
+    if decision_id is not None:
+        fields["decision_id"] = decision_id
+    payload = json.dumps(fields, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
 def scoped_request_hash(request_hash: str, calibration_session_id: str | None) -> str:
     """The hash a run recorded with a scope stores: the request and the session it named.
 
@@ -180,9 +215,14 @@ class RunLedger:
         reported_origin: ReportedLaunchOrigin | None = None,
         decision_id: str | None = None,
         preflight: Callable[[Any], None] | None = None,
+        async_preflight: Callable[[Any], Awaitable[None]] | None = None,
         session_name: str | None = None,
+        recorded_plan: Callable[[Any], RecordedPlan | None] | None = None,
     ) -> RunDispatch:
         """Launch one run at most once per idempotency key.
+
+        ``recorded_plan`` returns, for a run started from a stored calibration pipeline plan,
+        the plan's provenance, recorded on the run with the spec.
 
         ``session_name`` is the name (objective) of the automatic session a run without
         ``calibration_session_id`` creates, instead of the default named after the run; it is
@@ -196,7 +236,8 @@ class RunLedger:
         key, every request is a new run, as an unkeyed request always was a new launch.
 
         The request is validated, and then given to ``preflight`` (which refuses, for example,
-        a run whose hardware is already in use), before an automatic session is created or the
+        a run whose hardware is already in use) and then ``async_preflight`` (which refuses, for
+        example, a deployment that cannot run it), before an automatic session is created or the
         run is recorded or reserved, so a refused request leaves nothing behind. A retry that
         gets its recorded answer is neither validated nor checked again.
         """
@@ -207,7 +248,7 @@ class RunLedger:
             replay = self._replay(found.run, request_hash if found.legacy else hashed)
             if replay is not None:
                 return replay
-            validated = self._validated(validate, preflight)
+            validated = await self._validated(validate, preflight, async_preflight)
             self._check_decision(
                 project_id, found.run.calibration_session_id, decision_id, validated
             )
@@ -226,6 +267,7 @@ class RunLedger:
                 dispatch=dispatch,
                 response=response,
                 recorded_spec=recorded_spec,
+                recorded_plan=recorded_plan,
                 backend_name=backend_name,
                 reported_origin=reported_origin,
                 decision_id=decision_id,
@@ -246,9 +288,9 @@ class RunLedger:
                     ),
                 )
             association = RunAssociation.EXPLICIT
-            validated = self._validated(validate, preflight)
+            validated = await self._validated(validate, preflight, async_preflight)
         else:
-            validated = self._validated(validate, preflight)
+            validated = await self._validated(validate, preflight, async_preflight)
             try:
                 session = insert_or_load_automatic_session(
                     calibration_session_id=automatic_session_id_for_key(project_id, username, key),
@@ -277,17 +319,24 @@ class RunLedger:
             dispatch=dispatch,
             response=response,
             recorded_spec=recorded_spec,
+            recorded_plan=recorded_plan,
             backend_name=backend_name,
             reported_origin=reported_origin,
             decision_id=decision_id,
         )
 
     @staticmethod
-    def _validated(validate: Callable[[], Any], preflight: Callable[[Any], None] | None) -> Any:
-        """The validated request, refused when its preflight check fails."""
+    async def _validated(
+        validate: Callable[[], Any],
+        preflight: Callable[[Any], None] | None,
+        async_preflight: Callable[[Any], Awaitable[None]] | None,
+    ) -> Any:
+        """The validated request, refused when one of its preflight checks fails."""
         validated = validate()
         if preflight is not None:
             preflight(validated)
+        if async_preflight is not None:
+            await async_preflight(validated)
         return validated
 
     # -- Agent actions -------------------------------------------------------------------
@@ -485,6 +534,7 @@ class RunLedger:
         backend_name: str | None,
         reported_origin: ReportedLaunchOrigin | None,
         decision_id: str | None,
+        recorded_plan: Callable[[Any], RecordedPlan | None] | None = None,
     ) -> RunDispatch:
         """Record, admit, launch, and settle one attempt of a new or refused run."""
         run_id = existing.run_id if existing is not None else f"cpr-{uuid4()}"
@@ -515,6 +565,7 @@ class RunLedger:
                 reported_origin=reported_origin,
                 spec=recorded_spec(validated) if recorded_spec is not None else None,
                 decision_id=decision_id,
+                plan=recorded_plan(validated) if recorded_plan is not None else None,
             )
             # Only an attempt that removes its own reservation may launch: a close that
             # cleared it meanwhile has already counted this run as never started.
@@ -643,6 +694,7 @@ class RunLedger:
         reported_origin: ReportedLaunchOrigin | None = None,
         spec: dict[str, Any] | None = None,
         decision_id: str | None = None,
+        plan: RecordedPlan | None = None,
     ) -> RunDocument:
         """Record the launch before it happens: a new run, or a new attempt of a refused one.
 
@@ -652,6 +704,15 @@ class RunLedger:
         token = str(uuid4())
         timestamp = now()
         admission = RunAdmission.PENDING if reservation_id is not None else RunAdmission.ADMITTED
+        provenance: dict[str, Any] = (
+            {
+                "plan_id": plan.plan_id,
+                "review_digest": plan.review_digest,
+                "approved_plan": plan.review,
+            }
+            if plan is not None
+            else {}
+        )
         if existing is None:
             doc = RunDocument(
                 run_id=run_id,
@@ -674,6 +735,7 @@ class RunLedger:
                 decision_id=decision_id,
                 requested_at=timestamp,
                 updated_at=timestamp,
+                **provenance,
             )
             try:
                 insert_run(doc)
@@ -701,6 +763,7 @@ class RunLedger:
                     "admission": admission.value,
                     "error": "",
                     "spec": spec,
+                    **provenance,
                     "updated_at": timestamp,
                 },
                 "$inc": {"attempts": 1},
@@ -720,6 +783,7 @@ class RunLedger:
                 "attempts": existing.attempts + 1,
                 "error": "",
                 "spec": spec,
+                **provenance,
             }
         )
         return claimed

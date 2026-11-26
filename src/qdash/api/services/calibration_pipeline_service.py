@@ -302,6 +302,35 @@ class CalibrationPipelineService:
             ),
         )
 
+    def initial_target_qids(
+        self, project_id: str, chip_id: str, spec: CalibrationPipelineSpec
+    ) -> tuple[list[str] | None, PipelineProblem | None]:
+        """The qubits a run of ``spec`` starts from, as the worker resolves its targets.
+
+        Qubit and pair targets name them. MUX targets are expanded with the chip's MUX
+        mapping and wiring, as ``MuxTargets`` does on the worker; when that data cannot be
+        read the expansion is a problem, never a guess.
+        """
+        targets = spec.targets
+        if targets.qids:
+            return list(targets.qids), None
+        if targets.pairs:
+            return targets.pair_qids(), None
+        model = self._chip_round_model(project_id, chip_id)
+        if model.mapping_error is not None:
+            return None, _problem("targets.mux_ids", model.mapping_error)
+        if model.wiring is None:
+            reason = model.wiring_error or f"the wiring of chip {chip_id!r} could not be read"
+            return None, _problem(
+                "targets.mux_ids", f"the MUX targets could not be expanded to qubits: {reason}"
+            )
+        qids = mux_target_qids(
+            targets.mux_ids or [], targets.exclude_qids, model.wiring, model.mux_mapping
+        )
+        if not qids:
+            return None, _problem("targets.mux_ids", "the MUX targets select no qubit")
+        return qids, None
+
     def _validate_manual_rounds(
         self,
         project_id: str,

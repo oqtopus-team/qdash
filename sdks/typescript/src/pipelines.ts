@@ -5,6 +5,7 @@ import type {
   ExecutePipelineResponse,
   ExecutionResponseDetail,
   PipelineCatalogResponse,
+  PipelinePlanResponse,
   PipelineTargets,
   ReportedLaunchOrigin,
   ValidatePipelineResponse,
@@ -90,6 +91,61 @@ function recording(options: PipelineRecording | undefined): RecordingFields {
     idempotency_key: options.idempotencyKey,
     ...(options.decisionId ? { decision_id: options.decisionId } : {}),
   };
+}
+
+/** Where `Pipelines.executePlan` runs a stored plan, and the review it was approved as. */
+export interface PipelinePlanTarget {
+  /** Must be the plan's chip. */
+  chipId: string;
+  /** Must be the plan's backend when given. */
+  backendName?: string;
+  /**
+   * The `review_digest` of the plan the person approved, taken from what they were shown
+   * (never from model or user input). The server refuses a plan that no longer has it.
+   */
+  expectedReviewDigest: string;
+}
+
+/**
+ * Check that a recorded dispatch is the one asked for: a response that does not echo the
+ * session, the recorded run, the decision, or (for a plan) the plan and its review digest
+ * may have started without them, so it is unknown rather than an error to retry.
+ */
+function checkRecorded(
+  kind: string,
+  answer: Parameters<typeof resultUnknown>[1] & { data: ExecutePipelineResponse },
+  recorded: RecordingFields,
+  sessionId: string | undefined,
+  plan?: { planId: string; reviewDigest: string },
+  requireRecording = true,
+): void {
+  const response = answer.data;
+  const runId = response?.pipeline_run_id;
+  const isRecorded = typeof runId === "string" && !!runId.trim() && typeof response.calibration_session_id === "string";
+  if (requireRecording && (!isRecorded || (sessionId && response.calibration_session_id !== sessionId))) {
+    throw resultUnknown(
+      `${kind} result unknown: the execution may have started without its association. ` +
+        "Do not retry automatically or use a new key; reconcile the execution first.",
+      answer,
+    );
+  }
+  // A server that drops the decision would record the run without its intent.
+  const decisionId = recorded.decision_id;
+  if (decisionId && response.decision_id !== decisionId) {
+    throw resultUnknown(
+      `${kind} result unknown: the run may have been recorded without its decision ${decisionId}. ` +
+        "Do not retry automatically or use a new key; reconcile the run in the calibration session audit first.",
+      answer,
+    );
+  }
+  // A server that does not run plans by reference, or ran another review, answers without them.
+  if (plan && (response.plan_id !== plan.planId || response.review_digest !== plan.reviewDigest)) {
+    throw resultUnknown(
+      `${kind} result unknown: the response does not confirm plan ${plan.planId} with review digest ` +
+        `${plan.reviewDigest}. Do not retry automatically or use a new key; reconcile the execution first.`,
+      answer,
+    );
+  }
 }
 
 /** A dispatched pipeline execution, returned by `Pipelines.execute`. */
@@ -186,30 +242,96 @@ export class Pipelines {
         )
         .withRawResponse(),
     );
-    const response = answer.data;
-    if (recordIn) {
-      // A server that predates run recording ignores the fields and launches anyway.
-      const runId = response?.pipeline_run_id;
-      const isRecorded = typeof runId === "string" && !!runId.trim() && typeof response.calibration_session_id === "string";
-      if (!isRecorded || (sessionId && response.calibration_session_id !== sessionId)) {
-        throw resultUnknown(
-          "Pipeline result unknown: the execution may have started without its association. " +
-            "Do not retry automatically or use a new key; reconcile the execution first.",
-          answer,
-        );
-      }
-      // A server that drops the decision would record the run without its intent.
-      // Compare with the decision that was sent: the caller may change `recordIn` meanwhile.
-      const decisionId = recorded.decision_id;
-      if (decisionId && response.decision_id !== decisionId) {
-        throw resultUnknown(
-          `Pipeline result unknown: the run may have been recorded without its decision ${decisionId}. ` +
-            "Do not retry automatically or use a new key; reconcile the run in the calibration session audit first.",
-          answer,
-        );
-      }
+    // A server that predates run recording ignores the fields and launches anyway. The
+    // decision compared is the one sent: the caller may change `recordIn` meanwhile.
+    if (recordIn) checkRecorded("Pipeline", answer, recorded, sessionId);
+    return new PipelineRun(this.executions, answer.data);
+  }
+
+  /**
+   * Validate `spec` and store it as a plan to approve and run by reference. Nothing is run,
+   * reserved or recorded in a session; an invalid spec is a `QDashValidationError` (422) with
+   * the problems of `validate` and stores nothing. The plan holds the normalized spec with
+   * every default task list written out, the qubits its targets resolve to, the resolved calls
+   * and its `review_digest`; it expires after 24 hours and is never renewed.
+   *
+   * `idempotencyKey` names this creation (one per tool call, for example): repeating it with
+   * the same request returns the same plan (`replayed`), with another request is a
+   * `QDashConflictError`, and once the plan expired is an error (410). Sent once; a transport
+   * error is thrown, and repeating the call with the same key is then safe.
+   */
+  createPlan(
+    spec: PipelineSpecInput,
+    target: PipelineTarget,
+    options: { idempotencyKey: string },
+  ): Promise<PipelinePlanResponse> {
+    if (typeof options?.idempotencyKey !== "string" || !options.idempotencyKey.trim()) {
+      throw new TypeError("idempotencyKey must be a non-empty string");
     }
-    return new PipelineRun(this.executions, response);
+    return call(() =>
+      this.context.api.calibrationPipeline.createCalibrationPipelinePlan(
+        { ...request(spec, target), idempotency_key: options.idempotencyKey },
+        writeOptions(),
+      ),
+    );
+  }
+
+  /**
+   * A stored plan of the signed-in user, with its review content; `expired` says whether it
+   * can still run. Another user's plan is `QDashNotFoundError`.
+   */
+  getPlan(planId: string): Promise<PipelinePlanResponse> {
+    if (typeof planId !== "string" || !planId.trim()) throw new TypeError("planId must be a non-empty string");
+    return read(this.context.reads, (requestOptions) =>
+      this.context.api.calibrationPipeline.getCalibrationPipelinePlan({ plan_id: planId }, requestOptions),
+    );
+  }
+
+  /**
+   * Run a stored plan exactly as it was approved: the server refuses it when it expired, is
+   * for another chip or backend, no longer has `expectedReviewDigest`, or resolves to other
+   * content now. Recording, retries and errors are those of `execute`; a retry with the same
+   * key returns the recorded run even after the plan expired. A response that does not echo
+   * the plan and its review digest (and the session, run and decision of `recordIn`) throws
+   * `QDashResultUnknownError`: reconcile instead of retrying.
+   */
+  async executePlan(
+    planId: string,
+    target: PipelinePlanTarget,
+    recordIn?: PipelineRecording,
+    options: PipelineLaunchOptions = {},
+  ): Promise<PipelineRun> {
+    if (typeof planId !== "string" || !planId.trim()) throw new TypeError("planId must be a non-empty string");
+    const digest = target.expectedReviewDigest;
+    if (typeof digest !== "string" || !digest.trim()) throw new TypeError("expectedReviewDigest must be a non-empty string");
+    const recorded = recording(recordIn);
+    const sessionId = recordIn?.calibrationSessionId;
+    if (sessionId) await preflightCalibrationSession(this.context, sessionId, target.chipId);
+    const answer = await dispatch("Pipeline plan", () =>
+      this.context.api.calibrationPipeline
+        .executeCalibrationPipelinePlan(
+          {
+            plan_id: planId,
+            chip_id: target.chipId,
+            expected_review_digest: digest,
+            ...(target.backendName ? { backend_name: target.backendName } : {}),
+            ...recorded,
+            ...(options.reportedOrigin ? { reported_origin: options.reportedOrigin } : {}),
+          },
+          writeOptions(),
+        )
+        .withRawResponse(),
+    );
+    // The plan is always echoed: a server that ignored it may have run something else.
+    checkRecorded(
+      "Pipeline plan",
+      answer,
+      recorded,
+      sessionId,
+      { planId, reviewDigest: digest },
+      recordIn !== undefined,
+    );
+    return new PipelineRun(this.executions, answer.data);
   }
 }
 
