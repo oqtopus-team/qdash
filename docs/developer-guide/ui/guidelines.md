@@ -18,7 +18,9 @@ Use established aliases: `@/contexts`, `@/hooks/url-state`, `@/lib/utils`, `@/cl
 
 Follow [state ownership](./architecture.md#state-ownership). DaisyUI provides visual components;
 shared Radix wrappers provide focus, dismissal, portals, and keyboard behavior. Reuse the root
-`TooltipProvider`. Navigation links need clear labels, not tooltips repeating their destinations.
+`TooltipProvider`. Navigation links need clear labels. In the collapsed desktop sidebar, show
+those labels in tooltips on hover and keyboard focus; omit them when labels are visible or in
+the mobile More sheet.
 Chat links alone use `LinkHoverCardProvider`; external links are described without fetching them.
 Inline autocomplete keeps focus in its text field and uses combobox/listbox semantics.
 
