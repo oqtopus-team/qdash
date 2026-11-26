@@ -30,9 +30,10 @@ import logging
 import math
 import os
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, TypeGuard
 
 import yaml
 
@@ -377,80 +378,118 @@ _ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _MAX_SAFE_INTEGER = 2**53 - 1
 
 
-def _is_number(value: object) -> bool:
+def _is_number(value: object) -> TypeGuard[int | float]:
     return isinstance(value, int | float) and not isinstance(value, bool) and math.isfinite(value)
 
 
-def _is_whole(value: object) -> bool:
+def _is_whole(value: object) -> TypeGuard[int | float]:
+    return _is_number(value) and float(value).is_integer() and abs(value) <= _MAX_SAFE_INTEGER
+
+
+_FieldRule = Callable[[object], str | None]
+"""Why a non-null field value is not accepted, or ``None``."""
+
+
+def _non_empty_string_error(value: object) -> str | None:
+    return None if isinstance(value, str) and value else "must be a non-empty string"
+
+
+def _one_of(choices: tuple[str, ...]) -> _FieldRule:
+    message = f"must be one of {', '.join(choices)}"
+
+    def error(value: object) -> str | None:
+        # Tuple membership compares by equality, so an unhashable value is simply rejected.
+        return None if value in choices else message
+
+    return error
+
+
+def _base_url_error(value: object) -> str | None:
+    if isinstance(value, str):
+        if value.startswith("env:") and _ENV_NAME.fullmatch(value[4:]):
+            return None
+        if value.startswith(("http://", "https://")) and len(value.split("://", 1)[1]) > 0:
+            return None
+    return "must be an http:// or https:// URL or env:NAME"
+
+
+def _env_name_error(value: object) -> str | None:
+    if isinstance(value, str) and _ENV_NAME.fullmatch(value):
+        return None
+    return "must be an environment variable name"
+
+
+def _temperature_error(value: object) -> str | None:
     if not _is_number(value):
-        return False
-    assert isinstance(value, int | float)
-    return float(value).is_integer() and abs(value) <= _MAX_SAFE_INTEGER
+        return "must be a finite number"
+    return None if value >= 0 else "must be at least 0"
+
+
+def _top_p_error(value: object) -> str | None:
+    if not _is_number(value):
+        return "must be a finite number"
+    return None if 0 < value <= 1 else "must be greater than 0 and at most 1"
+
+
+def _whole_at_least(minimum: int) -> _FieldRule:
+    def error(value: object) -> str | None:
+        if not _is_whole(value):
+            return "must be a whole number"
+        return None if value >= minimum else f"must be at least {minimum}"
+
+    return error
+
+
+def _bool_error(value: object) -> str | None:
+    return None if isinstance(value, bool) else "must be true or false"
+
+
+def _mapping_error(value: object) -> str | None:
+    return None if isinstance(value, dict) else "must be a mapping"
+
+
+def _thinking_level_params_error(value: object) -> str | None:
+    if not isinstance(value, dict):
+        return "must be a mapping"
+    unknown = sorted(str(level) for level in value if level not in THINKING_LEVELS)
+    if unknown:
+        return f"has unknown level(s) {', '.join(unknown)}; use {', '.join(THINKING_LEVELS)}"
+    for level, params in value.items():
+        if not isinstance(params, dict):
+            return f"{level} must be a mapping"
+    return None
+
+
+_FIELD_RULES: dict[str, _FieldRule] = {
+    "provider": _non_empty_string_error,
+    "name": _non_empty_string_error,
+    "keep_alive": _non_empty_string_error,
+    "api_style": _one_of(API_STYLES),
+    "reasoning_effort": _one_of(REASONING_EFFORTS),
+    "prompt_cache_key_mode": _one_of(PROMPT_CACHE_KEY_MODES),
+    "base_url": _base_url_error,
+    "api_key_env": _env_name_error,
+    "temperature": _temperature_error,
+    "top_p": _top_p_error,
+    "max_output_tokens": _whole_at_least(1),
+    "num_ctx": _whole_at_least(1),
+    "top_k": _whole_at_least(-1),
+    "disable_thinking_instruction": _bool_error,
+    "strict_tool_schemas": _bool_error,
+    "requires_non_null_assistant_content": _bool_error,
+    "requires_tools_with_tool_history": _bool_error,
+    "sampling_params": _mapping_error,
+    "sampling_params_by_thinking_level": _thinking_level_params_error,
+}
+"""The value rule of each field in ``PROFILE_MODEL_FIELDS``."""
 
 
 def _model_field_error(field: str, value: object) -> str | None:
     """Why one field's value is not accepted, or ``None``."""
     if value is None:
         return None if field in _NULLABLE_FIELDS else "must not be null"
-    if field in ("provider", "name", "keep_alive"):
-        return None if isinstance(value, str) and value else "must be a non-empty string"
-    if field == "api_style":
-        return None if value in API_STYLES else f"must be one of {', '.join(API_STYLES)}"
-    if field == "base_url":
-        if isinstance(value, str):
-            if value.startswith("env:") and _ENV_NAME.fullmatch(value[4:]):
-                return None
-            if value.startswith(("http://", "https://")) and len(value.split("://", 1)[1]) > 0:
-                return None
-        return "must be an http:// or https:// URL or env:NAME"
-    if field == "api_key_env":
-        if isinstance(value, str) and _ENV_NAME.fullmatch(value):
-            return None
-        return "must be an environment variable name"
-    if field == "temperature":
-        if not _is_number(value):
-            return "must be a finite number"
-        return None if value >= 0 else "must be at least 0"  # type: ignore[operator]
-    if field == "top_p":
-        if not _is_number(value):
-            return "must be a finite number"
-        return None if 0 < value <= 1 else "must be greater than 0 and at most 1"  # type: ignore[operator]
-    if field in ("max_output_tokens", "num_ctx"):
-        if not _is_whole(value):
-            return "must be a whole number"
-        return None if value >= 1 else "must be at least 1"  # type: ignore[operator]
-    if field == "top_k":
-        if not _is_whole(value):
-            return "must be a whole number"
-        return None if value >= -1 else "must be at least -1"  # type: ignore[operator]
-    if field == "reasoning_effort":
-        if value in REASONING_EFFORTS:
-            return None
-        return f"must be one of {', '.join(REASONING_EFFORTS)}"
-    if field == "prompt_cache_key_mode":
-        if value in PROMPT_CACHE_KEY_MODES:
-            return None
-        return f"must be one of {', '.join(PROMPT_CACHE_KEY_MODES)}"
-    if field in (
-        "disable_thinking_instruction",
-        "strict_tool_schemas",
-        "requires_non_null_assistant_content",
-        "requires_tools_with_tool_history",
-    ):
-        return None if isinstance(value, bool) else "must be true or false"
-    if field == "sampling_params":
-        return None if isinstance(value, dict) else "must be a mapping"
-    if field == "sampling_params_by_thinking_level":
-        if not isinstance(value, dict):
-            return "must be a mapping"
-        unknown = sorted(str(level) for level in value if level not in THINKING_LEVELS)
-        if unknown:
-            return f"has unknown level(s) {', '.join(unknown)}; use {', '.join(THINKING_LEVELS)}"
-        for level, params in value.items():
-            if not isinstance(params, dict):
-                return f"{level} must be a mapping"
-        return None
-    return None
+    rule = _FIELD_RULES.get(field)
+    return None if rule is None else rule(value)
 
 
 def _validate_profile_model(where: str, model: dict[Any, Any]) -> None:
