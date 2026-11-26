@@ -34,7 +34,7 @@ from qdash.api.services.agent_parameter_update import (
 )
 from qdash.api.services.agent_session_gate import (
     ADMITTED_FILTER,
-    admission_refusal,
+    operation_refusal,
     release_abandoned_reservations,
 )
 from qdash.common.utils.datetime import now
@@ -104,12 +104,7 @@ def _replay(existing: CommitT, request_hash: str, *, conflict: str) -> CommitT:
 
 def _require_active_at_version(session: AgentSessionDocument, expected_state_version: int) -> None:
     """Refuse unless the session is active, admitted, and at the caller's state version."""
-    if session.status != AgentSessionStatus.ACTIVE:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Agent session is not active: {session.status.value}",
-        )
-    admission_refusal(session)
+    operation_refusal(session)
     if expected_state_version != session.state_version:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

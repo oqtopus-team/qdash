@@ -393,6 +393,16 @@ def admission_refusal(session: AgentSessionDocument) -> None:
         )
 
 
+def operation_refusal(session: AgentSessionDocument) -> None:
+    """Refuse an operation of a session that is not active or whose admission is not granted."""
+    if session.status != AgentSessionStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Agent session is not active: {session.status.value}",
+        )
+    admission_refusal(session)
+
+
 def load_agent_session(project_id: str, session_id: str) -> AgentSessionDocument:
     """Load a session, finish records a crash left half written, and apply its expiry.
 

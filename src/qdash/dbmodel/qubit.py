@@ -7,8 +7,8 @@ from pymongo import ASCENDING, IndexModel
 from qdash.datamodel.note import NoteModel
 from qdash.datamodel.qubit import QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.dbmodel.lookups import user_id_for_username
 from qdash.dbmodel.qubit_history import QubitHistoryDocument
-from qdash.dbmodel.user import UserDocument
 
 
 class QubitDocument(Document):
@@ -91,7 +91,7 @@ class QubitDocument(Document):
         if qubit_doc is None:
             raise ValueError(f"Qubit {qid} not found in chip {chip_id}")
         # Merge new calibration data into the existing data
-        qubit_doc.user_id = cls._user_id_for_username(username)
+        qubit_doc.user_id = user_id_for_username(username)
         qubit_doc.username = username
         qubit_doc.data = QubitDocument.merge_calib_data(qubit_doc.data, output_parameters)
         qubit_doc.system_info.update_time()
@@ -129,7 +129,7 @@ class QubitDocument(Document):
         if parameter_name not in qubit_doc.data:
             raise ValueError(f"Parameter {parameter_name} not found for qubit {qid}")
 
-        qubit_doc.user_id = cls._user_id_for_username(username)
+        qubit_doc.user_id = user_id_for_username(username)
         qubit_doc.username = username
         qubit_doc.data.pop(parameter_name)
         qubit_doc.system_info.update_time()
@@ -156,8 +156,3 @@ class QubitDocument(Document):
         doc.system_info.update_time()
         doc.save()
         return doc
-
-    @staticmethod
-    def _user_id_for_username(username: str) -> str | None:
-        user = UserDocument.find_one({"username": username}).run()
-        return user.user_id if user else None

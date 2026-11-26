@@ -15,6 +15,7 @@ from qdash.api.schemas.notification import (
     UnreadNotificationCountResponse,
 )
 from qdash.common.utils.datetime import now
+from qdash.dbmodel.lookups import user_id_for_username
 from qdash.dbmodel.notification import NotificationDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.user import UserDocument
@@ -77,12 +78,6 @@ class NotificationService:
             read_at=doc.read_at,
             created_at=doc.created_at,
         )
-
-    def _user_id_for_username(self, username: str | None) -> str | None:
-        if not username:
-            return None
-        user = UserDocument.find_one({"username": username}).run()
-        return user.user_id if user else None
 
     def _active_project_recipients(
         self, project_id: str, usernames: Iterable[str], actor_username: str
@@ -151,9 +146,9 @@ class NotificationService:
         """Create a notification unless an equivalent one already exists."""
         doc = NotificationDocument(
             project_id=project_id,
-            recipient_user_id=self._user_id_for_username(recipient_username),
+            recipient_user_id=user_id_for_username(recipient_username),
             recipient_username=recipient_username,
-            actor_user_id=self._user_id_for_username(actor_username),
+            actor_user_id=user_id_for_username(actor_username),
             actor_username=actor_username,
             kind=kind,
             source_type=source_type,
@@ -254,7 +249,7 @@ class NotificationService:
     ) -> ListNotificationsResponse:
         """List notifications for a user."""
         identity_query: dict[str, object] = {
-            "recipient_user_id": self._user_id_for_username(username) or ""
+            "recipient_user_id": user_id_for_username(username) or ""
         }
         query: dict[str, object] = dict(identity_query)
         if project_id:
@@ -285,7 +280,7 @@ class NotificationService:
     ) -> UnreadNotificationCountResponse:
         """Return unread notification count for a user."""
         query: dict[str, object] = {
-            "recipient_user_id": self._user_id_for_username(username) or "",
+            "recipient_user_id": user_id_for_username(username) or "",
             "read_at": None,
         }
         if project_id:
@@ -298,7 +293,7 @@ class NotificationService:
         """Mark one notification as read."""
         identity_query: dict[str, object] = {
             "_id": ObjectId(notification_id),
-            "recipient_user_id": self._user_id_for_username(username) or "",
+            "recipient_user_id": user_id_for_username(username) or "",
         }
         doc = NotificationDocument.find_one(identity_query).run()
         if doc is None:
@@ -313,7 +308,7 @@ class NotificationService:
     def mark_all_read(self, *, username: str, project_id: str | None) -> dict[str, int]:
         """Mark all matching notifications as read."""
         query: dict[str, object] = {
-            "recipient_user_id": self._user_id_for_username(username) or "",
+            "recipient_user_id": user_id_for_username(username) or "",
             "read_at": None,
         }
         if project_id:

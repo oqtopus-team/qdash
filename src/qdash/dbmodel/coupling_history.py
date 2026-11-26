@@ -7,7 +7,7 @@ from pymongo import ASCENDING, DESCENDING, IndexModel
 from qdash.common.utils.datetime import local_now
 from qdash.datamodel.coupling import CouplingModel
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.dbmodel.user import UserDocument
+from qdash.dbmodel.lookups import current_cooldown_id, user_id_for_username
 
 
 class CouplingHistoryDocument(Document):
@@ -71,34 +71,15 @@ class CouplingHistoryDocument(Document):
         ]
 
     @classmethod
-    def _resolve_cooldown_id(cls, *, project_id: str | None, chip_id: str | None) -> str:
-        """Look up the chip's current_cooldown_id at write time."""
-        if not project_id or not chip_id:
-            return ""
-        from qdash.dbmodel.chip import ChipDocument
-
-        chip = ChipDocument.find_one({"project_id": project_id, "chip_id": chip_id}).run()
-        if chip is None:
-            return ""
-        return getattr(chip, "current_cooldown_id", None) or ""
-
-    @classmethod
-    def _user_id_for_username(cls, username: str) -> str | None:
-        user = UserDocument.find_one({"username": username}).run()
-        return user.user_id if user else None
-
-    @classmethod
     def create_history(cls, coupling: CouplingModel) -> "CouplingHistoryDocument":
         """Create a history record from a CouplingDocument."""
         today = local_now().strftime("%Y%m%d")
-        cooldown_id = cls._resolve_cooldown_id(
-            project_id=coupling.project_id, chip_id=coupling.chip_id
-        )
+        cooldown_id = current_cooldown_id(project_id=coupling.project_id, chip_id=coupling.chip_id)
         username = coupling.username
         if username is None:
             msg = "CouplingDocument.username is required to create history"
             raise ValueError(msg)
-        user_id = coupling.user_id or cls._user_id_for_username(username)
+        user_id = coupling.user_id or user_id_for_username(username)
         existing_history = cls.find_one(
             {
                 "project_id": coupling.project_id,

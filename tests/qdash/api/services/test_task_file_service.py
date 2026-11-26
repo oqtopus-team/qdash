@@ -654,6 +654,23 @@ def test_catalog_publishes_the_same_documentation_for_fake_and_qubex_tasks() -> 
         assert fake[name].description == documentation.description
 
 
+def test_constant_and_parameter_expressions_share_the_restricted_evaluator() -> None:
+    tree = ast.parse(
+        "A = 2\nB = math.sqrt(A * 8)\nC: tuple = (A, -B, A // 3, 2**3)\nD = open('x')\nE = A + D\n"
+    )
+    assert TaskFileService._collect_safe_constants(tree) == {
+        "A": 2,
+        "B": 4.0,
+        "C": (2, -4.0, 0, 8),
+    }
+    expression = ast.parse("np.log10(SCALE) * 2", mode="eval").body
+    assert TaskFileService._evaluate_parameter_expression(expression, {"SCALE": 100}) == 4.0
+    with pytest.raises(ValueError, match="unsupported parameter expression"):
+        TaskFileService._evaluate_parameter_expression(
+            ast.parse("os.getcwd()", mode="eval").body, {}
+        )
+
+
 # --- Backend path confinement ---
 
 _TASK_SOURCE = 'class {cls}:\n    name: str = "{name}"\n'

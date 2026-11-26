@@ -14,9 +14,9 @@ from qdash.datamodel.task import CalibDataModel
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.coupling_history import CouplingHistoryDocument
+from qdash.dbmodel.lookups import user_id_for_username
 from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.qubit_history import QubitHistoryDocument
-from qdash.dbmodel.user import UserDocument
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ class MongoChipRepository:
         doc = ChipDocument(
             project_id=chip.project_id,
             chip_id=chip.chip_id,
-            user_id=self._user_id_for_username(chip.username),
+            user_id=user_id_for_username(chip.username),
             username=chip.username,
             size=chip.size,
             topology_id=chip.topology_id,
@@ -907,8 +907,3 @@ class MongoChipRepository:
         ]
         results = list(CouplingHistoryDocument.aggregate(pipeline).run())
         return [r["qid"] for r in results if r.get("qid")]
-
-    @staticmethod
-    def _user_id_for_username(username: str) -> str | None:
-        user = UserDocument.find_one({"username": username}).run()
-        return user.user_id if user else None

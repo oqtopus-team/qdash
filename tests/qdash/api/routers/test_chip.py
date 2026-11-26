@@ -333,6 +333,45 @@ class TestChipRouter:
         assert cleared.json()["content"] == ""
         assert ChipNoteDocument.find({"project_id": "test_project"}).count() == 1
 
+    def test_scoped_chip_note_upsert_updates_existing_scope_row(
+        self, test_client, test_project, auth_headers
+    ):
+        ChipDocument(
+            chip_id="test_chip_note_update",
+            username="test_user",
+            project_id="test_project",
+            size=64,
+            system_info=SystemInfoModel(),
+        ).insert()
+        CooldownDocument(
+            project_id="test_project",
+            cooldown_id="cd-u",
+            cryo_id="cryo-1",
+            started_at=datetime(2026, 1, 1, tzinfo=UTC),
+            ended_at=datetime(2026, 1, 15, tzinfo=UTC),
+            chip_ids=["test_chip_note_update"],
+        ).insert()
+
+        for content in ("draft", "final"):
+            response = test_client.put(
+                "/chips/test_chip_note_update/note",
+                headers=auth_headers,
+                params={"cooldown_id": "cd-u"},
+                json={"content": content},
+            )
+            assert response.status_code == 200
+
+        notes = list(ChipNoteDocument.find({"chip_id": "test_chip_note_update"}).run())
+        assert len(notes) == 1
+        note = notes[0]
+        assert note.note.content == "final"
+        assert (note.scope_type, note.scope_key, note.cooldown_id, note.scope_source) == (
+            "cooldown",
+            "cooldown:cd-u",
+            "cd-u",
+            "explicit_cooldown",
+        )
+
     def test_update_chip_topology_creates_missing_target_skeletons(
         self, test_client, test_project, auth_headers
     ):

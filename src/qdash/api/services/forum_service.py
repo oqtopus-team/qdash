@@ -36,6 +36,7 @@ from qdash.dbmodel.forum import (
     ForumLabelDocument,
     ForumPostDocument,
 )
+from qdash.dbmodel.lookups import user_id_for_username
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.dbmodel.user import UserDocument
@@ -193,12 +194,6 @@ class ForumService:
         """Initialize the service with an optional notification dependency."""
         self._notifications = notification_service
         self._slack_notifications = slack_notification_service
-
-    @staticmethod
-    def _user_id_for_username(username: str) -> str | None:
-        """Return the user ID for *username*, or None when the user is unknown."""
-        user = UserDocument.find_one({"username": username}).run()
-        return user.user_id if user else None
 
     @staticmethod
     def _is_author(doc: ForumPostDocument, *, user_id: str | None) -> bool:
@@ -940,7 +935,7 @@ class ForumService:
             project_id=project_id,
             number=thread_number,
             category=category,
-            user_id=self._user_id_for_username(username),
+            user_id=user_id_for_username(username),
             username=username,
             title=title if parent_id is None else None,
             content=content,
@@ -1189,7 +1184,7 @@ class ForumService:
         ).run()
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum post not found")
-        user_id = self._user_id_for_username(username)
+        user_id = user_id_for_username(username)
         can_edit_content = self._is_author(doc, user_id=user_id) or role == ProjectRole.OWNER
         can_edit_metadata = doc.parent_id is None and role == ProjectRole.EDITOR
         content_blocks_changed = content_blocks is not None and content_blocks != doc.content_blocks
@@ -1295,7 +1290,7 @@ class ForumService:
         ).run()
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum post not found")
-        user_id = self._user_id_for_username(username)
+        user_id = user_id_for_username(username)
         if not self._is_author(doc, user_id=user_id) and role != ProjectRole.OWNER:
             raise HTTPException(
                 status_code=403, detail="Only the author or project owner can delete this post"
@@ -1334,7 +1329,7 @@ class ForumService:
         ).run()
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum thread not found")
-        user_id = self._user_id_for_username(username)
+        user_id = user_id_for_username(username)
         if not self._is_author(doc, user_id=user_id) and role != ProjectRole.OWNER:
             raise HTTPException(
                 status_code=403, detail="Only the author or project owner can close this thread"
@@ -1381,7 +1376,7 @@ class ForumService:
         ).run()
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum thread not found")
-        user_id = self._user_id_for_username(username)
+        user_id = user_id_for_username(username)
         if not self._is_author(doc, user_id=user_id) and role != ProjectRole.OWNER:
             raise HTTPException(
                 status_code=403, detail="Only the author or project owner can reopen this thread"

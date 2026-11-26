@@ -6,8 +6,8 @@ from functools import lru_cache
 
 from bunnet import SortDirection
 
+from qdash.dbmodel.lookups import user_id_for_username
 from qdash.dbmodel.note_event import NoteEventDocument
-from qdash.dbmodel.user import UserDocument
 
 
 class MongoNoteEventRepository:
@@ -16,8 +16,7 @@ class MongoNoteEventRepository:
     @staticmethod
     @lru_cache(maxsize=1024)
     def _user_id_for_username(username: str) -> str | None:
-        user = UserDocument.find_one({"username": username}).run()
-        return user.user_id if user else None
+        return user_id_for_username(username)
 
     def append(
         self,
