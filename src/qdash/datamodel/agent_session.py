@@ -568,6 +568,34 @@ class AgentNotificationDelivery(BaseModel):
     last_reply_error: str = ""
 
 
+class AgentForumThreadStatus(str, Enum):
+    """Progress of the Forum thread QDash opens for one intervention."""
+
+    PENDING = "pending"  # waiting for the first or next attempt
+    CREATING = "creating"  # an attempt holds the lease
+    CREATED = "created"  # the thread exists; ``post_id`` names it
+
+
+class AgentInterventionForumThread(BaseModel):
+    """The Forum thread opened for an intervention, and the attempts to open it.
+
+    Stored with the intervention when it is recorded, so a crash before the thread exists
+    leaves a pending attempt that the API's sweeper finishes. Once ``created``, the link is
+    never replaced: archiving or deleting the thread does not open another one. ``None`` on
+    the intervention marks a record from before Forum threads existed; none is opened for it.
+    """
+
+    status: AgentForumThreadStatus = AgentForumThreadStatus.PENDING
+    attempts: int = 0
+    last_error: str = ""
+    last_attempt_at: datetime | None = None
+    next_attempt_at: datetime | None = None
+    lease_until: datetime | None = None
+    post_id: str | None = None
+    number: int | None = None
+    created_at: datetime | None = None
+
+
 class AgentSessionLifecycleEvent(str, Enum):
     """A session lifecycle event announced in the agent Slack channel."""
 

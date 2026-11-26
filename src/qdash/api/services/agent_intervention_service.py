@@ -22,7 +22,8 @@ Several documents change for one response (the intervention and the session). Th
 update is the single atomic decision; the intervention is written before it in a
 ``responding`` state and settled after it, and a read settles a response that a crash left
 half applied. Slack delivery is recorded on the intervention after it is persisted, and a
-failed delivery is retried without affecting the pause.
+failed delivery is retried without affecting the pause. The intervention's Forum thread is
+tracked the same way, independently of Slack (see ``agent_intervention_forum``).
 """
 
 from __future__ import annotations
@@ -76,6 +77,7 @@ from qdash.datamodel.agent_session import (
     AgentActionType,
     AgentInterventionDecision,
     AgentInterventionEvent,
+    AgentInterventionForumThread,
     AgentInterventionReason,
     AgentInterventionResponseRecord,
     AgentInterventionStatus,
@@ -985,6 +987,11 @@ class AgentInterventionService:
 
     # ------------------------------------------------------------------ create
 
+    @staticmethod
+    def _initial_forum_thread() -> AgentInterventionForumThread:
+        """The Forum thread state stored with a new intervention: due now, Slack or not."""
+        return AgentInterventionForumThread(next_attempt_at=now())
+
     def _initial_delivery(self) -> AgentNotificationDelivery:
         if self._notifier.is_enabled():
             return AgentNotificationDelivery(
@@ -1060,6 +1067,7 @@ class AgentInterventionService:
             session_status_at_open=session.status,
             session_state_version_at_open=session.state_version,
             notification=self._initial_delivery(),
+            forum_thread=self._initial_forum_thread(),
             events=[
                 AgentInterventionEvent(
                     at=timestamp,
@@ -1214,6 +1222,7 @@ class AgentInterventionService:
             session_status_at_open=session.status,
             session_state_version_at_open=session.state_version,
             notification=self._initial_delivery(),
+            forum_thread=self._initial_forum_thread(),
             events=[
                 AgentInterventionEvent(
                     at=timestamp,
@@ -1664,17 +1673,22 @@ class AgentInterventionService:
         self.deliver_notification(intervention_id, explicit=True)
         return self._response(self._reload(intervention_id), session)
 
-    def retry_due_notifications(self, *, limit: int = 20) -> int:
-        """Attempt every delivery that is due; used by the API's background sweeper."""
-        if not self._notifier.is_enabled():
-            return 0
-        # Write the records of pauses whose request crashed, so they are notified too.
+    @staticmethod
+    def materialize_pending_pauses(*, limit: int = 20) -> None:
+        """Write the intervention records of pauses whose request crashed before writing them."""
         pending = cast(
             "list[AgentSessionDocument]",
             AgentSessionDocument.find({"pending_intervention": {"$ne": None}}, limit=limit).run(),
         )
         for session in pending:
             materialize_pending_intervention(session)
+
+    def retry_due_notifications(self, *, limit: int = 20) -> int:
+        """Attempt every delivery that is due; used by the API's background sweeper."""
+        if not self._notifier.is_enabled():
+            return 0
+        # Write the records of pauses whose request crashed, so they are notified too.
+        self.materialize_pending_pauses(limit=limit)
         timestamp = now()
         docs = cast(
             "list[AgentInterventionDocument]",
@@ -1735,23 +1749,33 @@ def run_notification_sweeper(
     service: AgentInterventionService | None = None,
     *,
     interval_seconds: float = NOTIFICATION_SWEEP_INTERVAL_SECONDS,
-) -> asyncio.Task[None] | None:
-    """Start the loop that retries due Slack deliveries, when agent notifications are on.
+) -> asyncio.Task[None]:
+    """Start the loop that finishes the side effects of interventions and sessions.
 
-    The loop also sends due session start and end messages and expires overdue sessions.
-    Each API worker runs its own loop; the delivery lease keeps two workers from posting the
-    same message at once. Returns None when Slack agent notifications are not configured.
+    Every pass opens due intervention Forum threads, whether or not Slack is configured.
+    When Slack agent notifications are on, it also retries due Slack deliveries, sends due
+    session start and end messages, and expires overdue sessions. Each API worker runs its
+    own loop; the leases keep two workers from posting or opening the same thing at once.
     """
+    from qdash.api.services.agent_intervention_forum import AgentInterventionForumService
     from qdash.api.services.agent_session_notifications import AgentSessionNotificationService
 
     sweeper_service = service or AgentInterventionService()
-    if not sweeper_service._notifier.is_enabled():
-        return None
+    slack_enabled = sweeper_service.notifier.is_enabled()
     lifecycle = AgentSessionNotificationService(sweeper_service.notifier)
+    forum_threads = AgentInterventionForumService()
 
     async def sweep() -> None:
         while True:
             await asyncio.sleep(interval_seconds)
+            try:
+                # Writes the records of crashed pauses, so their threads are opened too.
+                await asyncio.to_thread(sweeper_service.materialize_pending_pauses)
+                await asyncio.to_thread(forum_threads.sweep)
+            except Exception:
+                logger.exception("Agent intervention Forum thread sweep failed")
+            if not slack_enabled:
+                continue
             try:
                 await asyncio.to_thread(sweeper_service.retry_due_notifications)
             except Exception:

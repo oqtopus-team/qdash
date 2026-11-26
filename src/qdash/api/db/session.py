@@ -195,8 +195,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         yield
     finally:
-        if sweeper is not None:
-            sweeper.cancel()
+        sweeper.cancel()
         lifecycle_sweeper.cancel()
         # Lets a sweep in progress stop (bounded) before its database connection closes.
         await asyncio.wait({lifecycle_sweeper})

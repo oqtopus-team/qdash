@@ -7,6 +7,7 @@ import pydantic
 from ..core.pydantic_utilities import UniversalBaseModel
 from .agent_intervention_attempt import AgentInterventionAttempt
 from .agent_intervention_event import AgentInterventionEvent
+from .agent_intervention_forum_thread_response import AgentInterventionForumThreadResponse
 from .agent_intervention_reason import AgentInterventionReason
 from .agent_intervention_response_record import AgentInterventionResponseRecord
 from .agent_intervention_status import AgentInterventionStatus
@@ -48,6 +49,11 @@ class AgentInterventionResponse(UniversalBaseModel):
     resumed_at: typing.Optional[dt.datetime] = None
     resume_outcome: typing.Optional[AgentResumeOutcomeRecord] = None
     notification: AgentNotificationDeliveryResponse
+    forum_thread: typing.Optional[AgentInterventionForumThreadResponse] = pydantic.Field(default=None)
+    """
+    The intervention's Forum thread; None for interventions recorded before Forum threads existed
+    """
+
     events: typing.List[AgentInterventionEvent]
     model: typing.Optional[AgentModelIdentity] = pydantic.Field(default=None)
     """

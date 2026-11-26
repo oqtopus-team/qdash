@@ -321,3 +321,47 @@ def test_session_start_and_stop_are_announced_for_the_owning_project(
     assert session.json()["end_notification"]["event"] == "cancelled"
     assert session.json()["end_notification"]["status"] == "sent"
     assert session.json()["start_notification"]["status"] == "sent"
+
+
+def test_both_ways_of_asking_for_an_expert_open_a_forum_thread_in_the_project(
+    test_client, slack: FakeSlack
+) -> None:
+    session_id, created = _open_intervention(test_client)
+    path = f"/agent-sessions/{session_id}/interventions/{created['intervention_id']}"
+    # The background task ran after the response.
+    viewed = test_client.get(path, headers=_headers("owner-token")).json()
+    assert viewed["forum_thread"]["status"] == "created"
+    post_id = viewed["forum_thread"]["post_id"]
+
+    other = _create_session(test_client, "owner-token", qid="Q01")
+    version = test_client.get(f"/agent-sessions/{other}", headers=_headers("owner-token")).json()[
+        "state_version"
+    ]
+    action = test_client.post(
+        f"/agent-sessions/{other}/actions",
+        headers=_headers("owner-token"),
+        json={
+            "idempotency_key": "human-1",
+            "expected_state_version": version,
+            "action_type": "request_human",
+            "diagnosis": "The resonator dip moved; please check the wiring.",
+        },
+    )
+    assert action.status_code == 201, action.text
+    requested = test_client.get(
+        f"/agent-sessions/{other}/interventions/{action.json()['intervention_id']}",
+        headers=_headers("owner-token"),
+    ).json()
+    assert requested["forum_thread"]["status"] == "created"
+
+    threads = test_client.get(
+        "/forum/posts", headers=_headers("owner-token"), params={"label": "agent"}
+    ).json()
+    assert threads["total"] == 2
+    assert post_id in {thread["id"] for thread in threads["posts"]}
+    assert {thread["username"] for thread in threads["posts"]} == {"qdash"}
+    assert all(
+        thread["labels"] == ["agent", "calibration", "question"] for thread in threads["posts"]
+    )
+    elsewhere = test_client.get("/forum/posts", headers=_headers("owner-token", "lab-b")).json()
+    assert elsewhere["total"] == 0

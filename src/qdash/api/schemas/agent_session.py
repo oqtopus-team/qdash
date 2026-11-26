@@ -24,6 +24,7 @@ from qdash.datamodel.agent_session import (
     AgentDecisionAssessment,
     AgentDecisionNextAction,
     AgentEvaluationMode,
+    AgentForumThreadStatus,
     AgentInterventionAttempt,
     AgentInterventionDecision,
     AgentInterventionEvent,
@@ -631,6 +632,19 @@ class AgentNotificationDeliveryResponse(BaseModel):
     last_reply_error: str = ""
 
 
+class AgentInterventionForumThreadResponse(BaseModel):
+    """The Forum thread QDash opens for an intervention, and the attempts to open it."""
+
+    status: AgentForumThreadStatus
+    attempts: int
+    last_error: str = ""
+    last_attempt_at: datetime | None = None
+    next_attempt_at: datetime | None = None
+    post_id: str | None = Field(default=None, description="The root Forum post, once created")
+    number: int | None = Field(default=None, description="The project's Forum thread number")
+    created_at: datetime | None = None
+
+
 class AgentResumeOption(BaseModel):
     """A plan node the expert may resume from, with its remaining visit budget."""
 
@@ -670,6 +684,13 @@ class AgentInterventionResponse(BaseModel):
     resumed_at: datetime | None = None
     resume_outcome: AgentResumeOutcomeRecord | None = None
     notification: AgentNotificationDeliveryResponse
+    forum_thread: AgentInterventionForumThreadResponse | None = Field(
+        default=None,
+        description=(
+            "The intervention's Forum thread; None for interventions recorded before Forum "
+            "threads existed"
+        ),
+    )
     events: list[AgentInterventionEvent]
     model: AgentModelIdentity | None = _recorded_model_field()
     created_at: datetime
