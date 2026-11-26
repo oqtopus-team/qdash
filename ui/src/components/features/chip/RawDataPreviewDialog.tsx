@@ -6,16 +6,13 @@ import { useEffect, useState } from "react";
 import { previewArtifactByPath } from "@/client/execution/execution";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import type { ArtifactPreviewResponse } from "@/schemas/artifactPreviewResponse";
+import { executionArtifactUrl } from "@/lib/utils/executionFiles";
 
 type PreviewValue = number | string | boolean | null;
 
 interface RawDataPreviewDialogProps {
   path: string | null;
   onClose: () => void;
-}
-
-function artifactUrl(path: string): string {
-  return `/api/executions/artifact?path=${encodeURIComponent(path)}`;
 }
 
 function fileName(path: string): string {
@@ -114,7 +111,7 @@ export function RawDataPreviewDialog({ path, onClose }: RawDataPreviewDialogProp
           {path && (
             <a
               className="btn btn-sm btn-primary"
-              href={artifactUrl(path)}
+              href={executionArtifactUrl(path)}
               download={fileName(path)}
             >
               <Download data-icon="inline-start" /> Download

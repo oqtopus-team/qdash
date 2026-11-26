@@ -1,42 +1,34 @@
 "use client";
 
-import {
-  ArrowRightLeft,
-  Check,
-  Download,
-  LoaderCircle,
-  X,
-  Lock,
-  Minimize,
-  ZoomIn,
-} from "lucide-react";
-import { useState, useMemo, useRef, useCallback, useEffect, type CSSProperties } from "react";
-import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import { ArrowRightLeft, Check } from "lucide-react";
+import { useState, useMemo, useRef, useCallback, type CSSProperties } from "react";
 
 import type { Task } from "@/schemas";
 
-import { downloadFiguresAsZip } from "@/client/task-result/task-result";
 import {
-  DownloadConfirmModal,
-  type DownloadItemCounts,
-  type DownloadOptions,
-} from "@/components/features/chip/DownloadConfirmModal";
+  GridDownloadConfirmModal,
+  GridDownloadControls,
+} from "@/components/features/chip/GridDownloadControls";
+import { GridLoadingPanel, GridTaskRequestAlerts } from "@/components/features/chip/GridTaskStatus";
+import {
+  hasDownloadableArtifacts,
+  useGridArtifactDownload,
+} from "@/components/features/chip/useGridArtifactDownload";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { CouplingTaskHistoryModal } from "@/components/features/chip/modals/CouplingTaskHistoryModal";
+import { gridFullscreenPanelClass } from "@/components/ui/GridFullscreenButton";
 import {
-  GridFullscreenButton,
-  gridFullscreenPanelClass,
-} from "@/components/ui/GridFullscreenButton";
-import { LockedGridScroller } from "@/components/ui/LockedGridScroller";
-import { useToast } from "@/components/ui/Toast";
-import { GridZoomControls } from "@/components/ui/GridZoomControls";
+  GridRegionBackBar,
+  PositionedRegionOverlay,
+  GridViewModeSwitch,
+  GridViewport,
+} from "@/components/ui/GridViewControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
-import { ViewSwitch } from "@/components/ui/ViewSwitch";
 import { useCouplingTaskResults } from "@/hooks/useCouplingTaskResults";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
-import { getApiErrorMessage, parseBlobErrorBody } from "@/lib/utils/apiError";
 import { useGridLayout } from "@/hooks/useGridLayout";
+import { useGridViewState } from "@/hooks/useGridViewState";
 import { usePanClickGuard } from "@/hooks/usePanClickGuard";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
@@ -70,12 +62,6 @@ interface ExtendedTask extends Task {
   couplingId: string;
 }
 
-const DEFAULT_DOWNLOAD_OPTIONS: DownloadOptions = {
-  figureImages: false,
-  jsonFigures: false,
-  rawData: true,
-};
-
 interface CouplingStatusDotProps {
   label: string;
   className: string;
@@ -100,35 +86,6 @@ export function CouplingStatusDot({ label, className, style, onClick }: Coupling
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>
   );
-}
-
-function toPathList(paths: string[] | string | null | undefined): string[] {
-  if (!paths) return [];
-  return Array.isArray(paths) ? paths : [paths];
-}
-
-function toNetcdfPathList(paths: string[] | string | null | undefined): string[] {
-  return toPathList(paths).filter((path) => path.toLowerCase().endsWith(".nc"));
-}
-
-function requestErrorMessage(error: unknown): string | null {
-  if (!error || typeof error !== "object") return null;
-  const response = (error as { response?: { data?: unknown } }).response;
-  const data = response?.data;
-  if (!data || typeof data !== "object") return null;
-  const detail = (data as { detail?: unknown }).detail;
-  if (typeof detail === "string") return detail;
-  if (Array.isArray(detail)) return detail.map((item) => JSON.stringify(item)).join("; ");
-  return null;
-}
-
-function taskRangeLabel(
-  selectedDate: string,
-  startAt?: string | null,
-  endAt?: string | null,
-): string {
-  if (startAt || endAt) return `${startAt ?? "..."} - ${endAt ?? "..."}`;
-  return selectedDate;
 }
 
 /**
@@ -195,41 +152,23 @@ export function CouplingGrid({
 
   const [selectedTaskInfo, setSelectedTaskInfo] = useState<SelectedTaskInfo | null>(null);
 
-  // Download selection mode state
-  const [downloadSelectionEnabled, setDownloadSelectionEnabled] = useState(false);
-  const [selectedForDownload, setSelectedForDownload] = useState<Set<string>>(new Set());
-  const toast = useToast();
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [isDownloadConfirmOpen, setIsDownloadConfirmOpen] = useState(false);
-  const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>(DEFAULT_DOWNLOAD_OPTIONS);
-
-  // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
   const [isDirectionReversed, setIsDirectionReversed] = useState(false);
   const { isFullscreen, toggleFullscreen, exitFullscreen } = useFullscreenPanel();
   const panClickGuard = usePanClickGuard();
 
-  // Lock works for every topology, but region zoom assumes a square grid; leave it when the
-  // grid is not square.
-  useEffect(() => {
-    if (!isSquareGrid) {
-      setZoomMode("full");
-      setSelectedRegion(null);
-      setRegionSelectionEnabled(false);
-    }
-  }, [isSquareGrid]);
-
-  // Region selection state
-  const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
-  const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
-  const [selectedRegion, setSelectedRegion] = useState<{
-    row: number;
-    col: number;
-  } | null>(null);
-  const [hoveredRegion, setHoveredRegion] = useState<{
-    row: number;
-    col: number;
-  } | null>(null);
+  // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
+  const {
+    viewMode,
+    changeViewMode,
+    zoomMode,
+    selectedRegion,
+    zoomToRegion,
+    showFullGrid,
+    hoveredRegion,
+    setHoveredRegion,
+    regionSelectionEnabled,
+    setRegionSelectionEnabled,
+  } = useGridViewState(isSquareGrid);
 
   // LOD: store zoom scale, compute visibility flags from effective cell size.
   const [currentScale, setCurrentScale] = useState<number | null>(null);
@@ -254,21 +193,6 @@ export function CouplingGrid({
     () => taskResponse?.data?.result ?? {},
     [taskResponse?.data?.result],
   );
-
-  const downloadCounts = useMemo(() => {
-    const counts: DownloadItemCounts = {
-      figureImages: 0,
-      jsonFigures: 0,
-      rawData: 0,
-    };
-    selectedForDownload.forEach((couplingId) => {
-      const task = taskResultMap[couplingId];
-      counts.figureImages += toPathList(task?.figure_path).length;
-      counts.jsonFigures += toPathList(task?.json_figure_path).length;
-      counts.rawData += toNetcdfPathList(task?.raw_data_path).length;
-    });
-    return counts;
-  }, [selectedForDownload, taskResultMap]);
 
   // Use grid layout hook for responsive sizing
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
@@ -328,8 +252,15 @@ export function CouplingGrid({
       );
   }, [baseCouplingPairs, isDirectionReversed, taskResultMap]);
 
-  const rangeLabel = taskRangeLabel(selectedDate, startAt, endAt);
-  const errorDetail = requestErrorMessage(error);
+  const downloadableCouplingIds = useMemo(
+    () => displayedCouplingTasks.filter(hasDownloadableArtifacts).map((task) => task.couplingId),
+    [displayedCouplingTasks],
+  );
+  const download = useGridArtifactDownload({
+    tasksById: taskResultMap,
+    downloadableIds: downloadableCouplingIds,
+    zipFilename: `${chipId}_${selectedTask}_${selectedDate}_coupling_artifacts.zip`,
+  });
 
   const containerClass = isFullscreen
     ? gridFullscreenPanelClass
@@ -337,23 +268,11 @@ export function CouplingGrid({
 
   if (isLoading)
     return (
-      <div className={containerClass}>
-        {isFullscreen && (
-          <div className="flex justify-end">
-            <button
-              onClick={exitFullscreen}
-              className="btn btn-sm btn-square btn-ghost"
-              title="Exit fullscreen (Esc)"
-              aria-label="Exit fullscreen"
-            >
-              <Minimize className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-        <div className="w-full flex flex-1 items-center justify-center py-12">
-          <span className="loading loading-spinner loading-lg"></span>
-        </div>
-      </div>
+      <GridLoadingPanel
+        className={containerClass}
+        isFullscreen={isFullscreen}
+        onExitFullscreen={exitFullscreen}
+      />
     );
 
   const displayCellSize = zoomMode === "region" ? cellSize * 0.8 : cellSize;
@@ -399,95 +318,10 @@ export function CouplingGrid({
   };
 
   // Download selection helpers
-  const toggleDownloadSelection = (couplingId: string) => {
-    setSelectedForDownload((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(couplingId)) {
-        newSet.delete(couplingId);
-      } else {
-        newSet.add(couplingId);
-      }
-      return newSet;
-    });
-  };
-
-  const selectAllForDownload = () => {
-    const allCouplingIds = displayedCouplingTasks
-      .filter((task) => hasDownloadableArtifacts(task))
-      .map((task) => task.couplingId);
-    setSelectedForDownload(new Set(allCouplingIds));
-  };
-
-  const clearDownloadSelection = () => {
-    setSelectedForDownload(new Set());
-  };
-
-  const handleDownload = async () => {
-    if (selectedForDownload.size === 0) return;
-
-    const paths: string[] = [];
-    selectedForDownload.forEach((couplingId) => {
-      const task = taskResultMap[couplingId];
-      if (!task) return;
-      if (downloadOptions.figureImages) {
-        paths.push(...toPathList(task.figure_path));
-      }
-      if (downloadOptions.jsonFigures) {
-        paths.push(...toPathList(task.json_figure_path));
-      }
-      if (downloadOptions.rawData) {
-        paths.push(...toNetcdfPathList(task.raw_data_path));
-      }
-    });
-
-    if (paths.length === 0) return;
-
-    setIsDownloading(true);
-    try {
-      const filename = `${chipId}_${selectedTask}_${selectedDate}_coupling_artifacts.zip`;
-      const response = await downloadFiguresAsZip({ paths, filename }, { responseType: "blob" });
-
-      const blob = response.data as Blob;
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      setIsDownloadConfirmOpen(false);
-      setDownloadSelectionEnabled(false);
-      setSelectedForDownload(new Set());
-    } catch (error) {
-      // Keep the dialog, options and selection so the download can be retried.
-      toast.error(
-        getApiErrorMessage(await parseBlobErrorBody(error), "Download failed. Please try again."),
-      );
-    } finally {
-      setIsDownloading(false);
-    }
-  };
-
-  const hasDownloadableArtifacts = (task: Task | null | undefined): boolean =>
-    Boolean(
-      toPathList(task?.figure_path).length ||
-      toPathList(task?.json_figure_path).length ||
-      toPathList(task?.raw_data_path).length,
-    );
-
-  const hasJsonFigures = (couplingId: string): boolean => {
-    const task = taskResultMap[couplingId];
-    return hasDownloadableArtifacts(task);
-  };
-
-  const availableForDownloadCount = displayedCouplingTasks.filter(hasDownloadableArtifacts).length;
 
   const setCouplingDirection = (reversed: boolean) => {
     setIsDirectionReversed(reversed);
-    setDownloadSelectionEnabled(false);
-    setSelectedForDownload(new Set());
+    download.cancel();
   };
 
   // Grid content (extracted for reuse in both view modes)
@@ -604,8 +438,8 @@ export function CouplingGrid({
           const centerY =
             ((displayRow1 + displayRow2) / 2) * (displayCellSize + gap) + displayCellSize / 2;
 
-          const isSelectedForDownload = selectedForDownload.has(task.couplingId);
-          const canBeDownloaded = hasJsonFigures(task.couplingId);
+          const isSelectedForDownload = download.selectedIds.has(task.couplingId);
+          const canBeDownloaded = hasDownloadableArtifacts(taskResultMap[task.couplingId]);
 
           const statusColor =
             task.status === "completed"
@@ -621,8 +455,8 @@ export function CouplingGrid({
                 key={task.couplingId}
                 label={`${task.couplingId}: ${task.status}`}
                 onClick={() => {
-                  if (downloadSelectionEnabled) {
-                    if (canBeDownloaded) toggleDownloadSelection(task.couplingId);
+                  if (download.isSelecting) {
+                    if (canBeDownloaded) download.toggle(task.couplingId);
                   } else {
                     setSelectedTaskInfo({
                       couplingId: task.couplingId,
@@ -638,7 +472,7 @@ export function CouplingGrid({
                   height: displayCellSize * 0.45,
                 }}
                 className={`rounded-md shadow-sm cursor-pointer -translate-x-1/2 -translate-y-1/2 ${statusColor} ${
-                  downloadSelectionEnabled && isSelectedForDownload
+                  download.isSelecting && isSelectedForDownload
                     ? "ring-2 ring-primary ring-offset-1"
                     : ""
                 }`}
@@ -651,9 +485,9 @@ export function CouplingGrid({
             <button
               key={task.couplingId}
               onClick={() => {
-                if (downloadSelectionEnabled) {
+                if (download.isSelecting) {
                   if (canBeDownloaded) {
-                    toggleDownloadSelection(task.couplingId);
+                    download.toggle(task.couplingId);
                   }
                 } else {
                   setSelectedTaskInfo({
@@ -670,12 +504,10 @@ export function CouplingGrid({
                 height: displayCellSize * 0.6,
               }}
               className={`rounded-xl bg-white shadow-xs border border-base-300/60 overflow-hidden transition-colors duration-200 hover:border-primary/40 -translate-x-1/2 -translate-y-1/2 ${
-                downloadSelectionEnabled && isSelectedForDownload
+                download.isSelecting && isSelectedForDownload
                   ? "ring-2 ring-primary ring-offset-2"
                   : ""
-              } ${
-                downloadSelectionEnabled && !canBeDownloaded ? "opacity-40 cursor-not-allowed" : ""
-              }`}
+              } ${download.isSelecting && !canBeDownloaded ? "opacity-40 cursor-not-allowed" : ""}`}
             >
               {figurePath && (
                 <div className="absolute inset-1">
@@ -688,7 +520,7 @@ export function CouplingGrid({
                 </div>
               )}
               {/* Download selection overlay */}
-              {downloadSelectionEnabled && canBeDownloaded && (
+              {download.isSelecting && canBeDownloaded && (
                 <div
                   className={`absolute inset-0 flex items-center justify-center transition-colors ${
                     isSelectedForDownload
@@ -709,108 +541,38 @@ export function CouplingGrid({
 
       {/* Region selection overlay - only for square grids */}
       {zoomMode === "full" && regionSelectionEnabled && isSquareGrid && viewMode === "region" && (
-        <>
-          {Array.from({ length: numRegions * numRegions }).map((_, index) => {
-            const regionRow = Math.floor(index / numRegions);
-            const regionCol = index % numRegions;
-            const isHovered = hoveredRegion?.row === regionRow && hoveredRegion?.col === regionCol;
-
-            const regionX = regionCol * regionSize * (displayCellSize + gap);
-            const regionY = regionRow * regionSize * (displayCellSize + gap);
-            const regionWidth = regionSize * (displayCellSize + gap) - gap;
-            const regionHeight = regionSize * (displayCellSize + gap) - gap;
-
-            return (
-              <button
-                key={index}
-                className={`absolute transition-colors duration-200 rounded-lg flex items-center justify-center z-20 ${
-                  isHovered
-                    ? "bg-primary/30 border-2 border-primary"
-                    : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
-                }`}
-                style={{
-                  top: regionY,
-                  left: regionX,
-                  width: regionWidth,
-                  height: regionHeight,
-                }}
-                onMouseEnter={() => setHoveredRegion({ row: regionRow, col: regionCol })}
-                onMouseLeave={() => setHoveredRegion(null)}
-                onClick={() => {
-                  setSelectedRegion({
-                    row: regionRow,
-                    col: regionCol,
-                  });
-                  setZoomMode("region");
-                }}
-                title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
-              >
-                <span className="text-xs font-medium text-white bg-black/50 px-2 py-1 rounded">
-                  {regionRow},{regionCol}
-                </span>
-              </button>
-            );
-          })}
-        </>
+        <PositionedRegionOverlay
+          numRegions={numRegions}
+          regionSize={regionSize}
+          hoveredRegion={hoveredRegion}
+          onHoverChange={setHoveredRegion}
+          onSelect={zoomToRegion}
+          cellSize={displayCellSize}
+          gap={gap}
+        />
       )}
     </div>
   );
 
   return (
     <div className={containerClass}>
-      {isFetching && !isLoading && (
-        <div className="alert alert-info py-2 text-sm">
-          <LoaderCircle className="h-4 w-4 animate-spin" />
-          Loading {selectedTask} data for {rangeLabel}
-        </div>
-      )}
-      {isError && (
-        <div className="alert alert-error text-sm">
-          <span>
-            Failed to load {selectedTask} data for {rangeLabel}
-            {errorDetail ? `: ${errorDetail}` : ""}
-          </span>
-        </div>
-      )}
+      <GridTaskRequestAlerts
+        selectedTask={selectedTask}
+        selectedDate={selectedDate}
+        startAt={startAt}
+        endAt={endAt}
+        isRefreshing={isFetching && !isLoading}
+        isError={isError}
+        error={error}
+      />
       {/* View mode toggle and Download controls */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg py-2">
         <div className="flex items-center gap-4">
-          <ViewSwitch
-            ariaLabel="Grid view"
-            size="sm"
-            value={viewMode}
-            onValueChange={(mode) => {
-              setViewMode(mode);
-              if (mode === "pan-zoom") {
-                setZoomMode("full");
-                setSelectedRegion(null);
-                setRegionSelectionEnabled(false);
-              }
-            }}
-            items={[
-              {
-                value: "pan-zoom",
-                label: <span className="hidden sm:inline">Zoom</span>,
-                icon: <ZoomIn aria-hidden="true" />,
-                ariaLabel: "Zoom",
-                title: "Zoom",
-              },
-              {
-                value: "region",
-                label: <span className="hidden sm:inline">Lock</span>,
-                icon: <Lock aria-hidden="true" />,
-                ariaLabel: "Lock",
-                title: "Lock",
-              },
-            ]}
-          />
+          <GridViewModeSwitch value={viewMode} onValueChange={changeViewMode} />
 
           <div
             className={
-              viewMode !== "region" ||
-              zoomMode !== "full" ||
-              !isSquareGrid ||
-              downloadSelectionEnabled
+              viewMode !== "region" || zoomMode !== "full" || !isSquareGrid || download.isSelecting
                 ? "invisible pointer-events-none"
                 : ""
             }
@@ -834,141 +596,32 @@ export function CouplingGrid({
 
         {/* Download selection controls */}
         {zoomMode === "full" && (
-          <>
-            {downloadSelectionEnabled ? (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-base-content/70">
-                  {selectedForDownload.size} / {availableForDownloadCount} selected
-                </span>
-                <button
-                  className="btn btn-sm btn-ghost"
-                  onClick={selectAllForDownload}
-                  title="Select all"
-                >
-                  All
-                </button>
-                <button
-                  className="btn btn-sm btn-ghost"
-                  onClick={clearDownloadSelection}
-                  title="Clear selection"
-                >
-                  Clear
-                </button>
-                <button
-                  className="btn btn-sm btn-primary"
-                  onClick={() => setIsDownloadConfirmOpen(true)}
-                  disabled={selectedForDownload.size === 0 || isDownloading}
-                >
-                  {isDownloading ? (
-                    <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
-                  ) : (
-                    <Download data-icon="inline-start" />
-                  )}
-                  Download
-                </button>
-                <button
-                  className="btn btn-sm btn-ghost btn-circle"
-                  onClick={() => {
-                    setDownloadSelectionEnabled(false);
-                    setSelectedForDownload(new Set());
-                  }}
-                  title="Cancel"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <button
-                  className="btn btn-sm btn-outline"
-                  onClick={() => {
-                    setDownloadSelectionEnabled(true);
-                    setRegionSelectionEnabled(false);
-                    selectAllForDownload();
-                  }}
-                  title="Select figures to download"
-                  disabled={availableForDownloadCount === 0}
-                >
-                  <Download data-icon="inline-start" />
-                  Download
-                </button>
-              </div>
-            )}
-          </>
+          <GridDownloadControls
+            download={download}
+            onStart={() => setRegionSelectionEnabled(false)}
+          />
         )}
       </div>
 
-      <DownloadConfirmModal
-        isOpen={isDownloadConfirmOpen}
-        selectedCount={selectedForDownload.size}
-        options={downloadOptions}
-        counts={downloadCounts}
-        isSubmitting={isDownloading}
-        onOptionsChange={setDownloadOptions}
-        onConfirm={handleDownload}
-        onClose={() => setIsDownloadConfirmOpen(false)}
-      />
+      <GridDownloadConfirmModal download={download} />
 
       {/* Back button when in region mode */}
       {viewMode === "region" && zoomMode === "region" && selectedRegion && (
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => {
-              setZoomMode("full");
-              setSelectedRegion(null);
-            }}
-            className="btn btn-sm btn-ghost"
-          >
-            ← Back to Full View
-          </button>
-          <span className="text-sm text-base-content/70">
-            Region {selectedRegion.row + 1},{selectedRegion.col + 1}
-          </span>
-        </div>
+        <GridRegionBackBar region={selectedRegion} onBack={showFullGrid} />
       )}
 
       {/* Grid display */}
-      <div
-        className={`flex-1 relative flex justify-center ${
-          viewMode === "pan-zoom"
-            ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
-            : "items-start overflow-hidden bg-base-200/60 rounded-lg"
-        }`}
-        style={{ padding: `${Math.max(4, padding / 4)}px` }}
-        ref={containerRef}
+      <GridViewport
+        viewMode={viewMode}
+        padding={padding}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+        onTransform={handleTransform}
+        panClickGuard={panClickGuard}
+        viewportRef={containerRef}
       >
-        <GridFullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
-        {viewMode === "pan-zoom" ? (
-          <TransformWrapper
-            initialScale={initialScale}
-            minScale={Math.min(0.3, initialScale)}
-            maxScale={4}
-            wheel={{ step: 0.08 }}
-            pinch={{ step: 5 }}
-            doubleClick={{ mode: "zoomIn", step: 0.7 }}
-            panning={{ velocityDisabled: true }}
-            smooth={false}
-            limitToBounds={false}
-            centerOnInit={true}
-            onTransform={handleTransform}
-          >
-            <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
-            <TransformComponent
-              contentProps={panClickGuard}
-              wrapperStyle={{ width: "100%", height: "100%" }}
-              contentStyle={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              {gridContent}
-            </TransformComponent>
-          </TransformWrapper>
-        ) : (
-          <LockedGridScroller>{gridContent}</LockedGridScroller>
-        )}
-      </div>
+        {gridContent}
+      </GridViewport>
 
       <CouplingTaskHistoryModal
         chipId={chipId}

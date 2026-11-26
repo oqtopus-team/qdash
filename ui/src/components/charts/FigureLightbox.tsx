@@ -7,6 +7,7 @@ import { X, ZoomIn, ZoomOut, Maximize2, LineChart, Image } from "lucide-react";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
+import { executionFigureUrl } from "@/lib/utils/executionFiles";
 
 const PlotlyRenderer = dynamic(
   () => import("@/components/charts/PlotlyRenderer").then((mod) => mod.PlotlyRenderer),
@@ -149,7 +150,7 @@ export function FigureLightbox({ src, alt, jsonFigurePath, onClose }: FigureLigh
               <PlotlyRenderer
                 sizing="container"
                 className="h-full w-full min-h-0 min-w-0"
-                fullPath={`/api/executions/figure?path=${encodeURIComponent(jsonFigurePath)}`}
+                fullPath={executionFigureUrl(jsonFigurePath)}
               />
             </div>
           ) : (

@@ -18,6 +18,7 @@ import { getGetTaskResultQueryKey } from "@/client/task/task";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { PlotlyRenderer } from "@/components/charts/PlotlyRenderer";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
+import { executionFigureUrl } from "@/lib/utils/executionFiles";
 
 const PARAMETER_UNITS: Record<string, string> = {
   readout_frequency: "GHz",
@@ -479,7 +480,7 @@ function SpectroscopyCorrectionEditor({
             {jsonFigurePaths[0] && (
               <div className="mx-auto w-fit max-w-full overflow-auto rounded-[var(--radius-box)] border border-base-300 bg-base-100 p-3 shadow-sm">
                 <PlotlyRenderer
-                  fullPath={`/api/executions/figure?path=${encodeURIComponent(jsonFigurePaths[0])}`}
+                  fullPath={executionFigureUrl(jsonFigurePaths[0])}
                   onClick={handlePlotClick}
                   highlightPoint={
                     pendingPoint

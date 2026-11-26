@@ -2,6 +2,7 @@
 
 import { Download } from "lucide-react";
 import { stringify } from "yaml";
+import { saveBlob } from "@/lib/utils/download";
 
 interface MetricConfig {
   key: string;
@@ -94,14 +95,7 @@ export function MetricsYamlDownloadButton({
       .replace(/(\d{8})(\d{6})/, "$1_$2");
     const filename = `metrics_${metricConfig.key}_${chipId}_${timestamp}.yaml`;
 
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
+    saveBlob(blob, filename);
   };
 
   return (
