@@ -96,31 +96,31 @@ DEFAULT_FORUM_CATEGORIES = [
 DEFAULT_FORUM_LABELS = [
     {
         "key": "agent",
-        "name": "Agent",
+        "name": "agent",
         "description": "Calibration agent activity and interventions",
         "color": "#8b5cf6",
     },
     {
         "key": "calibration",
-        "name": "Calibration",
+        "name": "calibration",
         "description": "Calibration results, tasks, and parameters",
         "color": "#0ea5e9",
     },
     {
         "key": "hardware",
-        "name": "Hardware",
+        "name": "hardware",
         "description": "Chip, wiring, control devices, and fridge",
         "color": "#f97316",
     },
     {
         "key": "software",
-        "name": "Software",
+        "name": "software",
         "description": "QDash, workflows, and tooling",
         "color": "#22c55e",
     },
     {
         "key": "question",
-        "name": "Question",
+        "name": "question",
         "description": "Questions for the team",
         "color": "#eab308",
     },

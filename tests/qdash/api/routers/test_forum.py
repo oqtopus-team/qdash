@@ -206,12 +206,13 @@ def test_new_project_lists_default_forum_labels(test_client, init_db):
     assert response.status_code == 200
     labels = response.json()["labels"]
     assert [item["key"] for item in labels] == DEFAULT_LABEL_KEYS
+    # Default names are lowercase classification terms.
     assert [item["name"] for item in labels] == [
-        "Agent",
-        "Calibration",
-        "Hardware",
-        "Software",
-        "Question",
+        "agent",
+        "calibration",
+        "hardware",
+        "software",
+        "question",
     ]
     assert all(re.fullmatch(r"#[0-9a-f]{6}", item["color"]) for item in labels)
     # Listing again does not duplicate them.
@@ -249,7 +250,7 @@ def test_default_forum_labels_are_editable(test_client, init_db):
         "color": "#123abc",
     }
     # The old default name is free again and does not bring the default back.
-    assert [item["name"] for item in listed].count("Question") == 0
+    assert [item["name"] for item in listed].count("question") == 0
 
 
 def test_deleted_default_forum_labels_are_not_recreated(test_client, init_db):
@@ -481,7 +482,7 @@ def test_label_update_racing_a_delete_does_not_restore_the_label(test_client, in
     assert deleted
     assert response.status_code == 404
     [row] = _label_rows("agent")
-    assert (row["name"], row["is_deleted"]) == ("Agent", True)
+    assert (row["name"], row["is_deleted"]) == ("agent", True)
 
 
 def test_recreating_deleted_default_restores_its_key(test_client, init_db):
@@ -567,7 +568,7 @@ def test_default_forum_labels_preserve_existing_project_labels(test_client, init
     headers = _setup_owner()
     for key, name, color in (
         ("hardware", "Cryo hardware", "#010203"),
-        ("triage", "question", "#040506"),
+        ("triage", "Question", "#040506"),
         ("review", "Review", "#070809"),
     ):
         ForumLabelDocument(project_id="test_project", key=key, name=name, color=color).insert()
@@ -580,7 +581,7 @@ def test_default_forum_labels_preserve_existing_project_labels(test_client, init
         "Cryo hardware",
         "#010203",
     )
-    assert (by_key["triage"]["name"], by_key["triage"]["color"]) == ("question", "#040506")
+    assert (by_key["triage"]["name"], by_key["triage"]["color"]) == ("Question", "#040506")
     assert (by_key["review"]["name"], by_key["review"]["color"]) == ("Review", "#070809")
     # The default "question" is reserved as deleted because its name is taken.
     [question] = _label_rows("question")
@@ -617,7 +618,7 @@ def test_default_forum_labels_are_project_scoped(test_client, init_db):
 
     other = test_client.get("/forum/labels", headers=other_headers).json()["labels"]
     assert [item["key"] for item in other] == DEFAULT_LABEL_KEYS
-    assert next(item for item in other if item["key"] == "hardware")["name"] == "Hardware"
+    assert next(item for item in other if item["key"] == "hardware")["name"] == "hardware"
     assert _label_keys(test_client, headers) == [
         key for key in DEFAULT_LABEL_KEYS if key != "agent"
     ]
