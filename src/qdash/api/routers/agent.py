@@ -38,6 +38,7 @@ from qdash.agent.prompts.task_chat import build_language_instruction
 from qdash.agent.runtime import AgentRuntime
 from qdash.api.dependencies import (
     get_agent_chat_session_service,
+    get_agent_chat_share_service,
     get_agent_investigation_service,
     get_agent_runtime,
     get_evaluation_service,
@@ -47,11 +48,15 @@ from qdash.api.lib.auth import bearer_scheme, get_current_active_user
 from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
+    get_project_context_editor,
     get_project_id_from_header,
 )
 from qdash.api.lib.sse import ClosingStreamingResponse, sse_event
 from qdash.api.schemas.agent_chat_session import (
     AgentChatSessionResponse,
+    AgentChatShareResponse,
+    AgentChatShareStatusResponse,
+    AgentChatShareSummary,
     CreateAgentChatBranchRequest,
     CreateAgentChatSessionRequest,
     ListAgentChatSessionsResponse,
@@ -71,6 +76,7 @@ from qdash.api.schemas.agent_source import (
     SourceSearchMatch,
 )
 from qdash.api.schemas.auth import User
+from qdash.api.schemas.success import SuccessResponse
 from qdash.api.services import chat_turn_runs, pi_chat_service
 from qdash.api.services.agent_chat_session_service import (
     AgentChatSessionService,
@@ -82,6 +88,7 @@ from qdash.api.services.agent_chat_session_service import (
     StopOutcome,
     request_turn_stop,
 )
+from qdash.api.services.agent_chat_share_service import AgentChatShareService
 from qdash.api.services.agent_investigation_service import (
     AgentInvestigationService,
     InvestigationNotFoundError,
@@ -637,12 +644,14 @@ async def delete_agent_chat_session(
     current_user: Annotated[User, Depends(get_current_active_user)],
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
     service: Annotated[AgentChatSessionService, Depends(get_agent_chat_session_service)],
+    share_service: Annotated[AgentChatShareService, Depends(get_agent_chat_share_service)],
 ) -> dict[str, bool]:
     """Delete a chat session owned by the current user.
 
     The chat's own running turn is stopped; a turn of another branch is not.
     Its runtime store and workspace are removed with the last session that uses
     them: a chat and its branches share one, so it stays while one is left.
+    Snapshots of the chat shared with projects are removed with it.
     When the runtime cannot remove the store yet, the deleted chat is kept,
     hidden, and the removal is retried by deleting it again or by the next
     listing of the user's chats.
@@ -658,6 +667,8 @@ async def delete_agent_chat_session(
         stop_chat=_deleted_chat_stopper(username, auth),
         release_store=_store_release(username, attempts=3),
     )
+    # A deleted chat is no longer shared in any project.
+    await asyncio.to_thread(share_service.delete_for_chat, username=username, session_id=session_id)
     return {"deleted": True}
 
 
@@ -710,6 +721,81 @@ async def branch_agent_chat_session(
             status_code=502,
             detail="The Agent runtime could not create the branch; try again",
         ) from exc
+
+
+ShareServiceDep = Annotated[AgentChatShareService, Depends(get_agent_chat_share_service)]
+
+
+@router.get(
+    "/chat/sessions/{session_id}/share",
+    summary="Get whether a chat is shared with the current project",
+    operation_id="getAgentChatShareStatus",
+    response_model=AgentChatShareStatusResponse,
+)
+def get_agent_chat_share_status(
+    session_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: ShareServiceDep,
+) -> AgentChatShareStatusResponse:
+    """Return the snapshot of one of the caller's chats shared with the current project."""
+    return service.get_status(ctx, session_id=session_id)
+
+
+@router.put(
+    "/chat/sessions/{session_id}/share",
+    summary="Share a chat snapshot with the current project, or update it",
+    operation_id="publishAgentChatShare",
+    response_model=AgentChatShareSummary,
+)
+def publish_agent_chat_share(
+    session_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: ShareServiceDep,
+) -> AgentChatShareSummary:
+    """Copy one of the caller's chats, as it is now, into a read-only project snapshot.
+
+    The chat itself stays private. Later changes to it are not shared until this is
+    called again, which replaces the snapshot and keeps its link. Tool steps, workspace
+    files, figures, interactive cards and runtime identifiers are not copied. A chat with
+    a running answer, or with answers from another project, is refused.
+    """
+    return service.publish(ctx, session_id=session_id)
+
+
+@router.get(
+    "/chat/shares/{share_id}",
+    summary="Get a chat snapshot shared with the current project",
+    operation_id="getAgentChatShare",
+    response_model=AgentChatShareResponse,
+)
+def get_agent_chat_share(
+    share_id: str,
+    response: Response,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: ShareServiceDep,
+) -> AgentChatShareResponse:
+    """Return a read-only chat snapshot to a member of the project it is shared with."""
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["Vary"] = "Authorization, X-Project-Id"
+    return service.get(ctx, share_id=share_id)
+
+
+@router.delete(
+    "/chat/shares/{share_id}",
+    summary="Stop sharing a chat snapshot",
+    operation_id="revokeAgentChatShare",
+    response_model=SuccessResponse,
+)
+def revoke_agent_chat_share(
+    share_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: ShareServiceDep,
+) -> SuccessResponse:
+    """Remove a shared snapshot: the chat's owner or a project owner may do so.
+
+    The original chat is not changed.
+    """
+    return service.revoke(ctx, share_id=share_id)
 
 
 def _source_error(exc: SourceAccessError) -> HTTPException:

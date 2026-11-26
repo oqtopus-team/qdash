@@ -12,6 +12,9 @@ import type {
   AgentCandidateCommitResponse,
   AgentCandidateSetCommitResponse,
   AgentChatSessionResponse,
+  AgentChatShareResponse,
+  AgentChatShareStatusResponse,
+  AgentChatShareSummary,
   AgentDecisionResponse,
   AgentInterventionResponse,
   AgentPreferences,
@@ -2218,6 +2221,7 @@ const updateAgentChatSession = (
  * The chat's own running turn is stopped; a turn of another branch is not.
  * Its runtime store and workspace are removed with the last session that uses
  * them: a chat and its branches share one, so it stays while one is left.
+ * Snapshots of the chat shared with projects are removed with it.
  * When the runtime cannot remove the store yet, the deleted chat is kept,
  * hidden, and the removal is retried by deleting it again or by the next
  * listing of the user's chats.
@@ -2250,6 +2254,65 @@ const branchAgentChatSession = (
       {url: `/agent/chat/sessions/${sessionId}/branches`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: createAgentChatBranchRequest
+    },
+      options);
+    }
+
+/**
+ * Return the snapshot of one of the caller's chats shared with the current project.
+ * @summary Get whether a chat is shared with the current project
+ */
+const getAgentChatShareStatus = (
+    sessionId: string,
+ options?: SecondParameter<typeof qdashRequest<AgentChatShareStatusResponse>>,) => {
+      return qdashRequest<AgentChatShareStatusResponse>(
+      {url: `/agent/chat/sessions/${sessionId}/share`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Copy one of the caller's chats, as it is now, into a read-only project snapshot.
+ *
+ * The chat itself stays private. Later changes to it are not shared until this is
+ * called again, which replaces the snapshot and keeps its link. Tool steps, workspace
+ * files, figures, interactive cards and runtime identifiers are not copied. A chat with
+ * a running answer, or with answers from another project, is refused.
+ * @summary Share a chat snapshot with the current project, or update it
+ */
+const publishAgentChatShare = (
+    sessionId: string,
+ options?: SecondParameter<typeof qdashRequest<AgentChatShareSummary>>,) => {
+      return qdashRequest<AgentChatShareSummary>(
+      {url: `/agent/chat/sessions/${sessionId}/share`, method: 'PUT'
+    },
+      options);
+    }
+
+/**
+ * Return a read-only chat snapshot to a member of the project it is shared with.
+ * @summary Get a chat snapshot shared with the current project
+ */
+const getAgentChatShare = (
+    shareId: string,
+ options?: SecondParameter<typeof qdashRequest<AgentChatShareResponse>>,) => {
+      return qdashRequest<AgentChatShareResponse>(
+      {url: `/agent/chat/shares/${shareId}`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Remove a shared snapshot: the chat's owner or a project owner may do so.
+ *
+ * The original chat is not changed.
+ * @summary Stop sharing a chat snapshot
+ */
+const revokeAgentChatShare = (
+    shareId: string,
+ options?: SecondParameter<typeof qdashRequest<SuccessResponse>>,) => {
+      return qdashRequest<SuccessResponse>(
+      {url: `/agent/chat/shares/${shareId}`, method: 'DELETE'
     },
       options);
     }
@@ -5749,7 +5812,7 @@ const listUserAvatars = (
       options);
     }
 
-return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,listExecutionGroups,getAgentSessionGraph,getExecutionActivity,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,listAgentSessions,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,stopAgentSession,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,createAgentIntervention,listAgentInterventions,getAgentIntervention,respondAgentIntervention,claimAgentInterventionResume,recordAgentResumeOutcome,retryAgentInterventionNotification,recordAgentDecision,listAgentDecisions,getAgentSessionAudit,exportAgentSessionAudit,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,createCalibrationSession,listCalibrationSessions,getCalibrationSession,getCalibrationSessionRun,closeCalibrationSession,recordCalibrationDecision,listCalibrationDecisions,getCalibrationSessionAudit,exportCalibrationSessionAudit,getAgentConfig,listAgentChatSessions,createAgentChatSession,getAgentChatSession,updateAgentChatSession,deleteAgentChatSession,branchAgentChatSession,listAgentSourceRoots,searchAgentSource,getAgentSourceFile,getAgentPreferences,updateAgentPreferences,getAgentSystemPrompt,listAgentSkills,getSettings,listChips,createChip,listChipConfigSources,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,formatFlowSource,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,getFlowExecutionPlan,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listDashboards,createDashboard,listDashboardTemplates,previewDashboardTemplate,getDashboard,updateDashboard,deleteDashboard,duplicateDashboard,listMetricScripts,createMetricScript,listMetricScriptTemplates,getMetricScriptCatalog,validateMetricScript,formatMetricScriptSource,evaluateMetricScriptDraft,getMetricScript,updateMetricScript,deleteMetricScript,copyMetricScript,evaluateMetricScript,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations,getCurrentUserAvatar,updateCurrentUserAvatar,listUserAvatars}};
+return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,listExecutionGroups,getAgentSessionGraph,getExecutionActivity,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,listAgentSessions,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,stopAgentSession,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,createAgentIntervention,listAgentInterventions,getAgentIntervention,respondAgentIntervention,claimAgentInterventionResume,recordAgentResumeOutcome,retryAgentInterventionNotification,recordAgentDecision,listAgentDecisions,getAgentSessionAudit,exportAgentSessionAudit,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,createCalibrationSession,listCalibrationSessions,getCalibrationSession,getCalibrationSessionRun,closeCalibrationSession,recordCalibrationDecision,listCalibrationDecisions,getCalibrationSessionAudit,exportCalibrationSessionAudit,getAgentConfig,listAgentChatSessions,createAgentChatSession,getAgentChatSession,updateAgentChatSession,deleteAgentChatSession,branchAgentChatSession,getAgentChatShareStatus,publishAgentChatShare,getAgentChatShare,revokeAgentChatShare,listAgentSourceRoots,searchAgentSource,getAgentSourceFile,getAgentPreferences,updateAgentPreferences,getAgentSystemPrompt,listAgentSkills,getSettings,listChips,createChip,listChipConfigSources,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,formatFlowSource,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,getFlowExecutionPlan,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listDashboards,createDashboard,listDashboardTemplates,previewDashboardTemplate,getDashboard,updateDashboard,deleteDashboard,duplicateDashboard,listMetricScripts,createMetricScript,listMetricScriptTemplates,getMetricScriptCatalog,validateMetricScript,formatMetricScriptSource,evaluateMetricScriptDraft,getMetricScript,updateMetricScript,deleteMetricScript,copyMetricScript,evaluateMetricScript,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations,getCurrentUserAvatar,updateCurrentUserAvatar,listUserAvatars}};
 export type LoginResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['login']>>>
 export type RegisterUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['registerUser']>>>
 export type GetCurrentUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCurrentUser']>>>
@@ -5854,6 +5917,10 @@ export type GetAgentChatSessionResult = NonNullable<Awaited<ReturnType<ReturnTyp
 export type UpdateAgentChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateAgentChatSession']>>>
 export type DeleteAgentChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['deleteAgentChatSession']>>>
 export type BranchAgentChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['branchAgentChatSession']>>>
+export type GetAgentChatShareStatusResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getAgentChatShareStatus']>>>
+export type PublishAgentChatShareResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['publishAgentChatShare']>>>
+export type GetAgentChatShareResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getAgentChatShare']>>>
+export type RevokeAgentChatShareResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['revokeAgentChatShare']>>>
 export type ListAgentSourceRootsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listAgentSourceRoots']>>>
 export type SearchAgentSourceResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['searchAgentSource']>>>
 export type GetAgentSourceFileResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getAgentSourceFile']>>>

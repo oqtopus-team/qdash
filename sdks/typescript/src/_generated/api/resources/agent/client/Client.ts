@@ -309,6 +309,7 @@ export class AgentClient {
      * The chat's own running turn is stopped; a turn of another branch is not.
      * Its runtime store and workspace are removed with the last session that uses
      * them: a chat and its branches share one, so it stays while one is left.
+     * Snapshots of the chat shared with projects are removed with it.
      * When the runtime cannot remove the store yet, the deleted chat is kept,
      * hidden, and the removal is retried by deleting it again or by the next
      * listing of the user's chats.
@@ -543,6 +544,307 @@ export class AgentClient {
             _response.rawResponse,
             "POST",
             "/agent/chat/sessions/{session_id}/branches",
+        );
+    }
+
+    /**
+     * Return the snapshot of one of the caller's chats shared with the current project.
+     *
+     * @param {QDashApi.GetAgentChatShareStatusRequest} request
+     * @param {AgentClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link QDashApi.UnprocessableEntityError}
+     * @throws {@link errors.ApiError}
+     * @throws {@link errors.ApiTimeoutError}
+     *
+     * @example
+     *     await client.agent.getAgentChatShareStatus({
+     *         session_id: "session_id"
+     *     })
+     */
+    public getAgentChatShareStatus(
+        request: QDashApi.GetAgentChatShareStatusRequest,
+        requestOptions?: AgentClient.RequestOptions,
+    ): core.HttpResponsePromise<QDashApi.AgentChatShareStatusResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__getAgentChatShareStatus(request, requestOptions));
+    }
+
+    private async __getAgentChatShareStatus(
+        request: QDashApi.GetAgentChatShareStatusRequest,
+        requestOptions?: AgentClient.RequestOptions,
+    ): Promise<core.WithRawResponse<QDashApi.AgentChatShareStatusResponse>> {
+        const { session_id: sessionId } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "X-Project-Id": requestOptions?.projectId ?? this._options?.projectId }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `agent/chat/sessions/${core.url.encodePathParam(sessionId, errors.ApiError)}/share`,
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return {
+                data: _response.body as QDashApi.AgentChatShareStatusResponse,
+                rawResponse: _response.rawResponse,
+            };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 422:
+                    throw new QDashApi.UnprocessableEntityError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.ApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "GET",
+            "/agent/chat/sessions/{session_id}/share",
+        );
+    }
+
+    /**
+     * Copy one of the caller's chats, as it is now, into a read-only project snapshot.
+     *
+     * The chat itself stays private. Later changes to it are not shared until this is
+     * called again, which replaces the snapshot and keeps its link. Tool steps, workspace
+     * files, figures, interactive cards and runtime identifiers are not copied. A chat with
+     * a running answer, or with answers from another project, is refused.
+     *
+     * @param {QDashApi.PublishAgentChatShareRequest} request
+     * @param {AgentClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link QDashApi.UnprocessableEntityError}
+     * @throws {@link errors.ApiError}
+     * @throws {@link errors.ApiTimeoutError}
+     *
+     * @example
+     *     await client.agent.publishAgentChatShare({
+     *         session_id: "session_id"
+     *     })
+     */
+    public publishAgentChatShare(
+        request: QDashApi.PublishAgentChatShareRequest,
+        requestOptions?: AgentClient.RequestOptions,
+    ): core.HttpResponsePromise<QDashApi.AgentChatShareSummary> {
+        return core.HttpResponsePromise.fromPromise(this.__publishAgentChatShare(request, requestOptions));
+    }
+
+    private async __publishAgentChatShare(
+        request: QDashApi.PublishAgentChatShareRequest,
+        requestOptions?: AgentClient.RequestOptions,
+    ): Promise<core.WithRawResponse<QDashApi.AgentChatShareSummary>> {
+        const { session_id: sessionId } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "X-Project-Id": requestOptions?.projectId ?? this._options?.projectId }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `agent/chat/sessions/${core.url.encodePathParam(sessionId, errors.ApiError)}/share`,
+            ),
+            method: "PUT",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as QDashApi.AgentChatShareSummary, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 422:
+                    throw new QDashApi.UnprocessableEntityError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.ApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "PUT",
+            "/agent/chat/sessions/{session_id}/share",
+        );
+    }
+
+    /**
+     * Return a read-only chat snapshot to a member of the project it is shared with.
+     *
+     * @param {QDashApi.GetAgentChatShareRequest} request
+     * @param {AgentClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link QDashApi.UnprocessableEntityError}
+     * @throws {@link errors.ApiError}
+     * @throws {@link errors.ApiTimeoutError}
+     *
+     * @example
+     *     await client.agent.getAgentChatShare({
+     *         share_id: "share_id"
+     *     })
+     */
+    public getAgentChatShare(
+        request: QDashApi.GetAgentChatShareRequest,
+        requestOptions?: AgentClient.RequestOptions,
+    ): core.HttpResponsePromise<QDashApi.AgentChatShareResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__getAgentChatShare(request, requestOptions));
+    }
+
+    private async __getAgentChatShare(
+        request: QDashApi.GetAgentChatShareRequest,
+        requestOptions?: AgentClient.RequestOptions,
+    ): Promise<core.WithRawResponse<QDashApi.AgentChatShareResponse>> {
+        const { share_id: shareId } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "X-Project-Id": requestOptions?.projectId ?? this._options?.projectId }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `agent/chat/shares/${core.url.encodePathParam(shareId, errors.ApiError)}`,
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as QDashApi.AgentChatShareResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 422:
+                    throw new QDashApi.UnprocessableEntityError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.ApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/agent/chat/shares/{share_id}");
+    }
+
+    /**
+     * Remove a shared snapshot: the chat's owner or a project owner may do so.
+     *
+     * The original chat is not changed.
+     *
+     * @param {QDashApi.RevokeAgentChatShareRequest} request
+     * @param {AgentClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link QDashApi.UnprocessableEntityError}
+     * @throws {@link errors.ApiError}
+     * @throws {@link errors.ApiTimeoutError}
+     *
+     * @example
+     *     await client.agent.revokeAgentChatShare({
+     *         share_id: "share_id"
+     *     })
+     */
+    public revokeAgentChatShare(
+        request: QDashApi.RevokeAgentChatShareRequest,
+        requestOptions?: AgentClient.RequestOptions,
+    ): core.HttpResponsePromise<QDashApi.SuccessResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__revokeAgentChatShare(request, requestOptions));
+    }
+
+    private async __revokeAgentChatShare(
+        request: QDashApi.RevokeAgentChatShareRequest,
+        requestOptions?: AgentClient.RequestOptions,
+    ): Promise<core.WithRawResponse<QDashApi.SuccessResponse>> {
+        const { share_id: shareId } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "X-Project-Id": requestOptions?.projectId ?? this._options?.projectId }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `agent/chat/shares/${core.url.encodePathParam(shareId, errors.ApiError)}`,
+            ),
+            method: "DELETE",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as QDashApi.SuccessResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 422:
+                    throw new QDashApi.UnprocessableEntityError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.ApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "DELETE",
+            "/agent/chat/shares/{share_id}",
         );
     }
 

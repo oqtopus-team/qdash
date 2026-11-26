@@ -1,13 +1,18 @@
 import { Lock, Users } from "lucide-react";
 
-import type { DashboardResponseVisibility } from "@/schemas";
+/** Who can open a record: its owner only, or every member of the project. */
+export type Visibility = "private" | "project";
 
-/** Who can open a dashboard or script, as a line of meta text with its icon. */
+/** Who can open a record, as a line of meta text with its icon. */
 export function VisibilityLabel({
   visibility,
+  privateLabel = "Private",
+  projectLabel = "Shared with project",
   className = "",
 }: {
-  visibility: DashboardResponseVisibility;
+  visibility: Visibility;
+  privateLabel?: string;
+  projectLabel?: string;
   className?: string;
 }) {
   const shared = visibility === "project";
@@ -15,7 +20,7 @@ export function VisibilityLabel({
   return (
     <span className={`inline-flex items-center gap-1 ${className}`}>
       <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-      {shared ? "Shared with project" : "Private"}
+      {shared ? projectLabel : privateLabel}
     </span>
   );
 }

@@ -1,6 +1,7 @@
 from typing import Any
 
 from qdash.dbmodel.agent_chat_session import AgentChatSessionDocument
+from qdash.dbmodel.agent_chat_share import AgentChatShareDocument
 from qdash.dbmodel.agent_chat_turn import AgentChatTurnDocument
 from qdash.dbmodel.agent_session import (
     AgentActionDocument,
@@ -118,6 +119,7 @@ def document_models() -> list[Any]:
         CooldownWiringEventDocument,
         AgentChatSessionDocument,
         AgentChatTurnDocument,
+        AgentChatShareDocument,
         # Provenance tracking
         ParameterVersionDocument,
         ProvenanceRelationDocument,

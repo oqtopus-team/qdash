@@ -67,6 +67,31 @@ Use **Save as Markdown** on a finished answer or **Download** on a code block. A
 under **Original write content from this answer** downloads that recorded write, not later
 workspace edits.
 
+### Share a Conversation with the Project
+
+Share a read-only snapshot when members need to follow your investigation. You need an
+Editor or Owner role in the selected project; Viewers can read shared conversations.
+
+1. Open the conversation on **Agent**, confirm the project, and wait for the answer to finish.
+2. Select **Share**, then **Snapshot shared with project**. Review the conversation before
+   selecting **Share snapshot**.
+3. Select **Copy link** and give the link to project members. Recipients must sign in with
+   access to that project.
+
+The snapshot includes messages, answer text, charts, and tables. It excludes tool steps,
+workspace files, attached figures, and interactive cards. The original chat stays private;
+later messages appear in the snapshot only after you select **Share → Update snapshot**.
+Updating keeps the same link.
+
+Chats with recorded answers from another project cannot be shared here. Start a new chat in
+the intended project if sharing is refused. Older messages may lack project records, so check
+that their contents are appropriate for the recipients before sharing.
+
+To revoke access, select **Private** in **Share**, then **Stop sharing**. You or a project Owner
+can also select **Stop sharing** on the shared page. Deleting the original chat removes its
+shared snapshots. If a link is unavailable, confirm project membership and ask the sender
+whether sharing has stopped.
+
 ### Calculations and Scripts
 
 When enabled, the assistant has a chat workspace for calculations. It has no network or direct
