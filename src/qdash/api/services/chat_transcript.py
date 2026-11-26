@@ -103,67 +103,9 @@ def _close_thinking(steps: list[Step], now: int) -> list[Step]:
     ]
 
 
-_SUBAGENT_STATUSES = {"queued", "running", "done", "error", "cancelled", "interrupted"}
-_SUBAGENT_ACTIVE = {"queued", "running"}
-
-
-def _step_subagents(value: Any) -> list[dict[str, Any]] | None:
-    """The research tasks of a ``tool_progress`` or ``tool_end`` payload, as the step stores them."""
-    if not isinstance(value, list):
-        return None
-    tasks: list[dict[str, Any]] = []
-    for task in value:
-        if not isinstance(task, dict):
-            continue
-        if (
-            not isinstance(task.get("id"), str)
-            or not isinstance(task.get("title"), str)
-            or not isinstance(task.get("status"), str)
-            or task.get("status") not in _SUBAGENT_STATUSES
-        ):
-            continue
-        calls = task.get("tool_calls")
-        item: dict[str, Any] = {
-            "id": task["id"],
-            "title": task["title"],
-            "status": task["status"],
-            "toolCalls": calls
-            if isinstance(calls, int) and not isinstance(calls, bool) and calls >= 0
-            else 0,
-        }
-        for source, target in (("started_at", "startedAt"), ("ended_at", "endedAt")):
-            moment = task.get(source)
-            if isinstance(moment, (int, float)) and not isinstance(moment, bool):
-                item[target] = moment
-        for key in ("activity", "result", "error"):
-            if isinstance(task.get(key), str) and task[key]:
-                item[key] = task[key]
-        tasks.append(item)
-    return tasks or None
-
-
-def _settle_subagents(step: Step) -> Step:
-    """``step`` with no research task left queued or running: its call ended or was cut off."""
-    tasks = step.get("subagents")
-    if not isinstance(tasks, list) or not any(
-        isinstance(t, dict) and t.get("status") in _SUBAGENT_ACTIVE for t in tasks
-    ):
-        return step
-    return {
-        **step,
-        "subagents": [
-            {**{k: v for k, v in t.items() if k != "activity"}, "status": "interrupted"}
-            if isinstance(t, dict) and t.get("status") in _SUBAGENT_ACTIVE
-            else t
-            for t in tasks
-        ],
-    }
-
-
 def _close_open_steps(steps: list[Step], now: int) -> list[Step]:
     closed: list[Step] = []
-    for raw in steps:
-        step = _settle_subagents(raw) if raw["kind"] == "tool" else raw
+    for step in steps:
         if step["kind"] == "thinking" and "endedAt" not in step:
             closed.append({**step, "endedAt": now})
         elif step["kind"] == "tool" and step.get("status") == "drafting":
@@ -383,18 +325,6 @@ class LiveTurn:
         self.steps = _close_thinking(self.steps, now)
         self.steps.append({"kind": "tool", **running, "startedAt": now})
 
-    def progress_tool(self, payload: dict[str, Any]) -> None:
-        """A running call's progress: the research tasks of a ``delegate_research`` call so far."""
-        subagents = _step_subagents(payload.get("subagents"))
-        call_id = payload.get("id")
-        if subagents is None or call_id is None:
-            return
-        for i in range(len(self.steps) - 1, -1, -1):
-            s = self.steps[i]
-            if s["kind"] == "tool" and s["id"] == call_id and s.get("status") == "running":
-                self.steps[i] = {**s, "subagents": subagents}
-                return
-
     def end_tool(self, payload: dict[str, Any]) -> None:
         call_id = payload.get("id")
         tool = payload.get("tool")
@@ -445,10 +375,7 @@ class LiveTurn:
         exit_code = payload.get("exit_code")
         if isinstance(exit_code, (int, float)) and not isinstance(exit_code, bool):
             ended["exitCode"] = exit_code
-        subagents = _step_subagents(payload.get("subagents"))
-        if subagents:
-            ended["subagents"] = subagents
-        self.steps[idx] = _settle_subagents(ended)
+        self.steps[idx] = ended
 
     def append_block(self, payload: dict[str, Any]) -> None:
         if payload.get("type") == "ui" and isinstance(payload.get("ui"), dict):
@@ -607,8 +534,6 @@ class TurnTranscript:
             turn.append_args_delta(data)
         elif event == "tool_start":
             turn.start_tool(data)
-        elif event == "tool_progress":
-            turn.progress_tool(data)
         elif event == "tool_end":
             turn.end_tool(data)
         elif event == "ui":

@@ -36,29 +36,6 @@ still enforces tool visibility and write approvals. Shell and file operations ru
 <a id="chat-about-a-task-result"></a>
 <a id="chat-page"></a>
 
-## Research subagents
-
-`delegate_research` in `agent-runtime/src/subagent-tool.ts` creates task-owned Pi child
-conversations in the chat's store. Children use the parent's model and authenticated QDash
-connection, but receive only their task brief and research instructions, without chat history,
-user preferences, or skills. The parent reconciles their bounded answers.
-
-Each call accepts up to four tasks and runs three at once; the runtime process admits six
-children across chats. Each child has at most eight tool rounds and a five-minute timeout.
-Results are capped at 5,000 characters for the parent and 4,000 for the UI, with a truncation
-marker when needed.
-
-Children receive only the audited QDash reads allowed inside Code Mode. A durable child marker
-and tool hook enforce that allowlist and reject nested calls. Children cannot use Code Mode,
-tool discovery, workspace tools, raw routes, approvals, or further delegation. Keep these
-restrictions at the execution boundary when extending the tool set.
-
-The web runtime enables subagents by default; the pi CLI does not expose this tool.
-Set `AGENT_SUBAGENTS=false` to disable it (`0`, `no`, and `off` also disable it).
-`AGENT_SUBAGENT_TIMEOUT_MS` sets a positive timeout in milliseconds; invalid or nonpositive
-values use 300000. Compose forwards both variables to the runtime; recreate the runtime service
-after changing them. Cancellation and recovery follow [Chat Streaming](./chat-streaming.md).
-
 ## Page context and editor edits
 
 A turn can include the open page and unsaved editor text. Proposed edits change the editor only

@@ -28,7 +28,6 @@ import {
   executionPagePath,
 } from "@/components/features/chat/ExecutionProgress";
 import { ChatLink } from "@/components/features/chat/ChatPreviewLink";
-import { SubagentTasks } from "@/components/features/chat/SubagentTasks";
 import {
   ChainOfThoughtContent,
   ChainOfThoughtStep,
@@ -295,11 +294,6 @@ function ToolStepRow({
       {!extrasOutside && step.figures && step.figures.length > 0 && (
         <FigureStrip paths={step.figures} compact className={`${ROW_INDENT} mt-1.5`} />
       )}
-      {!extrasOutside && step.subagents && step.subagents.length > 0 && (
-        <div className={ROW_INDENT}>
-          <SubagentTasks tasks={step.subagents} now={now} />
-        </div>
-      )}
       {(step.evaluation || step.classification) && (
         <div className={ROW_INDENT}>
           {step.evaluation && <EvaluationPanel evaluation={step.evaluation} />}
@@ -405,30 +399,13 @@ function isStepActive(step: TraceStep): boolean {
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /** What a folded group would hide but must not: failures, executions and, live, figures. */
-function FoldedGroupNotes({
-  steps,
-  showFigures,
-  now,
-}: {
-  steps: ToolStep[];
-  showFigures: boolean;
-  now: number;
-}) {
+function FoldedGroupNotes({ steps, showFigures }: { steps: ToolStep[]; showFigures: boolean }) {
   const failures = steps.filter((s) => s.status === "error");
-  // Delegated research stays visible: each subagent's state is the point of the step.
-  const delegations = steps.filter((s) => s.subagents && s.subagents.length > 0);
   const waits = steps
     .map((step) => ({ step, executionId: waitedExecution(step) }))
     .filter((w): w is { step: ToolStep; executionId: string } => w.executionId !== null);
   const figures = showFigures ? figuresInSteps(steps) : [];
-  if (
-    failures.length === 0 &&
-    waits.length === 0 &&
-    figures.length === 0 &&
-    delegations.length === 0
-  ) {
-    return null;
-  }
+  if (failures.length === 0 && waits.length === 0 && figures.length === 0) return null;
   return (
     <div className={`${ROW_INDENT} flex min-w-0 flex-col gap-1`}>
       {failures.map((step, i) => {
@@ -464,9 +441,6 @@ function FoldedGroupNotes({
           </p>
         ) : null,
       )}
-      {delegations.map((step, i) => (
-        <SubagentTasks key={`delegation-${i}`} tasks={step.subagents ?? []} now={now} />
-      ))}
       {figures.length > 0 && <FigureStrip paths={figures} compact />}
     </div>
   );
@@ -557,7 +531,7 @@ function WorkGroup({
           <RowChevron open={!folded} />
         </button>
       )}
-      {folded && <FoldedGroupNotes steps={tools} showFigures={live && !figuresOutside} now={now} />}
+      {folded && <FoldedGroupNotes steps={tools} showFigures={live && !figuresOutside} />}
       {/* Hidden, not unmounted, while folded: rows keep what the user opened. */}
       <ol
         id={contentId}
@@ -663,8 +637,6 @@ export function ChatTraceSummary({
   const [open, setOpen] = useState(false);
   const following = useChatFollowing();
   const [held, setHeld] = useState(() => finishedHere && !following);
-  // A stored trace is settled: nothing in it runs, so the clock never ticks.
-  const now = useNow(false);
   useEffect(() => {
     if (held && following) setHeld(false);
   }, [held, following]);
@@ -707,9 +679,7 @@ export function ChatTraceSummary({
           aria-hidden="true"
         />
       </button>
-      {!open && (
-        <FoldedGroupNotes steps={trace.steps.filter(isTool)} showFigures={false} now={now} />
-      )}
+      {!open && <FoldedGroupNotes steps={trace.steps.filter(isTool)} showFigures={false} />}
       {/* Hidden, not unmounted, while folded: rows keep what the user opened. */}
       <div id={contentId} hidden={!open} className={`${ROW_INDENT} mt-2`}>
         <TraceSteps steps={trace.steps} live={false} figuresOutside />
