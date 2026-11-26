@@ -2,7 +2,7 @@
 // QDash that answers the reanalyze routes, so the wire body, the policy, and the image content
 // are checked together.
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -63,7 +63,7 @@ function resonatorResponse(body) {
 }
 
 /** A QDash answering the two reanalyze routes and recording each request. */
-async function fakeQDash(t) {
+async function fakeQDash(t, { defaultChip = "64Qv3" } = {}) {
   const requests = [];
   const server = createServer((request, response) => {
     const url = new URL(request.url, "http://localhost");
@@ -76,7 +76,7 @@ async function fakeQDash(t) {
         response.writeHead(status, { "content-type": "application/json" });
         response.end(JSON.stringify(payload));
       };
-      if (url.pathname === "/chips") return send(200, { chips: [{ chip_id: "64Qv3", size: 64, activity_status: "active" }] });
+      if (url.pathname === "/chips") return send(200, { chips: [{ chip_id: defaultChip, size: 64, activity_status: "active" }] });
       if (url.pathname.endsWith("/reanalyze/qubit-spectroscopy")) return send(200, qubitResponse(body));
       if (url.pathname.endsWith("/reanalyze/resonator-spectroscopy")) return send(200, resonatorResponse(body));
       return send(404, { detail: `no ${url.pathname}` });
@@ -88,13 +88,34 @@ async function fakeQDash(t) {
   t.after(() => rm(directory, { recursive: true, force: true }));
   const configPath = join(directory, "config.ini");
   await writeFile(configPath, `[runtime]\nbase_url = "http://127.0.0.1:${server.address().port}"\napi_token = "user-token"\n`, { mode: 0o600 });
-  return { requests, connection: { profile: "runtime", configPath, useEnv: false } };
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  return { requests, baseUrl, connection: { profile: "runtime", configPath, useEnv: false } };
 }
 
-function extensionTools() {
+function extensionTools(handlers = new Map()) {
   const tools = new Map();
-  qdashExtension({ registerTool: (tool) => tools.set(tool.name, tool), registerCommand() {}, on() {}, appendEntry() {} });
+  qdashExtension({ registerTool: (tool) => tools.set(tool.name, tool), registerCommand() {}, on: (event, handler) => handlers.set(event, handler), appendEntry() {} });
   return tools;
+}
+
+const ENV_KEYS = ["XDG_CONFIG_HOME", "QDASH_BASE_URL", "QDASH_API_TOKEN", "QDASH_PROJECT_ID", "PI_CODING_AGENT_DIR"];
+
+/** Isolate the variables pi-qdash reads, with a config.toml of the given contents; restored after the test. */
+async function isolateEnv(t, toml) {
+  const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
+  for (const key of ENV_KEYS) delete process.env[key];
+  const home = await mkdtemp(join(tmpdir(), "pi-qdash-reanalysis-env-"));
+  process.env.XDG_CONFIG_HOME = join(home, "xdg");
+  process.env.PI_CODING_AGENT_DIR = join(home, "agent");
+  t.after(async () => {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    await rm(home, { recursive: true, force: true });
+  });
+  await mkdir(join(home, "xdg", "qdash"), { recursive: true });
+  await writeFile(join(home, "xdg", "qdash", "config.toml"), toml, { mode: 0o600 });
 }
 
 test("the reanalysis tools are deferred, script-callable reads for diagnosis", () => {
@@ -228,4 +249,43 @@ test("sourceTaskId and figure together are refused before any request", async (t
     /either sourceTaskId or figure, not both/,
   );
   assert.equal(requests.length, 0);
+});
+
+test("the session's chip is used only for the session's connection; another one resolves its own default", async (t) => {
+  const lab = await fakeQDash(t, { defaultChip: "LAB_DEFAULT" });
+  const other = await fakeQDash(t, { defaultChip: "OTHER_DEFAULT" });
+  await isolateEnv(
+    t,
+    `default_profile = "lab"\n[lab]\nbase_url = "${lab.baseUrl}"\napi_token = "lab-token"\n[other]\nbase_url = "${other.baseUrl}"\napi_token = "other-token"\n`,
+  );
+  const handlers = new Map();
+  const tool = extensionTools(handlers).get(REANALYZE_RESONATOR_TOOL);
+  // The session's context: profile lab with its chip SESSION_CHIP.
+  const session = (data) => ({ sessionManager: { getEntries: () => [{ type: "custom", customType: "qdash-context", data }] }, ui: { setStatus() {} } });
+  await handlers.get("session_start")({}, session({ profile: "lab", chipId: "SESSION_CHIP" }));
+  t.after(() => handlers.get("session_start")({}, session({})));
+  const reanalyzedChip = async (server, params) => {
+    server.requests.length = 0;
+    await tool.execute("call-ctx", { qid: "1", includeImage: false, ...params });
+    const call = server.requests.find((request) => request.path.endsWith("/reanalyze/resonator-spectroscopy"));
+    assert.ok(call, JSON.stringify(params));
+    return call.path.split("/")[2];
+  };
+
+  // The session's profile, implied or named, keeps the session's chip.
+  assert.equal(await reanalyzedChip(lab, {}), "SESSION_CHIP");
+  assert.equal(await reanalyzedChip(lab, { profile: "lab" }), "SESSION_CHIP");
+  // Another profile does not inherit it: that server's default chip is used.
+  assert.equal(await reanalyzedChip(other, { profile: "other" }), "OTHER_DEFAULT");
+  // An explicit chip always wins.
+  assert.equal(await reanalyzedChip(other, { profile: "other", chipId: "EXPLICIT" }), "EXPLICIT");
+  // Neither the environment nor another config file is the session's connection.
+  process.env.QDASH_BASE_URL = other.baseUrl;
+  process.env.QDASH_API_TOKEN = "env-token";
+  assert.equal(await reanalyzedChip(other, { useEnv: true }), "OTHER_DEFAULT");
+  delete process.env.QDASH_BASE_URL;
+  delete process.env.QDASH_API_TOKEN;
+  const altConfig = join(process.env.XDG_CONFIG_HOME, "alt.ini");
+  await writeFile(altConfig, `[lab]\nbase_url = "${lab.baseUrl}"\napi_token = "alt-token"\n`, { mode: 0o600 });
+  assert.equal(await reanalyzedChip(lab, { profile: "lab", configPath: altConfig }), "LAB_DEFAULT");
 });

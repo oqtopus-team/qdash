@@ -51,10 +51,14 @@ def _raw_figure() -> go.Figure:
     return set_figure_role(_heatmap(1.0), "raw")
 
 
-def _marked_figure() -> go.Figure:
+def _unlabeled_marked_figure() -> go.Figure:
     fig = _heatmap(2.0)
     fig.add_trace(go.Scatter(x=[6.1], y=[-30.0], mode="markers"))
-    return set_figure_role(fig, "marked")
+    return fig
+
+
+def _marked_figure() -> go.Figure:
+    return set_figure_role(_unlabeled_marked_figure(), "marked")
 
 
 def _write(path: Path, fig: go.Figure) -> str:
@@ -85,9 +89,10 @@ def _outputs(response: ReanalyzeResponse) -> dict[str, tuple[float, str]]:
 
 
 def test_load_raw_figure_prefers_raw_suffix_when_marked_comes_first(tmp_path: Path) -> None:
+    # Unlabeled figures: the filename alone identifies the raw one.
     paths = [
-        _write(tmp_path / "CheckQubitSpectroscopy_1_marked_0.json", _marked_figure()),
-        _write(tmp_path / "CheckQubitSpectroscopy_1_raw_1.json", _raw_figure()),
+        _write(tmp_path / "CheckQubitSpectroscopy_1_marked_0.json", _unlabeled_marked_figure()),
+        _write(tmp_path / "CheckQubitSpectroscopy_1_raw_1.json", _heatmap(1.0)),
     ]
 
     fig = ReanalysisService._load_raw_figure(_doc(paths, name="CheckQubitSpectroscopy"))
@@ -96,14 +101,35 @@ def test_load_raw_figure_prefers_raw_suffix_when_marked_comes_first(tmp_path: Pa
 
 
 def test_load_raw_figure_prefers_raw_suffix_when_raw_comes_first(tmp_path: Path) -> None:
+    # Unlabeled figures: the filename alone identifies the raw one.
     paths = [
-        _write(tmp_path / "CheckQubitSpectroscopy_1_raw_0.json", _raw_figure()),
-        _write(tmp_path / "CheckQubitSpectroscopy_1_marked_1.json", _marked_figure()),
+        _write(tmp_path / "CheckQubitSpectroscopy_1_raw_0.json", _heatmap(1.0)),
+        _write(tmp_path / "CheckQubitSpectroscopy_1_marked_1.json", _unlabeled_marked_figure()),
     ]
 
     fig = ReanalysisService._load_raw_figure(_doc(paths, name="CheckQubitSpectroscopy"))
 
     assert _is_raw(fig)
+
+
+def test_load_raw_figure_skips_raw_filename_whose_role_is_marked(tmp_path: Path) -> None:
+    paths = [
+        _write(tmp_path / "CheckQubitSpectroscopy_1_raw_0.json", _marked_figure()),
+        _write(tmp_path / "CheckQubitSpectroscopy_1_1.json", _raw_figure()),
+    ]
+
+    fig = ReanalysisService._load_raw_figure(_doc(paths, name="CheckQubitSpectroscopy"))
+
+    assert _is_raw(fig)
+
+
+def test_load_raw_figure_rejects_raw_filename_whose_role_is_marked(tmp_path: Path) -> None:
+    paths = [_write(tmp_path / "CheckQubitSpectroscopy_1_raw_0.json", _marked_figure())]
+
+    with pytest.raises(HTTPException) as excinfo:
+        ReanalysisService._load_raw_figure(_doc(paths, name="CheckQubitSpectroscopy"))
+
+    assert excinfo.value.status_code == 409
 
 
 def test_load_raw_figure_uses_figure_role_when_filenames_have_no_suffix(tmp_path: Path) -> None:
@@ -279,8 +305,11 @@ def _resonator_service(
     doc = _doc(paths, name="CheckResonatorSpectroscopy")
     service = ReanalysisService()
     monkeypatch.setattr(service, "_load_source_doc", lambda **_: doc)
+    # Each slot's peak sits on its own power row, so each slot has its own optimal power:
+    # -55, -50, -45, and -35 dB for slots 0 to 3 (5 dB below each row, at least -60 dB).
+    rows = [2, 3, 4, 6]
     resonances = [
-        Resonance(high_power_peaks=None, low_power_peak=Peak(x=i, y=6, prominence=1.0))
+        Resonance(high_power_peaks=None, low_power_peak=Peak(x=i, y=rows[i], prominence=1.0))
         for i in range(resonance_count)
     ]
     frequencies = [6.0, 6.1, 6.2, 6.3][:resonance_count]
@@ -290,7 +319,7 @@ def _resonator_service(
         return resonances, [], frequencies
 
     monkeypatch.setattr(module, "estimate_resonator_frequency_from_figure", fake_estimate)
-    monkeypatch.setattr(module, "estimate_minimum_usable_power", lambda *_a, **_k: -40.0)
+    monkeypatch.setattr(module, "estimate_minimum_usable_power", lambda *_a, **_k: -60.0)
     return service
 
 
@@ -306,7 +335,8 @@ def test_resonator_reanalysis_returns_optimal_power_and_readout_amplitude(
         params=ReanalyzeResonatorSpectroscopyParams(bare_shift_estimator_type="config"),
     )
 
-    # Same fixture and values as CheckResonatorSpectroscopy.postprocess's own test.
+    # Q01 is assigned to slot 3: it takes slot 3's frequency and power, not slot 0's
+    # (6.0 GHz, -55 dB).
     outputs = _outputs(response)
     assert outputs["readout_frequency"] == (6.3, "GHz")
     assert outputs["optimal_power"] == (-35.0, "dB")
@@ -562,6 +592,8 @@ def _trace(**overrides: Any) -> dict[str, Any]:
         (_trace(x=None), "list of numbers"),
         (_trace(x=[6.0], y=[-60.0], z=[[1.0]]), "at least 2 values"),
         (_trace(x=[6.0, float("inf")]), "finite numbers"),
+        (_trace(x=[6.0, 10**309]), "finite numbers"),
+        (_trace(z=[[1.0, 10**309], [3.0, 4.0]]), "finite numbers"),
         (_trace(z={"dtype": "f8", "bdata": "AAAA"}), "typed array"),
         ({"data": ["heatmap"]}, "non-empty list of traces"),
     ],
@@ -720,3 +752,95 @@ def test_service_rejects_inline_marked_figure() -> None:
 
     assert excinfo.value.status_code == 422
     assert "marked" in str(excinfo.value.detail)
+
+
+def test_inline_figure_drops_an_oversized_integer_dimension() -> None:
+    fig = ReanalysisService._parse_inline_figure(
+        {"data": [dict(_GRID)], "layout": {"width": 10**309, "height": 600}}
+    )
+
+    assert fig.layout.width is None
+    assert fig.layout.height == 600
+
+
+@pytest.mark.parametrize("name", ["Viridis", "Viridis_r", "viridis_R", "RdBu"])
+def test_inline_figure_keeps_a_named_plotly_colorscale(name: str) -> None:
+    fig = ReanalysisService._parse_inline_figure(
+        {"data": [{**_GRID, "colorscale": name}], "layout": {}}
+    )
+
+    assert fig.data[0].colorscale == go.Heatmap(colorscale=name).colorscale
+
+
+@pytest.mark.parametrize("name", ["NotAColorscale", "Viridis_rr", "_r", "", 3])
+def test_inline_figure_drops_an_unknown_colorscale(name: Any) -> None:
+    fig = ReanalysisService._parse_inline_figure(
+        {"data": [{**_GRID, "colorscale": name}], "layout": {}}
+    )
+
+    assert fig.data[0].colorscale is None
+
+
+def test_inline_figure_puts_a_descending_sweep_in_increasing_order() -> None:
+    figure = {
+        "data": [{**_GRID, "x": [6.1, 6.0], "z": [[1.0, 2.0], [3.0, 4.0]]}],
+        "layout": {},
+    }
+
+    fig = ReanalysisService._parse_inline_figure(figure)
+
+    assert list(fig.data[0].x) == [6.0, 6.1]
+    assert [list(row) for row in fig.data[0].z] == [[2.0, 1.0], [4.0, 3.0]]
+
+
+def _resonator_sweep(*, descending: bool) -> dict[str, Any]:
+    """Four resonances at 6.0-6.3 GHz, each column peaking on its own power row."""
+    xs = [6.0, 6.1, 6.2, 6.3]
+    ys = [-60.0, -55.0, -50.0, -45.0, -40.0, -35.0, -30.0, -25.0]
+    peak_rows = [2, 3, 4, 6]
+    zs = [[1.0 if peak_rows[column] == row else 0.0 for column in range(4)] for row in range(8)]
+    if descending:
+        xs = xs[::-1]
+        zs = [row[::-1] for row in zs]
+    return {"data": [{"type": "heatmap", "x": xs, "y": ys, "z": zs}], "layout": {}}
+
+
+def test_descending_inline_sweep_assigns_resonators_as_the_ascending_sweep(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = ReanalysisService()
+    monkeypatch.setattr(service, "_load_source_doc", _no_stored_lookup)
+
+    def column_peaks(fig: go.Figure, _config: Any) -> Any:
+        # One resonance per column, at its peak row, in the figure's x order.
+        trace = fig.data[0]
+        xs = list(trace.x)
+        zs = [list(row) for row in trace.z]
+        resonances = []
+        for column in range(len(xs)):
+            values = [row[column] for row in zs]
+            peak = Peak(x=column, y=values.index(max(values)), prominence=1.0)
+            resonances.append(Resonance(high_power_peaks=None, low_power_peak=peak))
+        return resonances, [], xs
+
+    monkeypatch.setattr(module, "estimate_resonator_frequency_from_figure", column_peaks)
+    monkeypatch.setattr(module, "estimate_minimum_usable_power", lambda *_a, **_k: -60.0)
+
+    def outputs(figure: dict[str, Any]) -> dict[str, tuple[float, str]]:
+        return _outputs(
+            service.reanalyze_resonator_spectroscopy(
+                project_id="p",
+                chip_id="chip",
+                qid="1",
+                params=ReanalyzeResonatorSpectroscopyParams(bare_shift_estimator_type="config"),
+                figure=figure,
+            )
+        )
+
+    ascending = outputs(_resonator_sweep(descending=False))
+    descending = outputs(_resonator_sweep(descending=True))
+
+    assert ascending["readout_frequency"] == (6.3, "GHz")
+    assert ascending["optimal_power"] == (-35.0, "dB")
+    assert descending["readout_frequency"] == ascending["readout_frequency"]
+    assert descending["optimal_power"] == ascending["optimal_power"]

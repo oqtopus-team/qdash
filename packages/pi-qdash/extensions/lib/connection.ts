@@ -140,6 +140,17 @@ export function connectionSource(params: ConnectionParams, env: Environment = pr
   return shouldUseEnv(params, env) ? "env" : `profile:${selectedProfile(params, env)}`;
 }
 
+/**
+ * Whether a call connects where the active context does, so the context's chip belongs to it.
+ * The context records a profile from the discovered config file only, so a call that names
+ * another config file never matches; a missing profile falls back to the context's.
+ */
+export function usesContextConnection(params: ConnectionParams, contextProfile: string | undefined, env: Environment = process.env): boolean {
+  if (params.configPath !== undefined) return false;
+  const call = { useEnv: params.useEnv, profile: params.profile ?? contextProfile };
+  return connectionSource(call, env) === connectionSource({ profile: contextProfile }, env);
+}
+
 /** The SDK config of a TOML profile, with a hint when a legacy INI profile is shadowed. */
 async function tomlConfig(file: ConfigFile, profile: string | undefined, env: Environment): Promise<SdkConfig> {
   try {

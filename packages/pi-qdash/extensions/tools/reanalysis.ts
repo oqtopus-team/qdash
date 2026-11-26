@@ -38,8 +38,11 @@ type ReanalyzeParams<P> = ConnectionParams & {
 
 export type ReanalysisDependencies = {
   makeClient(params: ConnectionParams): Promise<QDashConnection>;
-  /** The chip to use: the given one, else the session's or the server's default. */
-  resolveChipId(client: QDashConnection, chipId?: string): Promise<string>;
+  /**
+   * The chip to use: the call's `chipId`, else the session's when the call connects where the
+   * session does, else the connected server's default.
+   */
+  resolveChipId(client: QDashConnection, params: ConnectionParams & { chipId?: string }): Promise<string>;
 };
 
 type Json = Record<string, unknown>;
@@ -80,7 +83,7 @@ const connectionParams = {
 
 function targetParams(taskName: string) {
   return {
-    chipId: Type.Optional(Type.String({ description: "Chip ID. Defaults to the session's or the server's default chip." })),
+    chipId: Type.Optional(Type.String({ description: "Chip ID. Defaults to the session's chip when the call uses the session's profile, else the connected server's default chip." })),
     qid: Type.String({ description: "Qubit ID, such as \"6\"." }),
     sourceTaskId: Type.Optional(
       Type.String({ description: `${taskName} task result to re-analyze. Defaults to the qubit's latest ${taskName} result; pass it to keep comparing the same measurement. Not with figure.` }),
@@ -234,7 +237,7 @@ function registerReanalysisTool<P extends object>(
         throw new Error(`${spec.name} takes either sourceTaskId or figure, not both. Pass sourceTaskId to re-analyze a stored result, or figure for a Plotly figure you already have.`);
       }
       const client = await deps.makeClient(params);
-      const chipId = await deps.resolveChipId(client, params.chipId);
+      const chipId = await deps.resolveChipId(client, params);
       const includeImage = params.includeImage !== false;
       const parameters = definedEntries(params.parameters);
       const response = await spec.call(

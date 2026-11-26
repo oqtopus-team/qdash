@@ -16,6 +16,8 @@ import math
 import re
 from contextlib import contextmanager
 from dataclasses import dataclass
+from functools import cache
+from itertools import pairwise
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -64,6 +66,7 @@ logger = logging.getLogger(__name__)
 RESONATOR_TASK_NAME = "CheckResonatorSpectroscopy"
 QUBIT_TASK_NAME = "CheckQubitSpectroscopy"
 RAW_FIGURE_ROLE = "raw"
+MARKED_FIGURE_ROLE = "marked"
 PNG_MEDIA_TYPE = "image/png"
 PREVIEW_IMAGE_ERROR = "Preview image rendering failed."
 
@@ -78,7 +81,26 @@ def _inline_error(detail: str) -> HTTPException:
 
 
 def _is_finite_real(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        # A JSON integer beyond the float range, such as 10**309.
+        return False
+
+
+@cache
+def _named_colorscales() -> frozenset[str]:
+    """Plotly's named colorscales, lower case, each also reversed with the ``_r`` suffix."""
+    import plotly.colors
+
+    names = [name.lower() for name in plotly.colors.named_colorscales()]
+    return frozenset([*names, *(f"{name}_r" for name in names)])
+
+
+def _is_named_colorscale(value: Any) -> bool:
+    return isinstance(value, str) and value.lower() in _named_colorscales()
 
 
 def _finite_axis(trace: dict[str, Any], name: str) -> list[float]:
@@ -141,12 +163,19 @@ def _build_inline_figure(figure: dict[str, Any]) -> go.Figure:
     layout = figure.get("layout")
     layout = layout if isinstance(layout, dict) else {}
     meta = layout.get("meta")
-    if isinstance(meta, dict) and str(meta.get(FIGURE_ROLE_META_KEY, "")).lower() == "marked":
+    role = meta.get(FIGURE_ROLE_META_KEY, "") if isinstance(meta, dict) else ""
+    if str(role).lower() == MARKED_FIGURE_ROLE:
         raise _inline_error("it is labeled as a marked figure; send the raw spectroscopy figure.")
+
+    # The resonator assignment order runs in increasing frequency; analyze a descending
+    # sweep as the same sweep in increasing order.
+    if all(a > b for a, b in pairwise(xs)):
+        xs = xs[::-1]
+        zs = [row[::-1] for row in zs]
 
     heatmap: dict[str, Any] = {"x": xs, "y": ys, "z": zs}
     colorscale = trace.get("colorscale")
-    if isinstance(colorscale, str) and colorscale.isalnum():
+    if _is_named_colorscale(colorscale):
         heatmap["colorscale"] = colorscale
     colorbar = trace.get("colorbar")
     colorbar_title = _plain_label(colorbar.get("title")) if isinstance(colorbar, dict) else None
@@ -527,8 +556,9 @@ class ReanalysisService:
 
         Spectroscopy tasks store the marked figure first and the raw figure second,
         so the raw figure is found by its ``raw`` filename suffix, then by its
-        ``layout.meta`` figure role. A marked figure is never re-analyzed: when the
-        raw figure cannot be identified or read, an HTTP error is raised.
+        ``layout.meta`` figure role. A marked figure is never re-analyzed, even under a
+        ``raw`` filename: when the raw figure cannot be identified or read, an HTTP
+        error is raised.
 
         Records without role metadata predate the marked-first order and store the
         raw figure first, so their first figure is used when every figure is readable.
@@ -544,7 +574,10 @@ class ReanalysisService:
 
         for path in paths:
             if cls._has_raw_filename(path):
-                return cls._read_figure(doc, path)
+                fig = cls._read_figure(doc, path)
+                # The figure's own role wins over its filename.
+                if cls._figure_role(fig) != MARKED_FIGURE_ROLE:
+                    return fig
 
         loaded = [cls._try_read_figure(doc, path) for path in paths]
         figures = [item for item in loaded if not isinstance(item, HTTPException)]
