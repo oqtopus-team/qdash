@@ -22,7 +22,7 @@ export * from "./AgentChatMessageSchema.js";
 export * from "./AgentChatSessionResponse.js";
 export * from "./AgentChatSessionSummary.js";
 export * from "./AgentChatShareBlockSchema.js";
-export * from "./AgentChatShareBlockSchemaType.js";
+export * from "./AgentChatShareBlockType.js";
 export * from "./AgentChatShareMessageSchema.js";
 export * from "./AgentChatShareMessageSchemaIncomplete.js";
 export * from "./AgentChatShareMessageSchemaRole.js";

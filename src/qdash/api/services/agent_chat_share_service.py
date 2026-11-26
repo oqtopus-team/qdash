@@ -8,8 +8,8 @@ runtime: tool steps and their output, workspace files, figure paths, interactive
 attachments, and every store, conversation, entry or turn identifier.
 
 A chat is not bound to one project, but each of its turns is admitted in one
-(``AgentChatTurnDocument``). A chat whose recorded turns ran in another project is not
-shared, so a snapshot never carries one project's answers to the members of another.
+(``AgentChatTurnDocument``). A chat whose recorded turns, those inherited from the chats
+it was branched from included, ran in another project is not shared, so a snapshot never carries one project's answers to the members of another.
 Messages without a recorded turn (saved before turns were recorded) cannot be checked;
 the owner reviews them before sharing.
 
@@ -28,6 +28,7 @@ from starlette.exceptions import HTTPException
 
 from qdash.api.schemas.agent_chat_session import (
     AgentChatShareBlockSchema,
+    AgentChatShareBlockType,
     AgentChatShareMessageSchema,
     AgentChatShareResponse,
     AgentChatShareStatusResponse,
@@ -152,7 +153,10 @@ def snapshot_message(message: AgentChatMessage) -> AgentChatShareMessage | None:
 
 def _to_block_schema(block: AgentChatShareBlock) -> AgentChatShareBlockSchema:
     return AgentChatShareBlockSchema(
-        type=block.type, content=block.content, chart=block.chart, ui=block.ui
+        type=AgentChatShareBlockType(block.type),
+        content=block.content,
+        chart=block.chart,
+        ui=block.ui,
     )
 
 
@@ -177,6 +181,60 @@ def _to_summary(doc: AgentChatShareDocument) -> AgentChatShareSummary:
         created_at=doc.created_at,
         snapshot_at=doc.snapshot_at,
     )
+
+
+# How many chats a branch's lineage is followed through before it counts as unknown.
+_MAX_LINEAGE = 64
+
+
+def _lineage(chat: AgentChatSessionDocument) -> tuple[list[str], bool]:
+    """The chat's session and those of the chats it was branched from, nearest first.
+
+    A branch copies the messages of its source up to the answer it was branched at,
+    each with its ``turn_request_id``, so an inherited message's turn was recorded under
+    the source chat, or further up when the source was itself a branch. Deleted sources
+    whose document is kept still count. The lineage is complete only when every source
+    is found: a source that is gone, or whose session ID was taken by a chat created
+    no earlier than the branch, hides where its own messages came from. A cycle or a lineage
+    longer than ``_MAX_LINEAGE`` also counts as incomplete.
+    """
+    sessions = [chat.session_id]
+    current = chat
+    while current.branch is not None:
+        origin = current.branch
+        source_id = origin.source_session_id
+        if source_id in sessions or len(sessions) >= _MAX_LINEAGE:
+            return sessions, False
+        sessions.append(source_id)
+        source = AgentChatSessionDocument.find_one(
+            {"username": chat.username, "session_id": source_id}
+        ).run()
+        # A source is created before any branch of it; stored times are rounded to the
+        # millisecond, so a tie also counts as a later chat that took the ID.
+        if source is None or source.created_at >= origin.created_at:
+            return sessions, False
+        current = source
+    return sessions, True
+
+
+def _turn_projects(chat: AgentChatSessionDocument, request_ids: list[str]) -> set[str]:
+    """The projects the chat's recorded turns, its inherited ones included, ran in.
+
+    A turn is identified by its user, session and request ID, so while the lineage is
+    complete a request ID is looked up only in the chat's lineage: another chat of the
+    user with the same request ID is not one of its turns. When the lineage is
+    incomplete, every request ID is looked up across all of the user's chats, even one
+    also found in the lineage: a message inherited through a missing source may share
+    its request ID with a turn recorded here, so a local match does not prove where
+    that message came from. That may refuse a chat for an unrelated turn, never admit
+    one with another project's answers.
+    """
+    sessions, complete = _lineage(chat)
+    query: dict[str, Any] = {"username": chat.username, "request_id": {"$in": request_ids}}
+    if complete:
+        query["session_id"] = {"$in": sessions}
+    turns = AgentChatTurnDocument.find(query).to_list()
+    return {turn.project_id for turn in turns}
 
 
 class AgentChatShareService:
@@ -238,11 +296,7 @@ class AgentChatShareService:
             projects.add(chat.branch.project_id)
         request_ids = sorted({m.turn_request_id for m in chat.messages if m.turn_request_id})
         if request_ids:
-            # A branch's earlier turns were admitted under the chat it was branched from.
-            turns = AgentChatTurnDocument.find(
-                {"username": chat.username, "request_id": {"$in": request_ids}}
-            ).to_list()
-            projects.update(turn.project_id for turn in turns)
+            projects.update(_turn_projects(chat, request_ids))
         if projects - {project_id}:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

@@ -22534,13 +22534,7 @@
       "AgentChatShareBlockSchema": {
         "properties": {
           "type": {
-            "type": "string",
-            "enum": [
-              "text",
-              "chart",
-              "ui"
-            ],
-            "title": "Type"
+            "$ref": "#/components/schemas/AgentChatShareBlockType"
           },
           "content": {
             "anyOf": [
@@ -22587,6 +22581,16 @@
         ],
         "title": "AgentChatShareBlockSchema",
         "description": "One user-facing piece of a shared answer."
+      },
+      "AgentChatShareBlockType": {
+        "type": "string",
+        "enum": [
+          "text",
+          "chart",
+          "ui"
+        ],
+        "title": "AgentChatShareBlockType",
+        "description": "The kind of one piece of a shared answer.\n\nA named enum, so generated clients give it its own name instead of a generic\n``Type`` that would take that name from another schema's enum."
       },
       "AgentChatShareMessageSchema": {
         "properties": {

@@ -4,7 +4,7 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import UniversalBaseModel
-from .agent_chat_share_block_schema_type import AgentChatShareBlockSchemaType
+from .agent_chat_share_block_type import AgentChatShareBlockType
 
 
 class AgentChatShareBlockSchema(UniversalBaseModel):
@@ -12,7 +12,7 @@ class AgentChatShareBlockSchema(UniversalBaseModel):
     One user-facing piece of a shared answer.
     """
 
-    type: AgentChatShareBlockSchemaType
+    type: AgentChatShareBlockType
     content: typing.Optional[str] = pydantic.Field(default=None)
     """
     Markdown for text; the plain-text fallback for ui

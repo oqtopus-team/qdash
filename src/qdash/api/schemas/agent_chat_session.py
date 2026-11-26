@@ -1,6 +1,7 @@
 """Schemas for persisted agent chat sessions."""
 
 from datetime import datetime
+from enum import Enum
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -147,10 +148,22 @@ class CreateAgentChatBranchRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class AgentChatShareBlockType(str, Enum):
+    """The kind of one piece of a shared answer.
+
+    A named enum, so generated clients give it its own name instead of a generic
+    ``Type`` that would take that name from another schema's enum.
+    """
+
+    TEXT = "text"
+    CHART = "chart"
+    UI = "ui"
+
+
 class AgentChatShareBlockSchema(BaseModel):
     """One user-facing piece of a shared answer."""
 
-    type: Literal["text", "chart", "ui"]
+    type: AgentChatShareBlockType
     content: str | None = Field(
         default=None, description="Markdown for text; the plain-text fallback for ui"
     )

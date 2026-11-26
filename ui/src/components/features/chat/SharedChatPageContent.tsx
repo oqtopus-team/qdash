@@ -26,6 +26,7 @@ import { useToast } from "@/components/ui/Toast";
 import { VisibilityLabel } from "@/components/ui/VisibilityLabel";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
+import { sharedChatUrl } from "@/lib/utils/sharedChat";
 import type { UiBlockPayload } from "@/lib/agentUiSpec";
 
 const noop = () => {};
@@ -263,7 +264,8 @@ export function SharedChatPageContent({ shareId }: { shareId: string }) {
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-1">
-          <CopyLinkButton />
+          {/* The canonical link names the share's project, whatever URL opened this page. */}
+          <CopyLinkButton url={sharedChatUrl(data.share_id, data.project_id)} />
           {data.can_revoke && (
             <button
               type="button"

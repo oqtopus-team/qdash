@@ -7,14 +7,14 @@
  */
 import type { AgentChatShareBlockSchemaChart } from './agentChatShareBlockSchemaChart';
 import type { AgentChatShareBlockSchemaContent } from './agentChatShareBlockSchemaContent';
-import type { AgentChatShareBlockSchemaType } from './agentChatShareBlockSchemaType';
 import type { AgentChatShareBlockSchemaUi } from './agentChatShareBlockSchemaUi';
+import type { AgentChatShareBlockType } from './agentChatShareBlockType';
 
 /**
  * One user-facing piece of a shared answer.
  */
 export interface AgentChatShareBlockSchema {
-  type: AgentChatShareBlockSchemaType;
+  type: AgentChatShareBlockType;
   /** Markdown for text; the plain-text fallback for ui */
   content?: AgentChatShareBlockSchemaContent;
   /** Plotly data and layout */

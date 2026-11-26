@@ -6,7 +6,7 @@ import type * as QDashApi from "../index.js";
  * One user-facing piece of a shared answer.
  */
 export interface AgentChatShareBlockSchema {
-    type: QDashApi.AgentChatShareBlockSchemaType;
+    type: QDashApi.AgentChatShareBlockType;
     /** Markdown for text; the plain-text fallback for ui */
     content?: (string | null) | undefined;
     /** Plotly data and layout */

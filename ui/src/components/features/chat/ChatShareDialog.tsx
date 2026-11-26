@@ -19,15 +19,7 @@ import { VisibilityLabel, type Visibility } from "@/components/ui/VisibilityLabe
 import { VisibilitySelector } from "@/components/ui/VisibilitySelector";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
-
-/** The page a project member opens to read a shared snapshot, in the project it belongs to. */
-export function sharedChatPath(shareId: string, projectId: string): string {
-  return `/chat/shared/${encodeURIComponent(shareId)}?project=${encodeURIComponent(projectId)}`;
-}
-
-function sharedChatUrl(shareId: string, projectId: string): string {
-  return `${window.location.origin}${sharedChatPath(shareId, projectId)}`;
-}
+import { sharedChatUrl } from "@/lib/utils/sharedChat";
 
 /**
  * Share a read-only snapshot of one of the user's chats with the current project.

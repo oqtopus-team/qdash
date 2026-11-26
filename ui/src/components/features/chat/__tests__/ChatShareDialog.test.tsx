@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ChatShareDialog, sharedChatPath } from "@/components/features/chat/ChatShareDialog";
+import { ChatShareDialog } from "@/components/features/chat/ChatShareDialog";
 
 type QueryOptions = {
   request?: unknown;
@@ -146,9 +146,5 @@ describe("ChatShareDialog", () => {
     fireEvent.click(screen.getByRole("radio", { name: /Snapshot shared with project/ }));
     fireEvent.click(screen.getByRole("button", { name: "Share snapshot" }));
     expect(screen.getByRole("alert")).toHaveTextContent(/another project|Failed to share/);
-  });
-
-  it("builds a link that opens the share in its project", () => {
-    expect(sharedChatPath("chatshare_a", "p 1")).toBe("/chat/shared/chatshare_a?project=p%201");
   });
 });

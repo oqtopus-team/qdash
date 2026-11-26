@@ -661,14 +661,22 @@ async def delete_agent_chat_session(
     auth = pi_chat_service.QDashAuth(
         access_token=credentials.credentials, project_id=current_user.default_project_id
     )
+
+    async def remove_shares() -> None:
+        # A deleted chat is no longer shared in any project. Removed as soon as the chat
+        # is hidden, so a later failure to stop its turn or remove its store leaves no
+        # readable snapshot of it.
+        await asyncio.to_thread(
+            share_service.delete_for_chat, username=username, session_id=session_id
+        )
+
     await service.delete_session(
         username=username,
         session_id=session_id,
         stop_chat=_deleted_chat_stopper(username, auth),
         release_store=_store_release(username, attempts=3),
+        on_hidden=remove_shares,
     )
-    # A deleted chat is no longer shared in any project.
-    await asyncio.to_thread(share_service.delete_for_chat, username=username, session_id=session_id)
     return {"deleted": True}
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 from typing import Any
 
 import pytest
@@ -319,10 +320,13 @@ def test_a_running_or_empty_chat_is_not_shared(test_client, people):
 
 
 def test_deleting_the_chat_removes_its_shares(test_client, people, monkeypatch):
-    async def fake_delete(self: Any, *, username: str, session_id: str, **_: Any) -> None:
+    async def fake_delete(
+        self: Any, *, username: str, session_id: str, on_hidden: Any, **_: Any
+    ) -> None:
         AgentChatSessionDocument.find_one(
             {"username": username, "session_id": session_id}
         ).delete().run()
+        await on_hidden()
 
     monkeypatch.setattr(AgentChatSessionService, "delete_session", fake_delete)
     _chat()
@@ -429,3 +433,153 @@ def test_snapshot_message_handles_plain_malformed_and_unfinished_answers():
     assert [b.content for b in unfinished.blocks] == ["so far"]
     assert unfinished.omitted_content is True
     assert snapshot_message(AgentChatMessage(role="system", content="x")) is None
+
+
+def _turn(session_id: str, request_id: str, project_id: str, username: str = "alice") -> None:
+    AgentChatTurnDocument(
+        username=username,
+        session_id=session_id,
+        request_id=request_id,
+        project_id=project_id,
+        planner_model="test/model",
+    ).insert()
+
+
+def _branch(source: AgentChatSessionDocument, session_id: str) -> AgentChatSessionDocument:
+    """A ready branch of ``source`` holding a copy of all its messages, as branching makes."""
+    from qdash.dbmodel.agent_chat_session import AgentChatBranchOrigin
+
+    # Branched later than the source was created; stored times keep milliseconds only.
+    branched_at = source.created_at + timedelta(seconds=1)
+    doc = AgentChatSessionDocument(
+        username=source.username,
+        session_id=session_id,
+        title=source.title,
+        messages=[m.model_copy(deep=True) for m in source.messages],
+        store_session_id=source.store_session_id,
+        branch=AgentChatBranchOrigin(
+            source_session_id=source.session_id,
+            source_entry_id="42",
+            project_id=PROJECT,
+            created_at=branched_at,
+        ),
+        created_at=branched_at,
+    )
+    doc.insert()
+    return doc
+
+
+def test_a_turn_of_another_chat_with_the_same_request_id_does_not_refuse_sharing(
+    test_client, people
+):
+    """A turn is identified by its session too: an unrelated chat's turn is not this chat's."""
+    _chat()
+    AgentChatSessionDocument(username="alice", session_id="unrelated").insert()
+    _turn("unrelated", "req-1", OTHER_PROJECT)
+    assert _share(test_client)["message_count"] == 2
+
+
+def _foreign_source() -> AgentChatSessionDocument:
+    """A chat whose only turn ran in the other project."""
+    source = AgentChatSessionDocument(
+        username="alice",
+        session_id="src",
+        messages=[
+            AgentChatMessage(role="user", content="Other project?", turn_request_id="req-x"),
+            AgentChatMessage(
+                role="assistant", content="Its secrets.", entry_id="42", turn_request_id="req-x"
+            ),
+        ],
+    )
+    source.insert()
+    _turn("src", "req-x", OTHER_PROJECT)
+    return source
+
+
+@pytest.mark.parametrize("depth", [1, 2], ids=["branch", "nested-branch"])
+def test_a_branch_inheriting_another_projects_answers_is_not_shared(test_client, people, depth):
+    chat = _foreign_source()
+    for level in range(depth):
+        chat = _branch(chat, f"b{level}")
+    response = test_client.put(
+        f"/agent/chat/sessions/{chat.session_id}/share", headers=_headers("alice")
+    )
+    assert response.status_code == 409, response.text
+    assert AgentChatShareDocument.find_all().to_list() == []
+
+
+@pytest.mark.parametrize("remove", [_tombstone, _hard_delete], ids=["tombstone", "removed"])
+def test_a_branch_of_a_deleted_chat_with_another_projects_answers_is_not_shared(
+    test_client, people, remove
+):
+    """A deleted source still counts; when it is gone, its user's turns with the ID count."""
+    _branch(_branch(_foreign_source(), "b0"), "b1")
+    remove("alice", "src")
+    remove("alice", "b0")
+    response = test_client.put("/agent/chat/sessions/b1/share", headers=_headers("alice"))
+    assert response.status_code == 409, response.text
+
+
+def test_a_source_id_reused_by_a_later_chat_does_not_hide_inherited_answers(test_client, people):
+    """A chat created after the branch under its source's ID is not that source."""
+    branch = _branch(_branch(_foreign_source(), "b0"), "b1")
+    assert branch.branch is not None
+    _hard_delete("alice", "b0")
+    AgentChatSessionDocument(
+        username="alice",
+        session_id="b0",
+        created_at=branch.branch.created_at + timedelta(seconds=1),
+    ).insert()
+    response = test_client.put("/agent/chat/sessions/b1/share", headers=_headers("alice"))
+    assert response.status_code == 409, response.text
+
+
+def test_a_branch_of_this_projects_chat_is_shared_despite_unrelated_turns(test_client, people):
+    source = _chat()
+    _branch(source, "b0")
+    AgentChatSessionDocument(username="alice", session_id="unrelated").insert()
+    _turn("unrelated", "req-1", OTHER_PROJECT)
+    response = test_client.put("/agent/chat/sessions/b0/share", headers=_headers("alice"))
+    assert response.status_code == 200, response.text
+
+
+def test_a_deletion_failing_after_hiding_the_chat_still_removes_its_shares(
+    test_client, people, monkeypatch
+):
+    """Stopping the turn or removing the store may fail once the chat is hidden."""
+
+    async def no_stop(self: Any, doc: Any, stop_chat: Any) -> None:
+        return None
+
+    async def failing_settle(self: Any, *args: Any) -> bool:
+        raise RuntimeError("store removal failed")
+
+    monkeypatch.setattr(AgentChatSessionService, "_stop_deleted", no_stop)
+    monkeypatch.setattr(AgentChatSessionService, "_settle_store", failing_settle)
+    _chat()
+    share_id = _share(test_client)["share_id"]
+    with pytest.raises(RuntimeError, match="store removal failed"):
+        test_client.delete("/agent/chat/sessions/s1", headers=_headers("alice"))
+    kept = AgentChatSessionDocument.find_one({"username": "alice", "session_id": "s1"}).run()
+    assert kept is not None
+    assert kept.deleted_at is not None
+    assert AgentChatShareDocument.find_all().to_list() == []
+    got = test_client.get(f"/agent/chat/shares/{share_id}", headers=_headers("bob"))
+    assert got.status_code == 404
+
+
+def test_deleting_a_missing_chat_leaves_shares_alone(test_client, people):
+    _chat()
+    _share(test_client)
+    response = test_client.delete("/agent/chat/sessions/nope", headers=_headers("alice"))
+    assert response.status_code == 404
+    assert AgentChatShareDocument.find_all().count() == 1
+
+
+def test_review_missing_ancestor_collision(test_client, people):
+    _branch(_branch(_foreign_source(), "b0"), "b1")
+    _hard_delete("alice", "src")
+    _hard_delete("alice", "b0")
+    _turn("b1", "req-x", PROJECT)
+    response = test_client.put("/agent/chat/sessions/b1/share", headers=_headers("alice"))
+    assert response.status_code == 409, response.text

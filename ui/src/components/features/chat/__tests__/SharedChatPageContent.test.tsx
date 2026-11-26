@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SharedChatPageContent } from "@/components/features/chat/SharedChatPageContent";
@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   shareArgs: null as unknown[] | null,
   revoke: vi.fn(),
   success: vi.fn(),
+  copyText: vi.fn(),
 }));
 
 vi.mock("next/link", () => ({
@@ -56,6 +57,9 @@ vi.mock("@/components/features/chat/ChatPlotlyChart", () => ({
 }));
 vi.mock("@/components/features/chat/ChatUiBlock", () => ({
   ChatUiBlock: ({ ui }: { ui: { fallback?: string } }) => <div data-testid="ui">{ui.fallback}</div>,
+}));
+vi.mock("@/lib/utils/clipboard", () => ({
+  copyText: mocks.copyText,
 }));
 vi.mock("@/components/ui/Toast", () => ({
   useToast: () => ({ success: mocks.success, error: vi.fn() }),
@@ -155,6 +159,25 @@ describe("SharedChatPageContent", () => {
       expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
     }
     expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
+  });
+
+  it.each([
+    ["without a project", "/chat/shared/chatshare_abc"],
+    ["already naming the project", "/chat/shared/chatshare_abc?project=project-1&from=forum"],
+  ])("copies the share's canonical link when opened %s", async (_case, opened) => {
+    const previous = window.location.href;
+    window.history.replaceState(null, "", opened);
+    mocks.copyText.mockResolvedValue(undefined);
+    try {
+      render(<SharedChatPageContent shareId="chatshare_abc" />);
+      fireEvent.click(screen.getByRole("button", { name: "Copy link" }));
+      await waitFor(() => expect(mocks.success).toHaveBeenCalledWith("Link copied"));
+      expect(mocks.copyText).toHaveBeenCalledWith(
+        `${window.location.origin}/chat/shared/chatshare_abc?project=project-1`,
+      );
+    } finally {
+      window.history.replaceState(null, "", previous);
+    }
   });
 
   it("lets the owner or a project owner stop sharing", () => {

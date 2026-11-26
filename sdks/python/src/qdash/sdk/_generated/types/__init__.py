@@ -26,7 +26,7 @@ from .agent_chat_message_schema import AgentChatMessageSchema
 from .agent_chat_session_response import AgentChatSessionResponse
 from .agent_chat_session_summary import AgentChatSessionSummary
 from .agent_chat_share_block_schema import AgentChatShareBlockSchema
-from .agent_chat_share_block_schema_type import AgentChatShareBlockSchemaType
+from .agent_chat_share_block_type import AgentChatShareBlockType
 from .agent_chat_share_message_schema import AgentChatShareMessageSchema
 from .agent_chat_share_message_schema_incomplete import AgentChatShareMessageSchemaIncomplete
 from .agent_chat_share_message_schema_role import AgentChatShareMessageSchemaRole
@@ -594,7 +594,7 @@ __all__ = [
     "AgentChatSessionResponse",
     "AgentChatSessionSummary",
     "AgentChatShareBlockSchema",
-    "AgentChatShareBlockSchemaType",
+    "AgentChatShareBlockType",
     "AgentChatShareMessageSchema",
     "AgentChatShareMessageSchemaIncomplete",
     "AgentChatShareMessageSchemaRole",
