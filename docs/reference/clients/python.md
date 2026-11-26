@@ -305,6 +305,37 @@ For a stored spec, use `qdash.pipelines.validate(spec, chip_id=...)` and
 detail. Read `detail.pipeline.status` for the whole pipeline when present and `detail.status` for
 the individual execution. See [Pipeline specs](../../developer-guide/workflow/calibration-pipeline.md).
 
+### Run a Stored Plan
+
+With the `qdash` connection above, store a proposal without starting a measurement.
+Creation validates the expanded default task list, so it can reject a spec that ordinary
+validation accepts with omitted tasks. Review any reported problems before retrying:
+
+```python
+spec = {
+    "spec_version": 2,
+    "targets": {"qids": ["0"]},
+    "steps": [{"type": "CustomOneQubit", "step_name": "t1", "tasks": [{"name": "CheckT1"}]}],
+}
+plan = qdash.pipelines.create_plan(
+    spec, chip_id="64Qv3", idempotency_key="t1-proposal-001"
+)
+print(plan)  # Review targets, settings, warnings, and expiry before executing.
+# Run only after the required authorization:
+run = qdash.pipelines.execute_plan(
+    plan.plan_id,
+    chip_id=plan.chip_id,
+    expected_review_digest=plan.review_digest,
+    idempotency_key="t1-launch-001",
+)
+```
+
+`get_plan(plan_id)` retrieves your stored preview. Retain creation and launch keys separately for
+retries; use new keys for new proposals or launches. Plans expire after 24 hours and cannot be
+renewed. An execution response with a missing or mismatched plan ID or digest raises `RuntimeError`:
+the run may have started, so reconcile it before further work. See
+[stored-plan expiry and recovery](../../developer-guide/workflow/calibration-pipeline.md#stored-plans).
+
 ## Run a Registered Workflow
 
 First [save a workflow](../../user-guide/creating-workflows.md); replace `coherence_check` below

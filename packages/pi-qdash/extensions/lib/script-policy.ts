@@ -8,8 +8,10 @@ import { withIntentSearchText } from "./tool-intents.js";
 import {
   boundScriptData,
   isDeferredTool,
+  isNestedProposalTool,
   isNestedReadTool,
   isReviewedWriteTool,
+  isScriptCallableTool,
   nestedBlockMessage,
   QDASH_TOOL_NAMESPACE,
   SCRIPT_DATA_DESCRIPTION,
@@ -32,6 +34,8 @@ import {
  *
  * - Audited read tools declare an output schema, and a script calling one
  *   gets its redacted response data as a parsed value, bounded per call.
+ *   The audited proposal tool (`qdash_create_pipeline_plan`) is reached the
+ *   same way; it declares that it is not read-only but idempotent.
  * - Every other QDash tool is model-only (unreachable from scripts) or, when
  *   deferred, blocked from scripts by the `tool_call` hook. Writes keep the
  *   write gate's confirmation, which a script cannot pass.
@@ -99,8 +103,9 @@ export function applyToolPolicy<T extends PolicyToolDefinition>(definition: T): 
   const name = definition.name;
   if (!name.startsWith("qdash_")) return definition;
   const read = isNestedReadTool(name);
+  const proposal = isNestedProposalTool(name);
   const exposure: Exposure | undefined =
-    definition.exposure ?? (isDeferredTool(name) ? "deferred" : read ? undefined : "model-only");
+    definition.exposure ?? (isDeferredTool(name) ? "deferred" : read || proposal ? undefined : "model-only");
   // pi's tool_search ranks deferred tools by their description: the request-type
   // words let a search phrased as a request type find them (tool-intents.ts).
   const searchable =
@@ -116,6 +121,13 @@ export function applyToolPolicy<T extends PolicyToolDefinition>(definition: T): 
       ? {
           outputSchema: definition.outputSchema ?? SCRIPT_DATA_SCHEMA,
           annotations: { readOnlyHint: true, destructiveHint: false, ...definition.annotations },
+        }
+      : {}),
+    ...(proposal
+      ? {
+          outputSchema: definition.outputSchema ?? SCRIPT_DATA_SCHEMA,
+          // It stores a record, so it is never labelled a read; repeating a call is harmless.
+          annotations: { ...definition.annotations, readOnlyHint: false, destructiveHint: false, idempotentHint: true },
         }
       : {}),
     ...(isReviewedWriteTool(name)
@@ -136,7 +148,7 @@ export function nestedCallBlock(
   },
 ): string | undefined {
   if (name.startsWith("qdash_") || isReviewedWriteTool(name)) {
-    return isNestedReadTool(name) && options.ownTool ? undefined : nestedBlockMessage(name);
+    return isScriptCallableTool(name) && options.ownTool ? undefined : nestedBlockMessage(name);
   }
   // Another extension's orchestrating tool is not ours to police; a script is.
   if (options.parent !== undefined && options.parent !== CODEMODE_TOOL_NAME) return undefined;
@@ -223,7 +235,7 @@ export function installQDashToolPolicy(pi: ExtensionAPI, options: QDashToolPolic
       parents.delete(event.toolCallId);
       return undefined;
     }
-    if (event.isError || !isNestedReadTool(event.toolName)) return undefined;
+    if (event.isError || !isScriptCallableTool(event.toolName)) return undefined;
     if (!info(event.toolName).ownTool) return undefined;
     const bounded = boundScriptData(event.toolName, scriptDataOf(event));
     if (bounded.ok) return { structuredContent: bounded.value as never };

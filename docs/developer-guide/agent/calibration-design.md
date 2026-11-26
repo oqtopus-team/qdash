@@ -65,11 +65,14 @@ This choice has three complementary sources:
   account, not a QDash benchmark; its reported savings are not expected QDash savings.
 
 Evaluate these benefits on QDash workloads, including correctness, model tokens, latency, and
-measurement cost. Keeping Code Mode read-only is QDash's execution-authority decision, not a
-requirement or a safety result established by these sources.
+measurement cost. Keeping operational writes outside Code Mode is QDash's execution-authority decision, not a
+requirement or a safety result established by these sources. Proposal persistence is a separate,
+limited capability: it saves an experiment definition without granting execution authority.
 
 Keep measurements, commits, and long waits on their existing direct tool paths. Code Mode
-currently permits only audited read-only tool calls. Adding a builder must not widen that set.
+permits audited reads and `qdash_create_pipeline_plan`, which stores a validated proposal.
+This tool is explicitly classified as persistence, not a read. Adding a builder must not widen
+execution authority.
 The [extension design](./extensions.md#calibration-builders-in-code-mode) explains how both hosts
 share the implementation; the [script example](../../reference/pi-qdash.md#scripts-and-deferred-tools)
 shows preparation followed by a separate approved execution.
@@ -91,14 +94,21 @@ to bypass those checks. A calibration objective groups runs; it does not authori
 
 ## Preserve the proposal through approval and execution
 
-The current pipeline tools validate a spec, then accept the spec again in the direct execution
-call. Revalidate after edits and present the resolved tasks and settings for approval. Validation
-checks feasibility against observed state; it does not reserve hardware or authorize execution.
+Code Mode can save a validated proposal with `qdash_create_pipeline_plan`. The model then calls
+`qdash_run_pipeline` directly with its `planId`, without transcribing the spec. Each host fetches
+and preserves the resolved preview before approval; the approved call carries that preview's
+review digest. The existing validate-then-execute-spec path remains available.
 
-Binding approval and execution to a stored, validated plan is a design direction, not an
-implemented plan-ID execution API. Such a change must preserve the reviewed content and its
-provenance while rechecking permissions and relevant state at dispatch. If changed state invalidates
-the proposal, return to validation rather than silently changing the approved experiment.
+The API rechecks the stored plan before dispatch. The worker checks its resolved calls and initial
+targets before acquiring resources or measuring. A mismatch stops the run rather than replacing
+the approved experiment. Plans expire after 24 hours and cannot be renewed; create and approve a
+new plan when one expires or becomes invalid. Validation neither reserves hardware nor authorizes
+execution.
+
+This binds experiment definitions, not every scientific input. Runtime calibration values, task
+code, hardware state, and result-dependent filter outcomes remain dynamic. See the
+[stored-plan contract](../workflow/calibration-pipeline.md#stored-plans) for deployment requirements,
+expiry, and retry behavior.
 
 ## Recover from authoritative records
 

@@ -128,6 +128,12 @@ class RunDocument(Document):
     # request, so the audit can compare requested and executed run parameters. None for runs
     # recorded before it was stored.
     spec: dict[str, Any] | None = None
+    # For a run started from a stored calibration pipeline plan: the plan, the review digest
+    # the request approved, and the approved review content itself, so the audit keeps what
+    # was approved after the plan expires or is deleted. None for runs started from a spec.
+    plan_id: str | None = None
+    review_digest: str | None = None
+    approved_plan: dict[str, Any] | None = None
     # The decision of the session this run carries out, named by the request; None when the
     # request named none (every run recorded before decisions existed).
     decision_id: str | None = None

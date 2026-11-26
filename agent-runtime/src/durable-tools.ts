@@ -20,8 +20,8 @@ import {
   REVIEWED_WRITE_TOOL_NAMES,
   SESSION_GRANTED_WRITE_TOOL_NAMES,
   isDeferredTool,
-  isNestedReadTool,
   isReviewedWriteTool,
+  isScriptCallableTool,
 } from "./allowed-tools.ts";
 import type { QDashConnection } from "./auth.ts";
 import { acceptsImages, newestMessages } from "./figure-context.ts";
@@ -37,6 +37,12 @@ import {
 import { isWaitToolName, WAIT_SPECS, type WaitSpec } from "@oqtopus-team/pi-qdash/extensions/lib/waits.ts";
 import { HOST_MODEL_KEY, HOST_NAME_KEY } from "@oqtopus-team/pi-qdash/extensions/lib/host-model.ts";
 import { preApprovalProblems } from "@oqtopus-team/pi-qdash/extensions/lib/agent-session-policy.ts";
+import { connectClient } from "@oqtopus-team/pi-qdash/extensions/lib/connection.ts";
+import {
+  needsApprovalPreview,
+  resolvePipelinePlanPreview,
+  type ApprovalPreview,
+} from "@oqtopus-team/pi-qdash/extensions/lib/pipeline-plan-preview.ts";
 import { isTrustedExtension } from "./bundled-extensions.ts";
 import { withParameterOverrides } from "./tool-schemas.ts";
 import { parkingWait } from "./durable-waits.ts";
@@ -117,7 +123,28 @@ export interface ApprovalRequest {
    * decides does not change it.
    */
   model?: ApprovalModel;
+  /**
+   * For a call that names a stored pipeline plan: the plan the runtime fetched
+   * from QDash before asking, as the card shows it. Stored with the request, so
+   * the card and the approved call use exactly it, also after the plan expired.
+   */
+  preview?: ApprovalPreview;
 }
+
+/**
+ * Fetch what a call's approval must show besides its arguments: the stored plan a
+ * `qdash_run_pipeline` call names, read as the signed-in user. Injected in tests.
+ */
+export type ApprovalPreviewResolver = (
+  toolName: string,
+  args: Record<string, unknown>,
+  connection: QDashConnection,
+) => Promise<ApprovalPreview>;
+
+export const fetchApprovalPreview: ApprovalPreviewResolver = async (_toolName, args, connection) => {
+  const client = await connectClient(connection.toolArgs);
+  return resolvePipelinePlanPreview(client.qdash.pipelines, args);
+};
 
 /** A model reference: pi provider ID and model ID, nothing else. */
 export interface ApprovalModel {
@@ -177,6 +204,8 @@ export async function runCodingAgentTool(
    * no catalog entry.
    */
   modelRef?: ApprovalModel,
+  /** The preview the user approved with the call (`ApprovalRequest.preview`). */
+  approvedPreview?: ApprovalPreview,
 ) {
   const approved = approvedByUser && isReviewedWriteTool(tool.name);
   const extensionContext = {
@@ -193,7 +222,13 @@ export async function runCodingAgentTool(
     [HOST_NAME_KEY]: "qdash-web-agent",
     ...(modelRef ? { [HOST_MODEL_KEY]: { provider: modelRef.provider, id: modelRef.modelId } } : {}),
     ...(approved
-      ? { [HOST_WRITE_APPROVAL_KEY]: { toolCallId: callId, toolName: tool.name } }
+      ? {
+          [HOST_WRITE_APPROVAL_KEY]: {
+            toolCallId: callId,
+            toolName: tool.name,
+            ...(approvedPreview ? { preview: deepFreeze(structuredClone(approvedPreview)) } : {}),
+          },
+        }
       : {}),
   };
   const params = { ...approvalArgs(args), ...connection.toolArgs };
@@ -286,6 +321,8 @@ export function adaptCodingAgentTool(
     nested?: boolean;
     /** Offer the tool to the model only once `tool_search` (or a call by name) loaded it. */
     deferred?: boolean;
+    /** Fetch the preview a reviewed write's card shows (default: from QDash). */
+    resolvePreview?: ApprovalPreviewResolver;
     /**
      * Run a pi-qdash waiting tool (`WAIT_SPECS`) one poll per durable wake,
      * parked in between, instead of running its polling loop (see
@@ -326,13 +363,20 @@ export function adaptCodingAgentTool(
         // A call QDash would refuse fails here, before the user sees an approval card.
         const problems = preApprovalProblems(tool.name, args);
         if (problems) throw new Error(problems);
+        const shownArgs = approvalArgs(args);
+        // A call that names a stored plan shows that plan as QDash returns it now; one that
+        // cannot be shown (missing, expired, another chip) fails here, before any card.
+        const preview = needsApprovalPreview(tool.name, shownArgs)
+          ? await (options.resolvePreview ?? fetchApprovalPreview)(tool.name, shownArgs, connection)
+          : undefined;
         const model = await conversationModelRef(api, context);
         const approval: ApprovalRequest = {
           id: api.callId,
           tool: tool.name,
           label: tool.label || tool.name,
-          args: approvalArgs(args),
+          args: shownArgs,
           ...(model ? { model } : {}),
+          ...(preview ? { preview: JSON.parse(JSON.stringify(preview)) as ApprovalPreview } : {}),
         };
         return {
           output: [
@@ -496,7 +540,10 @@ export class QDashWriteTools {
     private readonly connection: QDashConnection,
   ) {}
 
-  /** Run an approved call with the exact arguments the user saw; returns its text. */
+  /**
+   * Run an approved call with the exact arguments the user saw; returns its text. A call
+   * that names a stored plan runs with the preview stored in the approval, never a fetch.
+   */
   async runApproved(approval: ApprovalRequest, signal?: AbortSignal): Promise<string> {
     const tool = this.tools.get(approval.tool);
     if (!tool) throw new Error(`write tool ${approval.tool} is not enabled`);
@@ -513,6 +560,7 @@ export class QDashWriteTools {
       approval.model ? catalogModel(this.modelRuntime, approval.model) : undefined,
       true,
       approval.model,
+      approval.preview,
     );
     const text = result.content
       .map((block) => (block.type === "text" ? block.text : ""))
@@ -539,7 +587,7 @@ export class QDashWriteTools {
  * `codemode` section lists the tools scripts may call under it and a script
  * can read its instructions with `describeNamespace("qdash")`. The namespace
  * groups tools only; Code Mode still shows and gives scripts only the audited
- * reads (see codemode.ts).
+ * reads and the audited proposal tool (see codemode.ts).
  */
 export function buildQDashExtension(
   extensions: ReadonlyArray<{
@@ -550,6 +598,7 @@ export function buildQDashExtension(
   cwd: string,
   connection: QDashConnection,
   localExtensionRoots: readonly string[] = [],
+  options: { resolvePreview?: ApprovalPreviewResolver } = {},
 ): {
   extension: Extension;
   writeTools: QDashWriteTools;
@@ -590,7 +639,9 @@ export function buildQDashExtension(
       const fillKnowledge = local && acceptsKnowledge(registered.definition.parameters);
       // Only the pinned, audited implementation of a read tool may run from a
       // script; a trusted replacement is model-only.
-      const nestedRead = !local && !writeName && isNestedReadTool(name);
+      // The audited proposal tool (qdash_create_pipeline_plan) is reached like a read; its
+      // idempotency key comes from the call id, so a replayed nested call stores nothing new.
+      const nestedRead = !local && !writeName && isScriptCallableTool(name);
       const deferredTool = isDeferredTool(name);
       // The pinned waiting tools park between polls; a trusted replacement runs its own code.
       const parkingWaitTool = !local && isWaitToolName(name);
@@ -603,6 +654,7 @@ export function buildQDashExtension(
           nested: nestedRead,
           deferred: deferredTool,
           parkingWait: parkingWaitTool,
+          ...(options.resolvePreview ? { resolvePreview: options.resolvePreview } : {}),
         }),
       );
       if (nestedRead) nested.add(name);

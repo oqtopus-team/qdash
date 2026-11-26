@@ -6,12 +6,15 @@ from contextlib import contextmanager
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, patch
+from uuid import UUID
 
 import pytest
 
 from qdash.api.services.flow_service.execution import EXECUTION_IN_PROGRESS_DETAIL
+from qdash.api.services.flow_service.prefect_gateway import SystemDeployment
 from qdash.common.utils.datetime import now
 from qdash.datamodel.agent_session import AgentSessionStatus
+from qdash.datamodel.calibration_plan import APPROVED_PLAN_CONTRACT, APPROVED_PLAN_CONTRACT_KEY
 from qdash.datamodel.calibration_session import (
     CalibrationAdmission,
     CalibrationChildKind,
@@ -126,14 +129,38 @@ def lab(init_db):
     _member("lab-b", owner, ProjectRole.OWNER)
 
 
+DEPLOYMENT_ID = UUID("00000000-0000-0000-0000-0000000000d1")
+# The schema a deployment of the current pipeline flow records for ``approved_plan``.
+PLAN_READY_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "spec": {"type": "object"},
+        "approved_plan": {
+            "anyOf": [{"type": "object"}, {"type": "null"}],
+            "default": None,
+            APPROVED_PLAN_CONTRACT_KEY: APPROVED_PLAN_CONTRACT,
+        },
+    },
+}
+
+
 @contextmanager
 def prefect(
-    flow_run_ids: list[str] | None = None, *, side_effect: Any = None
+    flow_run_ids: list[str] | None = None,
+    *,
+    side_effect: Any = None,
+    parameter_schema: Any = PLAN_READY_SCHEMA,
 ) -> Iterator[AsyncMock]:
-    """Patch Prefect so each created flow run gets the next ID from ``flow_run_ids``."""
+    """Patch Prefect so each created flow run gets the next ID from ``flow_run_ids``.
+
+    The pipeline deployment reports ``parameter_schema`` as its registered parameter schema;
+    by default one that accepts an approved plan.
+    """
     create = AsyncMock(side_effect=side_effect or list(flow_run_ids or ["flow-run-1"]))
+    deployment = SystemDeployment(id=DEPLOYMENT_ID, parameter_schema=parameter_schema)
     with (
         patch(f"{GATEWAY}.read_deployment_id", new=AsyncMock(return_value="deployment-1")),
+        patch(f"{GATEWAY}.read_deployment", new=AsyncMock(return_value=deployment)),
         patch(f"{GATEWAY}.create_flow_run", new=create),
     ):
         yield create

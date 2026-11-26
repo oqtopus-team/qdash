@@ -59,7 +59,18 @@ no credentials, tool access, or execution authority.
 The prelude follows the options line and adds no source lines. Persisted tool arguments retain
 the original script. Changes to the builder source also affect scripts resumed after a runtime
 upgrade; test replay behavior when changing definitions. Dynamic property names do not trigger
-installation. Existing tool gates still reject nested writes and waits.
+installation. Existing tool gates still reject nested execution, operational writes, and waits.
+
+`NESTED_PROPOSAL_TOOL_NAMES` separately permits `qdash_create_pipeline_plan` in both hosts.
+It persists a validated, expiring proposal with a creation key derived from the tool call ID;
+its annotations declare a write. It does not create a run or grant authority. The existing
+`qdash_plan_pipeline` remains read-only.
+
+For plan-reference execution, `pipeline-plan-preview.ts` resolves the proposal before approval.
+The CLI write gate and hosted runtime preserve that preview and bind its review digest to the
+approved arguments. The chat card renders the stored preview rather than validating a new spec.
+Missing or substituted approval bindings refuse execution. Test creation, approval, dispatch,
+and replay through both hosts when changing this contract.
 
 `tests/script-prelude.test.mjs` checks source preparation. The runtime's
 `test/cli-chat-parity.test.mjs` exercises both real sandboxes against a fixture API, including

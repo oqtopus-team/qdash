@@ -28,4 +28,8 @@ export interface ExecutePipelineResponse {
     pipeline_run_id?: (string | null) | undefined;
     /** The decision the recorded run carries out, as QDash linked it; null when the request named none. A client that sent a decision checks it is echoed here */
     decision_id?: (string | null) | undefined;
+    /** For a run of a stored plan: the plan it carries out. A client that ran a plan checks it and review_digest are echoed here */
+    plan_id?: (string | null) | undefined;
+    /** For a run of a stored plan: the review digest it ran. */
+    review_digest?: (string | null) | undefined;
 }

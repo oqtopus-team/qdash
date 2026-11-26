@@ -56,6 +56,7 @@ from qdash.common.manual_rounds import MANUAL_TARGET_OVERRIDE_REASON
 from qdash.common.mux_mapping import resolve_topology_mux_mapping
 from qdash.config import get_settings
 from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec, step_name
+from qdash.datamodel.calibration_plan import APPROVED_PLAN_CONTRACT, APPROVED_PLAN_CONTRACT_KEY
 from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY, FlowTargetOverride
 from qdash.datamodel.run import RUN_CONTEXT_KEY, RunIdentity
 from qdash.repository.run_ledger import NOTE_RUN_KEY, NOTE_SESSION_KEY, UNGROUPED_MARKER
@@ -659,20 +660,25 @@ class FlowService:
         flow_name: str | None = None,
         tags: list[str] | None = None,
         calibration_run: RunIdentity | None = None,
+        approved_plan: dict[str, Any] | None = None,
     ) -> ExecuteFlowResponse:
         """Run a validated pipeline spec through the system pipeline deployment.
 
         The caller (``CalibrationPipelineService``) has already validated the
         spec; this only claims the execution lock, creates the Prefect run, and
         pre-creates the execution row, exactly as a saved flow would.
+        ``approved_plan`` (``ApprovedPipelinePlan`` as JSON) is passed for a run of a stored
+        plan, so the worker checks the run against it before measuring; a spec run sends none.
         """
-        deployment_id = await self._system_deployment(
-            "calibration-pipeline/system-calibration-pipeline",
-            unavailable_detail=(
-                "Calibration pipeline deployment not available."
-                " The worker may not have started yet."
-            ),
-        )
+        if approved_plan is not None:
+            # Resolved and checked in the same read, so the run goes to the deployment whose
+            # schema was checked, never to one that would ignore the approval.
+            deployment_id = await self.approved_plan_deployment()
+        else:
+            deployment_id = await self._system_deployment(
+                PIPELINE_DEPLOYMENT,
+                unavailable_detail=_PIPELINE_UNAVAILABLE,
+            )
 
         # An unnamed run stays unnamed for the worker, which then names each step's
         # execution after the step alone; only the scheduled row needs a label now.
@@ -688,6 +694,8 @@ class FlowService:
             "tags": all_tags,
             "backend_name": backend_name,
         }
+        if approved_plan is not None:
+            parameters["approved_plan"] = approved_plan
         logger.info(
             f"Executing calibration pipeline '{name}' on chip {chip_id} "
             f"(deployment={deployment_id}, steps={len(spec.get('steps') or [])})"
@@ -715,6 +723,40 @@ class FlowService:
 
         logger.info(f"Pipeline flow run created: {result.flow_run_id}")
         return _execute_response(result, f"Calibration pipeline '{name}' started", calibration_run)
+
+    async def approved_plan_deployment(self) -> UUID:
+        """The pipeline deployment, when it is registered to accept an approved plan.
+
+        A stored plan's run is dispatched only to a deployment whose recorded parameter
+        schema advertises ``APPROVED_PLAN_CONTRACT`` on ``approved_plan``. A deployment
+        registered from older code has no such parameter (Prefect would drop it, and the run
+        would measure unchecked), and one registered before schemas were recorded has no
+        schema; both, and a schema that cannot be read, are refused with 503 and nothing is
+        dispatched. The schema shows the signature the deployment was registered with, not
+        which code a worker runs: the guarantee is that QDash never sends a stored plan to a
+        deployment that did not declare it checks one.
+        """
+        try:
+            deployment = await self._coordinator.read_deployment(PIPELINE_DEPLOYMENT)
+        except SystemDeploymentUnavailable as exc:
+            raise HTTPException(status_code=503, detail=_PIPELINE_UNAVAILABLE) from exc
+        advertised = approved_plan_contract(deployment.parameter_schema)
+        # Exactly the integer: a bool or a float that compares equal is not this contract.
+        if type(advertised) is not int or advertised != APPROVED_PLAN_CONTRACT:
+            found = "none" if advertised is None else repr(advertised)
+            logger.error(
+                f"Pipeline deployment {deployment.id} does not accept approved plans "
+                f"(contract {found}, need {APPROVED_PLAN_CONTRACT})"
+            )
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "The calibration pipeline deployment does not accept approved plans "
+                    f"(contract {found}, need {APPROVED_PLAN_CONTRACT}); the worker must be "
+                    "restarted with the current code to register it. Nothing was started."
+                ),
+            )
+        return deployment.id
 
     async def execute_agent_candidate_apply(
         self,
@@ -843,6 +885,29 @@ class FlowService:
         """Remove a file written for a save that could not be completed."""
         if file_path.exists():
             file_path.unlink()
+
+
+PIPELINE_DEPLOYMENT = "calibration-pipeline/system-calibration-pipeline"
+_PIPELINE_UNAVAILABLE = (
+    "Calibration pipeline deployment not available. The worker may not have started yet."
+)
+
+
+def approved_plan_contract(schema: Any) -> Any:
+    """The approved-plan contract a deployment's parameter schema advertises, if any.
+
+    Anything but a schema with an ``approved_plan`` property that names the contract gives
+    ``None``; the value is returned as found, so the caller compares it exactly.
+    """
+    if not isinstance(schema, dict):
+        return None
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return None
+    parameter = properties.get("approved_plan")
+    if not isinstance(parameter, dict):
+        return None
+    return parameter.get(APPROVED_PLAN_CONTRACT_KEY)
 
 
 def _flow_exists(name: str) -> HTTPException:

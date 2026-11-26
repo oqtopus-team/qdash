@@ -21,12 +21,19 @@
  * (`approvalReviewText`) through write-review.ts, which scrolls in the pi
  * terminal UI and refuses approval until the user displayed the end.
  *
+ * A call that names a stored pipeline plan (`qdash_run_pipeline` with
+ * `planId`) also needs the plan the user was shown: each of these fetches it
+ * before asking (pipeline-plan-preview.ts), shows its resolved content, and
+ * binds the approval to it. `requireWriteApproval` returns that preview; the
+ * tool runs the plan with its review digest, never one from the arguments.
+ *
  * Without a UI and without either approval the write is refused. Arguments
  * that are not plain JSON data cannot be shown or compared and are refused.
  * The session-granted tools (`SESSION_GRANTED_WRITE_TOOL_NAMES`) do not use
  * this: the user approved their bounded session once, and QDash checks each call.
  */
 
+import { formatPlanApprovalPreview, needsApprovalPreview, type ApprovalPreview } from "./pipeline-plan-preview.js";
 import { reviewWrite, type WriteReviewUI } from "./write-review.js";
 
 /**
@@ -39,6 +46,8 @@ export const HOST_WRITE_APPROVAL_KEY = "qdashWriteApproval";
 export interface HostWriteApproval {
   toolCallId: string;
   toolName: string;
+  /** What the host fetched and showed with the call, for a call that needs it. */
+  preview?: ApprovalPreview;
 }
 
 export interface WriteApprovalContext {
@@ -55,6 +64,11 @@ export interface WriteDialog {
   title: string;
   /** What the write does; the complete arguments are appended to it. */
   message: string;
+  /**
+   * For a call that needs a preview: fetch it for the tool's own dialog. The gate and a host
+   * fetch it themselves before they ask.
+   */
+  preview?: () => Promise<ApprovalPreview>;
 }
 
 /**
@@ -137,6 +151,7 @@ export function canonicalArgs(value: unknown): string | undefined {
 interface GateApproval {
   toolName: string;
   args: string;
+  preview?: ApprovalPreview;
 }
 
 // Calls the write gate's dialog approved, by tool call id: the tool name and
@@ -144,9 +159,20 @@ interface GateApproval {
 // first approval check and forgotten when the call ends without running.
 const gateApprovals = new Map<string, GateApproval>();
 
-/** Record that the user approved `toolName` call `toolCallId` with canonical arguments `args`. */
-export function recordGateApproval(toolCallId: string, toolName: string, args: string): void {
-  gateApprovals.set(toolCallId, { toolName, args });
+/**
+ * Record that the user approved `toolName` call `toolCallId` with canonical arguments `args`,
+ * and the preview the dialog showed with them, when the call needed one.
+ */
+export function recordGateApproval(toolCallId: string, toolName: string, args: string, preview?: ApprovalPreview): void {
+  gateApprovals.set(toolCallId, { toolName, args, ...(preview ? { preview: deepFrozen(structuredClone(preview)) } : {}) });
+}
+
+function deepFrozen<T>(value: T): T {
+  if (value !== null && typeof value === "object") {
+    for (const item of Object.values(value)) deepFrozen(item);
+    Object.freeze(value);
+  }
+  return value;
 }
 
 /** Forget an approval the gate recorded for a call that will not run. */
@@ -194,10 +220,24 @@ export function cancelledApprovalMessage(toolName: string): string {
   return `${toolName} was not run: the turn was cancelled before the write was approved.`;
 }
 
+/** The text a review of a call shows: the preview the call needs first, then the arguments. */
+export function previewReviewText(summary: string, approvedArgs: string, preview: ApprovalPreview | undefined): string {
+  return approvalReviewText(preview ? `${summary}\n\n${formatPlanApprovalPreview(preview)}` : summary, approvedArgs);
+}
+
+/** Why a call that needs a preview was approved without one. */
+export function missingPreviewMessage(toolName: string): string {
+  return `${toolName} was not run: its approval does not carry the stored plan the user was shown, so it covers no plan. Call it again so QDash's plan is shown for approval.`;
+}
+
 /**
  * Return when the host approved this call; otherwise ask the user with
  * `dialog`, or throw when the user declines, no UI exists, the turn is
  * cancelled, or the arguments differ from what the user approved.
+ *
+ * Returns the preview the approval showed, for a call that needs one
+ * (`needsApprovalPreview`), and undefined for every other call. A call that
+ * needs one and was approved without it is refused.
  */
 export async function requireWriteApproval(
   toolName: string,
@@ -205,7 +245,8 @@ export async function requireWriteApproval(
   params: object,
   ctx: WriteApprovalContext | undefined,
   dialog: WriteDialog,
-): Promise<void> {
+): Promise<ApprovalPreview | undefined> {
+  const needsPreview = needsApprovalPreview(toolName, params);
   const signal = ctx?.signal;
   if (signal?.aborted) {
     forgetGateApproval(toolCallId);
@@ -215,23 +256,32 @@ export async function requireWriteApproval(
   if (gate !== undefined) {
     // Single use: whatever the outcome, this approval is spent.
     gateApprovals.delete(toolCallId);
-    if (gate.toolName === toolName && canonicalArgs(params) === gate.args) return;
-    throw new Error(changedArgsMessage(toolName));
+    if (gate.toolName !== toolName || canonicalArgs(params) !== gate.args) throw new Error(changedArgsMessage(toolName));
+    if (needsPreview && !gate.preview) throw new Error(missingPreviewMessage(toolName));
+    return needsPreview ? gate.preview : undefined;
   }
   if (hostApproved(ctx, toolName, toolCallId)) {
     if (canonicalArgs(params) === undefined) throw new Error(unserializableArgsMessage(toolName));
-    return;
+    const preview = ctx?.[HOST_WRITE_APPROVAL_KEY]?.preview;
+    if (needsPreview && !preview) throw new Error(missingPreviewMessage(toolName));
+    return needsPreview ? preview : undefined;
   }
   if (!ctx?.hasUI || !ctx.ui) throw new Error(noApprovalMessage(toolName));
   const shown = canonicalArgs(params);
   if (shown === undefined) throw new Error(unserializableArgsMessage(toolName));
+  let preview: ApprovalPreview | undefined;
+  if (needsPreview) {
+    if (!dialog.preview) throw new Error(missingPreviewMessage(toolName));
+    preview = deepFrozen(structuredClone(await dialog.preview()));
+  }
   const ok = await reviewWrite(
     { mode: ctx.mode, ui: ctx.ui },
     dialog.title,
-    approvalReviewText(`${toolName}: ${dialog.message}`, shown),
+    previewReviewText(`${toolName}: ${dialog.message}`, shown, preview),
     signal,
   );
   if (signal?.aborted) throw new Error(cancelledApprovalMessage(toolName));
   if (!ok) throw new Error(`${toolName} requires explicit confirmation`);
   if (canonicalArgs(params) !== shown) throw new Error(changedArgsMessage(toolName));
+  return preview;
 }

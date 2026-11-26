@@ -262,6 +262,36 @@ See [pipeline specs](../../developer-guide/workflow/calibration-pipeline.md).
 Without a configured project, the TypeScript SDK uses the server's default project; the Python
 SDK instead requires an explicit project before running.
 
+### Run a Stored Plan
+
+Reuse the `qdash` connection above. Plan creation requires a key for retries and starts nothing.
+Creation validates the expanded default task list, so it can reject a spec that ordinary
+validation accepts with omitted tasks. Review any reported problems before retrying:
+
+```ts
+const spec = {
+  spec_version: 2,
+  targets: { qids: ["0"] },
+  steps: [{ type: "CustomOneQubit", step_name: "t1", tasks: [{ name: "CheckT1" }] }],
+};
+const plan = await qdash.pipelines.createPlan(spec, { chipId: "64Qv3" }, {
+  idempotencyKey: "t1-proposal-001",
+});
+console.log(plan); // Review targets, settings, warnings, and expiry before executing.
+// Run only after the required authorization:
+const run = await qdash.pipelines.executePlan(plan.plan_id, {
+  chipId: plan.chip_id,
+  expectedReviewDigest: plan.review_digest,
+}, { idempotencyKey: "t1-launch-001" });
+console.log(run.response);
+```
+
+`getPlan(planId)` retrieves your stored preview. Creation and execution keys identify different
+operations: retain each key for retries; use new keys for new proposals or launches. Plans expire
+after 24 hours and cannot be renewed. `executePlan` checks the echoed plan ID and digest; a missing
+or mismatched echo raises `QDashResultUnknownError`. Reconcile the recorded run before further work.
+See [stored-plan expiry and recovery](../../developer-guide/workflow/calibration-pipeline.md#stored-plans).
+
 ## Run a Registered Workflow
 
 First [save a workflow](../../user-guide/creating-workflows.md); replace `coherence_check` with

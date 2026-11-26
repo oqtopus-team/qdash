@@ -3,6 +3,12 @@ import type { QDashConnection } from "../lib/qdash-connection.js";
 import { Type } from "typebox";
 
 import { pausedSessionConflict } from "../lib/agent-loop.js";
+import {
+  planBindingProblem,
+  resolvePipelinePlanPreview,
+  runPipelineArgumentProblem,
+  type PipelinePlanApprovalPreview,
+} from "../lib/pipeline-plan-preview.js";
 import { toTextToolResult } from "../lib/results.js";
 import { requireWriteApproval } from "../lib/write-approval.js";
 import { isResultUnknown, resultUnknownToolError, sdkSession, unknownLaunchGuidance, type SdkSessionFactory } from "../lib/sdk-session.js";
@@ -95,6 +101,50 @@ export type PipelineExecution = {
 export function pipelineRunKey(toolCallId: string): string {
   const key = `qdash_run_pipeline:${toolCallId}`;
   return key.length <= 128 ? key : `qdash_run_pipeline:${toolCallId.slice(-100)}`;
+}
+
+/**
+ * The idempotency key of a plan creation: one per tool call, so a replayed call (for example
+ * a nested call a durable script repeats) returns the plan it stored instead of storing
+ * another. The call id comes from the host, never from the model's arguments.
+ */
+export function pipelinePlanKey(toolCallId: string): string {
+  const key = `qdash_create_pipeline_plan:${toolCallId}`;
+  return key.length <= 128 ? key : `qdash_create_pipeline_plan:${toolCallId.slice(-90)}`;
+}
+
+/** A stored plan as `POST /calibration-pipelines/plans` returns it. */
+export type PipelinePlan = {
+  plan_id: string;
+  chip_id: string;
+  backend_name: string;
+  expires_at: string;
+  expired?: boolean;
+  review_digest: string;
+  spec?: Record<string, unknown>;
+  targets?: PipelineValidation["targets"];
+  target_qids?: string[];
+  steps?: ResolvedPipelineStep[];
+  warnings?: PipelineProblem[];
+  task_run_count?: number;
+  replayed?: boolean;
+};
+
+/** Text shown for a stored plan: its ID, digest, expiry, starting qubits, and resolved steps. */
+export function formatPipelinePlanCreated(plan: PipelinePlan): string {
+  const name = typeof plan.spec?.name === "string" ? ` '${plan.spec.name}'` : "";
+  const warnings = problemLines(plan.warnings);
+  return [
+    `${plan.replayed ? "Already stored" : "Stored"} pipeline plan ${plan.plan_id}${name} on chip ${plan.chip_id} (backend ${plan.backend_name}).`,
+    `Review digest ${plan.review_digest}; expires ${plan.expires_at}. It runs nothing and approves nothing.`,
+    `Starting qubits: ${(plan.target_qids ?? []).join(", ") || "none"}. ${plan.task_run_count ?? 0} task calls per target.`,
+    ...(warnings.length ? ["", "Warnings (the plan is still valid):", ...warnings] : []),
+    "",
+    "Steps:",
+    ...stepLines(plan.steps),
+    "",
+    `To run it, call qdash_run_pipeline({ chipId: "${plan.chip_id}", planId: "${plan.plan_id}" }) directly (not from a script); the user approves the plan QDash shows them.`,
+  ].join("\n");
 }
 
 /** What `qdash_run_pipeline` reports as its origin; QDash stores it as client reported. */
@@ -427,12 +477,58 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
   });
 
   pi.registerTool({
+    name: "qdash_create_pipeline_plan",
+    label: "QDash Create Pipeline Plan",
+    description: "Validate a calibration pipeline spec and store it in QDash as a plan: an immutable proposal with its resolved calls, the qubits its targets resolve to, and a review digest, which expires after 24 hours. It writes only that record: it runs nothing, reserves no hardware, joins no calibration session, and approves nothing. Returns the plan with its plan_id; pass that planId to qdash_run_pipeline instead of the spec. Code mode scripts may call it.",
+    promptSnippet: "Store a validated QDash calibration pipeline spec as a plan to run by reference",
+    promptGuidelines: [
+      "Use qdash_create_pipeline_plan after building a spec in a codemode script (with qdash.calibration) and checking it with qdash_plan_pipeline; return the plan's plan_id from the script and call qdash_run_pipeline with planId directly, so the spec is never copied by hand.",
+      "qdash_create_pipeline_plan only stores a proposal; it is not an approval. Running the plan is still a qdash_run_pipeline call the user approves after the host shows them the stored plan.",
+      "A plan expires after 24 hours and is never renewed; after that build the spec again and store a new plan.",
+    ],
+    parameters: Type.Object({
+      ...connectionParams,
+      chipId: Type.Optional(Type.String({ description: "Chip to run on. Defaults to the session or default chip." })),
+      spec: specParam,
+      backendName: Type.Optional(Type.String({ description: "Defaults to the configured backend." })),
+    }),
+    async execute(toolCallId, params: ConnectionParams & { chipId?: string; spec: Record<string, unknown>; backendName?: string }) {
+      const client = await deps.makeClient(params);
+      const chipId = await deps.resolveChipId(client, params.chipId);
+      let plan: PipelinePlan;
+      try {
+        plan = (await (deps.sdk ?? sdkSession)(client).pipelines.createPlan(
+          params.spec,
+          { chipId, backendName: params.backendName },
+          { idempotencyKey: pipelinePlanKey(toolCallId) },
+        )) as PipelinePlan;
+      } catch (error) {
+        const problems = problemsFromError(error);
+        if (!problems) throw error;
+        const text = [
+          `QDash did not store the plan: the spec has ${problems.length} problem${problems.length === 1 ? "" : "s"}. Nothing was stored or started.`,
+          ...problemLines(problems),
+        ].join("\n");
+        return toTextToolResult(text, { valid: false, problems }, { tool: "qdash_create_pipeline_plan", chipId, stored: false, problemCount: problems.length });
+      }
+      return toTextToolResult(formatPipelinePlanCreated(plan), plan, {
+        tool: "qdash_create_pipeline_plan",
+        chipId: plan.chip_id,
+        planId: plan.plan_id,
+        stored: true,
+        ...(plan.replayed ? { replayed: true } : {}),
+      });
+    },
+  });
+
+  pi.registerTool({
     name: "qdash_run_pipeline",
     label: "QDash Run Pipeline",
-    description: "Run a calibration pipeline spec as one QDash execution. Completed tasks write their calibrated parameters to QDash directly, without an agent candidate gate. Confirmation-gated write operation. Validate with qdash_plan_pipeline first; the spec runs exactly as validated.",
-    promptSnippet: "Run a validated QDash calibration pipeline spec",
+    description: "Run a calibration pipeline as one QDash execution, from exactly one of a spec or the planId of a plan stored with qdash_create_pipeline_plan. Completed tasks write their calibrated parameters to QDash directly, without an agent candidate gate. Confirmation-gated write operation: with planId, the user approves the stored plan the host fetches from QDash, and it runs only with that plan's review digest. Validate a spec with qdash_plan_pipeline first; it runs exactly as validated.",
+    promptSnippet: "Run a validated QDash calibration pipeline spec or stored plan",
     promptGuidelines: [
-      "Use qdash_run_pipeline only for a spec that qdash_plan_pipeline reported valid.",
+      "Use qdash_run_pipeline only for a spec that qdash_plan_pipeline reported valid, or for the planId qdash_create_pipeline_plan returned; pass exactly one of spec and planId.",
+      "When a codemode script built the spec, store it with qdash_create_pipeline_plan in the script and pass only its planId here; do not copy the spec into this call.",
       "When the run serves a calibration objective, pass that objective's calibrationSessionId (from qdash_create_calibration_session or the user) so QDash records the run, with all its step executions, in it. Without it the run joins an automatic session of its own. It grants nothing: the user still approves this exact run.",
       "When the run carries out an experiment you recorded with qdash_record_calibration_decision, pass that decision's decisionId too, so the session's audit links your intent to this run. Record the decision first; never pass a decision of another session.",
       "If QDash reports that a run's launch outcome is unknown, do not start it again: check the reported execution ID with qdash_get_execution, or without one page through qdash_list_executions for the run's chipId, and tell the user.",
@@ -442,23 +538,31 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
     ],
     parameters: Type.Object({
       ...connectionParams,
-      chipId: Type.String({ description: "Chip to run on." }),
-      spec: specParam,
-      backendName: Type.Optional(Type.String({ description: "Defaults to the configured backend." })),
+      chipId: Type.String({ description: "Chip to run on; with planId, the plan's chip." }),
+      spec: Type.Optional(specParam),
+      planId: Type.Optional(Type.String({ description: "A plan stored with qdash_create_pipeline_plan, instead of spec. The user approves the stored plan QDash returns." })),
+      backendName: Type.Optional(Type.String({ description: "Defaults to the configured backend (with planId: the plan's)." })),
       calibrationSessionId: Type.Optional(Type.String({ description: "Record the run in this calibration session (open, on this chip, created by the user). Grants nothing." })),
       decisionId: Type.Optional(Type.String({ description: "With calibrationSessionId: the decision of that session (qdash_record_calibration_decision with an experiment) this run carries out." })),
     }),
-    async execute(toolCallId, params: ConnectionParams & { chipId: string; spec: Record<string, unknown>; backendName?: string; calibrationSessionId?: string; decisionId?: string }, _signal, _onUpdate, ctx) {
+    async execute(toolCallId, params: ConnectionParams & { chipId: string; spec?: Record<string, unknown>; planId?: string; backendName?: string; calibrationSessionId?: string; decisionId?: string }, _signal, _onUpdate, ctx) {
+      const argumentProblem = runPipelineArgumentProblem(params);
+      if (argumentProblem) throw new Error(argumentProblem);
       if (params.decisionId && !params.calibrationSessionId) {
         throw new Error("decisionId needs calibrationSessionId: a decision belongs to one calibration session.");
       }
       const recordedIn = params.calibrationSessionId
         ? ` It is recorded in calibration session ${params.calibrationSessionId}${params.decisionId ? ` as carrying out decision ${params.decisionId}` : ""}, which groups it and grants nothing.`
         : "";
-      await requireWriteApproval("qdash_run_pipeline", toolCallId, params, ctx, { title: "Run QDash calibration pipeline?", message: `This starts a calibration execution on chip ${params.chipId}. Completed tasks update calibrated parameters in QDash directly.${recordedIn}` });
+      const dialog = { title: "Run QDash calibration pipeline?", message: `This starts a calibration execution on chip ${params.chipId}. Completed tasks update calibrated parameters in QDash directly.${recordedIn}` };
+      if (params.planId !== undefined) {
+        return runStoredPlan(deps, toolCallId, { ...params, planId: params.planId }, ctx, dialog);
+      }
+      const spec = params.spec as Record<string, unknown>;
+      await requireWriteApproval("qdash_run_pipeline", toolCallId, params, ctx, dialog);
       const client = await deps.makeClient(params);
       // A paused agent session's targets must not be measured around its pause.
-      const conflict = await pausedSessionConflict(client, params.chipId, specQids(params.spec));
+      const conflict = await pausedSessionConflict(client, params.chipId, specQids(spec));
       if (conflict) {
         return toTextToolResult(conflict, { blocked: true }, { tool: "qdash_run_pipeline", chipId: params.chipId, started: false, blockedByPausedSession: true });
       }
@@ -474,7 +578,7 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
         };
         // The origin is this tool's own constant, never the model's arguments: QDash shows it as
         // reported, so a run started here is told apart from one the user started directly.
-        const run = await qdash.pipelines.execute(params.spec, { chipId: params.chipId, backendName: params.backendName }, recording, { reportedOrigin: PIPELINE_TOOL_ORIGIN });
+        const run = await qdash.pipelines.execute(spec, { chipId: params.chipId, backendName: params.backendName }, recording, { reportedOrigin: PIPELINE_TOOL_ORIGIN });
         const result = run.response as PipelineExecution;
         return toTextToolResult(formatPipelineExecution(result, params.chipId), result, {
           tool: "qdash_run_pipeline",
@@ -510,4 +614,88 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
       }
     },
   });
+}
+
+type RunPlanParams = ConnectionParams & { chipId: string; planId: string; backendName?: string; calibrationSessionId?: string; decisionId?: string };
+
+/**
+ * `qdash_run_pipeline` with `planId`: approve the plan the host fetched, then run it with the
+ * review digest of that preview. The model's arguments name the plan only; the digest, the
+ * starting qubits for the paused-session check, and what the user saw come from the preview.
+ */
+async function runStoredPlan(
+  deps: CalibrationPipelineDependencies,
+  toolCallId: string,
+  params: RunPlanParams,
+  ctx: Parameters<typeof requireWriteApproval>[3],
+  dialog: { title: string; message: string },
+) {
+  const client = await deps.makeClient(params);
+  const qdash = (deps.sdk ?? sdkSession)(client);
+  const preview = (await requireWriteApproval("qdash_run_pipeline", toolCallId, params, ctx, {
+    ...dialog,
+    preview: () => resolvePipelinePlanPreview(qdash.pipelines, params),
+  })) as PipelinePlanApprovalPreview | undefined;
+  const binding = planBindingProblem(preview, params);
+  if (binding || !preview) throw new Error(binding ?? "qdash_run_pipeline was not run: no approved plan.");
+  // A paused agent session's qubits must not be measured around its pause: the plan's own
+  // starting qubits, MUXes expanded, are what the check compares.
+  const conflict = await pausedSessionConflict(client, params.chipId, preview.targetQids.length ? preview.targetQids : undefined);
+  if (conflict) {
+    return toTextToolResult(conflict, { blocked: true }, { tool: "qdash_run_pipeline", chipId: params.chipId, planId: params.planId, started: false, blockedByPausedSession: true });
+  }
+  try {
+    const recording = {
+      idempotencyKey: pipelineRunKey(toolCallId),
+      ...(params.calibrationSessionId ? { calibrationSessionId: params.calibrationSessionId } : {}),
+      ...(params.decisionId ? { decisionId: params.decisionId } : {}),
+    };
+    const run = await qdash.pipelines.executePlan(
+      params.planId,
+      {
+        chipId: params.chipId,
+        expectedReviewDigest: preview.reviewDigest,
+        ...(params.backendName ? { backendName: params.backendName } : {}),
+      },
+      recording,
+      { reportedOrigin: PIPELINE_TOOL_ORIGIN },
+    );
+    const result = run.response as PipelineExecution;
+    return toTextToolResult(
+      [`Plan ${params.planId} (review digest ${preview.reviewDigest}).`, formatPipelineExecution(result, params.chipId)].join("\n"),
+      result,
+      {
+        tool: "qdash_run_pipeline",
+        chipId: params.chipId,
+        planId: params.planId,
+        reviewDigest: preview.reviewDigest,
+        executionId: result.execution_id,
+        started: true,
+        ...(result.calibration_session_id ? { calibrationSessionId: result.calibration_session_id, pipelineRunId: result.pipeline_run_id ?? undefined } : {}),
+        ...(params.decisionId ? { decisionId: params.decisionId } : {}),
+        ...(result.replayed ? { replayed: true } : {}),
+      },
+    );
+  } catch (error) {
+    if (isResultUnknown(error)) throw resultUnknownToolError(error, { chipId: params.chipId });
+    const problems = problemsFromError(error);
+    if (problems) {
+      const text = [
+        `QDash no longer accepts plan ${params.planId} (${problems.length} problem${problems.length === 1 ? "" : "s"}). Nothing was started.`,
+        ...problemLines(problems),
+        "",
+        "Fix the spec, store a new plan with qdash_create_pipeline_plan, and run that plan.",
+      ].join("\n");
+      return toTextToolResult(text, { problems }, { tool: "qdash_run_pipeline", chipId: params.chipId, planId: params.planId, started: false, problemCount: problems.length });
+    }
+    if (statusCodeOrStatus(error) === 503) {
+      throw new Error("QDash cannot run pipelines right now: the worker has not registered the calibration-pipeline deployment. Ask an operator to restart the worker, then try again.");
+    }
+    const detail = errorDetail(error);
+    if (detail && /unknown|may have started|being dispatched/i.test(detail)) {
+      throw new Error(`${detail} ${unknownLaunchGuidance(undefined, { chipId: params.chipId })}`);
+    }
+    if (detail) throw new Error(`QDash did not run plan ${params.planId}: ${detail}`);
+    throw error;
+  }
 }

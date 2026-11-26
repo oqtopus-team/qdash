@@ -10,6 +10,7 @@ import {
   ALLOWED_TOOL_NAMES,
   ALLOWLISTED_PACKAGES,
   DEFERRED_TOOL_NAMES,
+  NESTED_PROPOSAL_TOOL_NAMES,
   NESTED_READ_TOOL_NAMES,
   REVIEWED_WRITE_TOOL_NAMES,
   SESSION_GRANTED_WRITE_TOOL_NAMES,
@@ -89,10 +90,11 @@ test("bundled packages load tools and skills offline, retaining the pi-qdash all
     assert.ok(!toolNames.includes(extra));
     // Code Mode and deferred loading name real pi-qdash tools; scripts reach only the audited reads.
     for (const name of [...NESTED_READ_TOOL_NAMES, ...DEFERRED_TOOL_NAMES]) assert.ok(toolNames.includes(name), name);
-    assert.deepEqual(adapted.nestedTools.sort(), [...NESTED_READ_TOOL_NAMES].sort());
+    assert.deepEqual(adapted.nestedTools.sort(), [...NESTED_READ_TOOL_NAMES, ...NESTED_PROPOSAL_TOOL_NAMES].sort());
     assert.deepEqual(adapted.deferredTools.sort(), [...DEFERRED_TOOL_NAMES].sort());
     for (const tool of adapted.extension.tools) {
-      const nested = NESTED_READ_TOOL_NAMES.includes(tool.name);
+      // Scripts reach the audited reads and the audited proposal tool, nothing else.
+      const nested = NESTED_READ_TOOL_NAMES.includes(tool.name) || NESTED_PROPOSAL_TOOL_NAMES.includes(tool.name);
       assert.deepEqual(tool.callers, nested ? ["model", "tools"] : ["model"], tool.name);
       assert.equal(tool.deferred === true, DEFERRED_TOOL_NAMES.includes(tool.name), tool.name);
     }
@@ -245,7 +247,7 @@ test("stale packages, settings, and discovered resources cannot replace or exten
     const adapted = buildQDashExtension(extensions, {}, cwd, { toolArgs: {} }, roots);
     const offered = adapted.extension.tools.map(({ name }) => name);
     for (const name of STALE_TOOLS) assert.ok(!offered.includes(name), name);
-    assert.deepEqual(adapted.nestedTools.sort(), [...NESTED_READ_TOOL_NAMES].sort());
+    assert.deepEqual(adapted.nestedTools.sort(), [...NESTED_READ_TOOL_NAMES, ...NESTED_PROPOSAL_TOOL_NAMES].sort());
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

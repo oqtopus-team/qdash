@@ -1995,6 +1995,26 @@ class Mode(StrEnum):
     planner = "planner"
 
 
+class CreatePipelinePlanRequest(BaseModel):
+    """
+    Store a validated spec as a plan that can be approved and run by reference.
+    """
+
+    chip_id: Annotated[str, Field(min_length=1, title="Chip Id")]
+    spec: Annotated[dict[str, Any], Field(title="Spec")]
+    """
+    CalibrationPipelineSpec as JSON; see GET /calibration-pipelines/catalog.
+    """
+    backend_name: Annotated[str | None, Field(title="Backend Name")] = None
+    """
+    Defaults to the configured backend.
+    """
+    idempotency_key: Annotated[str, Field(max_length=128, min_length=1, title="Idempotency Key")]
+    """
+    Identity of this creation, such as the tool call that asks for it. While the plan it created is stored (until seven days after the plan expires), repeating it with the same request returns that plan, or reports it expired, and repeating it with another request is a conflict; it never changes or renews that plan. After the plan is deleted the key is free again: the same key then creates a new plan with a new plan_id and review_digest that needs its own approval.
+    """
+
+
 class CryostatCreateRequest(BaseModel):
     """
     Body for creating a cryostat.
@@ -4885,6 +4905,15 @@ class PipelineProblem(BaseModel):
     message: Annotated[str, Field(title="Message")]
 
 
+class PipelineProblemsDetail(BaseModel):
+    """
+    Why a calibration pipeline spec was refused, with every problem found.
+    """
+
+    message: Annotated[str, Field(title="Message")]
+    problems: Annotated[list[PipelineProblem] | None, Field(title="Problems")] = None
+
+
 class Position(BaseModel):
     """
     Position of the qubit on the device.
@@ -5512,6 +5541,22 @@ class ReportedLaunchOrigin(BaseModel):
     """
     The host or package that reports it, such as pi-qdash; empty when unnamed
     """
+
+
+class RequestFieldError(BaseModel):
+    """
+    One field of the request body that failed schema validation.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+    )
+    loc: Annotated[list[str | int], Field(title="Loc")]
+    """
+    Where in the request, e.g. ['body', 'chip_id'].
+    """
+    msg: Annotated[str, Field(title="Msg")]
+    type: Annotated[str, Field(title="Type")]
 
 
 class CallId(RootModel[str]):
@@ -9137,6 +9182,46 @@ class ExecuteFlowRequest(BaseModel):
     """
 
 
+class ExecutePipelinePlanRequest(BaseModel):
+    """
+    Run a stored plan exactly as it was reviewed.
+    """
+
+    chip_id: Annotated[str, Field(min_length=1, title="Chip Id")]
+    """
+    Must be the plan's chip.
+    """
+    expected_review_digest: Annotated[
+        str,
+        Field(pattern="^sha256:v[0-9]+:[0-9a-f]{64}$", title="Expected Review Digest"),
+    ]
+    """
+    The review digest the person approved. A plan with another digest, or one whose revalidated content no longer has it, is refused.
+    """
+    backend_name: Annotated[str | None, Field(title="Backend Name")] = None
+    """
+    Must be the plan's backend when given.
+    """
+    calibration_session_id: Annotated[
+        CalibrationSessionId2 | None, Field(title="Calibration Session Id")
+    ] = None
+    """
+    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
+    """
+    idempotency_key: Annotated[IdempotencyKey1 | None, Field(title="Idempotency Key")] = None
+    """
+    A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run.
+    """
+    decision_id: Annotated[DecisionId1 | None, Field(title="Decision Id")] = None
+    """
+    With calibration_session_id: the decision of that session this run carries out, recorded before dispatch with an experiment. QDash checks it belongs to the session and records the link on the run; it grants nothing.
+    """
+    reported_origin: ReportedLaunchOrigin | None = None
+    """
+    As for POST /calibration-pipelines/execute: stored as reported.
+    """
+
+
 class ExecutePipelineRequest(BaseModel):
     """
     Dispatch one pipeline run with a separate execution for each step reached.
@@ -10052,6 +10137,19 @@ class ParameterHistoryResponse(BaseModel):
     qid: Annotated[str, Field(title="Qid")]
     versions: Annotated[list[ParameterVersionResponse], Field(title="Versions")]
     total_versions: Annotated[int, Field(title="Total Versions")]
+
+
+class PipelinePlanUnprocessableResponse(BaseModel):
+    """
+    The 422 body of the stored-plan endpoints.
+
+    ``detail`` is a list when the request body does not match its schema, an object with
+    ``problems`` when the spec is not valid or its targets cannot be resolved, and a message
+    when the request does not match the plan (another chip or backend) or its calibration
+    session is on another chip.
+    """
+
+    detail: Annotated[list[RequestFieldError] | PipelineProblemsDetail | str, Field(title="Detail")]
 
 
 class PipelineStepProgress(BaseModel):
@@ -11062,6 +11160,14 @@ class ExecutePipelineResponse(BaseModel):
     """
     The decision the recorded run carries out, as QDash linked it; null when the request named none. A client that sent a decision checks it is echoed here
     """
+    plan_id: Annotated[str | None, Field(title="Plan Id")] = None
+    """
+    For a run of a stored plan: the plan it carries out. A client that ran a plan checks it and review_digest are echoed here
+    """
+    review_digest: Annotated[str | None, Field(title="Review Digest")] = None
+    """
+    For a run of a stored plan: the review digest it ran.
+    """
 
 
 class ExecutionGroupItem(BaseModel):
@@ -11281,6 +11387,62 @@ class PipelineCatalogResponse(BaseModel):
     JSON schema of CalibrationPipelineSpec.
     """
     example: Annotated[dict[str, Any] | None, Field(title="Example")] = None
+
+
+class PipelinePlanResponse(BaseModel):
+    """
+    A stored plan and everything an approval of it covers.
+
+    A plan starts nothing and grants nothing. ``review_digest`` is a full, versioned SHA-256
+    of the review content: the normalized spec with every default task list written out,
+    the qubits its targets resolve to when the run starts, the resolved calls of every step,
+    and the run defaults. Running the plan names that digest, so the run is the plan that
+    was reviewed. Filters and CR schedules still select from results while the run goes;
+    calibration values, task code and hardware state are read when it runs.
+    """
+
+    plan_id: Annotated[str, Field(title="Plan Id")]
+    """
+    Opaque ID of the plan.
+    """
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    backend_name: Annotated[str, Field(title="Backend Name")]
+    created_by: Annotated[str, Field(title="Created By")]
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    expires_at: Annotated[AwareDatetime, Field(title="Expires At")]
+    """
+    After this the plan cannot be executed; create a new plan instead.
+    """
+    expired: Annotated[bool, Field(title="Expired")]
+    review_version: Annotated[int, Field(title="Review Version")]
+    review_digest: Annotated[str, Field(title="Review Digest")]
+    """
+    sha256:v<version>:<hex> of the review content; pass it as expected_review_digest. Not the spec's plan_digest.
+    """
+    spec: Annotated[dict[str, Any], Field(title="Spec")]
+    """
+    The normalized spec with default task lists.
+    """
+    spec_digest: Annotated[str | None, Field(title="Spec Digest")] = None
+    """
+    The short spec digest /validate reports as plan_digest, for history.
+    """
+    targets: ResolvedPipelineTargets | None = None
+    target_qids: Annotated[list[str], Field(title="Target Qids")]
+    """
+    The qubits the targets resolve to when the run starts (MUXes expanded).
+    """
+    steps: Annotated[list[ResolvedPipelineStep] | None, Field(title="Steps")] = None
+    warnings: Annotated[list[PipelineProblem] | None, Field(title="Warnings")] = None
+    task_run_count: Annotated[int, Field(title="Task Run Count")] = 0
+    default_run_parameters: Annotated[
+        dict[str, Any] | None, Field(title="Default Run Parameters")
+    ] = None
+    task_parameters: Annotated[dict[str, Any] | None, Field(title="Task Parameters")] = None
+    replayed: Annotated[bool, Field(title="Replayed")] = False
+    """
+    True when a repeated creation returned the plan it stored before.
+    """
 
 
 class PipelineProgress(BaseModel):
