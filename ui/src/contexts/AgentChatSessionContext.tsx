@@ -16,6 +16,7 @@ import {
   appendDelta,
   appendLiveBlock,
   endTool,
+  failedTurnPayload,
   startDraft,
   startTool,
   stoppedBlocks,
@@ -1932,9 +1933,17 @@ export function AgentChatSessionProvider({
             }));
             return;
           }
+          // What streamed before the failure stays, as an unfinished answer ahead of the error.
+          const partial = failedTurnPayload(turn, Date.now());
           updateSessionMessages(
             sessionId,
-            [...shown, { role: "assistant", content: `Error: ${message}`, turnRequestId }],
+            [
+              ...shown,
+              ...(partial
+                ? [{ role: "assistant" as const, content: JSON.stringify(partial), turnRequestId }]
+                : []),
+              { role: "assistant", content: `Error: ${message}`, turnRequestId },
+            ],
             { save: false },
           );
           keep();

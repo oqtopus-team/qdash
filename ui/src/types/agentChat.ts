@@ -287,8 +287,9 @@ export type AgentBlocksResult = BlocksResult & {
    */
   in_progress?: boolean;
   /**
-   * The answer so far of a turn that no process ran any more when a later turn
-   * replaced it (its API process restarted mid-turn): it never ended.
+   * The answer so far of a turn that never ended: no process ran it any more when a
+   * later turn replaced it (its API process restarted mid-turn), or it failed, and the
+   * error follows as the next message.
    */
   interrupted?: boolean;
   /** The user's rating of this answer, kept with it for later evaluation. */

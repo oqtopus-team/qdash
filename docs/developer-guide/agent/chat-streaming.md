@@ -19,6 +19,16 @@ Text, reasoning, tool arguments, tool results, and rendered blocks stream as the
 intermediate updates do not lose tool output. Preserve event identity and ordering when changing
 translation; the final response must agree with the streamed blocks.
 
+Text before or between tool calls becomes work history; text after the last tool call becomes
+the final answer. `agent-runtime/src/prompt.ts` requests concise progress updates at meaningful
+milestones, separately from thinking. These updates use the existing text events, so their
+frequency depends on the model. Keep the answer boundary consistent between
+`ui/src/lib/agentChatStream.ts` and `src/qdash/api/services/chat_transcript.py`.
+
+On failure, both layers retain streamed content as an assistant message marked `interrupted`
+before the separate `Error: …` message. The last message remains the error for retry and status
+detection. Preserve this ordering and the partial content when changing recovery behavior.
+
 ## Durable Turns and Cancellation
 
 Closing a browser stream does not cancel a turn. Stop sends `turn_request_id` through

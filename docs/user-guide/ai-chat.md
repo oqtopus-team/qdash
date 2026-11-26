@@ -35,6 +35,11 @@ The header shows what the assistant is doing or waiting for. Closing the sidebar
 or reloading does not stop it. Reopen the chat to reconnect; use **Stop** to end the answer.
 A lost connection does not mean the underlying operation stopped.
 
+For longer requests, the assistant can report what it is checking, what it found, and what it
+will check next. Open **Worked for …** or **Work history** above a completed answer to reread
+these updates and tool activity. If an answer fails, any content received before the error stays
+in the conversation; treat it as unfinished.
+
 ### Add to an Answer in Progress, or Continue One
 
 Send a message while an answer runs to add guidance after its current step. Send figures in a
