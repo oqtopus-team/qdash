@@ -22,6 +22,7 @@ from qdash.api.dependencies.cache import (
 )
 from qdash.api.services.admin_service import AdminService
 from qdash.api.services.agent_chat_session_service import AgentChatSessionService
+from qdash.api.services.agent_intervention_forum import AgentInterventionForumService
 from qdash.api.services.agent_intervention_service import AgentInterventionService
 from qdash.api.services.agent_investigation_service import AgentInvestigationService
 from qdash.api.services.agent_session_audit import AgentSessionAuditService
@@ -90,6 +91,12 @@ from qdash.repository.user_avatar import MongoUserAvatarRepository
 def get_agent_intervention_service() -> AgentInterventionService:
     """Get the agent intervention service instance."""
     return AgentInterventionService()
+
+
+@cached_dependency_provider
+def get_agent_intervention_forum_service() -> AgentInterventionForumService:
+    """Get the service that opens the Forum thread of each agent intervention."""
+    return AgentInterventionForumService()
 
 
 @cached_dependency_provider

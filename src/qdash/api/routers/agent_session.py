@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response, status
 
 from qdash.api.dependencies import (
+    get_agent_intervention_forum_service,
     get_agent_intervention_service,
     get_agent_session_audit_service,
     get_agent_session_service,
@@ -47,6 +48,7 @@ from qdash.api.schemas.agent_session import (
     StopAgentSessionResponse,
     SubmitAgentActionRequest,
 )
+from qdash.api.services.agent_intervention_forum import AgentInterventionForumService
 from qdash.api.services.agent_intervention_service import AgentInterventionService
 from qdash.api.services.agent_session_audit import (
     DEFAULT_PAGE_SIZE,
@@ -64,6 +66,12 @@ from qdash.datamodel.agent_session import (
 )
 
 router = APIRouter(prefix="/agent-sessions")
+
+
+InterventionService = Annotated[AgentInterventionService, Depends(get_agent_intervention_service)]
+ForumThreadService = Annotated[
+    AgentInterventionForumService, Depends(get_agent_intervention_forum_service)
+]
 
 
 @router.post(
@@ -170,11 +178,12 @@ def submit_agent_action(
     background_tasks: BackgroundTasks,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[AgentSessionService, Depends(get_agent_session_service)],
+    forum_threads: ForumThreadService,
 ) -> AgentActionResponse:
     """Authorize and audit an action proposal without executing it.
 
     An authorized ``request_human`` also records an intervention, pauses the session on it,
-    and queues its Slack message.
+    and queues its Slack message and its Forum thread.
     """
     action = service.submit_action(
         project_id=ctx.project_id,
@@ -186,6 +195,7 @@ def submit_agent_action(
         background_tasks.add_task(
             service.interventions.deliver_notification, action.intervention_id
         )
+        background_tasks.add_task(forum_threads.ensure_thread, action.intervention_id)
     if (
         action.action_type == AgentActionType.COMPLETE_SESSION
         and action.decision == AgentActionDecision.AUTHORIZED
@@ -425,9 +435,6 @@ async def execute_agent_action(
     )
 
 
-InterventionService = Annotated[AgentInterventionService, Depends(get_agent_intervention_service)]
-
-
 @router.post(
     "/{session_id}/interventions",
     response_model=AgentInterventionResponse,
@@ -441,11 +448,12 @@ def create_agent_intervention(
     background_tasks: BackgroundTasks,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: InterventionService,
+    forum_threads: ForumThreadService,
 ) -> AgentInterventionResponse:
     """Record that the agent needs a person and pause the session if it is active.
 
-    The record is saved before any Slack message is attempted, and it is saved even when the
-    session has no actions left or has expired.
+    The record is saved before any Slack message or Forum thread is attempted, and it is
+    saved even when the session has no actions left or has expired.
     """
     intervention = service.create_intervention(
         project_id=ctx.project_id,
@@ -454,6 +462,7 @@ def create_agent_intervention(
         body=body,
     )
     background_tasks.add_task(service.deliver_notification, intervention.intervention_id)
+    background_tasks.add_task(forum_threads.ensure_thread, intervention.intervention_id)
     return intervention
 
 

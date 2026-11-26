@@ -1,7 +1,9 @@
 import os
 import shutil
+import tempfile
 import zipfile
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi import HTTPException
@@ -448,15 +450,49 @@ def test_download_zip_file_closes_descriptors_when_archiving_fails(
     swap_tree: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     config_dir, _ = swap_tree
-    baseline = len(os.listdir("/dev/fd"))
+    # Track the resources this download acquires instead of counting every open
+    # descriptor in the process, which other tests and garbage collection change.
+    opened: list[int] = []
+    closed: list[int] = []
+    archives: list[zipfile.ZipFile] = []
+    temp_dirs: list[str] = []
+    real_open, real_close, real_mkdtemp = os.open, os.close, tempfile.mkdtemp
+
+    def tracking_open(*args: Any, **kwargs: Any) -> int:
+        fd = real_open(*args, **kwargs)
+        opened.append(fd)
+        return fd
+
+    def tracking_close(fd: int) -> None:
+        closed.append(fd)
+        real_close(fd)
+
+    def tracking_mkdtemp(*args: Any, **kwargs: Any) -> str:
+        temp_dirs.append(real_mkdtemp(*args, **kwargs))
+        return temp_dirs[-1]
+
+    class TrackingZipFile(zipfile.ZipFile):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            super().__init__(*args, **kwargs)
+            archives.append(self)
 
     def fail(*_args: object) -> None:
         raise OSError("disk full")
 
+    monkeypatch.setattr(os, "open", tracking_open)
+    monkeypatch.setattr(os, "close", tracking_close)
+    monkeypatch.setattr(tempfile, "mkdtemp", tracking_mkdtemp)
+    monkeypatch.setattr(zipfile, "ZipFile", TrackingZipFile)
     monkeypatch.setattr(FileService, "_archive_file", staticmethod(fail))
 
     with pytest.raises(HTTPException) as exc_info:
         FileService(config_base_path=config_dir).download_zip_file(".")
 
     assert exc_info.value.status_code == 500
-    assert len(os.listdir("/dev/fd")) == baseline
+    # The tree anchor, the walked directory, and the file being archived.
+    assert len(opened) >= 3
+    assert sorted(closed) == sorted(opened)
+    assert len(archives) == 1
+    assert archives[0].fp is None
+    assert len(temp_dirs) == 1
+    assert not Path(temp_dirs[0]).exists()

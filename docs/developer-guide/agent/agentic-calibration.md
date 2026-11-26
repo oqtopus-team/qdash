@@ -74,6 +74,20 @@ Operations pass the session gate before dispatch. Work admitted before a pause m
 new work is refused. Resume waits for in-flight work. Stopping marks the session cancelled and
 blocks later work; it must not be mistaken for proof that a hardware operation has stopped.
 
+New interventions from either the intervention endpoint or a `request_human` action carry a
+`forum_thread` delivery state. `AgentInterventionForumService` creates a discussion under the
+system author `qdash`; replies do not change intervention or session state. The API response
+exposes delivery status and the created post's ID and number. Older interventions have no
+delivery state and are not backfilled.
+
+The API's notification sweeper always runs, even without Slack. It materializes pending pauses
+and retries Forum creation with capped backoff. A unique partial index on
+`forum_post.agent_intervention_id` prevents duplicate threads after a crash or concurrent
+attempts. `agent_session_id` links the post to its session independently of editable labels.
+An archived thread still satisfies delivery; Forum failures never undo a pause. Service and
+router regressions cover these paths in `test_agent_intervention_forum.py` and
+`test_agent_intervention.py`.
+
 ## Experiment audit
 
 The audit is a read-time projection of authoritative records plus append-only decisions. Only the

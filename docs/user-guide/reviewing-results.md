@@ -38,6 +38,10 @@ Project owners and editors can open **Forum** > **Labels** to add, edit, or dele
 Default labels work like other labels; deleting one removes it from threads and does not
 automatically recreate it. Use the **Label** filter in **Forum** to find matching discussions.
 
+For discussions opened by **qdash** during agent calibration, follow the thread's intervention
+link to [answer the expert request](./agent-calibration.md#when-the-agent-stops-for-an-expert).
+Forum replies alone do not authorize the agent to continue.
+
 ## Reuse the Finding
 
 **Knowledge** is read-only. To improve a task reference:

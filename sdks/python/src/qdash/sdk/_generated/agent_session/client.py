@@ -311,7 +311,7 @@ class AgentSessionClient:
         Authorize and audit an action proposal without executing it.
 
         An authorized ``request_human`` also records an intervention, pauses the session on it,
-        and queues its Slack message.
+        and queues its Slack message and its Forum thread.
 
         Parameters
         ----------
@@ -905,8 +905,8 @@ class AgentSessionClient:
         """
         Record that the agent needs a person and pause the session if it is active.
 
-        The record is saved before any Slack message is attempted, and it is saved even when the
-        session has no actions left or has expired.
+        The record is saved before any Slack message or Forum thread is attempted, and it is
+        saved even when the session has no actions left or has expired.
 
         Parameters
         ----------
@@ -1769,7 +1769,7 @@ class AsyncAgentSessionClient:
         Authorize and audit an action proposal without executing it.
 
         An authorized ``request_human`` also records an intervention, pauses the session on it,
-        and queues its Slack message.
+        and queues its Slack message and its Forum thread.
 
         Parameters
         ----------
@@ -2453,8 +2453,8 @@ class AsyncAgentSessionClient:
         """
         Record that the agent needs a person and pause the session if it is active.
 
-        The record is saved before any Slack message is attempted, and it is saved even when the
-        session has no actions left or has expired.
+        The record is saved before any Slack message or Forum thread is attempted, and it is
+        saved even when the session has no actions left or has expired.
 
         Parameters
         ----------

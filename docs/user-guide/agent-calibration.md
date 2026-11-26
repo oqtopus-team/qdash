@@ -28,6 +28,12 @@ you need them. New targets, tasks, or exhausted budgets require a new session.
 
 ## When the agent stops for an expert
 
+New expert requests also appear in **Forum**, posted by **qdash**, with the question,
+summary, and available evidence links. The thread uses **agent**, **calibration**, and
+**question** labels when those labels have not been deleted. Discuss the request there,
+then follow its intervention link to record the expert's decision. Forum replies do not
+answer the intervention or resume the agent.
+
 Open the intervention link from the agent or configured [Slack notifications](./setup.md#notify-experts-of-agent-interventions-in-slack).
 Review the attempts and evidence, enter **Guidance**, then choose **Reactivate session** or
 **Stop session**. Guidance does not expand the approved scope.
@@ -36,6 +42,11 @@ No new step starts while paused; an already dispatched measurement may finish. E
 exhausted, or stopped sessions cannot reactivate. An unknown measurement-start outcome must be
 investigated; the session can only be stopped. Slack links open QDash; replies in Slack do not
 answer the intervention.
+
+Forum threads are created even without Slack. If creation fails, QDash retries automatically
+without changing the session's state. If every Forum category is archived, restore a category so
+creation can succeed. Archiving a created thread does not create a replacement. Requests
+recorded before this feature was enabled are not added to Forum automatically.
 
 ## Continue after the expert answers
 
