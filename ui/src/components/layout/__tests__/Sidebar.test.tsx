@@ -478,37 +478,79 @@ describe("Sidebar", () => {
       expect(container.querySelectorAll("aside [title]")).toHaveLength(0);
     });
 
-    it("names collapsed icon rows without a hover or focus popup", () => {
-      vi.useFakeTimers();
+    it("names collapsed icon rows and shows a right-side tooltip on keyboard focus", () => {
       projectState.canEdit = true;
       sidebarState.isOpen = false;
       const { container } = render(<Sidebar />);
 
-      const desktop = getDesktop(container);
+      const { desktop } = getAsides(container);
       for (const name of ["Home", "Metrics", "Docs", "Prefect"]) {
-        const link = desktop.getByRole("link", { name });
+        const link = within(desktop as HTMLElement).getByRole("link", { name });
         focus(link);
-        fireEvent.pointerMove(link, { pointerType: "mouse" });
-        act(() => vi.advanceTimersByTime(1000));
 
+        const tooltip = screen.getByRole("tooltip");
+        expect(tooltip.textContent).toBe(name);
+        expect(link.getAttribute("aria-describedby")).toBe(tooltip.id);
+        // Portalled out of the scrolling nav, so the rail cannot clip it.
+        expect(desktop.contains(tooltip)).toBe(false);
+        expect(tooltip.getAttribute("data-side")).toBe("right");
+        expect(tooltip.className).toContain("bg-neutral");
+        expect(tooltip.className).toContain("text-neutral-content");
+
+        act(() => link.blur());
         expect(screen.queryByRole("tooltip")).toBeNull();
-        expect(link.hasAttribute("aria-describedby")).toBe(false);
       }
     });
 
-    it("labels the collapsed profile button without a popup and still opens the profile", () => {
+    it("opens a collapsed row tooltip on hover after the shared delay", () => {
       vi.useFakeTimers();
+      sidebarState.isOpen = false;
+      const { container } = render(<Sidebar />);
+
+      const docs = getDesktop(container).getByRole("link", { name: "Docs" });
+      fireEvent.pointerMove(docs, { pointerType: "mouse" });
+      expect(screen.queryByRole("tooltip")).toBeNull();
+      act(() => vi.advanceTimersByTime(350));
+
+      expect(screen.getByRole("tooltip").textContent).toBe("Docs");
+
+      fireEvent.pointerLeave(docs, { pointerType: "mouse" });
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+
+    it("labels the collapsed profile button with a tooltip and dismisses it on open", () => {
       sidebarState.isOpen = false;
       const { container } = render(<Sidebar />);
 
       const profile = getDesktop(container).getByRole("button", { name: "Open user profile" });
       focus(profile);
-      fireEvent.pointerMove(profile, { pointerType: "mouse" });
-      act(() => vi.advanceTimersByTime(1000));
-      expect(screen.queryByRole("tooltip")).toBeNull();
+      expect(screen.getByRole("tooltip").textContent).toBe("tester");
 
       fireEvent.click(profile);
       expect(screen.getByRole("dialog", { name: "User profile" })).toBeTruthy();
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+
+    it("keeps row and profile tooltips off while labels are visible", () => {
+      vi.useFakeTimers();
+      projectState.canEdit = true;
+      const { container } = render(<Sidebar />);
+
+      const desktop = getDesktop(container);
+      const controls = [
+        ...["Home", "Metrics", "Docs", "Prefect"].map((name) =>
+          desktop.getByRole("link", { name }),
+        ),
+        desktop.getByRole("button", { name: /tester/ }),
+      ];
+      for (const control of controls) {
+        focus(control);
+        fireEvent.pointerMove(control, { pointerType: "mouse" });
+        act(() => vi.advanceTimersByTime(1000));
+
+        expect(screen.queryByRole("tooltip")).toBeNull();
+        expect(control.hasAttribute("aria-describedby")).toBe(false);
+      }
     });
 
     it("never shows rail tooltips inside the mobile More sheet", () => {
@@ -517,9 +559,15 @@ describe("Sidebar", () => {
       const { container } = render(<Sidebar />);
 
       const { mobile } = getAsides(container);
-      focus(within(mobile as HTMLElement).getByRole("link", { name: "Home" }));
-
-      expect(screen.queryByRole("tooltip")).toBeNull();
+      const sheet = within(mobile as HTMLElement);
+      for (const control of [
+        sheet.getByRole("link", { name: "Home" }),
+        sheet.getByRole("link", { name: "Docs" }),
+        sheet.getByRole("button", { name: /tester/ }),
+      ]) {
+        focus(control);
+        expect(screen.queryByRole("tooltip")).toBeNull();
+      }
     });
 
     it("explains the toggle in a tooltip and dismisses it once the rail toggles", () => {
@@ -589,6 +637,49 @@ describe("Sidebar", () => {
       expect(screen.getByRole("tooltip").textContent).toBe("Expand sidebar");
 
       mockPathname.mockReturnValue("/metrics");
+      rerender(<Sidebar />);
+
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+
+    it("dismisses a stale row tooltip after navigation", () => {
+      sidebarState.isOpen = false;
+      const { container, rerender } = render(<Sidebar />);
+
+      focus(getDesktop(container).getByRole("link", { name: "Metrics" }));
+      expect(screen.getByRole("tooltip").textContent).toBe("Metrics");
+
+      mockPathname.mockReturnValue("/metrics");
+      rerender(<Sidebar />);
+
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+
+    it("dismisses a row tooltip and keeps focus on the row when the rail expands", () => {
+      sidebarState.isOpen = false;
+      const { container, rerender } = render(<Sidebar />);
+
+      const home = getDesktop(container).getByRole("link", { name: "Home" });
+      focus(home);
+      expect(screen.getByRole("tooltip").textContent).toBe("Home");
+
+      sidebarState.isOpen = true;
+      rerender(<Sidebar />);
+
+      expect(screen.queryByRole("tooltip")).toBeNull();
+      // The tooltip wrapper stays mounted, so the same link node keeps focus.
+      expect(getDesktop(container).getByRole("link", { name: "Home" })).toBe(home);
+      expect(document.activeElement).toBe(home);
+    });
+
+    it("dismisses a row tooltip when the mobile More sheet opens", () => {
+      sidebarState.isOpen = false;
+      const { container, rerender } = render(<Sidebar />);
+
+      focus(getDesktop(container).getByRole("link", { name: "Home" }));
+      expect(screen.getByRole("tooltip").textContent).toBe("Home");
+
+      sidebarState.isMobileOpen = true;
       rerender(<Sidebar />);
 
       expect(screen.queryByRole("tooltip")).toBeNull();
