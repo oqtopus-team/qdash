@@ -34,6 +34,19 @@ an active turn and follow it without submitting or saving another turn.
 A restart or unavailable turn must produce an explicit recovery state, not silently dispatch the
 same tools again. Keep cancellation, transport loss, and completion distinct.
 
+## Research task progress
+
+`delegate_research` publishes task details through the durable tool slot. The runtime emits
+`tool_update`, the API translates it to SSE `tool_progress`, and the transcript stores the
+bounded task records in the tool step's `subagents` field. `tool_end` carries the final records.
+The UI displays task status and expandable findings from these same records after reload.
+
+Stopping the parent aborts its children and their tools. Delegation is not replay-safe: after a
+runtime restart it ends as interrupted instead of restarting the research. A child read already
+in flight can replay once during recovery before cancellation reaches it. Runtime, transcript,
+and UI settlement prevent queued or running tasks from appearing active after their call ends.
+Test these paths in `agent-runtime/test/subagent-tool.test.mjs` and the chat transcript/stream tests.
+
 ## Branches
 
 A branch forks a Pi conversation at a selected answer in the same SQLite store. It does not copy

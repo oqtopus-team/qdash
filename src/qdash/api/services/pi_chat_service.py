@@ -71,7 +71,11 @@ _THINKING_LEVELS = {
 
 
 # Runtime tools whose derived label would not say what they do.
-_TOOL_LABELS = {"codemode": "Code mode script", "tool_search": "Search tools"}
+_TOOL_LABELS = {
+    "codemode": "Code mode script",
+    "tool_search": "Search tools",
+    "delegate_research": "Research subagents",
+}
 
 
 def tool_label(name: str) -> str:
@@ -945,6 +949,10 @@ async def translate(
                 raise TypeError(kind)
             elif kind == "tool_end":
                 completed_tools.append(tool_label(event["name"]))
+            elif kind == "tool_update" and (
+                not isinstance(event["id"], str) or not isinstance(event["name"], str)
+            ):
+                raise TypeError(kind)
             elif kind == "chart":
                 visuals.append({"type": "chart", "content": None, "chart": event["chart"]})
             elif kind == "ui":
@@ -1019,6 +1027,14 @@ async def translate(
                 "status",
                 {"step": "tool_call", "tool": event["name"], "message": f"{label}..."},
             )
+        elif kind == "tool_update":
+            # Progress of a running call: the research tasks a ``delegate_research`` call runs.
+            subagents = subagents_for_chat(event.get("subagents"))
+            if subagents:
+                yield sse_event(
+                    "tool_progress",
+                    {"id": event["id"], "tool": event["name"], "subagents": subagents},
+                )
         elif kind == "tool_end":
             figures = event.get("figures")
             # A result's durable entry names its call the same way in the original
@@ -1034,6 +1050,7 @@ async def translate(
             )
             classification = _classification_for_chat(event.get("classification"))
             calibration_session = _created_calibration_session_for_chat(event)
+            subagents = subagents_for_chat(event.get("subagents"))
             yield sse_event(
                 "tool_end",
                 {
@@ -1050,6 +1067,8 @@ async def translate(
                     # The calibration session a successful create call made, for the chat
                     # to show without another call.
                     **({"calibration_session": calibration_session} if calibration_session else {}),
+                    # The research tasks a ``delegate_research`` call ran and how each ended.
+                    **({"subagents": subagents} if subagents else {}),
                     # What a workspace tool (bash, read, write, edit) answered.
                     **(
                         {"output": event["output"]}
@@ -1227,6 +1246,71 @@ def _classification_for_chat(classification: Any) -> dict[str, Any] | None:
     if reason is not None:
         shown["reason"] = reason
     return shown
+
+
+_SUBAGENT_STATUSES = {"queued", "running", "done", "error", "cancelled", "interrupted"}
+# The runtime's bounds (agent-runtime/src/subagent-tool.ts), enforced again here.
+_MAX_SUBAGENT_TASKS = 4
+_MAX_SUBAGENT_TITLE = 80
+_MAX_SUBAGENT_RESULT = 4_000
+_MAX_SUBAGENT_ERROR = 400
+_MAX_SUBAGENT_ACTIVITY = 80
+
+
+def _clip(value: str, limit: int) -> str:
+    text = value.strip()
+    return f"{text[:limit]}…" if len(text) > limit else text
+
+
+def _finite_number(value: Any) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def subagents_for_chat(value: Any) -> list[dict[str, Any]] | None:
+    """The research tasks of a ``delegate_research`` call that the chat shows under its step.
+
+    Only the known fields pass, bounded: position, title, status, timing, how many tool
+    calls the subagent made, what it is doing, and its answer or error. Anything malformed
+    is dropped. The subagents' prompts and tool data never reach the chat this way.
+    """
+    if not isinstance(value, list):
+        return None
+    shown: list[dict[str, Any]] = []
+    for task in value[:_MAX_SUBAGENT_TASKS]:
+        if not isinstance(task, dict):
+            continue
+        task_id = task.get("id")
+        title = task.get("title")
+        status = task.get("status")
+        if (
+            not isinstance(task_id, str)
+            or not isinstance(title, str)
+            or not isinstance(status, str)
+            or status not in _SUBAGENT_STATUSES
+        ):
+            continue
+        calls = task.get("toolCalls")
+        item: dict[str, Any] = {
+            "id": task_id[:8],
+            "title": _clip(title, _MAX_SUBAGENT_TITLE),
+            "status": status,
+            "tool_calls": max(0, int(calls))
+            if isinstance(calls, int | float) and _finite_number(calls)
+            else 0,
+        }
+        for source, target in (("startedAt", "started_at"), ("endedAt", "ended_at")):
+            if _finite_number(task.get(source)):
+                item[target] = task[source]
+        for key, limit in (
+            ("activity", _MAX_SUBAGENT_ACTIVITY),
+            ("result", _MAX_SUBAGENT_RESULT),
+            ("error", _MAX_SUBAGENT_ERROR),
+        ):
+            text = task.get(key)
+            if isinstance(text, str) and text:
+                item[key] = _clip(text, limit)
+        shown.append(item)
+    return shown or None
 
 
 _CREATE_CALIBRATION_SESSION_TOOL = "qdash_create_calibration_session"

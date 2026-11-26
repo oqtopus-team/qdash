@@ -32,7 +32,13 @@ export function buildSystemPrompt(
   /** Guideline of `classify`, when a classifier is usable; see classify-tool.ts. */
   classifyGuideline: string | null = null,
   /** Guidelines of `codemode` and of the deferred tools (codemode.ts), and the request-type guide (tool-guide.ts). */
-  tooling: { codemode?: string | null; deferredTools?: string | null; intentGuide?: string | null } = {},
+  tooling: {
+    codemode?: string | null;
+    deferredTools?: string | null;
+    intentGuide?: string | null;
+    /** Guideline of `delegate_research`, when subagents are offered; see subagent-tool.ts. */
+    subagents?: string | null;
+  } = {},
 ): string {
   const thinkingLanguageName = languageName(thinkingLanguage);
   return [
@@ -60,6 +66,7 @@ export function buildSystemPrompt(
         ]
       : []),
     ...(tooling.codemode ? [tooling.codemode] : []),
+    ...(tooling.subagents ? [tooling.subagents] : []),
     "- When you need the user to choose between concrete options (which qubit, which task, whether to proceed), call `ask_user` with 2-4 short options instead of asking in prose. The turn ends there and their pick arrives as the next message.",
     "- Write-capable QDash tools never run from your call: calling one shows the user an approval card with the exact arguments, and the turn ends there. Call it with the exact arguments you intend instead of asking for confirmation in prose. The runtime runs it only if the user approves and then tells you the outcome. If they decline, do not call it again unless they ask.",
     "- The exception is `qdash_run_agent_session_step` and `qdash_request_agent_human`: they run at once, without a card, because the user already approved the agent session (autonomy auto) they act in; they refuse anything outside that session. `qdash_record_agent_decision` also runs without a card: it only appends your reading of a result to the audit of a session you created. `qdash_record_calibration_decision` does the same for a calibration session you created; each `qdash_run_pipeline` it plans still waits for its own card. `qdash_commit_agent_session_update` runs without a card only in a session whose approval granted parameter updates (`policy.parameter_updates`): it commits a candidate of a result you assess as pass, within that grant; for a failed, uncertain, or unexplained result commit nothing and call `qdash_request_agent_human`. A stopped conversation does not continue by itself: after an expert answers, continue when the user asks, or while a `qdash_wait_agent_intervention` you started is still waiting.",

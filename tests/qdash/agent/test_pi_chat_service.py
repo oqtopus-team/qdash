@@ -166,6 +166,62 @@ class TestTranslate:
         assert "classification" not in ends[2]
 
     @pytest.mark.asyncio
+    async def test_subagent_progress_and_results_reach_the_chat_bounded(self) -> None:
+        running = {
+            "id": "1",
+            "title": "Chip A",
+            "status": "running",
+            "toolCalls": 2,
+            "activity": "qdash_list_chips",
+            "startedAt": 5,
+            "prompt": "secret brief",
+        }
+        done = {**running, "status": "done", "endedAt": 9, "result": "r" * 9000}
+        events = await _collect(
+            {"type": "tool_start", "name": "delegate_research", "id": "d1"},
+            {
+                "type": "tool_update",
+                "name": "delegate_research",
+                "id": "d1",
+                "subagents": [running],
+            },
+            # Malformed progress shows nothing.
+            {"type": "tool_update", "name": "delegate_research", "id": "d1", "subagents": "x"},
+            {
+                "type": "tool_end",
+                "name": "delegate_research",
+                "id": "d1",
+                "isError": False,
+                "subagents": [done, {"id": "2", "title": "B", "status": "bogus"}],
+            },
+            {"type": "done", "text": "ok"},
+        )
+        progress = [data for name, data in events if name == "tool_progress"]
+        assert progress == [
+            {
+                "id": "d1",
+                "tool": "delegate_research",
+                "subagents": [
+                    {
+                        "id": "1",
+                        "title": "Chip A",
+                        "status": "running",
+                        "tool_calls": 2,
+                        "started_at": 5,
+                        "activity": "qdash_list_chips",
+                    }
+                ],
+            }
+        ]
+        (end,) = [data for name, data in events if name == "tool_end"]
+        (task,) = end["subagents"]
+        assert task["status"] == "done"
+        assert task["ended_at"] == 9
+        assert len(task["result"]) == 4001
+        assert "prompt" not in task
+        assert tool_label("delegate_research") == "Research subagents"
+
+    @pytest.mark.asyncio
     async def test_tool_end_carries_only_a_created_calibration_session(self) -> None:
         created = {"calibrationSessionId": "cs-1", "chipId": "64Qv3"}
         tool = "qdash_create_calibration_session"

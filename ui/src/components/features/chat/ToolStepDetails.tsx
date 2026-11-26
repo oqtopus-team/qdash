@@ -8,12 +8,14 @@ import {
   FileDiff,
   FilePenLine,
   LineChart,
+  Network,
   Tags,
   Terminal,
   Wrench,
 } from "lucide-react";
 import type { TraceStep } from "@/types/agentChat";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
+import { SUBAGENT_TOOL } from "@/components/features/chat/SubagentTasks";
 
 /**
  * What a tool step shows under its row: the workspace tools (bash, read,
@@ -48,6 +50,7 @@ export function toolIcon(tool: string) {
   if (tool === "edit") return FileDiff;
   if (tool === CLASSIFY_TOOL) return Tags;
   if (tool === CODEMODE_TOOL) return Code2;
+  if (tool === SUBAGENT_TOOL) return Network;
   if (tool.includes("python") || tool.endsWith("_flow")) return Code2;
   if (tool.includes("chart") || tool.includes("timeseries") || tool.includes("plot")) {
     return LineChart;
@@ -261,6 +264,12 @@ export function stepTitle(step: ToolStep): string {
       }
       if (step.status === "done" && outcome === "ambiguous") return "Classification unclear";
       return step.status === "done" ? "Classified" : step.label;
+    }
+    case SUBAGENT_TOOL: {
+      if (drafting) return "Writing research tasks";
+      const count = Array.isArray(args?.tasks) ? args.tasks.length : (step.subagents?.length ?? 0);
+      const tasks = count > 0 ? `${count} research task${count === 1 ? "" : "s"}` : "research";
+      return `${step.status === "running" ? "Delegating" : "Delegated"} ${tasks}`;
     }
     // The waiting tools: while running, the turn is parked on QDash, not working.
     case "qdash_wait_agent_intervention":

@@ -16,6 +16,7 @@ import {
   appendDelta,
   appendLiveBlock,
   endTool,
+  progressTool,
   startDraft,
   startTool,
   stoppedBlocks,
@@ -1792,6 +1793,8 @@ export function AgentChatSessionProvider({
                       steps: startTool(t.steps, payload),
                     }));
                     if (payload.tool === EXPERT_WAIT_TOOL) notify("expert");
+                  } else if (evt.event === "tool_progress") {
+                    updateTurn((t) => ({ ...t, steps: progressTool(t.steps, payload) }));
                   } else if (evt.event === "tool_end") {
                     updateTurn((t) => ({ ...t, steps: endTool(t.steps, payload) }));
                     if (payload.tool === EXPERT_REQUEST_TOOL && payload.is_error === false) {
