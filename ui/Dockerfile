@@ -20,6 +20,8 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_ENV=$NEXT_PUBLIC_ENV
 ENV NEXT_PUBLIC_DEFAULT_THEME=$NEXT_PUBLIC_DEFAULT_THEME
 COPY ./ui .
+# UI contract tests reference this fixture relative to the UI root at /app.
+COPY ./agent-runtime/testdata/presentation-v1.json /agent-runtime/testdata/presentation-v1.json
 # Use Turbopack for faster builds with build cache
 RUN --mount=type=cache,target=/app/.next/cache \
     bun run next build --turbo
