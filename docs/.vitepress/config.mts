@@ -193,6 +193,7 @@ const developerSidebar = [
         collapsed: true,
         items: [
           { text: "Architecture", link: "/developer-guide/agent/architecture" },
+          { text: "Calibration Design", link: "/developer-guide/agent/calibration-design" },
           {
             text: "Model Configuration",
             link: "/developer-guide/agent/model-configuration",

@@ -2,7 +2,7 @@
 
 QDash owns calibration execution, authorization, validation, and audit. The agent proposes the
 next action; it cannot bypass these checks. See [Agent Calibration](../../user-guide/agent-calibration.md)
-for the operator's workflow.
+for the operator's workflow. The rationale is in [Calibration Design](./calibration-design.md).
 
 ## Responsibility boundary
 
