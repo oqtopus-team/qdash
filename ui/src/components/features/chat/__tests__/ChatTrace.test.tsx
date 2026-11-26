@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -391,5 +391,100 @@ describe("ChatTrace", () => {
     expect(meta.textContent).toBe("Failed2s");
     expect(meta.className).not.toContain("ml-auto");
     expect(meta.nextElementSibling?.textContent).toBe("flow daily");
+  });
+
+  it("shows each delegated research task with its state, progress and findings", () => {
+    render(
+      <LiveTrace
+        steps={[
+          {
+            kind: "tool",
+            id: "d1",
+            tool: "delegate_research",
+            label: "Research subagents",
+            status: "running",
+            startedAt: Date.now() - 4000,
+            args: { tasks: [{}, {}, {}] },
+            subagents: [
+              {
+                id: "1",
+                title: "Chip A T1",
+                status: "running",
+                toolCalls: 2,
+                startedAt: Date.now() - 3000,
+                activity: "qdash_list_chips",
+              },
+              {
+                id: "2",
+                title: "Chip B T1",
+                status: "done",
+                toolCalls: 1,
+                startedAt: 0,
+                endedAt: 2000,
+                result: "**Q03** T1 is 40 us",
+              },
+              { id: "3", title: "Chip C T1", status: "error", toolCalls: 0, error: "model_error" },
+            ],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Delegating 3 research tasks")).toBeTruthy();
+    const rows = screen.getAllByTestId("subagent-task");
+    expect(rows.map((row) => row.getAttribute("data-status"))).toEqual([
+      "running",
+      "done",
+      "error",
+    ]);
+    // State is in words, not color alone.
+    expect(within(rows[0]).getByText("Running")).toBeTruthy();
+    expect(within(rows[1]).getByText("Done")).toBeTruthy();
+    expect(within(rows[2]).getByText("Failed")).toBeTruthy();
+    expect(rows[0].textContent).toMatch(/2 tool calls · \d+s · qdash_list_chips/);
+    expect(rows[1].textContent).toMatch(/1 tool call · 2s/);
+    // Findings and errors open on request.
+    fireEvent.click(screen.getByText("Findings"));
+    expect(screen.getByText("Q03")).toBeTruthy();
+    fireEvent.click(screen.getByText("Error"));
+    expect(screen.getByText("model_error")).toBeTruthy();
+  });
+
+  it("keeps delegated tasks visible in a folded group and after a reload", () => {
+    render(
+      <ChatTraceSummary
+        trace={{
+          durationMs: 5000,
+          steps: [
+            {
+              kind: "tool",
+              id: "c1",
+              tool: "qdash_list_chips",
+              label: "List chips",
+              status: "done",
+              startedAt: 0,
+              endedAt: 100,
+            },
+            {
+              kind: "tool",
+              id: "d1",
+              tool: "delegate_research",
+              label: "Research subagents",
+              status: "error",
+              startedAt: 100,
+              endedAt: 5000,
+              subagents: [
+                { id: "1", title: "Chip A", status: "done", toolCalls: 1, result: "ok" },
+                { id: "2", title: "Chip B", status: "interrupted", toolCalls: 3 },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByTestId("tool-group-summary").getAttribute("aria-expanded")).toBe("false");
+    const tasks = screen.getAllByTestId("subagent-tasks");
+    expect(tasks).toHaveLength(1);
+    expect(screen.getByText("Interrupted")).toBeTruthy();
+    expect(screen.getByLabelText("Research subagents: 1 of 2 done")).toBeTruthy();
   });
 });

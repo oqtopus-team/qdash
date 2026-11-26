@@ -108,6 +108,7 @@ import {
   type SkillSummary,
 } from "./skill-tool.ts";
 import { buildIntentGuide, extractToolGuide, TOOL_GUIDE_SKILL, toolGuideNames } from "./tool-guide.ts";
+import { SUBAGENT_GUIDELINE, SUBAGENT_TOOL } from "./subagent-tool.ts";
 
 const AGENT_DIR = process.env.PI_CODING_AGENT_DIR ?? "/app/.pi-agent";
 const WORK_DIR = process.env.AGENT_WORK_DIR ?? "/app/workspace";
@@ -130,6 +131,8 @@ const EXEC_CONFIG = execConfigFromEnv();
 const BUNDLED = bundledExtensions(fileURLToPath(new URL("../../packages/", import.meta.url)));
 const BUNDLED_PATHS = BUNDLED.map(({ path }) => path);
 const EXTENSION_PATHS = trustedBundleRoots(BUNDLED, ALLOWLISTED_PACKAGES);
+// Read-only research subagents (`delegate_research`, see subagent-tool.ts); on unless set to 0 or false.
+const SUBAGENTS_ENABLED = !/^(0|false|no|off)$/i.test(process.env.AGENT_SUBAGENTS ?? "");
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high";
 
@@ -393,6 +396,7 @@ export class SharedRuntime {
           new Set([...toolGuideNames(toolGuide), ...toolGuideNames(intentGuide)]),
         ),
         intentGuide,
+        subagents: SUBAGENTS_ENABLED ? SUBAGENT_GUIDELINE : null,
       },
     );
     const agentExtension = buildAgentExtension(systemPrompt, [
@@ -412,6 +416,7 @@ export class SharedRuntime {
       internalCalls: presentation ? PRESENTATION_INTERNAL_CALLS : {},
       codingTools: EXEC_CONFIG !== undefined,
       compaction: buildCompactionExtension({ timeoutMs: MODEL_STREAM_TIMEOUT_MS }),
+      subagents: SUBAGENTS_ENABLED,
     };
     const buildChatRegistry = (
       connection: QDashConnection,
@@ -429,6 +434,7 @@ export class SharedRuntime {
       ...(skills.length ? ["read_skill"] : []),
       CODEMODE_TOOL_NAME,
       TOOL_SEARCH_TOOL_NAME,
+      ...(SUBAGENTS_ENABLED ? [SUBAGENT_TOOL] : []),
     ];
     // Pinned definitions first so a trusted one replaces, as in buildQDashExtension.
     const enabledTools = new Map<string, EnabledTool>();

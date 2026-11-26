@@ -3,7 +3,11 @@
 import json
 from typing import Any
 
-from qdash.api.services.chat_transcript import TurnTranscript, transcript_digest
+from qdash.api.services.chat_transcript import (
+    TurnTranscript,
+    interrupted_content,
+    transcript_digest,
+)
 from qdash.dbmodel.agent_chat_session import AgentChatMessage, AgentChatSteer
 
 
@@ -163,6 +167,80 @@ def test_progress_keeps_open_tools_open_and_the_end_closes_them() -> None:
     ]
 
 
+def _subagent(task_id: str, status: str, **fields: Any) -> dict[str, Any]:
+    return {"id": task_id, "title": f"Task {task_id}", "status": status, "tool_calls": 1, **fields}
+
+
+def test_subagent_progress_is_saved_and_an_end_leaves_no_task_running() -> None:
+    fold = TurnTranscript("r1", _user(), clock=_clock())
+    fold.apply("tool_start", {"id": "d1", "tool": "delegate_research", "label": "Research"})
+    fold.apply(
+        "tool_progress",
+        {
+            "id": "d1",
+            "tool": "delegate_research",
+            "subagents": [
+                _subagent("1", "running", activity="qdash_list_chips", started_at=5),
+                _subagent("2", "queued"),
+            ],
+        },
+    )
+    _, partial = fold.messages()
+    (step,) = _payload(partial)["trace"]["steps"]
+    assert step["status"] == "running"
+    assert step["subagents"] == [
+        {
+            "id": "1",
+            "title": "Task 1",
+            "status": "running",
+            "toolCalls": 1,
+            "startedAt": 5,
+            "activity": "qdash_list_chips",
+        },
+        {"id": "2", "title": "Task 2", "status": "queued", "toolCalls": 1},
+    ]
+
+    # Saved in progress, then its process died: no task stays running.
+    restored = json.loads(interrupted_content(partial.content) or "{}")
+    (closed,) = restored["trace"]["steps"]
+    assert [t["status"] for t in closed["subagents"]] == ["interrupted", "interrupted"]
+    assert "activity" not in closed["subagents"][0]
+
+    # The end carries the final tasks; one it never settled was cut off.
+    fold.apply(
+        "tool_end",
+        {
+            "id": "d1",
+            "tool": "delegate_research",
+            "is_error": False,
+            "subagents": [_subagent("1", "done", result="found"), _subagent("2", "running")],
+        },
+    )
+    fold.apply("result", {"blocks": [{"type": "text", "content": "ok", "chart": None}]})
+    _, final = fold.messages()
+    (ended,) = _payload(final)["trace"]["steps"]
+    assert [(t["status"], t.get("result")) for t in ended["subagents"]] == [
+        ("done", "found"),
+        ("interrupted", None),
+    ]
+
+
+def test_a_stopped_delegation_keeps_its_last_progress_marked_interrupted() -> None:
+    fold = TurnTranscript("r1", _user(), clock=_clock())
+    fold.apply("tool_start", {"id": "d1", "tool": "delegate_research", "label": "Research"})
+    fold.apply(
+        "tool_progress",
+        {"id": "d1", "subagents": [_subagent("1", "done", result="x"), _subagent("2", "running")]},
+    )
+    # The aborted call ends without final tasks.
+    fold.apply("tool_end", {"id": "d1", "tool": "delegate_research", "is_error": True})
+    fold.stop()
+    _, stopped = fold.messages()
+    (step,) = _payload(stopped)["trace"]["steps"]
+    assert step["status"] == "error"
+    assert [t["status"] for t in step["subagents"]] == ["done", "interrupted"]
+
+
 def test_a_steer_closes_off_the_answer_so_far_and_follows_it() -> None:
     fold = TurnTranscript("r1", _user(), clock=_clock())
     fold.apply("delta", {"text": "First part"})
@@ -245,3 +323,14 @@ def test_a_restart_folds_the_replayed_turn_once() -> None:
     fold.apply("result", {"blocks": [{"type": "text", "content": "Hello", "chart": None}]})
     assert [m.role for m in fold.messages()] == ["user", "assistant"]
     assert _payload(fold.messages()[-1])["blocks"][0]["content"] == "Hello"
+
+
+def test_subagent_status_rejects_unhashable_values():
+    from qdash.api.services.chat_transcript import _step_subagents
+    from qdash.api.services.pi_chat_service import subagents_for_chat
+
+    statuses: list[object] = [[], {}, ["done"]]
+    for status in statuses:
+        tasks = [{"id": "1", "title": "Malformed", "status": status}]
+        assert _step_subagents(tasks) is None
+        assert subagents_for_chat(tasks) is None

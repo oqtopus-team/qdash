@@ -40,6 +40,20 @@ will check next. Open **Worked for …** or **Work history** above a completed a
 these updates and tool activity. If an answer fails, any content received before the error stays
 in the conversation; treat it as unfinished.
 
+### Split a Research Question
+
+Ask the assistant to split independent lookups, for example: “Use subagents to investigate
+Q01 and Q02 separately, then compare their calibration failures from today.”
+
+Expand **Research subagents** in the answer's activity to follow each task. Open **Findings**
+to read its result or **Error** to see why it failed. The assistant combines the findings
+into its answer. Each child uses your project access and the chat's model, and can only read
+QDash data; it cannot run calibrations or change settings.
+
+Reloading keeps the tasks visible. **Stop** stops the parent answer and its children.
+An **Interrupted** task did not finish; ask the assistant to investigate it again.
+This feature is available in the web Agent when enabled by the administrator.
+
 ### Add to an Answer in Progress, or Continue One
 
 Send a message while an answer runs to add guidance after its current step. Send figures in a

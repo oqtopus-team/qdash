@@ -7,6 +7,7 @@
 import { CLASSIFY_CHAT_TOOL, CLASSIFY_LIMITS, type ClassificationDetails } from "./classify-tool.ts";
 import { recordFromDetails, type EvaluateResult } from "./evaluate.ts";
 import { uiBlockFromDetails, type UiBlockPayload } from "./ui-tool.ts";
+import { SUBAGENT_TOOL, subagentsFromDetails, type SubagentTaskDetail } from "./subagent-tool.ts";
 
 export type NdjsonEvent =
   | { type: "tool_start"; name: string; id?: string; args?: unknown }
@@ -26,6 +27,8 @@ export type NdjsonEvent =
        * own result details (never from the model's arguments or text), for the chat to show.
        */
       calibrationSession?: CreatedCalibrationSession;
+      /** The research tasks a `delegate_research` call ran and how each ended, from its details; bounded. */
+      subagents?: SubagentTaskDetail[];
       /** What a workspace tool printed or answered, for the chat to show under the step; bounded. */
       output?: string;
       /** A command's exit status (`bash`). */
@@ -41,6 +44,8 @@ export type NdjsonEvent =
        */
       before_turn?: true;
     }
+  /** Progress of a running call: the research tasks of a `delegate_research` call so far; bounded. */
+  | { type: "tool_update"; name: string; id: string; subagents: SubagentTaskDetail[] }
   | { type: "text_delta"; delta: string }
   | { type: "thinking_delta"; delta: string }
   /** The model started writing a tool call; its arguments follow as `tool_args_delta` until `tool_start`. */
@@ -317,6 +322,11 @@ export function toNdjsonEvents(event: SessionEventLike): NdjsonEvent[] {
       },
     ];
   }
+  if (event.type === "tool_execution_update") {
+    if (event.toolName !== SUBAGENT_TOOL || !event.toolCallId) return [];
+    const subagents = subagentsFromDetails(event.result?.details);
+    return subagents ? [{ type: "tool_update", name: event.toolName, id: event.toolCallId, subagents }] : [];
+  }
   if (event.type === "tool_execution_end") {
     const out: NdjsonEvent[] = [];
     const durableResult = event.entry?.model?.[0];
@@ -339,6 +349,16 @@ export function toNdjsonEvents(event: SessionEventLike): NdjsonEvent[] {
       event.toolName === CLASSIFY_CHAT_TOOL ? classificationFromDetails(details) : undefined;
     const isError = event.isError === true || durableResult?.isError === true;
     const calibrationSession = createdCalibrationSessionFromDetails(event.toolName, details, isError);
+    // A call that ended has no running task: one its result still shows as queued or running was cut off
+    // (a restart ends the call interrupted with its last running details).
+    const subagents =
+      event.toolName === SUBAGENT_TOOL
+        ? subagentsFromDetails(details)?.map((task) =>
+            task.status === "queued" || task.status === "running"
+              ? { ...task, status: "interrupted" as const, activity: undefined }
+              : task,
+          )
+        : undefined;
     out.push({
       type: "tool_end",
       name: event.toolName ?? "unknown",
@@ -346,6 +366,7 @@ export function toNdjsonEvents(event: SessionEventLike): NdjsonEvent[] {
       ...(evaluation ? { evaluation } : {}),
       ...(classification ? { classification } : {}),
       ...(calibrationSession ? { calibrationSession } : {}),
+      ...(subagents ? { subagents } : {}),
       ...toolOutput(event),
       isError,
       ...(event.toolCallId ? { id: event.toolCallId } : {}),

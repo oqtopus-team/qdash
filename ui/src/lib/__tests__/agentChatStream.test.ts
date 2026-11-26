@@ -6,6 +6,7 @@ import {
   appendLiveBlock,
   endTool,
   failedTurnPayload,
+  progressTool,
   startDraft,
   startTool,
   stoppedBlocks,
@@ -172,6 +173,58 @@ describe("agentChatStream", () => {
       outcome: "ambiguous",
       probabilities: [{ category: "a", probability: 0.5 }],
     });
+  });
+
+  it("follows a delegation's research tasks and leaves none running once it ends", () => {
+    const running = { id: "1", title: "Chip A", status: "running", tool_calls: 2, started_at: 5 };
+    let steps: TraceStep[] = startTool([], { id: "d1", tool: "delegate_research", label: "R" });
+    steps = progressTool(steps, {
+      id: "d1",
+      subagents: [running, { id: "2", title: "Chip B", status: "queued" }, { id: 3 }],
+    });
+    expect(tool(steps).subagents).toEqual([
+      { id: "1", title: "Chip A", status: "running", toolCalls: 2, startedAt: 5 },
+      { id: "2", title: "Chip B", status: "queued", toolCalls: 0 },
+    ]);
+    // Malformed progress and progress for another call change nothing.
+    expect(progressTool(steps, { id: "d1", subagents: "x" })).toBe(steps);
+    expect(progressTool(steps, { id: "other", subagents: [running] })).toBe(steps);
+
+    // A stopped turn saves the last progress with no task still running.
+    const saved = toPersistedTrace({ steps, startedAt: 0 }, 10);
+    const stored = saved?.steps[0];
+    if (stored?.kind !== "tool") throw new Error("not a tool step");
+    expect(stored.subagents?.map((t) => t.status)).toEqual(["interrupted", "interrupted"]);
+
+    // The end carries the final tasks; one it left running was cut off.
+    steps = endTool(steps, {
+      id: "d1",
+      tool: "delegate_research",
+      subagents: [
+        { ...running, status: "done", result: "T1 is 40 us" },
+        { id: "2", title: "Chip B", status: "running", activity: "thinking" },
+      ],
+    });
+    expect(tool(steps).subagents).toEqual([
+      {
+        id: "1",
+        title: "Chip A",
+        status: "done",
+        toolCalls: 2,
+        startedAt: 5,
+        result: "T1 is 40 us",
+      },
+      { id: "2", title: "Chip B", status: "interrupted", toolCalls: 0 },
+    ]);
+    // An aborted call that ends without its tasks keeps the last progress, settled.
+    const aborted = endTool(
+      progressTool(startTool([], { id: "d2", tool: "delegate_research" }), {
+        id: "d2",
+        subagents: [running],
+      }),
+      { id: "d2", tool: "delegate_research", is_error: true },
+    );
+    expect(tool(aborted).subagents?.[0].status).toBe("interrupted");
   });
 
   it("opens a new step for a call that was never drafted", () => {

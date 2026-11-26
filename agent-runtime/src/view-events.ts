@@ -123,6 +123,8 @@ export class ViewEventTranslator {
   #streamed = new Map<number, Streamed>();
   readonly #started = new Set<string>();
   readonly #ended = new Set<string>();
+  /** The running details last reported for each open call, as JSON, for `tool_execution_update`. */
+  readonly #details = new Map<string, string>();
   /** Arguments of each tool call the model made, by call ID, for `tool_start`. */
   readonly #callArgs = new Map<string, unknown>();
   /** Calls of the current run's tool rounds that have not ended, with their tool names. */
@@ -202,6 +204,19 @@ export class ViewEventTranslator {
       if (slot.status === "pending" || this.#started.has(slot.callId)) continue;
       events.push(this.#start(slot.name, slot.callId));
     }
+    // Running details a call published (`api.details()`), such as subagent progress: each change once.
+    for (const slot of slots) {
+      if (slot.status === "pending" || slot.details === undefined || this.#ended.has(slot.callId)) continue;
+      const json = JSON.stringify(slot.details);
+      if (this.#details.get(slot.callId) === json) continue;
+      this.#details.set(slot.callId, json);
+      events.push({
+        type: "tool_execution_update",
+        toolName: slot.name,
+        toolCallId: slot.callId,
+        result: { details: slot.details },
+      });
+    }
     for (const slot of slots) {
       if (!this.#ended.has(slot.callId)) this.#open.set(slot.callId, slot.name);
       // A call that finished without a result entry: its tool task faulted or was orphaned.
@@ -243,6 +258,7 @@ export class ViewEventTranslator {
             // (local models may give every call the same ID): it starts and ends again.
             this.#started.delete(block.id);
             this.#ended.delete(block.id);
+            this.#details.delete(block.id);
             this.#open.set(block.id, typeof block.name === "string" ? block.name : "unknown");
           }
         }

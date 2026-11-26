@@ -8,6 +8,8 @@ import type {
   ContentBlock,
   CreatedCalibrationSession,
   LiveTurn,
+  SubagentStatus,
+  SubagentTask,
   ToolClassification,
   ToolEvaluation,
   TraceStep,
@@ -31,8 +33,64 @@ function closeThinking(steps: TraceStep[], now: number): TraceStep[] {
   );
 }
 
+const SUBAGENT_STATUSES = new Set<SubagentStatus>([
+  "queued",
+  "running",
+  "done",
+  "error",
+  "cancelled",
+  "interrupted",
+]);
+
+const finite = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
+
+/**
+ * The research tasks of a `tool_progress` or `tool_end` payload (a
+ * `delegate_research` call), when well-formed: only the known fields.
+ */
+function subagentTasks(value: unknown): SubagentTask[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const tasks = value.flatMap((raw): SubagentTask[] => {
+    if (!raw || typeof raw !== "object") return [];
+    const { id, title, status, tool_calls, started_at, ended_at, activity, result, error } =
+      raw as Record<string, unknown>;
+    if (typeof id !== "string" || typeof title !== "string") return [];
+    if (!SUBAGENT_STATUSES.has(status as SubagentStatus)) return [];
+    return [
+      {
+        id,
+        title,
+        status: status as SubagentStatus,
+        toolCalls: finite(tool_calls) && tool_calls >= 0 ? Math.floor(tool_calls) : 0,
+        ...(finite(started_at) ? { startedAt: started_at } : {}),
+        ...(finite(ended_at) ? { endedAt: ended_at } : {}),
+        ...(typeof activity === "string" && activity ? { activity } : {}),
+        ...(typeof result === "string" && result ? { result } : {}),
+        ...(typeof error === "string" && error ? { error } : {}),
+      },
+    ];
+  });
+  return tasks.length ? tasks : undefined;
+}
+
+/** The step with no research task left queued or running: its call ended or was cut off. */
+function settleSubagents<T extends TraceStep>(step: T): T {
+  if (step.kind !== "tool" || !step.subagents) return step;
+  if (!step.subagents.some((t) => t.status === "queued" || t.status === "running")) return step;
+  return {
+    ...step,
+    subagents: step.subagents.map((task) => {
+      if (task.status !== "queued" && task.status !== "running") return task;
+      const { activity: _activity, ...rest } = task;
+      return { ...rest, status: "interrupted" as const };
+    }),
+  };
+}
+
 function closeOpenSteps(steps: TraceStep[], now: number): TraceStep[] {
-  return steps.map((step) => {
+  return steps.map((raw) => {
+    const step = settleSubagents(raw);
     if (step.kind === "thinking" && step.endedAt === undefined) return { ...step, endedAt: now };
     // A call still being written when the turn ended was never made: it is
     // kept as cancelled, with what was typed as its arguments, never as done.
@@ -227,6 +285,24 @@ function createdCalibrationSession(
   };
 }
 
+/** A running call's progress: the research tasks of a `delegate_research` call so far. */
+export function progressTool(
+  steps: TraceStep[],
+  payload: { id?: string | null; subagents?: unknown },
+): TraceStep[] {
+  const subagents = subagentTasks(payload.subagents);
+  if (!subagents || payload.id == null) return steps;
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const s = steps[i];
+    if (s.kind === "tool" && s.id === payload.id && s.status === "running") {
+      const next = [...steps];
+      next[i] = { ...s, subagents };
+      return next;
+    }
+  }
+  return steps;
+}
+
 export function endTool(
   steps: TraceStep[],
   payload: {
@@ -239,6 +315,7 @@ export function endTool(
     calibration_session?: unknown;
     output?: unknown;
     exit_code?: unknown;
+    subagents?: unknown;
   },
 ): TraceStep[] {
   // Match by call id, preferring the call of that id still running: a local model
@@ -275,8 +352,9 @@ export function endTool(
           payload.calibration_session,
         )
       : undefined;
+  const subagents = subagentTasks(payload.subagents);
   const next = [...steps];
-  next[idx] = {
+  next[idx] = settleSubagents({
     ...step,
     status: payload.is_error ? "error" : "done",
     endedAt: Date.now(),
@@ -286,7 +364,8 @@ export function endTool(
     ...(calibrationSession ? { calibrationSession } : {}),
     ...(typeof payload.output === "string" && payload.output ? { output: payload.output } : {}),
     ...(typeof payload.exit_code === "number" ? { exitCode: payload.exit_code } : {}),
-  };
+    ...(subagents ? { subagents } : {}),
+  });
   return next;
 }
 
