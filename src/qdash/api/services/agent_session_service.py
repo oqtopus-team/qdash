@@ -53,7 +53,6 @@ from qdash.api.services.agent_parameter_update import (
 )
 from qdash.api.services.agent_session_gate import (
     ADMITTED_FILTER,
-    admission_refusal,
     admit_calibration_child,
     autonomous_session_refusal,
     end_notification_update,
@@ -62,6 +61,7 @@ from qdash.api.services.agent_session_gate import (
     load_agent_session,
     materialize_pending_action,
     materialize_pending_intervention,
+    operation_refusal,
     pass_execution_gate,
     raw_document,
     reject_calibration_child,
@@ -507,12 +507,7 @@ class AgentSessionService:
     ) -> CandidateGateResponse:
         """Evaluate a candidate against immutable session bounds without writing state."""
         session = self._get_session_document(project_id, session_id)
-        if session.status != AgentSessionStatus.ACTIVE:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Agent session is not active: {session.status.value}",
-            )
-        admission_refusal(session)
+        operation_refusal(session)
 
         bounds = session.policy.allowed_overrides.get(body.parameter_name)
         if bounds is None:
@@ -760,12 +755,7 @@ class AgentSessionService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="The session's previous action record is still being written; retry",
             )
-        if session.status != AgentSessionStatus.ACTIVE:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Agent session is not active: {session.status.value}",
-            )
-        admission_refusal(session)
+        operation_refusal(session)
         if body.expected_state_version != session.state_version:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1289,12 +1279,7 @@ class AgentSessionService:
             return self._candidate_commit_response(existing)
 
         session = self._get_session_document(project_id, session_id)
-        if session.status != AgentSessionStatus.ACTIVE:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Agent session is not active: {session.status.value}",
-            )
-        admission_refusal(session)
+        operation_refusal(session)
         if body.expected_state_version != session.state_version:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1480,12 +1465,7 @@ class AgentSessionService:
             )
 
         session = self._get_session_document(project_id, session_id)
-        if session.status != AgentSessionStatus.ACTIVE:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Agent session is not active: {session.status.value}",
-            )
-        admission_refusal(session)
+        operation_refusal(session)
         if body.expected_state_version != session.state_version:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1682,12 +1662,7 @@ class AgentSessionService:
         request_hash = self._backend_apply_request_hash(body)
         session = self._get_session_document(project_id, session_id)
         release_abandoned_reservations(project_id, session_id)
-        if session.status != AgentSessionStatus.ACTIVE:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Agent session is not active: {session.status.value}",
-            )
-        admission_refusal(session)
+        operation_refusal(session)
         if body.expected_state_version != session.state_version:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1962,12 +1937,7 @@ class AgentSessionService:
         session = self._get_session_document(project_id, session_id)
         if body.autonomous:
             autonomous_session_refusal(session, username)
-        if session.status != AgentSessionStatus.ACTIVE:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Agent session is not active: {session.status.value}",
-            )
-        admission_refusal(session)
+        operation_refusal(session)
         if body.reconfigure and not session.policy.allow_reconfigure:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

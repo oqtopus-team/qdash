@@ -1,11 +1,11 @@
 """Schema definitions for task_result router."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
-from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
+from qdash.datamodel.field_types import ElapsedTime
 from qdash.datamodel.task import (
     ParameterModel,
     TaskResultInputParameter,
@@ -36,22 +36,10 @@ class TaskResult(BaseModel):
     raw_data_path: list[str] | None = None
     start_at: datetime | None = None
     end_at: datetime | None = None
-    elapsed_time: timedelta | None = None
+    elapsed_time: ElapsedTime = None
     task_type: str | None = None
     invocation: TaskInvocation | None = Field(default=None, description=_INVOCATION)
     default_view: bool = True
-
-    @field_validator("elapsed_time", mode="before")
-    @classmethod
-    def _parse_elapsed_time(cls, v: Any) -> timedelta | None:
-        """Parse elapsed_time from various formats."""
-        return parse_elapsed_time(v)
-
-    @field_serializer("elapsed_time")
-    @classmethod
-    def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
-        """Serialize elapsed_time to H:MM:SS format."""
-        return format_elapsed_time(v) if v else None
 
 
 class LatestTaskResultResponse(BaseModel):
@@ -85,19 +73,7 @@ class TaskResultListItem(BaseModel):
     invocation: TaskInvocation | None = Field(default=None, description=_INVOCATION)
     start_at: datetime | None = None
     end_at: datetime | None = None
-    elapsed_time: timedelta | None = None
-
-    @field_validator("elapsed_time", mode="before")
-    @classmethod
-    def _parse_elapsed_time(cls, v: Any) -> timedelta | None:
-        """Parse elapsed_time from various formats."""
-        return parse_elapsed_time(v)
-
-    @field_serializer("elapsed_time")
-    @classmethod
-    def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
-        """Serialize elapsed_time to H:MM:SS format."""
-        return format_elapsed_time(v) if v else None
+    elapsed_time: ElapsedTime = None
 
 
 class TaskResultListResponse(BaseModel):

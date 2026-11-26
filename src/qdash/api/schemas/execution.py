@@ -1,13 +1,13 @@
 """Schema definitions for execution router."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import BaseModel, Field
 
-from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
 from qdash.datamodel.agent_session import AgentSessionStatus
 from qdash.datamodel.calibration_session import CalibrationSessionStatus
+from qdash.datamodel.field_types import ElapsedTime
 from qdash.datamodel.launch_origin import ReportedLaunchOrigin
 from qdash.datamodel.step_record import TransformStepRecord
 from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
@@ -73,25 +73,13 @@ class Task(BaseModel):
     raw_data_path: list[str] | None = None
     start_at: datetime | None = None
     end_at: datetime | None = None
-    elapsed_time: timedelta | None = None
+    elapsed_time: ElapsedTime = None
     task_type: str | None = None
     invocation: TaskInvocation | None = Field(
         default=None,
         description="Planned step and call this result executed; null for older results.",
     )
     default_view: bool = True
-
-    @field_validator("elapsed_time", mode="before")
-    @classmethod
-    def _parse_elapsed_time(cls, v: Any) -> timedelta | None:
-        """Parse elapsed_time from various formats."""
-        return parse_elapsed_time(v)
-
-    @field_serializer("elapsed_time")
-    @classmethod
-    def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
-        """Serialize elapsed_time to H:MM:SS format."""
-        return format_elapsed_time(v) if v else None
 
 
 class ExecutionAgentSessionLink(BaseModel):
@@ -189,7 +177,7 @@ class ExecutionResponseSummary(BaseModel):
     username: str = ""
     start_at: datetime | None = None
     end_at: datetime | None = None
-    elapsed_time: timedelta | None = None
+    elapsed_time: ElapsedTime = None
     tags: list[str]
     note: dict[str, Any]
     agent_session: ExecutionAgentSessionLink | None = Field(
@@ -205,18 +193,6 @@ class ExecutionResponseSummary(BaseModel):
     reported_origin: ReportedLaunchOrigin | None = Field(
         default=None, description=_REPORTED_ORIGIN_DESCRIPTION
     )
-
-    @field_validator("elapsed_time", mode="before")
-    @classmethod
-    def _parse_elapsed_time(cls, v: Any) -> timedelta | None:
-        """Parse elapsed_time from various formats."""
-        return parse_elapsed_time(v)
-
-    @field_serializer("elapsed_time")
-    @classmethod
-    def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
-        """Serialize elapsed_time to H:MM:SS format."""
-        return format_elapsed_time(v) if v else None
 
 
 class PipelineStepProgress(BaseModel):
@@ -307,7 +283,7 @@ class ExecutionResponseDetail(BaseModel):
     username: str = ""
     start_at: datetime | None = None
     end_at: datetime | None = None
-    elapsed_time: timedelta | None = None
+    elapsed_time: ElapsedTime = None
     task: list[Task]
     note: dict[str, Any]
     tags: list[str] = []
@@ -329,18 +305,6 @@ class ExecutionResponseDetail(BaseModel):
     reported_origin: ReportedLaunchOrigin | None = Field(
         default=None, description=_REPORTED_ORIGIN_DESCRIPTION
     )
-
-    @field_validator("elapsed_time", mode="before")
-    @classmethod
-    def _parse_elapsed_time(cls, v: Any) -> timedelta | None:
-        """Parse elapsed_time from various formats."""
-        return parse_elapsed_time(v)
-
-    @field_serializer("elapsed_time")
-    @classmethod
-    def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
-        """Serialize elapsed_time to H:MM:SS format."""
-        return format_elapsed_time(v) if v else None
 
 
 class CancelExecutionResponse(BaseModel):

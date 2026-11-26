@@ -190,25 +190,25 @@ class ChipService:
             )
         qids = list(mapping.qids_of(mux_id))
 
-        # Fetch task results
-        all_results = self._task_result_repo.find_latest_by_chip_and_qids(
+        task_results = self._latest_results_by_qid(project_id, chip_id, qids, task_names)
+
+        return self._build_mux_detail(mux_id, qids, task_names, task_results)
+
+    def _latest_results_by_qid(
+        self, project_id: str, chip_id: str, qids: list[str], task_names: list[str]
+    ) -> dict[str, dict[str, Any]]:
+        """Latest task results of the qubits, keyed by qid and task name (first result wins)."""
+        task_results: dict[str, dict[str, Any]] = {}
+        for result in self._task_result_repo.find_latest_by_chip_and_qids(
             project_id=project_id,
             chip_id=chip_id,
             qids=qids,
             task_names=task_names,
-        )
-
-        # Organize results by qid and task name
-        task_results: dict[str, dict[str, Any]] = {}
-        for result in all_results:
+        ):
             qid = result.qid if hasattr(result, "qid") else ""
             name = result.name if hasattr(result, "name") else ""
-            if qid not in task_results:
-                task_results[qid] = {}
-            if name not in task_results[qid]:
-                task_results[qid][name] = result
-
-        return self._build_mux_detail(mux_id, qids, task_names, task_results)
+            task_results.setdefault(qid, {}).setdefault(name, result)
+        return task_results
 
     def _mux_mapping(self, project_id: str, chip_id: str) -> MuxMapping:
         """MUX membership from the chip topology (legacy ``qid // 4`` without one)."""
@@ -249,23 +249,7 @@ class ChipService:
         groups = self._mux_mapping(project_id, chip_id).groups_for_qubit_count(chip_size)
         qids = [qid for members in groups.values() for qid in members]
 
-        # Fetch all task results in one query
-        all_results = self._task_result_repo.find_latest_by_chip_and_qids(
-            project_id=project_id,
-            chip_id=chip_id,
-            qids=qids,
-            task_names=task_names,
-        )
-
-        # Organize results by qid and task name
-        task_results: dict[str, dict[str, Any]] = {}
-        for result in all_results:
-            qid = result.qid if hasattr(result, "qid") else ""
-            name = result.name if hasattr(result, "name") else ""
-            if qid not in task_results:
-                task_results[qid] = {}
-            if name not in task_results[qid]:
-                task_results[qid][name] = result
+        task_results = self._latest_results_by_qid(project_id, chip_id, qids, task_names)
 
         # Build mux details
         muxes: dict[int, MuxDetailResponse] = {}
@@ -403,12 +387,7 @@ class ChipService:
         body: UpdateChipRequest,
         username: str,
     ) -> ChipResponse:
-        doc = ChipDocument.find_one(
-            ChipDocument.project_id == project_id,
-            ChipDocument.chip_id == chip_id,
-        ).run()
-        if doc is None:
-            raise HTTPException(status_code=404, detail="Chip not found")
+        doc = self._get_chip_document(project_id=project_id, chip_id=chip_id)
         if body.topology_id is not None:
             try:
                 ChipInitializer.ensure_topology_documents(
@@ -443,6 +422,14 @@ class ChipService:
             raise HTTPException(status_code=404, detail="Chip not found")
         return doc
 
+    @staticmethod
+    def _find_chip_note(project_id: str, chip_id: str, scope_key: str) -> ChipNoteDocument | None:
+        return ChipNoteDocument.find_one(
+            ChipNoteDocument.project_id == project_id,
+            ChipNoteDocument.chip_id == chip_id,
+            ChipNoteDocument.scope_key == scope_key,
+        ).run()
+
     def get_chip_note(
         self,
         *,
@@ -465,11 +452,7 @@ class ChipService:
         if scope.scope_type == "global":
             return doc.note
 
-        scoped_doc = ChipNoteDocument.find_one(
-            ChipNoteDocument.project_id == project_id,
-            ChipNoteDocument.chip_id == chip_id,
-            ChipNoteDocument.scope_key == scope.scope_key,
-        ).run()
+        scoped_doc = self._find_chip_note(project_id, chip_id, scope.scope_key)
         if scoped_doc is None:
             return NoteModel()
         return scoped_doc.note
@@ -502,31 +485,18 @@ class ChipService:
             doc.save()
             return note
 
-        scoped_doc = ChipNoteDocument.find_one(
-            ChipNoteDocument.project_id == project_id,
-            ChipNoteDocument.chip_id == chip_id,
-            ChipNoteDocument.scope_key == scope.scope_key,
-        ).run()
+        scoped_doc = self._find_chip_note(project_id, chip_id, scope.scope_key)
         if scoped_doc is None:
             scoped_doc = ChipNoteDocument(
                 project_id=project_id,
                 chip_id=chip_id,
                 note=note,
-                scope_type=scope.scope_type,
-                scope_key=scope.scope_key,
-                cooldown_id=scope.cooldown_id,
-                scope_started_at=scope.started_at,
-                scope_ended_at=scope.ended_at,
-                scope_source=scope.source,
+                **NoteService._scope_fields(scope),
             )
             scoped_doc.insert()
         else:
             scoped_doc.note = note
-            scoped_doc.scope_type = scope.scope_type
-            scoped_doc.cooldown_id = scope.cooldown_id
-            scoped_doc.scope_started_at = scope.started_at
-            scoped_doc.scope_ended_at = scope.ended_at
-            scoped_doc.scope_source = scope.source
+            NoteService._apply_scope(scoped_doc, scope)
             scoped_doc.system_info.update_time()
             scoped_doc.save()
         return note
@@ -556,11 +526,7 @@ class ChipService:
             doc.save()
             return SuccessResponse(message="Chip note cleared")
 
-        scoped_doc = ChipNoteDocument.find_one(
-            ChipNoteDocument.project_id == project_id,
-            ChipNoteDocument.chip_id == chip_id,
-            ChipNoteDocument.scope_key == scope.scope_key,
-        ).run()
+        scoped_doc = self._find_chip_note(project_id, chip_id, scope.scope_key)
         if scoped_doc is not None:
             scoped_doc.delete()
         return SuccessResponse(message="Chip note cleared")
@@ -568,12 +534,7 @@ class ChipService:
     # ---------- chip deletion ----------
 
     def get_deletion_impact(self, *, project_id: str, chip_id: str) -> ChipDeletionImpactResponse:
-        doc = ChipDocument.find_one(
-            ChipDocument.project_id == project_id,
-            ChipDocument.chip_id == chip_id,
-        ).run()
-        if doc is None:
-            raise HTTPException(status_code=404, detail="Chip not found")
+        self._get_chip_document(project_id=project_id, chip_id=chip_id)
 
         scope = {"project_id": project_id, "chip_id": chip_id}
         qubit_count = QubitDocument.find(scope).count()
@@ -597,12 +558,7 @@ class ChipService:
         )
 
     def delete_chip(self, *, project_id: str, chip_id: str, force: bool) -> SuccessResponse:
-        doc = ChipDocument.find_one(
-            ChipDocument.project_id == project_id,
-            ChipDocument.chip_id == chip_id,
-        ).run()
-        if doc is None:
-            raise HTTPException(status_code=404, detail="Chip not found")
+        doc = self._get_chip_document(project_id=project_id, chip_id=chip_id)
 
         scope = {"project_id": project_id, "chip_id": chip_id}
         qubit_count = QubitDocument.find(scope).count()

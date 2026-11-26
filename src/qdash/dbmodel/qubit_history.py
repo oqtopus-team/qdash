@@ -7,7 +7,7 @@ from pymongo import ASCENDING, DESCENDING, IndexModel
 from qdash.common.utils.datetime import local_now
 from qdash.datamodel.qubit import QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.dbmodel.user import UserDocument
+from qdash.dbmodel.lookups import current_cooldown_id, user_id_for_username
 
 
 class QubitHistoryDocument(Document):
@@ -71,32 +71,15 @@ class QubitHistoryDocument(Document):
         ]
 
     @classmethod
-    def _resolve_cooldown_id(cls, *, project_id: str | None, chip_id: str | None) -> str:
-        """Look up the chip's current_cooldown_id at write time."""
-        if not project_id or not chip_id:
-            return ""
-        from qdash.dbmodel.chip import ChipDocument
-
-        chip = ChipDocument.find_one({"project_id": project_id, "chip_id": chip_id}).run()
-        if chip is None:
-            return ""
-        return getattr(chip, "current_cooldown_id", None) or ""
-
-    @classmethod
-    def _user_id_for_username(cls, username: str) -> str | None:
-        user = UserDocument.find_one({"username": username}).run()
-        return user.user_id if user else None
-
-    @classmethod
     def create_history(cls, qubit: QubitModel) -> "QubitHistoryDocument":
         """Create a history record from a QubitDocument."""
         today = local_now().strftime("%Y%m%d")
-        cooldown_id = cls._resolve_cooldown_id(project_id=qubit.project_id, chip_id=qubit.chip_id)
+        cooldown_id = current_cooldown_id(project_id=qubit.project_id, chip_id=qubit.chip_id)
         username = qubit.username
         if username is None:
             msg = "QubitDocument.username is required to create history"
             raise ValueError(msg)
-        user_id = qubit.user_id or cls._user_id_for_username(username)
+        user_id = qubit.user_id or user_id_for_username(username)
         existing_history = cls.find_one(
             {
                 "project_id": qubit.project_id,

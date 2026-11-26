@@ -56,6 +56,27 @@ RABI_NORMALIZATION_INPUT_UNITS = {
 }
 
 
+_SAFE_CONSTANT_TYPES = (str, int, float, bool, tuple, list)
+_BINARY_OPERATORS: dict[type[ast.operator], Callable[[Any, Any], Any]] = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.FloorDiv: operator.floordiv,
+    ast.Mod: operator.mod,
+    ast.Pow: operator.pow,
+}
+_UNARY_OPERATORS: dict[type[ast.unaryop], Callable[[Any], Any]] = {
+    ast.UAdd: operator.pos,
+    ast.USub: operator.neg,
+}
+_MATH_FUNCTIONS: dict[str, Callable[..., float]] = {
+    "log": math.log,
+    "log10": math.log10,
+    "sqrt": math.sqrt,
+}
+
+
 class TaskFileService:
     """Service for task discovery and metadata extraction."""
 
@@ -560,27 +581,8 @@ class TaskFileService:
 
     @staticmethod
     def _evaluate_parameter_expression(node: ast.expr, namespace: dict[str, object]) -> object:
-        """Evaluate the expression subset allowed in parameter declarations."""
-        safe_types = (str, int, float, bool, tuple, list)
-        binary_operators: dict[type[ast.operator], Callable[[Any, Any], Any]] = {
-            ast.Add: operator.add,
-            ast.Sub: operator.sub,
-            ast.Mult: operator.mul,
-            ast.Div: operator.truediv,
-            ast.FloorDiv: operator.floordiv,
-            ast.Mod: operator.mod,
-            ast.Pow: operator.pow,
-        }
-        unary_operators: dict[type[ast.unaryop], Callable[[Any], Any]] = {
-            ast.UAdd: operator.pos,
-            ast.USub: operator.neg,
-        }
-        math_functions: dict[str, Callable[..., float]] = {
-            "log": math.log,
-            "log10": math.log10,
-            "sqrt": math.sqrt,
-        }
-        if isinstance(node, ast.Constant) and isinstance(node.value, safe_types):
+        """Evaluate the expression subset allowed in parameter and constant declarations."""
+        if isinstance(node, ast.Constant) and isinstance(node.value, _SAFE_CONSTANT_TYPES):
             return node.value
         if isinstance(node, (ast.Tuple, ast.List)):
             values = [
@@ -590,13 +592,13 @@ class TaskFileService:
             return tuple(values) if isinstance(node, ast.Tuple) else values
         if isinstance(node, ast.Name) and node.id in namespace:
             return namespace[node.id]
-        if isinstance(node, ast.BinOp) and type(node.op) in binary_operators:
-            return binary_operators[type(node.op)](
+        if isinstance(node, ast.BinOp) and type(node.op) in _BINARY_OPERATORS:
+            return _BINARY_OPERATORS[type(node.op)](
                 TaskFileService._evaluate_parameter_expression(node.left, namespace),
                 TaskFileService._evaluate_parameter_expression(node.right, namespace),
             )
-        if isinstance(node, ast.UnaryOp) and type(node.op) in unary_operators:
-            return unary_operators[type(node.op)](
+        if isinstance(node, ast.UnaryOp) and type(node.op) in _UNARY_OPERATORS:
+            return _UNARY_OPERATORS[type(node.op)](
                 TaskFileService._evaluate_parameter_expression(node.operand, namespace)
             )
         if (
@@ -604,10 +606,10 @@ class TaskFileService:
             and isinstance(node.func, ast.Attribute)
             and isinstance(node.func.value, ast.Name)
             and node.func.value.id in {"math", "np"}
-            and node.func.attr in math_functions
+            and node.func.attr in _MATH_FUNCTIONS
             and not node.keywords
         ):
-            return math_functions[node.func.attr](
+            return _MATH_FUNCTIONS[node.func.attr](
                 *(
                     cast("Any", TaskFileService._evaluate_parameter_expression(arg, namespace))
                     for arg in node.args
@@ -618,53 +620,8 @@ class TaskFileService:
     @staticmethod
     def _collect_safe_constants(tree: ast.Module) -> dict[str, object]:
         """Collect constants using a restricted, side-effect-free AST evaluator."""
-        binary_operators: dict[type[ast.operator], Callable[[Any, Any], Any]] = {
-            ast.Add: operator.add,
-            ast.Sub: operator.sub,
-            ast.Mult: operator.mul,
-            ast.Div: operator.truediv,
-            ast.FloorDiv: operator.floordiv,
-            ast.Mod: operator.mod,
-            ast.Pow: operator.pow,
-        }
-        unary_operators: dict[type[ast.unaryop], Callable[[Any], Any]] = {
-            ast.UAdd: operator.pos,
-            ast.USub: operator.neg,
-        }
-        math_functions: dict[str, Callable[..., float]] = {
-            "log": math.log,
-            "log10": math.log10,
-            "sqrt": math.sqrt,
-        }
         constants: dict[str, object] = {}
-        safe_types = (str, int, float, bool, tuple, list)
-
-        def evaluate(node: ast.expr, namespace: dict[str, object]) -> object:
-            if isinstance(node, ast.Constant) and isinstance(node.value, safe_types):
-                return node.value
-            if isinstance(node, (ast.Tuple, ast.List)):
-                values = [evaluate(item, namespace) for item in node.elts]
-                return tuple(values) if isinstance(node, ast.Tuple) else values
-            if isinstance(node, ast.Name) and node.id in namespace:
-                return namespace[node.id]
-            if isinstance(node, ast.BinOp) and type(node.op) in binary_operators:
-                return binary_operators[type(node.op)](
-                    evaluate(node.left, namespace), evaluate(node.right, namespace)
-                )
-            if isinstance(node, ast.UnaryOp) and type(node.op) in unary_operators:
-                return unary_operators[type(node.op)](evaluate(node.operand, namespace))
-            if (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Attribute)
-                and isinstance(node.func.value, ast.Name)
-                and node.func.value.id in {"math", "np"}
-                and node.func.attr in math_functions
-                and not node.keywords
-            ):
-                return math_functions[node.func.attr](
-                    *(cast("Any", evaluate(arg, namespace)) for arg in node.args)
-                )
-            raise ValueError("unsupported constant expression")
+        evaluate = TaskFileService._evaluate_parameter_expression
 
         def collect(
             module_tree: ast.Module,
@@ -696,7 +653,7 @@ class TaskFileService:
                         except (ArithmeticError, TypeError, ValueError):
                             unresolved.append((name, value_node))
                             continue
-                        if isinstance(value, safe_types):
+                        if isinstance(value, _SAFE_CONSTANT_TYPES):
                             collected[name] = value
                             progress = True
                     if not progress:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime  # noqa: TC003
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -27,6 +27,12 @@ from qdash.datamodel.note import NoteCommentModel, NoteModel
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+CooldownIdQuery = Annotated[
+    str | None, Query(description="Optional explicit cool-down scope identifier")
+]
+ScopeStartQuery = Annotated[datetime | None, Query(description="Optional time-range scope start")]
+ScopeEndQuery = Annotated[datetime | None, Query(description="Optional time-range scope end")]
+
 
 # =============================================================================
 # Qubit notes
@@ -45,23 +51,15 @@ def upsert_qubit_note(
     body: NoteUpsertRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
-    cooldown_id: Annotated[
-        str | None,
-        Query(description="Optional explicit cool-down scope identifier"),
-    ] = None,
-    start_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope start"),
-    ] = None,
-    end_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope end"),
-    ] = None,
+    cooldown_id: CooldownIdQuery = None,
+    start_at: ScopeStartQuery = None,
+    end_at: ScopeEndQuery = None,
 ) -> NoteModel:
-    return service.upsert_qubit_note(
+    return service.upsert_target_note(
         project_id=ctx.project_id,
         chip_id=chip_id,
-        qid=qid,
+        target_type="qubit",
+        target_id=qid,
         content=body.content,
         username=ctx.user.username,
         cooldown_id=cooldown_id,
@@ -81,23 +79,15 @@ def delete_qubit_note(
     qid: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
-    cooldown_id: Annotated[
-        str | None,
-        Query(description="Optional explicit cool-down scope identifier"),
-    ] = None,
-    start_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope start"),
-    ] = None,
-    end_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope end"),
-    ] = None,
+    cooldown_id: CooldownIdQuery = None,
+    start_at: ScopeStartQuery = None,
+    end_at: ScopeEndQuery = None,
 ) -> SuccessResponse:
-    return service.delete_qubit_note(
+    return service.delete_target_note(
         project_id=ctx.project_id,
         chip_id=chip_id,
-        qid=qid,
+        target_type="qubit",
+        target_id=qid,
         username=ctx.user.username,
         cooldown_id=cooldown_id,
         start_at=start_at,
@@ -117,23 +107,15 @@ def create_qubit_note_comment(
     body: NoteCommentRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
-    cooldown_id: Annotated[
-        str | None,
-        Query(description="Optional explicit cool-down scope identifier"),
-    ] = None,
-    start_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope start"),
-    ] = None,
-    end_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope end"),
-    ] = None,
+    cooldown_id: CooldownIdQuery = None,
+    start_at: ScopeStartQuery = None,
+    end_at: ScopeEndQuery = None,
 ) -> NoteCommentModel:
-    return service.create_qubit_note_comment(
+    return service.create_target_note_comment(
         project_id=ctx.project_id,
         chip_id=chip_id,
-        qid=qid,
+        target_type="qubit",
+        target_id=qid,
         content=body.content,
         username=ctx.user.username,
         cooldown_id=cooldown_id,
@@ -155,23 +137,15 @@ def update_qubit_note_comment(
     body: NoteCommentRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
-    cooldown_id: Annotated[
-        str | None,
-        Query(description="Optional explicit cool-down scope identifier"),
-    ] = None,
-    start_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope start"),
-    ] = None,
-    end_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope end"),
-    ] = None,
+    cooldown_id: CooldownIdQuery = None,
+    start_at: ScopeStartQuery = None,
+    end_at: ScopeEndQuery = None,
 ) -> NoteCommentModel:
-    return service.update_qubit_note_comment(
+    return service.update_target_note_comment(
         project_id=ctx.project_id,
         chip_id=chip_id,
-        qid=qid,
+        target_type="qubit",
+        target_id=qid,
         comment_id=comment_id,
         content=body.content,
         username=ctx.user.username,
@@ -194,23 +168,15 @@ def delete_qubit_note_comment(
     comment_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
-    cooldown_id: Annotated[
-        str | None,
-        Query(description="Optional explicit cool-down scope identifier"),
-    ] = None,
-    start_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope start"),
-    ] = None,
-    end_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope end"),
-    ] = None,
+    cooldown_id: CooldownIdQuery = None,
+    start_at: ScopeStartQuery = None,
+    end_at: ScopeEndQuery = None,
 ) -> SuccessResponse:
-    return service.delete_qubit_note_comment(
+    return service.delete_target_note_comment(
         project_id=ctx.project_id,
         chip_id=chip_id,
-        qid=qid,
+        target_type="qubit",
+        target_id=qid,
         comment_id=comment_id,
         username=ctx.user.username,
         actor_system_role=ctx.user.system_role,
@@ -233,23 +199,15 @@ def upsert_qubit_metric_note(
     body: NoteUpsertRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
-    cooldown_id: Annotated[
-        str | None,
-        Query(description="Optional explicit cool-down scope identifier"),
-    ] = None,
-    start_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope start"),
-    ] = None,
-    end_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope end"),
-    ] = None,
+    cooldown_id: CooldownIdQuery = None,
+    start_at: ScopeStartQuery = None,
+    end_at: ScopeEndQuery = None,
 ) -> NoteModel:
-    return service.upsert_qubit_metric_note(
+    return service.upsert_metric_note(
         project_id=ctx.project_id,
         chip_id=chip_id,
-        qid=qid,
+        target_type="qubit",
+        target_id=qid,
         metric_key=metric_key,
         content=body.content,
         username=ctx.user.username,
@@ -271,23 +229,15 @@ def delete_qubit_metric_note(
     metric_key: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
-    cooldown_id: Annotated[
-        str | None,
-        Query(description="Optional explicit cool-down scope identifier"),
-    ] = None,
-    start_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope start"),
-    ] = None,
-    end_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope end"),
-    ] = None,
+    cooldown_id: CooldownIdQuery = None,
+    start_at: ScopeStartQuery = None,
+    end_at: ScopeEndQuery = None,
 ) -> SuccessResponse:
-    return service.delete_qubit_metric_note(
+    return service.delete_metric_note(
         project_id=ctx.project_id,
         chip_id=chip_id,
-        qid=qid,
+        target_type="qubit",
+        target_id=qid,
         metric_key=metric_key,
         username=ctx.user.username,
         cooldown_id=cooldown_id,
@@ -313,23 +263,15 @@ def upsert_coupling_note(
     body: NoteUpsertRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
-    cooldown_id: Annotated[
-        str | None,
-        Query(description="Optional explicit cool-down scope identifier"),
-    ] = None,
-    start_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope start"),
-    ] = None,
-    end_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope end"),
-    ] = None,
+    cooldown_id: CooldownIdQuery = None,
+    start_at: ScopeStartQuery = None,
+    end_at: ScopeEndQuery = None,
 ) -> NoteModel:
-    return service.upsert_coupling_note(
+    return service.upsert_target_note(
         project_id=ctx.project_id,
         chip_id=chip_id,
-        coupling_id=coupling_id,
+        target_type="coupling",
+        target_id=coupling_id,
         content=body.content,
         username=ctx.user.username,
         cooldown_id=cooldown_id,
@@ -349,23 +291,15 @@ def delete_coupling_note(
     coupling_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
-    cooldown_id: Annotated[
-        str | None,
-        Query(description="Optional explicit cool-down scope identifier"),
-    ] = None,
-    start_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope start"),
-    ] = None,
-    end_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope end"),
-    ] = None,
+    cooldown_id: CooldownIdQuery = None,
+    start_at: ScopeStartQuery = None,
+    end_at: ScopeEndQuery = None,
 ) -> SuccessResponse:
-    return service.delete_coupling_note(
+    return service.delete_target_note(
         project_id=ctx.project_id,
         chip_id=chip_id,
-        coupling_id=coupling_id,
+        target_type="coupling",
+        target_id=coupling_id,
         username=ctx.user.username,
         cooldown_id=cooldown_id,
         start_at=start_at,
@@ -385,23 +319,15 @@ def create_coupling_note_comment(
     body: NoteCommentRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
-    cooldown_id: Annotated[
-        str | None,
-        Query(description="Optional explicit cool-down scope identifier"),
-    ] = None,
-    start_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope start"),
-    ] = None,
-    end_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope end"),
-    ] = None,
+    cooldown_id: CooldownIdQuery = None,
+    start_at: ScopeStartQuery = None,
+    end_at: ScopeEndQuery = None,
 ) -> NoteCommentModel:
-    return service.create_coupling_note_comment(
+    return service.create_target_note_comment(
         project_id=ctx.project_id,
         chip_id=chip_id,
-        coupling_id=coupling_id,
+        target_type="coupling",
+        target_id=coupling_id,
         content=body.content,
         username=ctx.user.username,
         cooldown_id=cooldown_id,
@@ -423,23 +349,15 @@ def update_coupling_note_comment(
     body: NoteCommentRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
-    cooldown_id: Annotated[
-        str | None,
-        Query(description="Optional explicit cool-down scope identifier"),
-    ] = None,
-    start_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope start"),
-    ] = None,
-    end_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope end"),
-    ] = None,
+    cooldown_id: CooldownIdQuery = None,
+    start_at: ScopeStartQuery = None,
+    end_at: ScopeEndQuery = None,
 ) -> NoteCommentModel:
-    return service.update_coupling_note_comment(
+    return service.update_target_note_comment(
         project_id=ctx.project_id,
         chip_id=chip_id,
-        coupling_id=coupling_id,
+        target_type="coupling",
+        target_id=coupling_id,
         comment_id=comment_id,
         content=body.content,
         username=ctx.user.username,
@@ -462,23 +380,15 @@ def delete_coupling_note_comment(
     comment_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
-    cooldown_id: Annotated[
-        str | None,
-        Query(description="Optional explicit cool-down scope identifier"),
-    ] = None,
-    start_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope start"),
-    ] = None,
-    end_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope end"),
-    ] = None,
+    cooldown_id: CooldownIdQuery = None,
+    start_at: ScopeStartQuery = None,
+    end_at: ScopeEndQuery = None,
 ) -> SuccessResponse:
-    return service.delete_coupling_note_comment(
+    return service.delete_target_note_comment(
         project_id=ctx.project_id,
         chip_id=chip_id,
-        coupling_id=coupling_id,
+        target_type="coupling",
+        target_id=coupling_id,
         comment_id=comment_id,
         username=ctx.user.username,
         actor_system_role=ctx.user.system_role,
@@ -501,23 +411,15 @@ def upsert_coupling_metric_note(
     body: NoteUpsertRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
-    cooldown_id: Annotated[
-        str | None,
-        Query(description="Optional explicit cool-down scope identifier"),
-    ] = None,
-    start_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope start"),
-    ] = None,
-    end_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope end"),
-    ] = None,
+    cooldown_id: CooldownIdQuery = None,
+    start_at: ScopeStartQuery = None,
+    end_at: ScopeEndQuery = None,
 ) -> NoteModel:
-    return service.upsert_coupling_metric_note(
+    return service.upsert_metric_note(
         project_id=ctx.project_id,
         chip_id=chip_id,
-        coupling_id=coupling_id,
+        target_type="coupling",
+        target_id=coupling_id,
         metric_key=metric_key,
         content=body.content,
         username=ctx.user.username,
@@ -539,23 +441,15 @@ def delete_coupling_metric_note(
     metric_key: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
-    cooldown_id: Annotated[
-        str | None,
-        Query(description="Optional explicit cool-down scope identifier"),
-    ] = None,
-    start_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope start"),
-    ] = None,
-    end_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope end"),
-    ] = None,
+    cooldown_id: CooldownIdQuery = None,
+    start_at: ScopeStartQuery = None,
+    end_at: ScopeEndQuery = None,
 ) -> SuccessResponse:
-    return service.delete_coupling_metric_note(
+    return service.delete_metric_note(
         project_id=ctx.project_id,
         chip_id=chip_id,
-        coupling_id=coupling_id,
+        target_type="coupling",
+        target_id=coupling_id,
         metric_key=metric_key,
         username=ctx.user.username,
         cooldown_id=cooldown_id,
@@ -639,18 +533,9 @@ def get_chip_notes_summary(
     chip_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     service: Annotated[NoteService, Depends(get_note_service)],
-    cooldown_id: Annotated[
-        str | None,
-        Query(description="Optional explicit cool-down scope identifier"),
-    ] = None,
-    start_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope start"),
-    ] = None,
-    end_at: Annotated[
-        datetime | None,
-        Query(description="Optional time-range scope end"),
-    ] = None,
+    cooldown_id: CooldownIdQuery = None,
+    start_at: ScopeStartQuery = None,
+    end_at: ScopeEndQuery = None,
 ) -> ChipNotesSummaryResponse:
     return service.chip_notes_summary(
         project_id=ctx.project_id,

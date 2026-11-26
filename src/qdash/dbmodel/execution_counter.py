@@ -5,7 +5,7 @@ from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
 
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.dbmodel.user import UserDocument
+from qdash.dbmodel.lookups import user_id_for_username
 
 
 class ExecutionCounterDocument(Document):
@@ -40,11 +40,6 @@ class ExecutionCounterDocument(Document):
         from_attributes=True,
     )
 
-    @staticmethod
-    def _user_id_for_username(username: str) -> str | None:
-        user = UserDocument.find_one({"username": username}).run()
-        return user.user_id if user else None
-
     @classmethod
     def get_next_index(
         cls,
@@ -62,5 +57,5 @@ class ExecutionCounterDocument(Document):
             username=username,
             chip_id=chip_id,
             project_id=project_id,
-            user_id=user_id or cls._user_id_for_username(username),
+            user_id=user_id or user_id_for_username(username),
         )

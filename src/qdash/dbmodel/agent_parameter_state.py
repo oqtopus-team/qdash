@@ -37,6 +37,7 @@ from qdash.dbmodel.agent_session import (
     AgentBackendApplyLockDocument,
     AgentCandidateCommitDocument,
 )
+from qdash.dbmodel.lookups import user_id_for_username
 from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.qubit_history import QubitHistoryDocument
 
@@ -118,7 +119,7 @@ def compare_and_set_parameter(
     )
     base = deepcopy(expected.value) if isinstance(expected.value, dict) else {}
     merged = QubitDocument.merge_calib_data(base, deepcopy(snapshot))
-    user_id = QubitDocument._user_id_for_username(username)
+    user_id = user_id_for_username(username)
     updated = QubitDocument.get_motor_collection().find_one_and_update(
         {**_qubit_filter(project_id, chip_id, qid), **condition},
         {

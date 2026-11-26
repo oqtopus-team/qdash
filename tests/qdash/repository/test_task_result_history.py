@@ -156,3 +156,39 @@ def test_find_accepts_a_query_time_limit_inside_a_pymongo_timeout(init_db) -> No
         )
 
     assert [r.task_id for r in results] == ["task-2", "task-1"]
+
+
+def test_metric_aggregations_share_the_completed_result_match_stage() -> None:
+    cutoff = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    end = datetime(2026, 1, 2, tzinfo=timezone.utc)
+    pipelines: list[list[dict[str, Any]]] = []
+
+    def record(pipeline: list[dict[str, Any]]) -> MagicMock:
+        pipelines.append(pipeline)
+        query = MagicMock()
+        query.run.return_value = []
+        return query
+
+    repo = MongoTaskResultHistoryRepository()
+    common = {
+        "chip_id": "chip-1",
+        "project_id": "project-1",
+        "entity_type": "qubit",
+        "cutoff_time": cutoff,
+        "end_time": end,
+    }
+    with patch.object(TaskResultHistoryDocument, "aggregate", side_effect=record):
+        repo.aggregate_latest_metrics(metric_keys={"t1"}, **common)  # type: ignore[arg-type]
+        repo.aggregate_average_metrics(metric_keys={"t1"}, **common)  # type: ignore[arg-type]
+        repo.aggregate_best_metrics(metric_modes={"t1": "maximize"}, **common)  # type: ignore[arg-type]
+
+    expected = {
+        "chip_id": "chip-1",
+        "project_id": "project-1",
+        "task_type": "qubit",
+        "status": "completed",
+        "excluded": {"$ne": True},
+        "$or": [{"output_parameters.t1": {"$exists": True}}],
+        "start_at": {"$gte": cutoff, "$lte": end},
+    }
+    assert [pipeline[0] for pipeline in pipelines] == [{"$match": expected}] * 3

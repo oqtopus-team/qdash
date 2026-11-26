@@ -14,7 +14,7 @@ from pymongo.errors import DuplicateKeyError
 from qdash.common.utils.datetime import now
 from qdash.datamodel.calibration_note import CalibrationNoteModel
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
-from qdash.dbmodel.user import UserDocument
+from qdash.dbmodel.lookups import user_id_for_username
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +35,7 @@ class MongoCalibrationNoteRepository:
 
     """
 
-    @staticmethod
-    def _user_id_for_username(username: str) -> str | None:
-        user = UserDocument.find_one({"username": username}).run()
-        return user.user_id if user else None
+    _user_id_for_username = staticmethod(user_id_for_username)
 
     def find_one(
         self,
