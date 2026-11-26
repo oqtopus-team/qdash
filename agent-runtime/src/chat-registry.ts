@@ -21,7 +21,6 @@ import { buildCodemodeExtensions, createCodemodeSandbox, modelOnlyTools, type In
 import { buildQDashExtension, type QDashWriteTools } from "./durable-tools.ts";
 import { buildPageContextSection, buildProposeCodeEditTool, editorOf, PAGE_SECTION, type PageContext } from "./page-context.ts";
 import { buildUserInstructionsSection } from "./prompt.ts";
-import { buildSubagentExtension, subagentGuardExtension } from "./subagent-tool.ts";
 
 /** Section key of the user's preferences in the system prompt. */
 export const USER_PREFERENCES_SECTION = "user-preferences";
@@ -56,8 +55,6 @@ export interface ChatRegistryParts {
   codingTools: boolean;
   /** From `buildCompactionExtension`: the summarizer chats compact with. */
   compaction?: Extension;
-  /** Offer `delegate_research`, whose children call the audited read-only QDash tools. */
-  subagents?: boolean;
 }
 
 export interface ChatRegistry {
@@ -126,15 +123,5 @@ export function buildChatRegistry(
     internalCalls: parts.internalCalls,
   };
   for (const extension of buildCodemodeExtensions(sandbox, policy)) registry.install(extension);
-  // Read-only research subagents: children of a `delegate_research` call get
-  // only the audited read-only QDash tools, the same ones scripts may call,
-  // and the guard keeps them to those whatever their stored agent says.
-  if (parts.subagents) {
-    const reads = new Set(qdash.nestedTools);
-    const readTools = (qdash.extension.tools ?? []).filter((tool) => reads.has(tool.name));
-    const guard = subagentGuardExtension(readTools.map((tool) => tool.name));
-    registry.install(guard);
-    registry.install(buildSubagentExtension({ qdash: qdash.extension, readTools, guard }));
-  }
   return { registry, writeTools: qdash.writeTools, close: () => sandbox.close() };
 }

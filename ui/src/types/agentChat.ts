@@ -226,31 +226,6 @@ export interface ToolClassification {
   reason?: string;
 }
 
-/** Where one research task of a `delegate_research` call stands. */
-export type SubagentStatus = "queued" | "running" | "done" | "error" | "cancelled" | "interrupted";
-
-/**
- * One read-only research task the assistant delegated to a subagent, as the
- * runtime reported it: bounded, never the subagent's prompt or tool data.
- */
-export interface SubagentTask {
-  /** Its position in the call, from 1. */
-  id: string;
-  title: string;
-  /** `interrupted`: the call ended or was cut off before this task did. */
-  status: SubagentStatus;
-  /** Tool calls the subagent made. */
-  toolCalls: number;
-  startedAt?: number;
-  endedAt?: number;
-  /** What it is doing now, while it runs: a tool name, or `thinking`. */
-  activity?: string;
-  /** Its answer, bounded. */
-  result?: string;
-  /** Why it gave no answer, bounded. */
-  error?: string;
-}
-
 export type TraceStep =
   | { kind: "thinking"; text: string; startedAt: number; endedAt?: number }
   | {
@@ -290,8 +265,6 @@ export type TraceStep =
        * (the tool's result, relayed by the runtime and the API); never the model's arguments or text.
        */
       calibrationSession?: CreatedCalibrationSession;
-      /** The research tasks a `delegate_research` call ran, updated while it runs. */
-      subagents?: SubagentTask[];
     }
   | { kind: "text"; text: string };
 

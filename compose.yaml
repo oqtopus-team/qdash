@@ -312,8 +312,6 @@ services:
       # A turn runs until it answers or the user stops it; calibrations a tool
       # waits on take as long as they take. Set these (ms) to steer the model to
       # answer after a while, or to abort a turn outright. 0 disables.
-      - AGENT_SUBAGENTS=${AGENT_SUBAGENTS:-true}
-      - AGENT_SUBAGENT_TIMEOUT_MS=${AGENT_SUBAGENT_TIMEOUT_MS:-300000}
       - CHAT_WRAP_UP_MS=${AGENT_RUNTIME_WRAP_UP_MS:-0}
       - CHAT_TIMEOUT_MS=${AGENT_RUNTIME_TIMEOUT_MS:-0}
       - CHAT_PING_MS=${AGENT_RUNTIME_PING_MS:-15000}
