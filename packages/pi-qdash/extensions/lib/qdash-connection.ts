@@ -368,7 +368,8 @@ function filenameFromPath(path: string): string | undefined {
   return path.split("/").filter(Boolean).at(-1);
 }
 
-function mediaTypeForPath(path: string): string {
+/** The media type a figure path names by its extension; `application/octet-stream` otherwise. */
+export function mediaTypeForPath(path: string): string {
   const lower = path.toLowerCase();
   if (lower.endsWith(".png")) return "image/png";
   if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
@@ -390,9 +391,29 @@ async function responseBody(response: Response): Promise<unknown> {
   }
 }
 
-function checkPollOptions(timeoutSeconds: number, pollIntervalSeconds: number): void {
+/**
+ * Read until `done` accepts a value, pausing `pollIntervalSeconds` (default 0.5) between reads;
+ * the error from `timedOut` once `timeoutSeconds` (default `defaultTimeoutSeconds`) have passed.
+ * `read` may answer undefined for "not there yet". The signal stops the pause between reads.
+ */
+async function pollUntil<T>(
+  options: PollOptions,
+  defaultTimeoutSeconds: number,
+  read: () => Promise<T | undefined>,
+  done: (value: T) => boolean,
+  timedOut: (timeoutSeconds: number) => Error,
+): Promise<T> {
+  const timeoutSeconds = options.timeoutSeconds ?? defaultTimeoutSeconds;
+  const pollIntervalSeconds = options.pollIntervalSeconds ?? 0.5;
   if (timeoutSeconds < 0 || pollIntervalSeconds < 0) {
     throw new RangeError("Polling timeout and interval must be non-negative");
+  }
+  const deadline = Date.now() + timeoutSeconds * 1_000;
+  while (true) {
+    const value = await read();
+    if (value !== undefined && done(value)) return value;
+    if (Date.now() >= deadline) throw timedOut(timeoutSeconds);
+    await pause(pollIntervalSeconds, options.signal);
   }
 }
 
@@ -833,29 +854,26 @@ export class QDashConnection {
    * reaches a terminal status; the run is never cancelled. `QDashTimeoutError` after
    * `timeoutSeconds` (default 600), polling every `pollIntervalSeconds` (default 0.5).
    */
-  async waitForExecution(executionId: string, options: PollOptions = {}): Promise<ExecutionResponseDetail> {
-    const timeoutSeconds = options.timeoutSeconds ?? 600;
-    const pollIntervalSeconds = options.pollIntervalSeconds ?? 0.5;
-    checkPollOptions(timeoutSeconds, pollIntervalSeconds);
-    const deadline = Date.now() + timeoutSeconds * 1_000;
+  waitForExecution(executionId: string, options: PollOptions = {}): Promise<ExecutionResponseDetail> {
     const wholePipeline = options.wholePipeline ?? true;
-    while (true) {
-      let execution: ExecutionResponseDetail | undefined;
-      try {
-        execution = await this.getExecution(executionId, options.signal);
-      } catch (error) {
-        if (!(options.notFoundAsPending && error instanceof QDashNotFoundError)) throw error;
-      }
-      if (execution) {
+    return pollUntil(
+      options,
+      600,
+      async () => {
+        try {
+          return await this.getExecution(executionId, options.signal);
+        } catch (error) {
+          if (options.notFoundAsPending && error instanceof QDashNotFoundError) return undefined;
+          throw error;
+        }
+      },
+      (execution) => {
         // A pipeline step's own execution completes long before the run does.
         const status = wholePipeline && execution.pipeline ? execution.pipeline.status : execution.status;
-        if (EXECUTION_TERMINAL.has(String(status).toLowerCase())) return execution;
-      }
-      if (Date.now() >= deadline) {
-        throw new QDashTimeoutError(`Execution '${executionId}' did not reach a terminal state within ${timeoutSeconds} seconds`);
-      }
-      await pause(pollIntervalSeconds, options.signal);
-    }
+        return EXECUTION_TERMINAL.has(String(status).toLowerCase());
+      },
+      (timeoutSeconds) => new QDashTimeoutError(`Execution '${executionId}' did not reach a terminal state within ${timeoutSeconds} seconds`),
+    );
   }
 
   /**
@@ -1127,19 +1145,14 @@ export class QDashConnection {
   }
 
   /** Poll a candidate commit until its backend apply is `applied` or `failed` (default 300 s). */
-  async waitForAgentCandidateApply(sessionId: string, commitId: string, options: PollOptions = {}): Promise<AgentCandidateCommitResponse> {
-    const timeoutSeconds = options.timeoutSeconds ?? 300;
-    const pollIntervalSeconds = options.pollIntervalSeconds ?? 0.5;
-    checkPollOptions(timeoutSeconds, pollIntervalSeconds);
-    const deadline = Date.now() + timeoutSeconds * 1_000;
-    while (true) {
-      const commit = await this.getAgentCandidateCommit(sessionId, commitId);
-      if (commit.backend_status === "applied" || commit.backend_status === "failed") return commit;
-      if (Date.now() >= deadline) {
-        throw new Error(`Agent candidate commit '${commitId}' was not applied within ${timeoutSeconds} seconds`);
-      }
-      await pause(pollIntervalSeconds, options.signal);
-    }
+  waitForAgentCandidateApply(sessionId: string, commitId: string, options: PollOptions = {}): Promise<AgentCandidateCommitResponse> {
+    return pollUntil(
+      options,
+      300,
+      () => this.getAgentCandidateCommit(sessionId, commitId),
+      (commit) => commit.backend_status === "applied" || commit.backend_status === "failed",
+      (timeoutSeconds) => new Error(`Agent candidate commit '${commitId}' was not applied within ${timeoutSeconds} seconds`),
+    );
   }
 
   listForumPosts(options: ForumPostListOptions = {}): Promise<QDashApi.ListForumPostsResponse> {
@@ -1284,17 +1297,12 @@ export class QDashConnection {
     field: "operation_id" | "execution_id",
     options: PollOptions,
   ): Promise<AgentActionResponse> {
-    const timeoutSeconds = options.timeoutSeconds ?? 120;
-    const pollIntervalSeconds = options.pollIntervalSeconds ?? 0.5;
-    checkPollOptions(timeoutSeconds, pollIntervalSeconds);
-    const deadline = Date.now() + timeoutSeconds * 1_000;
-    while (true) {
-      const action = await this.getAgentAction(sessionId, actionId, options.signal);
-      if (action.execution_status === "failed" || action[field] != null) return action;
-      if (Date.now() >= deadline) {
-        throw new Error(`Agent action '${actionId}' did not produce ${field} within ${timeoutSeconds} seconds`);
-      }
-      await pause(pollIntervalSeconds, options.signal);
-    }
+    return pollUntil(
+      options,
+      120,
+      () => this.getAgentAction(sessionId, actionId, options.signal),
+      (action) => action.execution_status === "failed" || action[field] != null,
+      (timeoutSeconds) => new Error(`Agent action '${actionId}' did not produce ${field} within ${timeoutSeconds} seconds`),
+    );
   }
 }

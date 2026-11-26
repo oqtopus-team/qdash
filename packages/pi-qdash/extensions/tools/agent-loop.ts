@@ -32,6 +32,7 @@ import { toTextToolResult } from "../lib/results.js";
 import { serverTimestampText } from "../lib/server-time.js";
 import { pollUntilSettled, WAIT_AGENT_INTERVENTION } from "../lib/waits.js";
 import { CONFIG_PATH_DESCRIPTION, PROFILE_DESCRIPTION } from "../lib/connection.js";
+import { errorText, sdkStatusCode } from "../lib/errors.js";
 
 /**
  * Tools of the model-driven calibration loop in an agent session.
@@ -100,15 +101,6 @@ const NEXT_ACTIONS = [
   "complete",
   "stop",
 ] as const;
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function statusOf(error: unknown): number | undefined {
-  const status = (error as { statusCode?: unknown } | null)?.statusCode;
-  return typeof status === "number" ? status : undefined;
-}
 
 /** Most reads of a session's history while its state version keeps changing. */
 export const SNAPSHOT_ATTEMPTS = 3;
@@ -182,7 +174,7 @@ async function listDecisions(client: QDashConnection, sessionId: string, signal:
     return { items: await withAbort(client.listAgentDecisions(sessionId), signal, `Decisions of ${sessionId}`) };
   } catch (error) {
     if (signal?.aborted) throw error;
-    const status = statusOf(error);
+    const status = sdkStatusCode(error);
     return { items: null, unavailable: { unsupported: status === 404 || status === 405, reason: errorText(error) } };
   }
 }
@@ -253,7 +245,7 @@ async function recordCallDecision(
     return { kind: "recorded", line: `Audit: recorded ${what} ${decision.decision_id}${cited} (next ${decision.next_action}).`, decision };
   } catch (error) {
     if (signal?.aborted) throw error;
-    const status = statusOf(error);
+    const status = sdkStatusCode(error);
     const reason = errorText(error);
     if (status === 404 || status === 405) {
       return { kind: "unsupported", line: `Audit: the ${what} was NOT recorded: this QDash does not record decisions.`, reason: "this QDash does not record decisions" };
@@ -312,7 +304,7 @@ async function ownedSessionContext(
 
 /** QDash's refusal of an autonomous write (403 or 409), as text; other errors propagate. */
 function refusedByQDash(error: unknown): string | undefined {
-  const status = statusOf(error);
+  const status = sdkStatusCode(error);
   return status === 403 || status === 409 ? errorText(error) : undefined;
 }
 
@@ -855,7 +847,7 @@ export function registerAgentLoopTools(pi: ExtensionAPI, deps: AgentLoopDependen
           );
         } catch (error) {
           if (signal?.aborted) throw error;
-          const status = statusOf(error);
+          const status = sdkStatusCode(error);
           if (status === undefined || status >= 500) {
             const reason = errorText(error);
             return toTextToolResult(
@@ -1064,7 +1056,7 @@ export function registerAgentLoopTools(pi: ExtensionAPI, deps: AgentLoopDependen
         audit = await withAbort(client.getAgentSessionAudit(params.sessionId, { cursor: params.cursor, limit }), signal, `Audit of ${params.sessionId}`);
       } catch (error) {
         if (signal?.aborted) throw error;
-        const status = statusOf(error);
+        const status = sdkStatusCode(error);
         if (status === 409 && params.cursor) {
           const text = `The audit of ${params.sessionId} changed after its first page was read (${errorText(error)}). Discard the pages read so far: they belong to an older snapshot. Call qdash_get_agent_session_audit again without a cursor to read a fresh snapshot from the start.`;
           return toTextToolResult(text, { reason: errorText(error) }, { ...details, complete: false, restart: true, nextCursor: null });

@@ -6,7 +6,7 @@
  * the reason it is absent. A failed or missing part is never filled from other
  * data, and a cooldown is never inferred.
  */
-import { read as readGet, type Context } from "./_http.js";
+import { isRecord, read as readGet, type Context } from "./_http.js";
 import { QDashApiError, QDashValidationError } from "./errors.js";
 import type {
   CooldownResponse,
@@ -97,10 +97,6 @@ export const COOLDOWN_NOT_ASSOCIATED =
   "QDash's task result response does not include the cooldown the result was recorded in; no cooldown is inferred from times or from the chip's current cooldown. Name one with cooldownId to check it against the result.";
 
 const EVIDENCE_OPTIONS = new Set(["cooldownId"]);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
 
 function text(value: unknown): string | undefined {
   return typeof value === "string" && value !== "" ? value : undefined;

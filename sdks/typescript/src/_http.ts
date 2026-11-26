@@ -71,7 +71,8 @@ export function sessionFetch(config: QDashConfig, custom: Fetch | undefined): Fe
   return custom;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+/** Whether a value is a JSON object (not null, not an array). */
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 

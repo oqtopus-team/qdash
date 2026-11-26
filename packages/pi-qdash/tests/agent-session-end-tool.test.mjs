@@ -146,3 +146,31 @@ test("a QDash without stop requests, or one that does not answer, is never repor
   }
   assert.equal(fake.state.sessions.get(sessionId).status, "active");
 });
+
+test("a refused stop is read by its SDK statusCode alone; a status field does not count", async () => {
+  const stopFailing = (fields) => {
+    let tool;
+    registerAgentSessionEndTool({ registerTool(registered) { tool = registered; } }, {
+      async makeClient() {
+        return {
+          async getAgentSession(sessionId) { return { session_id: sessionId, project_id: "p", status: "active", state_version: 1 }; },
+          async stopAgentSession() { throw Object.assign(new Error("stop failed"), fields); },
+        };
+      },
+    });
+    const id = `stop-${JSON.stringify(fields)}`;
+    return tool.execute(id, { sessionId: "s-1", outcome: "stopped", reason: "stop" }, undefined, undefined, { hasUI: false, [HOST_WRITE_APPROVAL_KEY]: { toolCallId: id, toolName: END_AGENT_SESSION_TOOL } });
+  };
+  const unsupported = /Not ended: this QDash has no stop request/;
+  const unconfirmed = /Not confirmed: QDash did not confirm the stop/;
+
+  assert.match(textOf(await stopFailing({ statusCode: 404 })), unsupported);
+  // A status alone is no status: the outcome stays unknown.
+  const statusOnly = await stopFailing({ status: 404 });
+  assert.match(textOf(statusOnly), unconfirmed);
+  assert.equal(statusOnly.details.outcomeUnknown, true);
+  // Both present: statusCode decides either way.
+  assert.match(textOf(await stopFailing({ statusCode: 404, status: 500 })), unsupported);
+  assert.match(textOf(await stopFailing({ statusCode: 500, status: 404 })), unconfirmed);
+  assert.match(textOf(await stopFailing({ statusCode: 409, status: 500 })), /Not ended: QDash refused \(stop failed\)\. The session is still active\./);
+});
