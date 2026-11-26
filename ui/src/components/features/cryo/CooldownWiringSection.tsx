@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import dynamic from "next/dynamic";
 
 import { useUpdateCooldown } from "@/client/cooldown/cooldown";
-import { DARK_THEMES, type ThemeName } from "@/constants/themes";
+import { useIsDarkTheme } from "@/contexts/ThemeContext";
 
 import { CooldownWiringHistory } from "./CooldownWiringHistory";
 import { SaveStatus, useDebouncedAutosave } from "./SaveStatus";
@@ -24,22 +24,9 @@ interface CooldownWiringSectionProps {
   onChange: () => void;
 }
 
+/** BlockNote color scheme of the active theme. */
 function useThemeScheme(): "light" | "dark" {
-  const [scheme, setScheme] = useState<"light" | "dark">("light");
-  useEffect(() => {
-    const compute = () => {
-      const t = document.documentElement.getAttribute("data-theme")?.toLowerCase() ?? "";
-      setScheme(DARK_THEMES.includes(t as ThemeName) ? "dark" : "light");
-    };
-    compute();
-    const obs = new MutationObserver(compute);
-    obs.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    });
-    return () => obs.disconnect();
-  }, []);
-  return scheme;
+  return useIsDarkTheme() ? "dark" : "light";
 }
 
 export function CooldownWiringSection({

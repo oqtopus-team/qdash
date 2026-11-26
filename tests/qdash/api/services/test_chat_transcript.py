@@ -205,6 +205,26 @@ def test_a_stopped_turn_keeps_what_streamed_and_a_failed_one_says_why() -> None:
     assert failed.end == "failed"
 
 
+def test_a_failed_turn_keeps_its_progress_updates_ahead_of_the_error() -> None:
+    fold = TurnTranscript("r1", _user(), clock=_clock())
+    fold.apply("delta", {"text": "Checking the latest T1 results."})
+    fold.apply("tool_start", {"id": "c1", "tool": "qdash_get_task_results", "args": {}})
+    fold.apply("tool_end", {"id": "c1", "tool": "qdash_get_task_results", "is_error": False})
+    fold.apply("delta", {"text": "Q3 looks low; comparing"})
+    fold.apply("error", {"detail": "conversation was not answered: model_error"})
+    *_, partial, error = fold.messages()
+    assert error.content == "Error: conversation was not answered: model_error"
+    payload = _payload(partial)
+    assert payload["interrupted"] is True
+    # The update before the tool stays in the trace; the text after it is the answer so far.
+    assert [s["kind"] for s in payload["trace"]["steps"]] == ["text", "tool"]
+    assert payload["trace"]["steps"][0]["text"] == "Checking the latest T1 results."
+    assert payload["blocks"] == [
+        {"type": "text", "content": "Q3 looks low; comparing", "chart": None}
+    ]
+    assert partial.turn_request_id == error.turn_request_id == "r1"
+
+
 def test_a_continue_adds_no_user_message_and_a_noop_or_refusal_adds_nothing() -> None:
     fold = TurnTranscript("r1", None, clock=_clock())
     fold.apply("noop", {"reason": "nothing_to_answer"})

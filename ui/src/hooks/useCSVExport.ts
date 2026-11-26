@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 
 import type { TimeSeriesDataPoint, CorrelationDataPoint, CSVExportOptions } from "@/types/analysis";
+import { saveBlob } from "@/lib/utils/download";
 
 /**
  * Custom hook for CSV export functionality
@@ -30,12 +31,7 @@ export function useCSVExport() {
 
     // Create and trigger download
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    saveBlob(blob, filename);
   }, []);
 
   // Export time series data

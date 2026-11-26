@@ -753,7 +753,7 @@ def test_a_commit_reserved_before_the_pause_finishes_and_blocks_resume_meanwhile
         return write(**kwargs)
 
     monkeypatch.setattr(
-        "qdash.api.services.agent_session_service.compare_and_set_parameter", pause_during_write
+        "qdash.api.services.agent_candidate_commit.compare_and_set_parameter", pause_during_write
     )
     committed = sessions.commit_action_candidate(
         project_id=PROJECT,

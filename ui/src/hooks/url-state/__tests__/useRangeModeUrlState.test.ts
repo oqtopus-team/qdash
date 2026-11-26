@@ -44,4 +44,16 @@ describe("useRangeModeUrlState", () => {
 
     expect(result.current.hasUrlRange).toBe(false);
   });
+
+  it("reports a set range param even when the range is malformed or one-sided", () => {
+    const render = (searchParams: string) =>
+      renderHook(() => useRangeModeUrlState(), {
+        wrapper: withNuqsTestingAdapter({ searchParams }),
+      }).result.current;
+
+    expect(render("").hasRangeParams).toBe(false);
+    expect(render("start=&end=").hasRangeParams).toBe(false);
+    expect(render("start=2026-02-30T00:00").hasRangeParams).toBe(true);
+    expect(render("end=2026-06-08T00:00").hasRangeParams).toBe(true);
+  });
 });

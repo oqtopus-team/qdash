@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/config", summary="Get metrics configuration", operation_id="getMetricsConfig")
-async def get_metrics_config() -> dict[str, Any]:
+def get_metrics_config() -> dict[str, Any]:
     """Get metrics metadata configuration for visualization.
 
     Retrieves the metrics configuration loaded from YAML, including display
@@ -47,7 +47,7 @@ async def get_metrics_config() -> dict[str, Any]:
 @router.get(
     "/chips/{chip_id}/metrics", response_model=ChipMetricsResponse, operation_id="getChipMetrics"
 )
-async def get_chip_metrics(
+def get_chip_metrics(
     chip_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     metrics_service: Annotated[MetricsService, Depends(get_metrics_service)],
@@ -115,7 +115,7 @@ async def get_chip_metrics(
     response_model=QubitMetricHistoryResponse,
     operation_id="getQubitMetricHistory",
 )
-async def get_qubit_metric_history(
+def get_qubit_metric_history(
     chip_id: str,
     qid: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
@@ -164,7 +164,7 @@ async def get_qubit_metric_history(
     response_model=QubitMetricHistoryResponse,
     operation_id="getCouplingMetricHistory",
 )
-async def get_coupling_metric_history(
+def get_coupling_metric_history(
     chip_id: str,
     coupling_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
@@ -222,7 +222,7 @@ async def get_coupling_metric_history(
         }
     },
 )
-async def download_metrics_pdf(
+def download_metrics_pdf(
     chip_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     metrics_service: Annotated[MetricsService, Depends(get_metrics_service)],

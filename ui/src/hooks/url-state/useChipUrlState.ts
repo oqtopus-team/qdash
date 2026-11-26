@@ -1,10 +1,9 @@
-import { useCallback, useMemo, useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 
 import { useQueryState, parseAsString } from "nuqs";
 
-import { dateToDateTimeLocal } from "@/lib/utils/datetime";
-
 import { URL_DEFAULTS } from "./types";
+import { useRangeModeUrlState } from "./useRangeModeUrlState";
 
 interface UseChipUrlStateResult {
   selectedChip: string;
@@ -40,21 +39,12 @@ export function useChipUrlState(): UseChipUrlStateResult {
 
   const [selectedCooldownId, setSelectedCooldownIdState] = useQueryState("cooldown", parseAsString);
 
-  const [startDate, setStartDateState] = useQueryState("start", parseAsString);
-  const [endDate, setEndDateState] = useQueryState("end", parseAsString);
+  const { startDate, endDate, setStartDate, setEndDate, setQuickRange, hasRangeParams } =
+    useRangeModeUrlState();
 
   const [viewMode, setViewModeState] = useQueryState("view", parseAsString);
 
   const [qubitViewMode, setQubitViewModeState] = useQueryState("qview", parseAsString);
-
-  const rangeDefaults = useMemo(() => {
-    const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    return {
-      start: dateToDateTimeLocal(sevenDaysAgo),
-      end: dateToDateTimeLocal(now),
-    };
-  }, []);
 
   // Mark as initialized after first render
   useEffect(() => {
@@ -90,30 +80,6 @@ export function useChipUrlState(): UseChipUrlStateResult {
     [setSelectedCooldownIdState],
   );
 
-  const setStartDate = useCallback(
-    (date: string) => {
-      setStartDateState(date && date.length > 0 ? date : null);
-    },
-    [setStartDateState],
-  );
-
-  const setEndDate = useCallback(
-    (date: string) => {
-      setEndDateState(date && date.length > 0 ? date : null);
-    },
-    [setEndDateState],
-  );
-
-  const setQuickRange = useCallback(
-    (days: number) => {
-      const now = new Date();
-      const past = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-      setStartDateState(dateToDateTimeLocal(past));
-      setEndDateState(dateToDateTimeLocal(now));
-    },
-    [setStartDateState, setEndDateState],
-  );
-
   const setViewMode = useCallback(
     (mode: string) => {
       setViewModeState(mode === URL_DEFAULTS.VIEW ? null : mode); // Remove default from URL
@@ -134,9 +100,9 @@ export function useChipUrlState(): UseChipUrlStateResult {
     selectedDate: selectedDate ?? URL_DEFAULTS.DATE,
     selectedTask: selectedTask ?? URL_DEFAULTS.TASK,
     selectedCooldownId: selectedCooldownId ?? null,
-    startDate: startDate ?? rangeDefaults.start,
-    endDate: endDate ?? rangeDefaults.end,
-    hasTimeRangeParams: Boolean(startDate || endDate),
+    startDate,
+    endDate,
+    hasTimeRangeParams: hasRangeParams,
     viewMode: viewMode ?? URL_DEFAULTS.VIEW,
     qubitViewMode: qubitViewMode ?? "dashboard",
     setSelectedChip,

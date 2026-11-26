@@ -34,7 +34,6 @@ import { useForumAiReply } from "@/hooks/useForumAiReply";
 import { useForumLabels } from "@/hooks/useForumLabels";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
-import { formatDateTimeCompact } from "@/lib/utils/datetime";
 
 import {
   DEFAULT_FORUM_CATEGORIES,
@@ -43,24 +42,12 @@ import {
 } from "./categories";
 import { ForumLabelPicker } from "./ForumLabelSelector";
 import type { ForumBlockSnapshotGetter, ForumMentionCandidate } from "./ForumBlockEditor";
+import { formatCooldownPeriod, normalizeTargetType } from "./forumTargets";
 
 const ForumBlockEditor = dynamic(
   () => import("./ForumBlockEditor").then((m) => ({ default: m.ForumBlockEditor })),
   { ssr: false },
 );
-
-function normalizeTargetType(value: string | null | undefined): "qubit" | "coupling" | null {
-  return value === "qubit" || value === "coupling" ? value : null;
-}
-
-function formatCooldownPeriod(
-  cooldown: { started_at?: string | null; ended_at?: string | null } | undefined,
-): string {
-  if (!cooldown?.started_at) return "";
-  const start = formatDateTimeCompact(cooldown.started_at);
-  const end = cooldown.ended_at ? formatDateTimeCompact(cooldown.ended_at) : "ongoing";
-  return `${start} - ${end}`;
-}
 
 /** Splits comma-separated label params into a deduplicated list of trimmed keys. */
 export function parseLabels(values: string[]): string[] {

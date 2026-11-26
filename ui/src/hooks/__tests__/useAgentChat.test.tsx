@@ -1134,6 +1134,42 @@ describe("continuing an answer that ended early", () => {
     expect(result.current.chat.canContinue).toBe(false);
   });
 
+  it("keeps a failed turn's progress updates ahead of its error, and continues after them", async () => {
+    const result = await renderChat();
+    act(() => result.current.chat.send("Why is Q3 T1 low?"));
+    await waitFor(() => expect(result.current.chat.isStreaming).toBe(true));
+    stream.push(sse("delta", { text: "Checking the latest T1 results." }));
+    stream.push(sse("tool_start", { id: "c1", tool: "qdash_get_task_results", label: "Results" }));
+    stream.push(sse("tool_end", { id: "c1", tool: "qdash_get_task_results", is_error: false }));
+    stream.push(sse("delta", { text: "Q3 dropped" }));
+    stream.push(sse("error", { detail: "conversation was not answered: model_error" }));
+    stream.close();
+    await waitFor(() => expect(result.current.chat.isStreaming).toBe(false));
+
+    const messages = result.current.chat.messages;
+    expect(messages.map((m) => m.role)).toEqual(["user", "assistant", "assistant"]);
+    const partial = JSON.parse(messages[1].content);
+    expect(partial.interrupted).toBe(true);
+    expect(partial.trace.steps.map((s: { kind: string }) => s.kind)).toEqual(["text", "tool"]);
+    expect(partial.trace.steps[0].text).toBe("Checking the latest T1 results.");
+    expect(partial.blocks).toEqual([{ type: "text", content: "Q3 dropped", chart: null }]);
+    expect(messages[2].content).toBe("Error: conversation was not answered: model_error");
+    expect(messages[1].turnRequestId).toBe(messages[2].turnRequestId);
+    expect(result.current.chat.canContinue).toBe(true);
+    expect(result.current.chat.canRetryLast).toBe(true);
+    stream = controllableStream();
+
+    // A continue drops the error and keeps the updates before it.
+    fetchMock.mockClear();
+    act(() => result.current.chat.continueLast());
+    await waitFor(() => expect(result.current.chat.isStreaming).toBe(true));
+    const { body } = streamRequest();
+    expect(body.conversation_history.map((m: { role: string }) => m.role)).toEqual([
+      "user",
+      "assistant",
+    ]);
+  });
+
   it("keeps a stopped answer and adds the continuation after it", async () => {
     const result = await renderChat();
     act(() => result.current.chat.send("Explain T2"));

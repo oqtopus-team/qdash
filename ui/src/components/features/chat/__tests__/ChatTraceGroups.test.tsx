@@ -252,3 +252,44 @@ describe("finished tool groups", () => {
     expect(within(rows[1]).getByRole("button", { name: /Get figure.*Done/ })).toBeTruthy();
   });
 });
+
+describe("work history of a finished answer", () => {
+  const trace = {
+    durationMs: 83_000,
+    steps: [
+      { kind: "text" as const, text: "Checking the latest T1 results." },
+      tool({ id: "a", startedAt: 0, endedAt: 1000 }),
+      { kind: "text" as const, text: "Q3 is low; comparing with last week." },
+      tool({ id: "b", startedAt: 1000, endedAt: 2000, status: "error" }),
+      tool({ id: "c", startedAt: 2000, endedAt: 3000 }),
+    ],
+  };
+
+  it("folds the updates and steps behind one row that opens to them", () => {
+    render(<ChatTraceSummary trace={trace} foldable />);
+    const row = screen.getByTestId("work-history-summary");
+    expect(row.getAttribute("aria-expanded")).toBe("false");
+    expect(row.textContent).toContain("Worked for 1m 23s");
+    expect(row.textContent).toContain("2 updates · 3 tools · 1 failed");
+    const content = document.getElementById(row.getAttribute("aria-controls")!)!;
+    expect(content.hidden).toBe(true);
+    expect(screen.getByText("Checking the latest T1 results.").closest("[hidden]")).toBe(content);
+    // A failure stays visible while folded.
+    const visibleFailures = () =>
+      screen.getAllByTestId("tool-group-failure").filter((el) => !el.closest("[hidden]"));
+    expect(visibleFailures()).toHaveLength(1);
+
+    fireEvent.click(row);
+    expect(row.getAttribute("aria-expanded")).toBe("true");
+    expect(content.hidden).toBe(false);
+    // Open, the failure shows once, in its own group.
+    expect(visibleFailures()).toHaveLength(1);
+    expect(content.contains(visibleFailures()[0])).toBe(true);
+  });
+
+  it("shows the updates as they streamed when the answer has no text of its own", () => {
+    render(<ChatTraceSummary trace={trace} />);
+    expect(screen.queryByTestId("work-history-summary")).toBeNull();
+    expect(screen.getByText("Checking the latest T1 results.").closest("[hidden]")).toBeNull();
+  });
+});

@@ -10,7 +10,6 @@ describe("useCSVExport", () => {
 
   beforeEach(() => {
     mockLink = originalCreateElement("a");
-    vi.spyOn(mockLink, "setAttribute");
     vi.spyOn(mockLink, "click").mockImplementation(() => {});
 
     vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
@@ -48,7 +47,7 @@ describe("useCSVExport", () => {
       const blob = createObjectURLMock.mock.calls[0][0] as Blob;
       expect(blob.type).toBe("text/csv;charset=utf-8;");
 
-      expect(mockLink.setAttribute).toHaveBeenCalledWith("download", "test.csv");
+      expect(mockLink.download).toBe("test.csv");
       expect(mockLink.click).toHaveBeenCalledOnce();
     });
 
@@ -136,10 +135,7 @@ describe("useCSVExport", () => {
         );
       });
 
-      expect(mockLink.setAttribute).toHaveBeenCalledWith(
-        "download",
-        "timeseries_CHIP01_t1_daily_20240615T123045.csv",
-      );
+      expect(mockLink.download).toBe("timeseries_CHIP01_t1_daily_20240615T123045.csv");
 
       vi.useRealTimers();
     });
@@ -157,10 +153,7 @@ describe("useCSVExport", () => {
         );
       });
 
-      expect(mockLink.setAttribute).toHaveBeenCalledWith(
-        "download",
-        "timeseries_unknown_t1_data_20240615T123045.csv",
-      );
+      expect(mockLink.download).toBe("timeseries_unknown_t1_data_20240615T123045.csv");
 
       vi.useRealTimers();
     });
@@ -202,10 +195,7 @@ describe("useCSVExport", () => {
         );
       });
 
-      expect(mockLink.setAttribute).toHaveBeenCalledWith(
-        "download",
-        "correlation_CHIP01_Q0_t1_vs_t2_echo_20240615T123045.csv",
-      );
+      expect(mockLink.download).toBe("correlation_CHIP01_Q0_t1_vs_t2_echo_20240615T123045.csv");
 
       vi.useRealTimers();
     });

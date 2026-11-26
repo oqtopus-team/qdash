@@ -4,14 +4,11 @@ import { Download } from "lucide-react";
 
 import { InteractiveFigureContent } from "@/components/charts/InteractiveFigureContent";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import { executionArtifactUrl } from "@/lib/utils/executionFiles";
 
 interface FigureJsonPreviewDialogProps {
   path: string | null;
   onClose: () => void;
-}
-
-function artifactUrl(path: string): string {
-  return `/api/executions/artifact?path=${encodeURIComponent(path)}`;
 }
 
 function fileName(path: string): string {
@@ -40,7 +37,7 @@ export function FigureJsonPreviewDialog({ path, onClose }: FigureJsonPreviewDial
           {path && (
             <a
               className="btn btn-sm btn-primary"
-              href={artifactUrl(path)}
+              href={executionArtifactUrl(path)}
               download={fileName(path)}
             >
               <Download data-icon="inline-start" /> Download JSON
