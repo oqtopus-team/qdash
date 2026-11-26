@@ -254,6 +254,17 @@ test("with pi's codemode and tool_search active, the section gives chat's script
   assert.doesNotMatch(buildQDashGuidanceSection(["qdash_list_chips"], SKILL, { deferredTools: ["qdash_list_cooldowns"] }), RUNTIME_ONLY);
 });
 
+test("the script rule says tool results are parsed values, not JSON text", async () => {
+  const { QDASH_SCRIPT_GUIDELINE } = await import("../.test-dist/lib/qdash-guidance.js");
+  assert.match(QDASH_SCRIPT_GUIDELINE, /resolves to its response data as a JavaScript value \(an object or array, already parsed\)/);
+  assert.match(QDASH_SCRIPT_GUIDELINE, /do not call `JSON\.parse` on it, which fails on an object; parse only a value that is actually a JSON string/);
+  // The example awaits the call and reads a field of the page object directly.
+  assert.match(QDASH_SCRIPT_GUIDELINE, /`const page = await tools\.qdash_list_task_results\(\{ limit: 100 \}\); text\(page\.total\)`/);
+  assert.doesNotMatch(QDASH_SCRIPT_GUIDELINE, /JSON\.parse\(await/);
+  // "as JSON" read as a JSON string and led scripts to JSON.parse an object.
+  assert.doesNotMatch(QDASH_SCRIPT_GUIDELINE, /data as JSON\b/);
+});
+
 test("chat and the pi CLI give the same script and deferred-tool rules", async () => {
   const { QDASH_SCRIPT_GUIDELINE, deferredToolsGuideline } = await import("../.test-dist/lib/qdash-guidance.js");
   const section = buildQDashGuidanceSection(["codemode", "tool_search", "qdash_list_chips"], null, { deferredTools: ["qdash_list_cryostats"] });

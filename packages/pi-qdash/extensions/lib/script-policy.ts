@@ -11,6 +11,7 @@ import {
   isReviewedWriteTool,
   nestedBlockMessage,
   QDASH_TOOL_NAMESPACE,
+  SCRIPT_DATA_DESCRIPTION,
   scriptDataOf,
   withScriptDeadline,
 } from "./tool-policy.js";
@@ -30,7 +31,7 @@ import {
  * batches and discovers QDash tools the way QDash chat does:
  *
  * - Audited read tools declare an output schema, and a script calling one
- *   gets its redacted response data as JSON, bounded per call.
+ *   gets its redacted response data as a parsed value, bounded per call.
  * - Every other QDash tool is model-only (unreachable from scripts) or, when
  *   deferred, blocked from scripts by the `tool_call` hook. Writes keep the
  *   write gate's confirmation, which a script cannot pass.
@@ -56,10 +57,7 @@ import {
 export const CODEMODE_ENV = "PI_QDASH_CODEMODE";
 
 /** What a script receives from an audited read tool. */
-export const SCRIPT_DATA_SCHEMA = Type.Unknown({
-  description:
-    "The tool's redacted QDash response data as JSON: the data its text answer summarizes, not truncated.",
-});
+export const SCRIPT_DATA_SCHEMA = Type.Unknown({ description: SCRIPT_DATA_DESCRIPTION });
 
 /** pi built-ins that run commands or change files; never callable from a script while pi-qdash is loaded. */
 const SIDE_EFFECT_BUILTINS = new Set(["bash", "powershell", "write", "edit"]);

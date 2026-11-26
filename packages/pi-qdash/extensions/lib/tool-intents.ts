@@ -46,6 +46,7 @@ export const QDASH_TOOL_INTENTS: readonly ToolIntentSpec[] = [
       "qdash_list_chip_qubits",
       "qdash_list_chip_couplings",
       "qdash_list_task_results",
+      "qdash_summarize_task_results",
       "qdash_get_task_result",
       "qdash_get_timeseries",
       "qdash_recent_calibration_summary",

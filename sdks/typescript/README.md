@@ -40,6 +40,21 @@ for shared Python/TypeScript TOML profiles, workflows, metrics, and dashboards.
 INI profiles remain readable with a deprecation warning. Reuse the session across operations;
 there is no connection to close.
 
+## Summarize Task Results
+
+Reuse a configured `qdash` session to aggregate multiple pages:
+
+```ts
+const summary = await qdash.taskResults.summarize({ chipId: "64Qv3", maxRows: 1000 });
+if (!summary.complete) console.warn(summary.diagnostics);
+console.log(summary.aggregates.byStatus);
+```
+
+Aggregates count only the distinct rows read. Check `complete` before treating them as full
+counts; even a complete offset read is not a snapshot. See the
+[summary contract](https://oqtopus-team.github.io/qdash/reference/clients/typescript#summarize-task-results)
+for filters, limits, and recovery.
+
 ## Read a Result with Context
 
 Reuse a configured `qdash` session and a task ID from `qdash.api.taskResult.listTaskResults()`:

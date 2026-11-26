@@ -106,7 +106,7 @@ export class QDash {
   readonly workflows: Workflows;
   readonly scripts: Scripts;
   readonly dashboards: Dashboards;
-  /** Compound task-result reads, such as `compareLatest` and `evidence`. */
+  /** Compound task-result reads, such as `compareLatest`, `evidence` and `summarize`. */
   readonly taskResults: TaskResults;
 
   private readonly snapshot: QDashConfig;

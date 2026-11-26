@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add SDK-backed task-result summaries with bounded pagination and completeness diagnostics.
+
 - Preserve execution reconciliation guidance when an SDK launch outcome is unknown.
 - Allow custom tool hosts to supply SDK fetch and environment settings through `sdkSessionFactory`.
 

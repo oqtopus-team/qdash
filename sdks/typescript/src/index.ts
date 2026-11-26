@@ -11,7 +11,7 @@
  * `qdash.workflows` lists, reads and runs the project's registered workflows;
  * `qdash.pipelines` works with whole specs; `qdash.scripts` and `qdash.dashboards` save
  * metric scripts and custom dashboards defined with `Script` and `Dashboard`;
- * `qdash.taskResults` combines task-result reads, such as `compareLatest` and `evidence`;
+ * `qdash.taskResults` combines task-result reads, such as `compareLatest`, `evidence` and `summarize`;
  * `qdash.run(executionId)` follows any dispatched run.
  */
 export { QDash } from "./session.js";
@@ -78,6 +78,15 @@ export type {
   OutputParameterChange,
   TaskResultComparison,
 } from "./results.js";
+export { SUMMARIZE_DEFAULT_ROWS, SUMMARIZE_MAX_PAGES, SUMMARIZE_MAX_ROWS, SUMMARIZE_PAGE_SIZE } from "./summary.js";
+export type {
+  TaskResultCounts,
+  TaskResultSummary,
+  TaskResultSummaryDiagnostic,
+  TaskResultSummaryDiagnosticCode,
+  TaskResultSummaryFilters,
+  TaskResultSummaryOptions,
+} from "./summary.js";
 export { COOLDOWN_NOT_ASSOCIATED } from "./evidence.js";
 export type {
   CooldownContext,

@@ -50,6 +50,7 @@ saved-workflow tools do not report such responses as successfully started.
 | `qdash_get_cooldown_wiring`, `qdash_wiring_insights`, `qdash_list_cooldown_wiring_events` | Wiring, attenuation insights, and event history. |
 | `qdash_get_timeseries`, `qdash_inspect_timeseries_csv`, `qdash_compare_timeseries` | Timeseries retrieval, local CSV inspection, and comparison. |
 | `qdash_list_task_results`, `qdash_get_task_result`, `qdash_get_task_knowledge` | Task results and full or summarized task knowledge. |
+| `qdash_summarize_task_results` | SDK-backed counts by stored status, task, and day, with completeness diagnostics. |
 | `qdash_get_task_result_evidence` | One result with execution, current target values, and optional named cooldown checks; accepts `taskId` and optional `cooldownId`. Deferred, read-only, and available in scripts. |
 | `qdash_list_flows`, `qdash_get_flow` | Saved flows. |
 | `qdash_list_executions`, `qdash_get_execution`, `qdash_wait_execution`, `qdash_compare_executions` | Execution history, status, and comparison. |
@@ -65,6 +66,15 @@ progress exposes their `transform` outcome and occurrence `key`; `not_recorded` 
 run did not record that transform, not that it failed. `skipped` means the run never reached it.
 Task history has no date filter; use task results with `startFrom` and `startTo` for a period.
 See [client contracts](./clients/typescript.md#high-level-client) for response shapes.
+
+`qdash_summarize_task_results` accepts `chipId`, `taskName`, `qid` or `couplingId`,
+`executionId`, `username`, `status`, `messageContains`, `startFrom`/`startTo` (aliases `startAt`/`endAt`),
+`timezone` (default UTC), and `maxRows` (default 1000, maximum 5000). It reads at most 50
+pages of 100 rows. Use the list tool when you need individual result rows.
+Inspect `complete` and `diagnostics` before reporting task/day aggregates as full counts.
+`total` and `statusCounts` are the first page's totals; `statusCounts` excludes the status
+filter. Offset reads are not a snapshot. See the [SDK summary contract](./clients/typescript.md#summarize-task-results)
+for partial results and recovery.
 
 `qdash_get_task_result_evidence` reports each context part as `ok`, `failed`, `not_applicable`,
 or `not_associated`. A failed result read fails the tool; a failed context read leaves the other
