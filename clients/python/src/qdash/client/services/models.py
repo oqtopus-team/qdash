@@ -266,6 +266,52 @@ class AgentChatSessionSummary(BaseModel):
     updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
 
 
+class AgentChatShareBlockType(StrEnum):
+    """
+    The kind of one piece of a shared answer.
+
+    A named enum, so generated clients give it its own name instead of a generic
+    ``Type`` that would take that name from another schema's enum.
+    """
+
+    text = "text"
+    chart = "chart"
+    ui = "ui"
+
+
+class Role(StrEnum):
+    user = "user"
+    assistant = "assistant"
+
+
+class Incomplete(StrEnum):
+    """
+    The answer did not end normally
+    """
+
+    stopped = "stopped"
+    interrupted = "interrupted"
+
+
+class AgentChatShareSummary(BaseModel):
+    """
+    A chat's snapshot shared with the current project, as its owner manages it.
+    """
+
+    share_id: Annotated[str, Field(title="Share Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    title: Annotated[str, Field(title="Title")]
+    message_count: Annotated[int, Field(title="Message Count")]
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    """
+    When the chat was first shared
+    """
+    snapshot_at: Annotated[AwareDatetime, Field(title="Snapshot At")]
+    """
+    When the snapshot was last copied
+    """
+
+
 class EntryId1(RootModel[str]):
     root: Annotated[str, Field(max_length=64, title="Entry Id")]
 
@@ -7793,6 +7839,88 @@ class AgentChatSessionResponse(BaseModel):
     """
     created_at: Annotated[AwareDatetime, Field(title="Created At")]
     updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+
+
+class AgentChatShareBlockSchema(BaseModel):
+    """
+    One user-facing piece of a shared answer.
+    """
+
+    type: AgentChatShareBlockType
+    content: Annotated[str | None, Field(title="Content")] = None
+    """
+    Markdown for text; the plain-text fallback for ui
+    """
+    chart: Annotated[dict[str, Any] | None, Field(title="Chart")] = None
+    """
+    Plotly data and layout
+    """
+    ui: Annotated[dict[str, Any] | None, Field(title="Ui")] = None
+    """
+    A read-only composed UI spec
+    """
+
+
+class AgentChatShareMessageSchema(BaseModel):
+    """
+    One message of a shared snapshot, without tool steps or runtime identifiers.
+    """
+
+    role: Annotated[Role, Field(title="Role")]
+    blocks: Annotated[list[AgentChatShareBlockSchema] | None, Field(title="Blocks")] = None
+    is_error: Annotated[bool, Field(title="Is Error")] = False
+    """
+    The answer ended with an error
+    """
+    figures_attached: Annotated[bool, Field(title="Figures Attached")] = False
+    """
+    The user message went out with figures; the snapshot does not keep them
+    """
+    incomplete: Annotated[Incomplete | None, Field(title="Incomplete")] = None
+    """
+    The answer did not end normally
+    """
+    omitted_content: Annotated[bool, Field(title="Omitted Content")] = False
+    """
+    Tool steps, figures or interactive cards of the answer were left out
+    """
+    created_at: Annotated[AwareDatetime | None, Field(title="Created At")] = None
+
+
+class AgentChatShareResponse(BaseModel):
+    """
+    A shared snapshot as a project member reads it.
+    """
+
+    share_id: Annotated[str, Field(title="Share Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    title: Annotated[str, Field(title="Title")]
+    owner_username: Annotated[str, Field(title="Owner Username")]
+    messages: Annotated[list[AgentChatShareMessageSchema], Field(title="Messages")]
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    """
+    When the chat was first shared
+    """
+    snapshot_at: Annotated[AwareDatetime, Field(title="Snapshot At")]
+    """
+    When the snapshot was last copied
+    """
+    is_owner: Annotated[bool, Field(title="Is Owner")]
+    """
+    The caller owns the chat and may update the snapshot
+    """
+    can_revoke: Annotated[bool, Field(title="Can Revoke")]
+    """
+    The caller may stop sharing: the chat's owner or a project owner
+    """
+
+
+class AgentChatShareStatusResponse(BaseModel):
+    """
+    Whether one of the caller's chats is shared with the current project.
+    """
+
+    share: AgentChatShareSummary | None = None
 
 
 class AgentDecisionResponse(BaseModel):

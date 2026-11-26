@@ -22,6 +22,7 @@ from qdash.api.dependencies.cache import (
 )
 from qdash.api.services.admin_service import AdminService
 from qdash.api.services.agent_chat_session_service import AgentChatSessionService
+from qdash.api.services.agent_chat_share_service import AgentChatShareService
 from qdash.api.services.agent_intervention_forum import AgentInterventionForumService
 from qdash.api.services.agent_intervention_service import AgentInterventionService
 from qdash.api.services.agent_investigation_service import AgentInvestigationService
@@ -473,6 +474,12 @@ def get_notification_service() -> NotificationService:
 def get_agent_chat_session_service() -> AgentChatSessionService:
     """Get the agent chat session service instance."""
     return AgentChatSessionService()
+
+
+@cached_dependency_provider
+def get_agent_chat_share_service() -> AgentChatShareService:
+    """Get the service for chat snapshots shared with a project."""
+    return AgentChatShareService()
 
 
 @cached_dependency_provider

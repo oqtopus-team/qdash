@@ -34,7 +34,7 @@ import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
 
 import { NEW_DASHBOARD_PATH } from "./dashboardDraft";
 import { DashboardFormDialog, type DashboardFormValues } from "./DashboardFormDialog";
-import { VisibilityLabel } from "./VisibilityLabel";
+import { VisibilityLabel } from "@/components/ui/VisibilityLabel";
 
 interface DashboardRowProps {
   dashboard: DashboardResponse;

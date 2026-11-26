@@ -1,8 +1,12 @@
 from qdash.client.services.models import (
+    AgentChatShareBlockSchema,
+    AgentChatShareBlockType,
     Condition,
     CrDirection,
+    DashboardPanelModel,
     DeviceTopologyRequest,
     FidelityCondition,
+    Type,
 )
 
 
@@ -16,3 +20,11 @@ def test_device_topology_request_serializes_condition_cr_direction() -> None:
     request = DeviceTopologyRequest(condition=condition)
 
     assert request.model_dump()["condition"]["cr_direction"] == "mix"
+
+
+def test_dashboard_panel_type_keeps_its_name_beside_the_chat_share_block_type() -> None:
+    # A new enum elsewhere in the schema must not take the existing ``Type`` export.
+    assert Type.qubit_metric.value == "qubit_metric"
+    assert DashboardPanelModel.model_fields["type"].annotation is Type
+    assert {member.value for member in AgentChatShareBlockType} == {"text", "chart", "ui"}
+    assert AgentChatShareBlockSchema.model_fields["type"].annotation is AgentChatShareBlockType

@@ -85,6 +85,7 @@ identify occurrences within a sequence, not globally across the Run.
 | `notification` | `NotificationDocument` | `notification.py` |
 | `copilot_chat_session` | `AgentChatSessionDocument` | `agent_chat_session.py` |
 | `copilot_chat_turn` | `AgentChatTurnDocument` (insert-once, one per user, session, and request ID) | `agent_chat_turn.py` |
+| `agent_chat_share` | `AgentChatShareDocument` (read-only project snapshot) | `agent_chat_share.py` |
 | `dashboard` | `DashboardDocument` | `dashboard.py` |
 | `metric_script` | `MetricScriptDocument` | `metric_script.py` |
 | `copilot_store_teardown` | None (raw collection, one lease per owner and store) | `api/services/agent_chat_session_service.py` |

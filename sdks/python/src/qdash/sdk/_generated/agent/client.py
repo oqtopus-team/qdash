@@ -6,6 +6,9 @@ from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.request_options import RequestOptions
 from ..types.agent_chat_message_schema import AgentChatMessageSchema
 from ..types.agent_chat_session_response import AgentChatSessionResponse
+from ..types.agent_chat_share_response import AgentChatShareResponse
+from ..types.agent_chat_share_status_response import AgentChatShareStatusResponse
+from ..types.agent_chat_share_summary import AgentChatShareSummary
 from ..types.agent_preferences import AgentPreferences
 from ..types.agent_skill_list import AgentSkillList
 from ..types.agent_system_prompt import AgentSystemPrompt
@@ -13,6 +16,7 @@ from ..types.list_agent_chat_sessions_response import ListAgentChatSessionsRespo
 from ..types.list_source_roots_response import ListSourceRootsResponse
 from ..types.search_source_response import SearchSourceResponse
 from ..types.source_file_response import SourceFileResponse
+from ..types.success_response import SuccessResponse
 from .raw_client import AsyncRawAgentClient, RawAgentClient
 
 # this is used as the default value for optional parameters
@@ -205,6 +209,7 @@ class AgentClient:
         The chat's own running turn is stopped; a turn of another branch is not.
         Its runtime store and workspace are removed with the last session that uses
         them: a chat and its branches share one, so it stays while one is left.
+        Snapshots of the chat shared with projects are removed with it.
         When the runtime cannot remove the store yet, the deleted chat is kept,
         hidden, and the removal is retried by deleting it again or by the next
         listing of the user's chats.
@@ -338,6 +343,149 @@ class AgentClient:
         _response = self._raw_client.branch_agent_chat_session(
             session_id, entry_id=entry_id, target_session_id=target_session_id, request_options=request_options
         )
+        return _response.data
+
+    def get_agent_chat_share_status(
+        self, session_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AgentChatShareStatusResponse:
+        """
+        Return the snapshot of one of the caller's chats shared with the current project.
+
+        Parameters
+        ----------
+        session_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AgentChatShareStatusResponse
+            Successful Response
+
+        Examples
+        --------
+        from qdash.sdk._generated import QDashApi
+
+        client = QDashApi(
+            project_id="YOUR_PROJECT_ID",
+            token="YOUR_TOKEN",
+            base_url="https://yourhost.com/path/to/api",
+        )
+        client.agent.get_agent_chat_share_status(
+            session_id="session_id",
+        )
+        """
+        _response = self._raw_client.get_agent_chat_share_status(session_id, request_options=request_options)
+        return _response.data
+
+    def publish_agent_chat_share(
+        self, session_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AgentChatShareSummary:
+        """
+        Copy one of the caller's chats, as it is now, into a read-only project snapshot.
+
+        The chat itself stays private. Later changes to it are not shared until this is
+        called again, which replaces the snapshot and keeps its link. Tool steps, workspace
+        files, figures, interactive cards and runtime identifiers are not copied. A chat with
+        a running answer, or with answers from another project, is refused.
+
+        Parameters
+        ----------
+        session_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AgentChatShareSummary
+            Successful Response
+
+        Examples
+        --------
+        from qdash.sdk._generated import QDashApi
+
+        client = QDashApi(
+            project_id="YOUR_PROJECT_ID",
+            token="YOUR_TOKEN",
+            base_url="https://yourhost.com/path/to/api",
+        )
+        client.agent.publish_agent_chat_share(
+            session_id="session_id",
+        )
+        """
+        _response = self._raw_client.publish_agent_chat_share(session_id, request_options=request_options)
+        return _response.data
+
+    def get_agent_chat_share(
+        self, share_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AgentChatShareResponse:
+        """
+        Return a read-only chat snapshot to a member of the project it is shared with.
+
+        Parameters
+        ----------
+        share_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AgentChatShareResponse
+            Successful Response
+
+        Examples
+        --------
+        from qdash.sdk._generated import QDashApi
+
+        client = QDashApi(
+            project_id="YOUR_PROJECT_ID",
+            token="YOUR_TOKEN",
+            base_url="https://yourhost.com/path/to/api",
+        )
+        client.agent.get_agent_chat_share(
+            share_id="share_id",
+        )
+        """
+        _response = self._raw_client.get_agent_chat_share(share_id, request_options=request_options)
+        return _response.data
+
+    def revoke_agent_chat_share(
+        self, share_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> SuccessResponse:
+        """
+        Remove a shared snapshot: the chat's owner or a project owner may do so.
+
+        The original chat is not changed.
+
+        Parameters
+        ----------
+        share_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        SuccessResponse
+            Successful Response
+
+        Examples
+        --------
+        from qdash.sdk._generated import QDashApi
+
+        client = QDashApi(
+            project_id="YOUR_PROJECT_ID",
+            token="YOUR_TOKEN",
+            base_url="https://yourhost.com/path/to/api",
+        )
+        client.agent.revoke_agent_chat_share(
+            share_id="share_id",
+        )
+        """
+        _response = self._raw_client.revoke_agent_chat_share(share_id, request_options=request_options)
         return _response.data
 
     def list_agent_source_roots(
@@ -815,6 +963,7 @@ class AsyncAgentClient:
         The chat's own running turn is stopped; a turn of another branch is not.
         Its runtime store and workspace are removed with the last session that uses
         them: a chat and its branches share one, so it stays while one is left.
+        Snapshots of the chat shared with projects are removed with it.
         When the runtime cannot remove the store yet, the deleted chat is kept,
         hidden, and the removal is retried by deleting it again or by the next
         listing of the user's chats.
@@ -972,6 +1121,181 @@ class AsyncAgentClient:
         _response = await self._raw_client.branch_agent_chat_session(
             session_id, entry_id=entry_id, target_session_id=target_session_id, request_options=request_options
         )
+        return _response.data
+
+    async def get_agent_chat_share_status(
+        self, session_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AgentChatShareStatusResponse:
+        """
+        Return the snapshot of one of the caller's chats shared with the current project.
+
+        Parameters
+        ----------
+        session_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AgentChatShareStatusResponse
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from qdash.sdk._generated import AsyncQDashApi
+
+        client = AsyncQDashApi(
+            project_id="YOUR_PROJECT_ID",
+            token="YOUR_TOKEN",
+            base_url="https://yourhost.com/path/to/api",
+        )
+
+
+        async def main() -> None:
+            await client.agent.get_agent_chat_share_status(
+                session_id="session_id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.get_agent_chat_share_status(session_id, request_options=request_options)
+        return _response.data
+
+    async def publish_agent_chat_share(
+        self, session_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AgentChatShareSummary:
+        """
+        Copy one of the caller's chats, as it is now, into a read-only project snapshot.
+
+        The chat itself stays private. Later changes to it are not shared until this is
+        called again, which replaces the snapshot and keeps its link. Tool steps, workspace
+        files, figures, interactive cards and runtime identifiers are not copied. A chat with
+        a running answer, or with answers from another project, is refused.
+
+        Parameters
+        ----------
+        session_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AgentChatShareSummary
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from qdash.sdk._generated import AsyncQDashApi
+
+        client = AsyncQDashApi(
+            project_id="YOUR_PROJECT_ID",
+            token="YOUR_TOKEN",
+            base_url="https://yourhost.com/path/to/api",
+        )
+
+
+        async def main() -> None:
+            await client.agent.publish_agent_chat_share(
+                session_id="session_id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.publish_agent_chat_share(session_id, request_options=request_options)
+        return _response.data
+
+    async def get_agent_chat_share(
+        self, share_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AgentChatShareResponse:
+        """
+        Return a read-only chat snapshot to a member of the project it is shared with.
+
+        Parameters
+        ----------
+        share_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AgentChatShareResponse
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from qdash.sdk._generated import AsyncQDashApi
+
+        client = AsyncQDashApi(
+            project_id="YOUR_PROJECT_ID",
+            token="YOUR_TOKEN",
+            base_url="https://yourhost.com/path/to/api",
+        )
+
+
+        async def main() -> None:
+            await client.agent.get_agent_chat_share(
+                share_id="share_id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.get_agent_chat_share(share_id, request_options=request_options)
+        return _response.data
+
+    async def revoke_agent_chat_share(
+        self, share_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> SuccessResponse:
+        """
+        Remove a shared snapshot: the chat's owner or a project owner may do so.
+
+        The original chat is not changed.
+
+        Parameters
+        ----------
+        share_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        SuccessResponse
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from qdash.sdk._generated import AsyncQDashApi
+
+        client = AsyncQDashApi(
+            project_id="YOUR_PROJECT_ID",
+            token="YOUR_TOKEN",
+            base_url="https://yourhost.com/path/to/api",
+        )
+
+
+        async def main() -> None:
+            await client.agent.revoke_agent_chat_share(
+                share_id="share_id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.revoke_agent_chat_share(share_id, request_options=request_options)
         return _response.data
 
     async def list_agent_source_roots(

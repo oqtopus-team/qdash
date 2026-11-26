@@ -13,7 +13,6 @@ import {
   CircleAlert,
   Copy,
   EllipsisVertical,
-  Link as LinkIcon,
   Lock,
   Pencil,
   Plus,
@@ -61,7 +60,6 @@ import { useToast } from "@/components/ui/Toast";
 import { useOptionalChatDock } from "@/contexts/ChatDockContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
-import { copyText } from "@/lib/utils/clipboard";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
 import {
   useChipTopologyId,
@@ -91,7 +89,8 @@ import {
 } from "./layout";
 import { type PanelDraft, PanelEditorDialog } from "./PanelEditorDialog";
 import { readMetricScriptConfig } from "./panelConfig";
-import { VisibilityLabel } from "./VisibilityLabel";
+import { VisibilityLabel } from "@/components/ui/VisibilityLabel";
+import { CopyLinkButton } from "@/components/ui/CopyLinkButton";
 
 type PendingConfirm = "leave-edit" | "delete" | null;
 
@@ -453,15 +452,6 @@ export function DashboardPageContent({ dashboardId }: { dashboardId: string | nu
     );
   };
 
-  const handleCopyLink = async () => {
-    try {
-      await copyText(window.location.href);
-      toast.success("Link copied");
-    } catch {
-      toast.error("Failed to copy the link");
-    }
-  };
-
   const handleDuplicate = () => {
     duplicateMutation.mutate(
       { dashboardId: storedId },
@@ -700,10 +690,7 @@ export function DashboardPageContent({ dashboardId }: { dashboardId: string | nu
   // sharing, settings and delete actions sit behind one overflow menu next to Edit.
   const viewActions = (
     <>
-      <button type="button" className="btn btn-ghost btn-sm" onClick={handleCopyLink}>
-        <LinkIcon data-icon="inline-start" aria-hidden="true" />
-        Copy link
-      </button>
+      <CopyLinkButton />
       {canEdit && (
         <button
           type="button"

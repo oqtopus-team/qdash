@@ -26,6 +26,9 @@ import type {
 
 import type {
   AgentChatSessionResponse,
+  AgentChatShareResponse,
+  AgentChatShareStatusResponse,
+  AgentChatShareSummary,
   AgentPreferences,
   AgentPreferencesUpdate,
   AgentSkillList,
@@ -41,6 +44,7 @@ import type {
   SearchAgentSourceParams,
   SearchSourceResponse,
   SourceFileResponse,
+  SuccessResponse,
   UpdateAgentChatSessionRequest
 } from '../../schemas';
 
@@ -501,6 +505,7 @@ export const useUpdateAgentChatSession = <TError = HTTPValidationError,
  * The chat's own running turn is stopped; a turn of another branch is not.
  * Its runtime store and workspace are removed with the last session that uses
  * them: a chat and its branches share one, so it stays while one is left.
+ * Snapshots of the chat shared with projects are removed with it.
  * When the runtime cannot remove the store yet, the deleted chat is kept,
  * hidden, and the removal is retried by deleting it again or by the next
  * listing of the user's chats.
@@ -636,6 +641,325 @@ export const useBranchAgentChatSession = <TError = HTTPValidationError,
         TContext
       > => {
       return useMutation(getBranchAgentChatSessionMutationOptions(options), queryClient);
+    }
+    /**
+ * Return the snapshot of one of the caller's chats shared with the current project.
+ * @summary Get whether a chat is shared with the current project
+ */
+export const getAgentChatShareStatus = (
+    sessionId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<AgentChatShareStatusResponse>(
+      {url: `/agent/chat/sessions/${sessionId}/share`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetAgentChatShareStatusQueryKey = (sessionId: string,) => {
+    return [
+    `/agent/chat/sessions/${sessionId}/share`
+    ] as const;
+    }
+
+
+export const getGetAgentChatShareStatusQueryOptions = <TData = Awaited<ReturnType<typeof getAgentChatShareStatus>>, TError = HTTPValidationError>(sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentChatShareStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAgentChatShareStatusQueryKey(sessionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgentChatShareStatus>>> = ({ signal }) => getAgentChatShareStatus(sessionId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: sessionId !== null && sessionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgentChatShareStatus>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAgentChatShareStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getAgentChatShareStatus>>>
+export type GetAgentChatShareStatusQueryError = HTTPValidationError
+
+
+export function useGetAgentChatShareStatus<TData = Awaited<ReturnType<typeof getAgentChatShareStatus>>, TError = HTTPValidationError>(
+ sessionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentChatShareStatus>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAgentChatShareStatus>>,
+          TError,
+          Awaited<ReturnType<typeof getAgentChatShareStatus>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAgentChatShareStatus<TData = Awaited<ReturnType<typeof getAgentChatShareStatus>>, TError = HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentChatShareStatus>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAgentChatShareStatus>>,
+          TError,
+          Awaited<ReturnType<typeof getAgentChatShareStatus>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAgentChatShareStatus<TData = Awaited<ReturnType<typeof getAgentChatShareStatus>>, TError = HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentChatShareStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get whether a chat is shared with the current project
+ */
+
+export function useGetAgentChatShareStatus<TData = Awaited<ReturnType<typeof getAgentChatShareStatus>>, TError = HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentChatShareStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAgentChatShareStatusQueryOptions(sessionId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Copy one of the caller's chats, as it is now, into a read-only project snapshot.
+ *
+ * The chat itself stays private. Later changes to it are not shared until this is
+ * called again, which replaces the snapshot and keeps its link. Tool steps, workspace
+ * files, figures, interactive cards and runtime identifiers are not copied. A chat with
+ * a running answer, or with answers from another project, is refused.
+ * @summary Share a chat snapshot with the current project, or update it
+ */
+export const publishAgentChatShare = (
+    sessionId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<AgentChatShareSummary>(
+      {url: `/agent/chat/sessions/${sessionId}/share`, method: 'PUT', signal
+    },
+      options);
+    }
+
+
+
+
+export const getPublishAgentChatShareMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishAgentChatShare>>, TError,{sessionId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof publishAgentChatShare>>, TError,{sessionId: string}, TContext> => {
+
+const mutationKey = ['publishAgentChatShare'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof publishAgentChatShare>>, {sessionId: string}> = (props) => {
+          const {sessionId} = props ?? {};
+
+          return  publishAgentChatShare(sessionId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PublishAgentChatShareMutationResult = NonNullable<Awaited<ReturnType<typeof publishAgentChatShare>>>
+
+    export type PublishAgentChatShareMutationError = HTTPValidationError
+
+    /**
+ * @summary Share a chat snapshot with the current project, or update it
+ */
+export const usePublishAgentChatShare = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishAgentChatShare>>, TError,{sessionId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof publishAgentChatShare>>,
+        TError,
+        {sessionId: string},
+        TContext
+      > => {
+      return useMutation(getPublishAgentChatShareMutationOptions(options), queryClient);
+    }
+    /**
+ * Return a read-only chat snapshot to a member of the project it is shared with.
+ * @summary Get a chat snapshot shared with the current project
+ */
+export const getAgentChatShare = (
+    shareId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<AgentChatShareResponse>(
+      {url: `/agent/chat/shares/${shareId}`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetAgentChatShareQueryKey = (shareId: string,) => {
+    return [
+    `/agent/chat/shares/${shareId}`
+    ] as const;
+    }
+
+
+export const getGetAgentChatShareQueryOptions = <TData = Awaited<ReturnType<typeof getAgentChatShare>>, TError = HTTPValidationError>(shareId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentChatShare>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAgentChatShareQueryKey(shareId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgentChatShare>>> = ({ signal }) => getAgentChatShare(shareId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: shareId !== null && shareId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgentChatShare>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAgentChatShareQueryResult = NonNullable<Awaited<ReturnType<typeof getAgentChatShare>>>
+export type GetAgentChatShareQueryError = HTTPValidationError
+
+
+export function useGetAgentChatShare<TData = Awaited<ReturnType<typeof getAgentChatShare>>, TError = HTTPValidationError>(
+ shareId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentChatShare>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAgentChatShare>>,
+          TError,
+          Awaited<ReturnType<typeof getAgentChatShare>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAgentChatShare<TData = Awaited<ReturnType<typeof getAgentChatShare>>, TError = HTTPValidationError>(
+ shareId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentChatShare>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAgentChatShare>>,
+          TError,
+          Awaited<ReturnType<typeof getAgentChatShare>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAgentChatShare<TData = Awaited<ReturnType<typeof getAgentChatShare>>, TError = HTTPValidationError>(
+ shareId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentChatShare>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get a chat snapshot shared with the current project
+ */
+
+export function useGetAgentChatShare<TData = Awaited<ReturnType<typeof getAgentChatShare>>, TError = HTTPValidationError>(
+ shareId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentChatShare>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAgentChatShareQueryOptions(shareId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Remove a shared snapshot: the chat's owner or a project owner may do so.
+ *
+ * The original chat is not changed.
+ * @summary Stop sharing a chat snapshot
+ */
+export const revokeAgentChatShare = (
+    shareId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<SuccessResponse>(
+      {url: `/agent/chat/shares/${shareId}`, method: 'DELETE', signal
+    },
+      options);
+    }
+
+
+
+
+export const getRevokeAgentChatShareMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeAgentChatShare>>, TError,{shareId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof revokeAgentChatShare>>, TError,{shareId: string}, TContext> => {
+
+const mutationKey = ['revokeAgentChatShare'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokeAgentChatShare>>, {shareId: string}> = (props) => {
+          const {shareId} = props ?? {};
+
+          return  revokeAgentChatShare(shareId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevokeAgentChatShareMutationResult = NonNullable<Awaited<ReturnType<typeof revokeAgentChatShare>>>
+
+    export type RevokeAgentChatShareMutationError = HTTPValidationError
+
+    /**
+ * @summary Stop sharing a chat snapshot
+ */
+export const useRevokeAgentChatShare = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeAgentChatShare>>, TError,{shareId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof revokeAgentChatShare>>,
+        TError,
+        {shareId: string},
+        TContext
+      > => {
+      return useMutation(getRevokeAgentChatShareMutationOptions(options), queryClient);
     }
     /**
  * QDash and allowlisted dependency source served read-only, with known revisions.

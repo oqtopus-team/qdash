@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { PanelLeftOpen, SquarePen } from "lucide-react";
+import { PanelLeftOpen, Share2, SquarePen } from "lucide-react";
 import { useOptionalChatDock } from "@/contexts/ChatDockContext";
 import { useAgentChatSessionContext } from "@/contexts/AgentChatSessionContext";
 import { withViewTransition } from "@/lib/viewTransition";
 import { ChatSidebar, RenameInput, SessionMenu } from "@/components/features/chat/ChatSidebar";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ChatShareDialog } from "@/components/features/chat/ChatShareDialog";
 import { ChatThread, type ChatThreadHandle } from "@/components/features/chat/ChatThread";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { ChatStatusLine, useChatStatus } from "@/components/features/chat/ChatTurnStatus";
@@ -59,6 +60,7 @@ export function AgentChatPage() {
   const [showSidebar, setShowSidebar] = useState(true);
   const [renaming, setRenaming] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const threadRef = useRef<ChatThreadHandle>(null);
 
@@ -182,10 +184,30 @@ export function AgentChatPage() {
           ) : (
             <h2 className="ml-1 text-sm font-medium truncate text-base-content/80">Agent</h2>
           )}
+          {activeSession && hasMessages && activeSession.messagesLoaded && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm ml-auto shrink-0"
+              onClick={() => setSharing(true)}
+            >
+              <Share2 data-icon="inline-start" aria-hidden="true" />
+              Share
+            </button>
+          )}
         </header>
 
         <ChatThread ref={threadRef} variant="page" />
       </div>
+
+      {activeSession && (
+        <ChatShareDialog
+          open={sharing}
+          onOpenChange={setSharing}
+          sessionId={activeSession.id}
+          title={activeSession.title}
+          running={runningSessionIds.includes(activeSession.id)}
+        />
+      )}
 
       <ConfirmDialog
         open={confirmDelete}

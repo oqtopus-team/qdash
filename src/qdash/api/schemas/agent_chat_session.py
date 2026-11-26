@@ -1,6 +1,7 @@
 """Schemas for persisted agent chat sessions."""
 
 from datetime import datetime
+from enum import Enum
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -139,4 +140,85 @@ class CreateAgentChatBranchRequest(BaseModel):
             "Client-generated ID of the new chat session; sending the same request again "
             "returns the same branch"
         ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Read-only snapshots shared with a project
+# ---------------------------------------------------------------------------
+
+
+class AgentChatShareBlockType(str, Enum):
+    """The kind of one piece of a shared answer.
+
+    A named enum, so generated clients give it its own name instead of a generic
+    ``Type`` that would take that name from another schema's enum.
+    """
+
+    TEXT = "text"
+    CHART = "chart"
+    UI = "ui"
+
+
+class AgentChatShareBlockSchema(BaseModel):
+    """One user-facing piece of a shared answer."""
+
+    type: AgentChatShareBlockType
+    content: str | None = Field(
+        default=None, description="Markdown for text; the plain-text fallback for ui"
+    )
+    chart: dict[str, Any] | None = Field(default=None, description="Plotly data and layout")
+    ui: dict[str, Any] | None = Field(default=None, description="A read-only composed UI spec")
+
+
+class AgentChatShareMessageSchema(BaseModel):
+    """One message of a shared snapshot, without tool steps or runtime identifiers."""
+
+    role: Literal["user", "assistant"]
+    blocks: list[AgentChatShareBlockSchema] = Field(default_factory=list)
+    is_error: bool = Field(default=False, description="The answer ended with an error")
+    figures_attached: bool = Field(
+        default=False,
+        description="The user message went out with figures; the snapshot does not keep them",
+    )
+    incomplete: Literal["stopped", "interrupted"] | None = Field(
+        default=None, description="The answer did not end normally"
+    )
+    omitted_content: bool = Field(
+        default=False,
+        description="Tool steps, figures or interactive cards of the answer were left out",
+    )
+    created_at: datetime | None = None
+
+
+class AgentChatShareSummary(BaseModel):
+    """A chat's snapshot shared with the current project, as its owner manages it."""
+
+    share_id: str
+    project_id: str
+    title: str
+    message_count: int
+    created_at: datetime = Field(..., description="When the chat was first shared")
+    snapshot_at: datetime = Field(..., description="When the snapshot was last copied")
+
+
+class AgentChatShareStatusResponse(BaseModel):
+    """Whether one of the caller's chats is shared with the current project."""
+
+    share: AgentChatShareSummary | None = None
+
+
+class AgentChatShareResponse(BaseModel):
+    """A shared snapshot as a project member reads it."""
+
+    share_id: str
+    project_id: str
+    title: str
+    owner_username: str
+    messages: list[AgentChatShareMessageSchema]
+    created_at: datetime = Field(..., description="When the chat was first shared")
+    snapshot_at: datetime = Field(..., description="When the snapshot was last copied")
+    is_owner: bool = Field(..., description="The caller owns the chat and may update the snapshot")
+    can_revoke: bool = Field(
+        ..., description="The caller may stop sharing: the chat's owner or a project owner"
     )

@@ -556,6 +556,7 @@ class AgentChatSessionService:
         session_id: str,
         stop_chat: StopChat,
         release_store: ReleaseStore,
+        on_hidden: Callable[[], Awaitable[None]] | None = None,
     ) -> bool:
         """Delete the session; return whether the runtime state it leaves is settled.
 
@@ -568,8 +569,14 @@ class AgentChatSessionService:
         ``reclaim``. When the runtime could not say whether it stopped the turn,
         the tombstone stays even while the store is used, so that a retry can
         still find the chat and stop it.
+
+        ``on_hidden`` runs once the session is hidden, before its turn is stopped
+        or its store removed, so what it removes is gone even when a later step
+        fails; deleting the session again runs it again.
         """
         doc = await asyncio.to_thread(self._tombstone_session, username, session_id)
+        if on_hidden is not None:
+            await on_hidden()
         store = store_of(doc)
         if doc.branch is None or doc.branch.status == "ready":
             await self._stop_deleted(doc, stop_chat)

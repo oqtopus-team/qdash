@@ -6535,7 +6535,7 @@
           "agent"
         ],
         "summary": "Delete a chat session",
-        "description": "Delete a chat session owned by the current user.\n\nThe chat's own running turn is stopped; a turn of another branch is not.\nIts runtime store and workspace are removed with the last session that uses\nthem: a chat and its branches share one, so it stays while one is left.\nWhen the runtime cannot remove the store yet, the deleted chat is kept,\nhidden, and the removal is retried by deleting it again or by the next\nlisting of the user's chats.",
+        "description": "Delete a chat session owned by the current user.\n\nThe chat's own running turn is stopped; a turn of another branch is not.\nIts runtime store and workspace are removed with the last session that uses\nthem: a chat and its branches share one, so it stays while one is left.\nSnapshots of the chat shared with projects are removed with it.\nWhen the runtime cannot remove the store yet, the deleted chat is kept,\nhidden, and the removal is retried by deleting it again or by the next\nlisting of the user's chats.",
         "operationId": "deleteAgentChatSession",
         "security": [
           {
@@ -6638,6 +6638,258 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AgentChatSessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/chat/sessions/{session_id}/share": {
+      "get": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Get whether a chat is shared with the current project",
+        "description": "Return the snapshot of one of the caller's chats shared with the current project.",
+        "operationId": "getAgentChatShareStatus",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentChatShareStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Share a chat snapshot with the current project, or update it",
+        "description": "Copy one of the caller's chats, as it is now, into a read-only project snapshot.\n\nThe chat itself stays private. Later changes to it are not shared until this is\ncalled again, which replaces the snapshot and keeps its link. Tool steps, workspace\nfiles, figures, interactive cards and runtime identifiers are not copied. A chat with\na running answer, or with answers from another project, is refused.",
+        "operationId": "publishAgentChatShare",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentChatShareSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/chat/shares/{share_id}": {
+      "get": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Get a chat snapshot shared with the current project",
+        "description": "Return a read-only chat snapshot to a member of the project it is shared with.",
+        "operationId": "getAgentChatShare",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "share_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Share Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentChatShareResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "Stop sharing a chat snapshot",
+        "description": "Remove a shared snapshot: the chat's owner or a project owner may do so.\n\nThe original chat is not changed.",
+        "operationId": "revokeAgentChatShare",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "share_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Share Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
                 }
               }
             }
@@ -22278,6 +22530,261 @@
         ],
         "title": "AgentChatSessionSummary",
         "description": "Lightweight session entry used in the session list."
+      },
+      "AgentChatShareBlockSchema": {
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/AgentChatShareBlockType"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content",
+            "description": "Markdown for text; the plain-text fallback for ui"
+          },
+          "chart": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chart",
+            "description": "Plotly data and layout"
+          },
+          "ui": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ui",
+            "description": "A read-only composed UI spec"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "AgentChatShareBlockSchema",
+        "description": "One user-facing piece of a shared answer."
+      },
+      "AgentChatShareBlockType": {
+        "type": "string",
+        "enum": [
+          "text",
+          "chart",
+          "ui"
+        ],
+        "title": "AgentChatShareBlockType",
+        "description": "The kind of one piece of a shared answer.\n\nA named enum, so generated clients give it its own name instead of a generic\n``Type`` that would take that name from another schema's enum."
+      },
+      "AgentChatShareMessageSchema": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "title": "Role"
+          },
+          "blocks": {
+            "items": {
+              "$ref": "#/components/schemas/AgentChatShareBlockSchema"
+            },
+            "type": "array",
+            "title": "Blocks"
+          },
+          "is_error": {
+            "type": "boolean",
+            "title": "Is Error",
+            "description": "The answer ended with an error",
+            "default": false
+          },
+          "figures_attached": {
+            "type": "boolean",
+            "title": "Figures Attached",
+            "description": "The user message went out with figures; the snapshot does not keep them",
+            "default": false
+          },
+          "incomplete": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "stopped",
+                  "interrupted"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incomplete",
+            "description": "The answer did not end normally"
+          },
+          "omitted_content": {
+            "type": "boolean",
+            "title": "Omitted Content",
+            "description": "Tool steps, figures or interactive cards of the answer were left out",
+            "default": false
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "AgentChatShareMessageSchema",
+        "description": "One message of a shared snapshot, without tool steps or runtime identifiers."
+      },
+      "AgentChatShareResponse": {
+        "properties": {
+          "share_id": {
+            "type": "string",
+            "title": "Share Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "owner_username": {
+            "type": "string",
+            "title": "Owner Username"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/AgentChatShareMessageSchema"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the chat was first shared"
+          },
+          "snapshot_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Snapshot At",
+            "description": "When the snapshot was last copied"
+          },
+          "is_owner": {
+            "type": "boolean",
+            "title": "Is Owner",
+            "description": "The caller owns the chat and may update the snapshot"
+          },
+          "can_revoke": {
+            "type": "boolean",
+            "title": "Can Revoke",
+            "description": "The caller may stop sharing: the chat's owner or a project owner"
+          }
+        },
+        "type": "object",
+        "required": [
+          "share_id",
+          "project_id",
+          "title",
+          "owner_username",
+          "messages",
+          "created_at",
+          "snapshot_at",
+          "is_owner",
+          "can_revoke"
+        ],
+        "title": "AgentChatShareResponse",
+        "description": "A shared snapshot as a project member reads it."
+      },
+      "AgentChatShareStatusResponse": {
+        "properties": {
+          "share": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentChatShareSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "AgentChatShareStatusResponse",
+        "description": "Whether one of the caller's chats is shared with the current project."
+      },
+      "AgentChatShareSummary": {
+        "properties": {
+          "share_id": {
+            "type": "string",
+            "title": "Share Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "message_count": {
+            "type": "integer",
+            "title": "Message Count"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the chat was first shared"
+          },
+          "snapshot_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Snapshot At",
+            "description": "When the snapshot was last copied"
+          }
+        },
+        "type": "object",
+        "required": [
+          "share_id",
+          "project_id",
+          "title",
+          "message_count",
+          "created_at",
+          "snapshot_at"
+        ],
+        "title": "AgentChatShareSummary",
+        "description": "A chat's snapshot shared with the current project, as its owner manages it."
       },
       "AgentChatSteerSchema": {
         "properties": {

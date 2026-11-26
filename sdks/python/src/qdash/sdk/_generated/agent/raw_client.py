@@ -14,6 +14,9 @@ from ..core.serialization import convert_and_respect_annotation_metadata
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.agent_chat_message_schema import AgentChatMessageSchema
 from ..types.agent_chat_session_response import AgentChatSessionResponse
+from ..types.agent_chat_share_response import AgentChatShareResponse
+from ..types.agent_chat_share_status_response import AgentChatShareStatusResponse
+from ..types.agent_chat_share_summary import AgentChatShareSummary
 from ..types.agent_preferences import AgentPreferences
 from ..types.agent_skill_list import AgentSkillList
 from ..types.agent_system_prompt import AgentSystemPrompt
@@ -21,6 +24,7 @@ from ..types.list_agent_chat_sessions_response import ListAgentChatSessionsRespo
 from ..types.list_source_roots_response import ListSourceRootsResponse
 from ..types.search_source_response import SearchSourceResponse
 from ..types.source_file_response import SourceFileResponse
+from ..types.success_response import SuccessResponse
 from pydantic import ValidationError
 
 # this is used as the default value for optional parameters
@@ -270,6 +274,7 @@ class RawAgentClient:
         The chat's own running turn is stopped; a turn of another branch is not.
         Its runtime store and workspace are removed with the last session that uses
         them: a chat and its branches share one, so it stays while one is left.
+        Snapshots of the chat shared with projects are removed with it.
         When the runtime cannot remove the store yet, the deleted chat is kept,
         hidden, and the removal is retried by deleting it again or by the next
         listing of the user's chats.
@@ -453,6 +458,225 @@ class RawAgentClient:
                     AgentChatSessionResponse,
                     parse_obj_as(
                         type_=AgentChatSessionResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def get_agent_chat_share_status(
+        self, session_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[AgentChatShareStatusResponse]:
+        """
+        Return the snapshot of one of the caller's chats shared with the current project.
+
+        Parameters
+        ----------
+        session_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[AgentChatShareStatusResponse]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"agent/chat/sessions/{quote_path_param(session_id)}/share",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    AgentChatShareStatusResponse,
+                    parse_obj_as(
+                        type_=AgentChatShareStatusResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def publish_agent_chat_share(
+        self, session_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[AgentChatShareSummary]:
+        """
+        Copy one of the caller's chats, as it is now, into a read-only project snapshot.
+
+        The chat itself stays private. Later changes to it are not shared until this is
+        called again, which replaces the snapshot and keeps its link. Tool steps, workspace
+        files, figures, interactive cards and runtime identifiers are not copied. A chat with
+        a running answer, or with answers from another project, is refused.
+
+        Parameters
+        ----------
+        session_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[AgentChatShareSummary]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"agent/chat/sessions/{quote_path_param(session_id)}/share",
+            method="PUT",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    AgentChatShareSummary,
+                    parse_obj_as(
+                        type_=AgentChatShareSummary,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def get_agent_chat_share(
+        self, share_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[AgentChatShareResponse]:
+        """
+        Return a read-only chat snapshot to a member of the project it is shared with.
+
+        Parameters
+        ----------
+        share_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[AgentChatShareResponse]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"agent/chat/shares/{quote_path_param(share_id)}",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    AgentChatShareResponse,
+                    parse_obj_as(
+                        type_=AgentChatShareResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def revoke_agent_chat_share(
+        self, share_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[SuccessResponse]:
+        """
+        Remove a shared snapshot: the chat's owner or a project owner may do so.
+
+        The original chat is not changed.
+
+        Parameters
+        ----------
+        share_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[SuccessResponse]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"agent/chat/shares/{quote_path_param(share_id)}",
+            method="DELETE",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    SuccessResponse,
+                    parse_obj_as(
+                        type_=SuccessResponse,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -1091,6 +1315,7 @@ class AsyncRawAgentClient:
         The chat's own running turn is stopped; a turn of another branch is not.
         Its runtime store and workspace are removed with the last session that uses
         them: a chat and its branches share one, so it stays while one is left.
+        Snapshots of the chat shared with projects are removed with it.
         When the runtime cannot remove the store yet, the deleted chat is kept,
         hidden, and the removal is retried by deleting it again or by the next
         listing of the user's chats.
@@ -1274,6 +1499,225 @@ class AsyncRawAgentClient:
                     AgentChatSessionResponse,
                     parse_obj_as(
                         type_=AgentChatSessionResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def get_agent_chat_share_status(
+        self, session_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[AgentChatShareStatusResponse]:
+        """
+        Return the snapshot of one of the caller's chats shared with the current project.
+
+        Parameters
+        ----------
+        session_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[AgentChatShareStatusResponse]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"agent/chat/sessions/{quote_path_param(session_id)}/share",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    AgentChatShareStatusResponse,
+                    parse_obj_as(
+                        type_=AgentChatShareStatusResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def publish_agent_chat_share(
+        self, session_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[AgentChatShareSummary]:
+        """
+        Copy one of the caller's chats, as it is now, into a read-only project snapshot.
+
+        The chat itself stays private. Later changes to it are not shared until this is
+        called again, which replaces the snapshot and keeps its link. Tool steps, workspace
+        files, figures, interactive cards and runtime identifiers are not copied. A chat with
+        a running answer, or with answers from another project, is refused.
+
+        Parameters
+        ----------
+        session_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[AgentChatShareSummary]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"agent/chat/sessions/{quote_path_param(session_id)}/share",
+            method="PUT",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    AgentChatShareSummary,
+                    parse_obj_as(
+                        type_=AgentChatShareSummary,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def get_agent_chat_share(
+        self, share_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[AgentChatShareResponse]:
+        """
+        Return a read-only chat snapshot to a member of the project it is shared with.
+
+        Parameters
+        ----------
+        share_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[AgentChatShareResponse]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"agent/chat/shares/{quote_path_param(share_id)}",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    AgentChatShareResponse,
+                    parse_obj_as(
+                        type_=AgentChatShareResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def revoke_agent_chat_share(
+        self, share_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[SuccessResponse]:
+        """
+        Remove a shared snapshot: the chat's owner or a project owner may do so.
+
+        The original chat is not changed.
+
+        Parameters
+        ----------
+        share_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[SuccessResponse]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"agent/chat/shares/{quote_path_param(share_id)}",
+            method="DELETE",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    SuccessResponse,
+                    parse_obj_as(
+                        type_=SuccessResponse,  # type: ignore
                         object_=_response.json(),
                     ),
                 )

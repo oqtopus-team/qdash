@@ -51,6 +51,24 @@ the database or reconstruct a transcript. Branches share the current workspace f
 snapshot from the fork point. Deleting a chat removes shared state only when no remaining chat
 uses it.
 
+## Project Sharing
+
+`agent_chat_share_service.py` copies persisted chat messages into `agent_chat_share` for
+read-only project access. It projects text, chart, and composed UI blocks, excluding tool
+traces, runtime identifiers, attachments, and interactive cards. Publishing again replaces
+the snapshot while preserving its link; it never subscribes to the original chat's stream.
+
+Only the chat owner with an Editor or Owner role can publish. Every read checks project
+membership and scope. The chat owner or a project Owner can revoke a snapshot; deleting the
+source chat removes its snapshots. Recorded turns from another project and running answers
+prevent publication. Legacy messages without turn records rely on the owner's review.
+
+`SharedChatPageContent` renders snapshots without the live session provider's editing or
+runtime controls. Dashboard and chat share `VisibilitySelector`, `VisibilityLabel`, and
+`CopyLinkButton` from `components/ui/`. Test authorization, snapshot independence, revocation,
+and excluded blocks in `tests/qdash/api/routers/test_agent_chat_share.py`, plus the chat sharing
+UI tests. For the procedure, see [Agent](../../user-guide/ai-chat.md#share-a-conversation-with-the-project).
+
 ## Calibration Session State in the Chat
 
 Session links come from the chat's successful or running session-scoped tool calls, not model
