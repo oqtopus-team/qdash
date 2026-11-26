@@ -8,11 +8,21 @@
  * failure by itself: the evaluator judges the records QDash kept.
  */
 
-import type { ApprovalPlan, ScenarioTarget } from "./scenarios.ts";
+import { formatPlanApprovalPreview, type PipelinePlanApprovalPreview } from "../../../packages/pi-qdash/extensions/lib/pipeline-plan-preview.ts";
+import { parseServerTimestamp } from "../../../packages/pi-qdash/extensions/lib/server-time.ts";
+import type { ApprovalPlan, PipelineRunPlan, ScenarioTarget } from "./scenarios.ts";
 
 export interface ApprovalRequest {
   toolName: string;
   args: Record<string, unknown>;
+  /** The complete text pi's dialog shows: what the harness, as the user, was asked to approve. */
+  dialogMessage?: string;
+  /**
+   * For `qdash_run_pipeline` with `planId`: the plan as the harness itself read it from QDash
+   * (`GET /calibration-pipelines/plans/{plan_id}`), or undefined when it could not be read.
+   * The model's arguments name the plan only, so this is what the approval judges.
+   */
+  storedPlan?: Record<string, unknown>;
 }
 
 export interface ApprovalContext {
@@ -24,6 +34,8 @@ export interface ApprovalContext {
   scenarioCalibrationSessionIds?: ReadonlySet<string>;
   /** Dialogs of each tool the harness already approved in this scenario. */
   approvedCounts?: Readonly<Record<string, number>>;
+  /** The current time, for a stored plan's expiry (defaults to Date.now). */
+  now?: () => number;
 }
 
 export interface ApprovalDecision {
@@ -135,14 +147,32 @@ function explicitTasks(step: Record<string, unknown>): string[] | undefined {
   return names;
 }
 
+/** Why spec targets are not exactly the selected qubit, or undefined when they are. */
+function targetsProblem(targets: Record<string, unknown> | undefined, qid: string): string | undefined {
+  const qids = strings(targets?.qids);
+  const muxes = targets?.mux_ids !== undefined && targets?.mux_ids !== null;
+  const excludes = targets?.exclude_qids !== undefined && targets?.exclude_qids !== null;
+  if (!targets || muxes || excludes || !qids || qids.length !== 1 || qids[0] !== qid) {
+    return "the pipeline must target exactly the selected qubit";
+  }
+  return undefined;
+}
+
+/** A review digest as QDash writes it (`sha256:v<version>:<hex>`, ExecutePipelinePlanRequest). */
+export const REVIEW_DIGEST_PATTERN = /^sha256:v[0-9]+:[0-9a-f]{64}$/;
+
 /**
  * Whether the pipeline the model proposes stays inside the scenario's bounds: the validation
  * chip, the fake (default) backend, exactly the selected qubit, only explicitly named tasks
  * from the plan, a bounded number of task calls, and recorded in this scenario's calibration
  * session. A step that relies on its default tasks is declined: the harness cannot tell from
  * the spec alone what it would run.
+ *
+ * A call that names a stored plan (`planId`) carries no spec; the stored plan the harness read
+ * from QDash is judged instead (`reviewStoredPlan`). A scenario that requires a plan reference
+ * declines a raw spec, and every scenario declines a call with both.
  */
-export function reviewPipelineRun(args: Record<string, unknown>, context: ApprovalContext): ApprovalDecision {
+export function reviewPipelineRun(args: Record<string, unknown>, context: ApprovalContext, request: Pick<ApprovalRequest, "dialogMessage" | "storedPlan"> = {}): ApprovalDecision {
   const bounds = context.plan.runPipeline;
   if (!bounds) return decline("this scenario approves no pipeline run");
   if (args.chipId !== context.target.chipId) return decline("the pipeline must run on the disposable chip");
@@ -153,14 +183,13 @@ export function reviewPipelineRun(args: Record<string, unknown>, context: Approv
   if (typeof sessionId !== "string" || !context.scenarioCalibrationSessionIds?.has(sessionId)) {
     return decline("the pipeline must be recorded in the calibration session this scenario created");
   }
+  if (args.spec !== undefined && args.planId !== undefined) return decline("the pipeline must name exactly one of a spec and a stored plan");
+  if (args.planId !== undefined) return reviewStoredPlan(args, bounds, context, request);
+  if (bounds.requirePlanReference) return decline("this scenario approves only a run of a stored plan by planId, not a spec written into the call");
   const spec = record(args.spec);
   if (!spec) return decline("the pipeline has no spec object");
-  const targets = record(spec.targets);
-  const qids = strings(targets?.qids);
-  const muxes = targets?.mux_ids !== undefined && targets?.mux_ids !== null;
-  if (!targets || muxes || (targets.exclude_qids !== undefined && targets.exclude_qids !== null) || !qids || qids.length !== 1 || qids[0] !== context.target.qid) {
-    return decline("the pipeline must target exactly the selected qubit");
-  }
+  const targets = targetsProblem(record(spec.targets), context.target.qid);
+  if (targets) return decline(targets);
   const steps = Array.isArray(spec.steps) ? spec.steps : [];
   if (steps.length === 0) return decline("the pipeline has no steps");
   let calls = 0;
@@ -175,6 +204,119 @@ export function reviewPipelineRun(args: Record<string, unknown>, context: Approv
   return { approve: true, reason: "a bounded pipeline on the disposable qubit, recorded in the scenario's calibration session" };
 }
 
+/**
+ * Whether a stored plan the call names stays inside the scenario's bounds, judged from the
+ * plan the harness read from QDash itself: the call's plan, unexpired, with a review digest,
+ * on the validation chip and the fake backend, starting on exactly the selected qubit, and
+ * resolving to at most `maxTaskCalls` calls of the scenario's tasks. The dialog must show the
+ * same plan and digest, so what the harness checked is what pi asked the user to approve (the
+ * host fetched it independently; plans are immutable, so the two agree only on the same plan).
+ *
+ * The plan's resolved steps are what its digest binds, so they decide what it runs. A transform
+ * step (a filter) resolves to no call and runs no task; it is allowed here because, unlike a raw
+ * spec step that relies on defaults, its resolution is known.
+ */
+function reviewStoredPlan(args: Record<string, unknown>, bounds: PipelineRunPlan, context: ApprovalContext, request: Pick<ApprovalRequest, "dialogMessage" | "storedPlan">): ApprovalDecision {
+  const planId = args.planId;
+  if (typeof planId !== "string" || planId.trim() === "") return decline("the stored plan's planId must be a non-empty string");
+  const plan = request.storedPlan;
+  if (!plan) return decline("the stored plan could not be read from QDash");
+  if (plan.plan_id !== planId) return decline("QDash answered for another plan than the call names");
+  const digest = typeof plan.review_digest === "string" ? plan.review_digest : "";
+  if (!REVIEW_DIGEST_PATTERN.test(digest)) return decline("the stored plan has no review digest");
+  const expiresAt = parseServerTimestamp(plan.expires_at);
+  if (plan.expired === true || !Number.isFinite(expiresAt) || !(expiresAt > (context.now ?? Date.now)())) return decline("the stored plan has expired");
+  if (plan.chip_id !== context.target.chipId) return decline("the stored plan must be for the disposable chip");
+  if (plan.backend_name !== "fake") return decline("the stored plan must run on the fake backend");
+  const shown = dialogShowsPlan(request.dialogMessage ?? "", plan, args);
+  if (shown) return decline(shown);
+  const spec = record(plan.spec);
+  const targets = targetsProblem(record(spec?.targets), context.target.qid);
+  if (targets) return decline(targets);
+  const targetQids = strings(plan.target_qids);
+  if (!targetQids || targetQids.length !== 1 || targetQids[0] !== context.target.qid) return decline("the stored plan must start on exactly the selected qubit");
+  const steps = Array.isArray(plan.steps) ? plan.steps.map(record) : [];
+  if (steps.length === 0 || steps.some((step) => step === undefined)) return decline("the stored plan has no resolved steps");
+  const specSteps = Array.isArray(spec?.steps) ? spec.steps : [];
+  if (specSteps.length !== steps.length) return decline("the stored plan's resolved steps do not match its spec");
+  const names: string[] = [];
+  for (const step of steps as Record<string, unknown>[]) {
+    const calls = Array.isArray(step.calls) ? step.calls.map(record) : [];
+    if (calls.some((call) => call === undefined || typeof call.name !== "string")) return decline("every resolved call must name its task");
+    if (step.kind === "transform") {
+      if (calls.length > 0) return decline("a transform step of the stored plan resolves to task calls");
+      continue;
+    }
+    if (calls.length === 0) return decline("every calibration step of the stored plan must resolve to task calls");
+    names.push(...calls.map((call) => String(call?.name)));
+  }
+  if (names.length === 0) return decline("the stored plan runs no task");
+  if (!names.every((name) => bounds.tasks.includes(name))) return decline(`the pipeline may only run ${bounds.tasks.join(", ")}`);
+  const counted = typeof plan.task_run_count === "number" ? plan.task_run_count : names.length;
+  if (Math.max(names.length, counted) > bounds.maxTaskCalls) return decline(`the pipeline may make at most ${bounds.maxTaskCalls} task call(s)`);
+  return { approve: true, reason: "a stored plan on the disposable qubit within the scenario's tasks, shown with its review digest, recorded in the scenario's calibration session" };
+}
+
+/** The review line that names a stored plan, and the one that names its digest (formatPlanApprovalPreview). */
+const PLAN_LINE = /^Stored pipeline plan /;
+const DIGEST_LINE = /^Review digest /;
+const ARGUMENTS_LINE = "Arguments (the approval covers exactly these):";
+const ANY_DIGEST = /sha256:v[0-9]+:[0-9a-f]+/g;
+
+/**
+ * The review pi-qdash shows for this plan (formatPlanApprovalPreview), built from the plan the
+ * harness read, as `resolvePipelinePlanPreview` builds it from the plan the host read.
+ */
+export function expectedPlanReview(plan: Record<string, unknown>): string {
+  const preview: PipelinePlanApprovalPreview = {
+    kind: "calibration_pipeline_plan",
+    planId: String(plan.plan_id),
+    reviewDigest: String(plan.review_digest),
+    chipId: String(plan.chip_id),
+    backendName: String(plan.backend_name),
+    expiresAt: String(plan.expires_at),
+    targetQids: Array.isArray(plan.target_qids) ? plan.target_qids.filter((qid): qid is string => typeof qid === "string") : [],
+    plan: JSON.parse(JSON.stringify(plan)) as Record<string, unknown>,
+  };
+  return formatPlanApprovalPreview(preview);
+}
+
+/**
+ * Why the dialog text does not show exactly this plan for exactly this call, or undefined when it
+ * does. Judged by structure, never by a substring that could sit in a longer ID or a note:
+ *
+ * - the complete review of the plan the harness read appears as whole, consecutive lines;
+ * - it is the only line naming a stored plan and the only line naming a review digest, and no
+ *   other digest appears anywhere in the text;
+ * - the text ends with the one argument listing the approval covers, and that listing is this
+ *   call's arguments.
+ */
+export function dialogShowsPlan(message: string, plan: Record<string, unknown>, args: Record<string, unknown>): string | undefined {
+  const lines = message.split("\n");
+  const review = expectedPlanReview(plan).split("\n");
+  const at = lines.findIndex((_, start) => review.every((line, offset) => lines[start + offset] === line));
+  if (at < 0) return "the dialog does not show the review of the stored plan the harness read";
+  if (lines.filter((line) => PLAN_LINE.test(line)).length !== 1 || lines.filter((line) => DIGEST_LINE.test(line)).length !== 1) {
+    return "the dialog names more than one stored plan or review digest";
+  }
+  const digests = message.match(ANY_DIGEST) ?? [];
+  if (digests.some((digest) => digest !== plan.review_digest)) return "the dialog shows another review digest";
+  const listings = lines.flatMap((line, index) => (line === ARGUMENTS_LINE ? [index] : []));
+  if (listings.length !== 1 || listings[0] < at + review.length) return "the dialog does not end with the one argument listing the approval covers";
+  let listed: unknown;
+  try {
+    listed = JSON.parse(lines.slice(listings[0] + 1).join("\n"));
+  } catch {
+    return "the dialog's argument listing is not the call's arguments";
+  }
+  const fields = record(listed);
+  const keys = (value: Record<string, unknown>) => Object.keys(value).filter((key) => value[key] !== undefined).sort();
+  if (!fields || JSON.stringify(keys(fields)) !== JSON.stringify(keys(args)) || keys(args).some((key) => JSON.stringify(fields[key]) !== JSON.stringify(args[key]))) {
+    return "the dialog's argument listing is not the call's arguments";
+  }
+  return undefined;
+}
+
 /** Decide one approval dialog. */
 export function decideApproval(request: ApprovalRequest, context: ApprovalContext): ApprovalDecision {
   switch (request.toolName) {
@@ -183,7 +325,7 @@ export function decideApproval(request: ApprovalRequest, context: ApprovalContex
     case "qdash_create_calibration_session":
       return reviewCalibrationSessionCreation(request.args, context);
     case "qdash_run_pipeline":
-      return reviewPipelineRun(request.args, context);
+      return reviewPipelineRun(request.args, context, request);
     case "qdash_commit_agent_candidate":
     case "qdash_commit_agent_candidate_set":
       // Updates are approved once, with the session; no scenario approves a commit per call.

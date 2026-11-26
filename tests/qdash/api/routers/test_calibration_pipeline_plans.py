@@ -359,6 +359,36 @@ class TestExecute:
         assert run.spec == plan["spec"]
         assert run.run_name == "coarse-then-coherence"
 
+    def test_session_reads_show_the_plan_a_run_carries_out(self, test_client):
+        plan = _create(test_client).json()
+        with prefect(["flow-run-1", "flow-run-2"]):
+            by_plan = _execute(test_client, plan).json()
+            _release_locks()
+            by_spec = test_client.post(
+                "/calibration-pipelines/execute",
+                headers=_headers(),
+                json={"chip_id": CHIP, "spec": good_spec(), "idempotency_key": "spec-run"},
+            ).json()
+        for launch, plan_id, digest in [
+            (by_plan, plan["plan_id"], plan["review_digest"]),
+            (by_spec, None, None),
+        ]:
+            session_id = launch["calibration_session_id"]
+            detail = test_client.get(f"/calibration-sessions/{session_id}", headers=_headers())
+            assert detail.status_code == 200, detail.text
+            [listed] = [
+                run
+                for run in detail.json()["pipeline_runs"]
+                if run["run_id"] == launch["pipeline_run_id"]
+            ]
+            assert (listed["plan_id"], listed["review_digest"]) == (plan_id, digest)
+            one = test_client.get(
+                f"/calibration-sessions/{session_id}/runs/{launch['pipeline_run_id']}",
+                headers=_headers(),
+            )
+            assert one.status_code == 200, one.text
+            assert (one.json()["plan_id"], one.json()["review_digest"]) == (plan_id, digest)
+
     def test_supported_deployment_receives_the_approved_plan(self, test_client):
         plan = _create(test_client).json()
         with prefect() as create_flow_run:

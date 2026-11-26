@@ -84,6 +84,8 @@ same recorded request: an already dispatched run can replay even after plan clea
 dispatch outcome requires reconciliation, not a new launch key. Each new execution still needs
 its own authority. SDK calls do not provide the interactive approval of Agent or pi CLI.
 Run records retain `plan_id`, `review_digest`, and `approved_plan` for audit after plan deletion.
+Calibration session reads of a run (`GET /calibration-sessions/{calibration_session_id}` and its
+`runs/{run_id}`) return `plan_id` and `review_digest`, which are null for a run started from a spec.
 See [Code Mode and approval](../agent/calibration-design.md#preserve-the-proposal-through-approval-and-execution).
 
 ### Version 1 specs

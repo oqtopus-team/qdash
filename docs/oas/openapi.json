@@ -27823,6 +27823,30 @@
             "title": "Error",
             "default": ""
           },
+          "plan_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Id",
+            "description": "For a run of a stored calibration pipeline plan: the plan it carries out; null for a run requested with a spec"
+          },
+          "review_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Digest",
+            "description": "For a run of a stored plan: the review digest the request approved and the run carries out; null for a run requested with a spec"
+          },
           "requested_at": {
             "type": "string",
             "format": "date-time",
@@ -28055,6 +28079,30 @@
             "type": "string",
             "title": "Error",
             "default": ""
+          },
+          "plan_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Id",
+            "description": "For a run of a stored calibration pipeline plan: the plan it carries out; null for a run requested with a spec"
+          },
+          "review_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Digest",
+            "description": "For a run of a stored plan: the review digest the request approved and the run carries out; null for a run requested with a spec"
           },
           "requested_at": {
             "type": "string",

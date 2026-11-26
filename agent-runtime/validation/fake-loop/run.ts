@@ -53,6 +53,7 @@ import {
   createFakeChip,
   getCalibrationSession,
   getExecution,
+  getPipelinePlan,
   getQubit,
   type Json,
   listChipExecutions,
@@ -383,7 +384,20 @@ async function gatherCalibrationEvidence(api: QDashApi, options: Options, since:
       if (!(error instanceof ApiError && error.status === 404)) throw error;
     }
   }
-  return { sessions, executionDetails };
+  // The stored plan each run names, as QDash keeps it; a deleted plan is absent, not invented.
+  const plans: Record<string, Json> = {};
+  for (const session of sessions) {
+    for (const run of (session.pipeline_runs ?? []) as Json[]) {
+      const planId = typeof run.plan_id === "string" ? run.plan_id : "";
+      if (!planId || planId in plans) continue;
+      try {
+        plans[planId] = await getPipelinePlan(api, planId);
+      } catch (error) {
+        if (!(error instanceof ApiError && error.status === 404)) throw error;
+      }
+    }
+  }
+  return { sessions, executionDetails, plans };
 }
 
 /** Run the scenario's manual baseline pipeline to its end, before the prompt. */
@@ -437,7 +451,7 @@ async function runScenario(api: QDashApi, options: Options, launch: PiLaunch, sc
 
   let baselineRun: { flowRunId: string; status: string } | undefined;
   if (scenario.expect.calibration) {
-    const capable = await calibrationCapabilities(api);
+    const capable = await calibrationCapabilities(api, { storedPlan: scenario.expect.calibration.storedPlan === true });
     if (!capable.ok) return { ...report, status: "blocked", reason: `this QDash cannot record calibration sessions with reported origins: ${capable.detail}` };
   }
   if (scenario.baseline) {
@@ -456,15 +470,19 @@ async function runScenario(api: QDashApi, options: Options, launch: PiLaunch, sc
   const storedT1 = scenario.id === "stored-t1" ? qubitValue(await getQubit(api, options.chipId, options.qid), "t1") : undefined;
   const scenarioLaunch = launchFor(launch, scenario);
   const approvedCounts: Record<string, number> = {};
-  const onDialog = async (_request: unknown, call: { toolName: string; args: Record<string, unknown> } | undefined) => {
+  const onDialog = async (request: { message: string }, call: { toolName: string; args: Record<string, unknown> } | undefined) => {
     if (!call) return { confirmed: false, reason: "unmatched dialog" };
+    // A run of a stored plan names it only: the harness reads the plan itself, as the user would
+    // read the review, and judges that. A failed read leaves it undefined, which approves nothing.
+    const planId = call.toolName === "qdash_run_pipeline" && typeof call.args.planId === "string" ? call.args.planId : undefined;
+    const storedPlan = planId && scenario.approvals.runPipeline ? await getPipelinePlan(api, planId).catch(() => undefined) : undefined;
     const sessions = await listScenarioSessions(api, options.chipId, startedAt).catch(() => []);
     // Read only when the scenario plans calibration writes; a failed read approves nothing.
     const calibrationSessions = scenario.approvals.createCalibrationSession || scenario.approvals.runPipeline
       ? await listScenarioCalibrationSessions(api, options.chipId, startedAt).catch(() => undefined)
       : [];
     if (calibrationSessions === undefined) return { confirmed: false, reason: "the scenario's calibration sessions could not be read" };
-    const decision = decideApproval(call, {
+    const decision = decideApproval({ ...call, dialogMessage: request.message, ...(storedPlan ? { storedPlan } : {}) }, {
       target,
       plan: scenario.approvals,
       scenarioSessionIds: new Set(sessions.map((session) => String(session.session_id))),

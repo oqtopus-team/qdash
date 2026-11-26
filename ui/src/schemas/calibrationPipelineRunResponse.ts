@@ -11,7 +11,9 @@ import type { CalibrationPipelineRunResponseExecutionId } from './calibrationPip
 import type { CalibrationPipelineRunResponseFlowEndState } from './calibrationPipelineRunResponseFlowEndState';
 import type { CalibrationPipelineRunResponseFlowRunId } from './calibrationPipelineRunResponseFlowRunId';
 import type { CalibrationPipelineRunResponsePipeline } from './calibrationPipelineRunResponsePipeline';
+import type { CalibrationPipelineRunResponsePlanId } from './calibrationPipelineRunResponsePlanId';
 import type { CalibrationPipelineRunResponseReportedOrigin } from './calibrationPipelineRunResponseReportedOrigin';
+import type { CalibrationPipelineRunResponseReviewDigest } from './calibrationPipelineRunResponseReviewDigest';
 import type { CalibrationPipelineRunStatus } from './calibrationPipelineRunStatus';
 import type { CalibrationRunKind } from './calibrationRunKind';
 import type { CalibrationRunTrigger } from './calibrationRunTrigger';
@@ -49,6 +51,10 @@ export interface CalibrationPipelineRunResponse {
   /** The first step's execution, as returned at dispatch */
   execution_id?: CalibrationPipelineRunResponseExecutionId;
   error?: string;
+  /** For a run of a stored calibration pipeline plan: the plan it carries out; null for a run requested with a spec */
+  plan_id?: CalibrationPipelineRunResponsePlanId;
+  /** For a run of a stored plan: the review digest the request approved and the run carries out; null for a run requested with a spec */
+  review_digest?: CalibrationPipelineRunResponseReviewDigest;
   requested_at: string;
   updated_at: string;
   /** The run as a whole, from its step executions; null until its first execution exists */
