@@ -42,9 +42,11 @@ from .agent_decision_assessment import AgentDecisionAssessment
 from .agent_decision_next_action import AgentDecisionNextAction
 from .agent_decision_response import AgentDecisionResponse
 from .agent_evaluation_mode import AgentEvaluationMode
+from .agent_forum_thread_status import AgentForumThreadStatus
 from .agent_intervention_attempt import AgentInterventionAttempt
 from .agent_intervention_decision import AgentInterventionDecision
 from .agent_intervention_event import AgentInterventionEvent
+from .agent_intervention_forum_thread_response import AgentInterventionForumThreadResponse
 from .agent_intervention_reason import AgentInterventionReason
 from .agent_intervention_response import AgentInterventionResponse
 from .agent_intervention_response_record import AgentInterventionResponseRecord
@@ -608,9 +610,11 @@ __all__ = [
     "AgentDecisionNextAction",
     "AgentDecisionResponse",
     "AgentEvaluationMode",
+    "AgentForumThreadStatus",
     "AgentInterventionAttempt",
     "AgentInterventionDecision",
     "AgentInterventionEvent",
+    "AgentInterventionForumThreadResponse",
     "AgentInterventionReason",
     "AgentInterventionResponse",
     "AgentInterventionResponseRecord",

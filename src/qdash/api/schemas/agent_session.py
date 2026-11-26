@@ -24,6 +24,7 @@ from qdash.datamodel.agent_session import (
     AgentDecisionAssessment,
     AgentDecisionNextAction,
     AgentEvaluationMode,
+    AgentForumThreadStatus,
     AgentInterventionAttempt,
     AgentInterventionDecision,
     AgentInterventionEvent,
@@ -40,6 +41,7 @@ from qdash.datamodel.agent_session import (
     AgentSessionStopRecord,
 )
 from qdash.datamodel.calibration_session import CalibrationAdmission  # noqa: TC001
+from qdash.datamodel.field_types import TimezoneAwareDatetime  # noqa: TC001
 from qdash.datamodel.quality_metrics import RECORDED_QUALITY_METRICS
 
 MODEL_FIELD_DESCRIPTION = (
@@ -631,6 +633,20 @@ class AgentNotificationDeliveryResponse(BaseModel):
     last_reply_error: str = ""
 
 
+class AgentInterventionForumThreadResponse(BaseModel):
+    """The Forum thread QDash opens for an intervention, and the attempts to open it."""
+
+    status: AgentForumThreadStatus
+    attempts: int
+    last_error: str = ""
+    # Stored timestamps come back from MongoDB naive; they are UTC, so mark them as such.
+    last_attempt_at: TimezoneAwareDatetime = None
+    next_attempt_at: TimezoneAwareDatetime = None
+    post_id: str | None = Field(default=None, description="The root Forum post, once created")
+    number: int | None = Field(default=None, description="The project's Forum thread number")
+    created_at: TimezoneAwareDatetime = None
+
+
 class AgentResumeOption(BaseModel):
     """A plan node the expert may resume from, with its remaining visit budget."""
 
@@ -670,6 +686,13 @@ class AgentInterventionResponse(BaseModel):
     resumed_at: datetime | None = None
     resume_outcome: AgentResumeOutcomeRecord | None = None
     notification: AgentNotificationDeliveryResponse
+    forum_thread: AgentInterventionForumThreadResponse | None = Field(
+        default=None,
+        description=(
+            "The intervention's Forum thread; None for interventions recorded before Forum "
+            "threads existed"
+        ),
+    )
     events: list[AgentInterventionEvent]
     model: AgentModelIdentity | None = _recorded_model_field()
     created_at: datetime

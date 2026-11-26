@@ -498,6 +498,16 @@ class AgentEvaluationMode(StrEnum):
     required = "required"
 
 
+class AgentForumThreadStatus(StrEnum):
+    """
+    Progress of the Forum thread QDash opens for one intervention.
+    """
+
+    pending = "pending"
+    creating = "creating"
+    created = "created"
+
+
 class ActionId(RootModel[str]):
     root: Annotated[str, Field(max_length=200, min_length=1, title="Action Id")]
 
@@ -567,6 +577,27 @@ class AgentInterventionEvent(BaseModel):
     actor: Annotated[str, Field(title="Actor")]
     kind: Annotated[str, Field(title="Kind")]
     detail: Annotated[str, Field(title="Detail")] = ""
+
+
+class AgentInterventionForumThreadResponse(BaseModel):
+    """
+    The Forum thread QDash opens for an intervention, and the attempts to open it.
+    """
+
+    status: AgentForumThreadStatus
+    attempts: Annotated[int, Field(title="Attempts")]
+    last_error: Annotated[str, Field(title="Last Error")] = ""
+    last_attempt_at: Annotated[AwareDatetime | None, Field(title="Last Attempt At")] = None
+    next_attempt_at: Annotated[AwareDatetime | None, Field(title="Next Attempt At")] = None
+    post_id: Annotated[str | None, Field(title="Post Id")] = None
+    """
+    The root Forum post, once created
+    """
+    number: Annotated[int | None, Field(title="Number")] = None
+    """
+    The project's Forum thread number
+    """
+    created_at: Annotated[AwareDatetime | None, Field(title="Created At")] = None
 
 
 class AgentInterventionReason(StrEnum):
@@ -10650,6 +10681,10 @@ class AgentInterventionResponse(BaseModel):
     resumed_at: Annotated[AwareDatetime | None, Field(title="Resumed At")] = None
     resume_outcome: AgentResumeOutcomeRecord | None = None
     notification: AgentNotificationDeliveryResponse
+    forum_thread: AgentInterventionForumThreadResponse | None = None
+    """
+    The intervention's Forum thread; None for interventions recorded before Forum threads existed
+    """
     events: Annotated[list[AgentInterventionEvent], Field(title="Events")]
     model: AgentModelIdentity | None = None
     """

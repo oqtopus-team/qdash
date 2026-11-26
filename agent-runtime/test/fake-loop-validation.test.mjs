@@ -144,6 +144,9 @@ test("in a guarded pi session every reviewed write reaches the approval dialog, 
   faux.setResponses([create({ confirmWrite: true }), create({}), create({}), fauxAssistantMessage([fauxText("done")])]);
   const model = faux.getModel();
   const agentDir = join(workDir, "guard-agent");
+  // pi-qdash loads its saved context from this directory independently of the loader.
+  // Keep a user's saved profile from overriding the fake server's environment.
+  process.env.PI_CODING_AGENT_DIR = agentDir;
   const loader = new DefaultResourceLoader({
     cwd: workDir,
     agentDir,
@@ -182,7 +185,7 @@ test("in a guarded pi session every reviewed write reaches the approval dialog, 
     assert.match(text(results[0]), /rejected by user/);
     // 2: asked and declined; 3: asked and approved, then QDash creates the session.
     assert.equal(results[1].isError, true);
-    assert.equal(results[2].isError, false);
+    assert.equal(results[2].isError, false, text(results[2]));
     assert.equal(confirms.length, 3);
     const posts = fake.state.requests.filter((request) => request.method === "POST" && request.path === "/agent-sessions");
     assert.equal(posts.length, 1);

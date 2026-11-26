@@ -3209,7 +3209,7 @@
           "agent-session"
         ],
         "summary": "Submit an agent action",
-        "description": "Authorize and audit an action proposal without executing it.\n\nAn authorized ``request_human`` also records an intervention, pauses the session on it,\nand queues its Slack message.",
+        "description": "Authorize and audit an action proposal without executing it.\n\nAn authorized ``request_human`` also records an intervention, pauses the session on it,\nand queues its Slack message and its Forum thread.",
         "operationId": "submitAgentAction",
         "security": [
           {
@@ -4043,7 +4043,7 @@
           "agent-session"
         ],
         "summary": "Record an agent intervention",
-        "description": "Record that the agent needs a person and pause the session if it is active.\n\nThe record is saved before any Slack message is attempted, and it is saved even when the\nsession has no actions left or has expired.",
+        "description": "Record that the agent needs a person and pause the session if it is active.\n\nThe record is saved before any Slack message or Forum thread is attempted, and it is\nsaved even when the session has no actions left or has expired.",
         "operationId": "createAgentIntervention",
         "security": [
           {
@@ -23094,6 +23094,16 @@
         "title": "AgentEvaluationMode",
         "description": "Whether the session's results are evaluated with the calibration evaluator.\n\nThe evaluator (qcal_evaluate from pi-qcaleval) is optional and separate from the task's\nown completion checks and any numeric gates. In every mode an evaluation that exists for\na result must support an update: a failed, pending, disputed, or negative one blocks it."
       },
+      "AgentForumThreadStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "creating",
+          "created"
+        ],
+        "title": "AgentForumThreadStatus",
+        "description": "Progress of the Forum thread QDash opens for one intervention."
+      },
       "AgentInterventionAttempt": {
         "properties": {
           "node_id": {
@@ -23243,6 +23253,89 @@
         ],
         "title": "AgentInterventionEvent",
         "description": "One audit entry: who did what to the intervention, and when."
+      },
+      "AgentInterventionForumThreadResponse": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/AgentForumThreadStatus"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "last_error": {
+            "type": "string",
+            "title": "Last Error",
+            "default": ""
+          },
+          "last_attempt_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Attempt At"
+          },
+          "next_attempt_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Attempt At"
+          },
+          "post_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Post Id",
+            "description": "The root Forum post, once created"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number",
+            "description": "The project's Forum thread number"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "attempts"
+        ],
+        "title": "AgentInterventionForumThreadResponse",
+        "description": "The Forum thread QDash opens for an intervention, and the attempts to open it."
       },
       "AgentInterventionReason": {
         "type": "string",
@@ -23429,6 +23522,17 @@
           },
           "notification": {
             "$ref": "#/components/schemas/AgentNotificationDeliveryResponse"
+          },
+          "forum_thread": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentInterventionForumThreadResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The intervention's Forum thread; None for interventions recorded before Forum threads existed"
           },
           "events": {
             "items": {

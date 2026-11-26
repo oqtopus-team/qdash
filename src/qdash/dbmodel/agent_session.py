@@ -17,6 +17,7 @@ from qdash.datamodel.agent_session import (
     AgentDecisionNextAction,
     AgentInterventionAttempt,
     AgentInterventionEvent,
+    AgentInterventionForumThread,
     AgentInterventionReason,
     AgentInterventionResponseRecord,
     AgentInterventionStatus,
@@ -353,6 +354,9 @@ class AgentInterventionDocument(Document):
     resumed_at: datetime | None = None
     resume_outcome: AgentResumeOutcomeRecord | None = None
     notification: AgentNotificationDelivery = Field(default_factory=AgentNotificationDelivery)
+    # The Forum thread QDash opens for the expert discussion; None on records from before
+    # Forum threads existed. The intervention, not the thread, stays authoritative.
+    forum_thread: AgentInterventionForumThread | None = None
     events: list[AgentInterventionEvent] = Field(default_factory=list)
     # The model the requesting host reported; None when it reported none.
     model: AgentModelIdentity | None = None
@@ -386,6 +390,12 @@ class AgentInterventionDocument(Document):
                 [
                     ("notification.status", ASCENDING),
                     ("notification.next_attempt_at", ASCENDING),
+                ]
+            ),
+            IndexModel(
+                [
+                    ("forum_thread.status", ASCENDING),
+                    ("forum_thread.next_attempt_at", ASCENDING),
                 ]
             ),
         ]

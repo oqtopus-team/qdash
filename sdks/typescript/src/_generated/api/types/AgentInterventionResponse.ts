@@ -31,6 +31,8 @@ export interface AgentInterventionResponse {
     resumed_at?: (string | null) | undefined;
     resume_outcome?: (QDashApi.AgentResumeOutcomeRecord | null) | undefined;
     notification: QDashApi.AgentNotificationDeliveryResponse;
+    /** The intervention's Forum thread; None for interventions recorded before Forum threads existed */
+    forum_thread?: (QDashApi.AgentInterventionForumThreadResponse | null) | undefined;
     events: QDashApi.AgentInterventionEvent[];
     /** The model the client host reported for this record; null when none was reported. Client reported, not verified by QDash. */
     model?: (QDashApi.AgentModelIdentity | null) | undefined;
