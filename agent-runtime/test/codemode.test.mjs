@@ -35,6 +35,7 @@ import {
   runningScriptCount,
   TOOL_SEARCH_TOOL_NAME,
   toolPolicyExtension,
+  prepareScript,
   withScriptDeadline,
 } from "../src/codemode.ts";
 import { buildQDashExtension, QDASH_DATA_SCHEMA } from "../src/durable-tools.ts";
@@ -560,6 +561,76 @@ test("a script's deadline is bounded", () => {
     withScriptDeadline('// @options: {"timeout_ms": 5000}\ntext(1)'),
     '// @options: {"timeout_ms":5000}\ntext(1)',
   );
+});
+
+test("a script that names qdash gets qdash.calibration; the model's call and every other script keep their code", async () => {
+  // Scripts that do not name the helpers run byte for byte as before.
+  for (const source of ["text(1)", "await tools.qdash_list_chips({})", '// @options: {"timeout_ms": 5000}\ntext(1)']) {
+    assert.equal(prepareScript(source), withScriptDeadline(source));
+  }
+  const prepared = prepareScript("text(qdash.calibration.SPEC_VERSION)");
+  assert.equal(prepared.split("\n").length, 2);
+  assert.match(prepared.split("\n")[1], /^\(0, globalThis\.eval\)\(".*"\);text\(qdash\.calibration\.SPEC_VERSION\)$/);
+
+  const plan = piTool("qdash_plan_pipeline", (params) => ({ valid: true, spec: params.spec }));
+  const code = [
+    '// @options: {"timeout_ms": 30000}',
+    "const c = qdash.calibration;",
+    "const spec = c.calibrationSpec(c.qubitTargets(['0']), [c.oneQubitCheck({ step_id: 'check' }), c.filterByStatus({ step: 'check' })]);",
+    "const result = await tools.qdash_plan_pipeline({ spec });",
+    "text('valid ' + result.valid + ' ' + ('qdash_run_pipeline' in tools));",
+  ].join("\n");
+  const chat = await openChat({
+    piExtensions: [piExtension([plan, piTool("qdash_run_pipeline")])],
+    responses: [
+      fauxAssistantMessage([fauxToolCall(CODEMODE_TOOL_NAME, { code }, { id: "s1" })], { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxText("ok")),
+    ],
+  });
+  try {
+    assert.equal((await ask(chat.conversation, "plan a check")).status, "done");
+    const [script] = await results(chat.conversation);
+    assert.equal(script.isError, false, resultText(script));
+    // The write tool is not even in a script's tools.
+    assert.match(resultText(script), /valid true false/);
+    assert.deepEqual(plan.calls.map((call) => call.spec), [
+      { spec_version: 2, targets: { qids: ["0"] }, steps: [{ type: "OneQubitCheck", step_id: "check" }, { type: "FilterByStatus", step: "check" }] },
+    ]);
+    // The conversation keeps the code the model wrote; the helpers exist only in the run.
+    const recorded = JSON.stringify((await chat.conversation.context(context)).entries);
+    assert.ok(recorded.includes(JSON.stringify(code).slice(1, -1)));
+    assert.equal(recorded.includes("globalThis.eval"), false);
+  } finally {
+    await chat.close();
+  }
+});
+
+test("a script's use strict still applies in the sandbox when it gets qdash.calibration", async () => {
+  const strict = '"use strict"\nundeclaredProbe = 1;\ntext("sloppy " + qdash.calibration.SPEC_VERSION);';
+  // A string that only starts an expression is not a directive, so this script stays sloppy.
+  const sloppy = '"use strict"\n+ "";\nundeclaredProbe = 1;\ntext("sloppy " + qdash.calibration.SPEC_VERSION);';
+  const chat = await openChat({
+    piExtensions: [],
+    responses: [
+      fauxAssistantMessage(
+        [fauxToolCall(CODEMODE_TOOL_NAME, { code: strict }, { id: "s1" }), fauxToolCall(CODEMODE_TOOL_NAME, { code: sloppy }, { id: "s2" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage(fauxText("ok")),
+    ],
+  });
+  try {
+    assert.equal((await ask(chat.conversation, "go")).status, "done");
+    const runs = await results(chat.conversation);
+    const strictRun = runs.find((message) => message.toolCallId === "s1");
+    const sloppyRun = runs.find((message) => message.toolCallId === "s2");
+    assert.equal(strictRun.isError, true, resultText(strictRun));
+    assert.match(resultText(strictRun), /undeclaredProbe/);
+    assert.equal(sloppyRun.isError, false, resultText(sloppyRun));
+    assert.match(resultText(sloppyRun), /sloppy 2/);
+  } finally {
+    await chat.close();
+  }
 });
 
 test("Code Mode reports an invalid timeout_ms as the SDK words it", async () => {

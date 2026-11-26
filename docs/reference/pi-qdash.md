@@ -215,6 +215,26 @@ cancelled turn invalidate approval. Session-granted writes remain limited to the
 shell tools, and unaudited calls are blocked. Call them directly. A script result is limited to
 512 KiB; the default timeout is 120 seconds, capped at 300.
 
+Scripts can build calibration specs with `qdash.calibration`, the same pure builders as the
+[TypeScript SDK](./clients/typescript.md#define-a-calibration). Load `qdash_plan_pipeline` with
+`tool_search` first. Replace the chip and targets with values from your deployment:
+
+```js
+const c = qdash.calibration;
+const spec = c.calibrationSpec(c.qubitTargets(["0", "1"]), [
+  c.customOneQubit({ step_name: "t1", tasks: [c.taskCall("CheckT1")] }),
+  c.filterByStatus({ step: "t1" }),
+]);
+const plan = await tools.qdash_plan_pipeline({ chipId: "64Qv3", spec });
+text({ spec, plan });
+```
+
+This only defines and validates a plan. Inspect `plan.valid` and resolve reported problems before
+calling `qdash_run_pipeline` directly with the same spec and chip for approval. That call runs
+an ordinary pipeline; agent-session measurements must use the session's own step tools.
+The helpers do not enable script writes or waits. Use the literal `qdash.calibration` reference;
+helpers are installed when the source names `qdash`, not through dynamically assembled names.
+
 Classified deferred tools include a `Request type` line in their searchable descriptions.
 Search with purpose words such as `diagnosis task result evidence` or `measurement preparation`,
 or use an exact tool name. The shared guide covers stored values, diagnosis, measurement

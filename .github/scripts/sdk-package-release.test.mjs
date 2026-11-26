@@ -21,7 +21,8 @@ test("the source SDK is self-contained: its own runtime libraries, no client, th
   assert.equal(manifest.version, "0.0.0");
   assert.deepEqual(Object.keys(manifest.dependencies).sort(), [...SDK_DEPENDENCIES].sort());
   assert.equal(manifest.dependencies[CLIENT], undefined);
-  assert.deepEqual(Object.keys(manifest.exports), ["."]);
+  // The package root, and the calibration builders on their own: no HTTP, config, or Node code.
+  assert.deepEqual(Object.keys(manifest.exports), [".", "./calibration"]);
   const clientManifest = JSON.parse(readFileSync(new URL("../../clients/typescript/package.json", import.meta.url), "utf8"));
   assert.equal(clientManifest.dependencies[SDK], undefined, "the client must not depend on the SDK");
   assert.equal(clientManifest.exports["./sdk"], undefined);

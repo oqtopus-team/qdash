@@ -28,6 +28,32 @@ test("the SDK is self-contained: its own errors and generated client, no depende
   assert.doesNotMatch(readFileSync(join(sdkRoot, "dist/index.js"), "utf8"), /from "@oqtopus-team\/qdash-client"/);
 });
 
+test("the SDK publishes its calibration builders as @oqtopus-team/qdash-sdk/calibration, with no runtime imports", async () => {
+  const calibration = await import("@oqtopus-team/qdash-sdk/calibration");
+  for (const name of ["taskCall", "qubitTargets", "muxTargets", "couplingTargets", "customOneQubit", "customTwoQubit", "calibrationStep", "calibrationSpec", "sweep", "calibrationDefinitionsSource"]) {
+    assert.ok(name in calibration, `${name} must be exported from @oqtopus-team/qdash-sdk/calibration`);
+    // The same functions as the package root.
+    assert.equal(calibration[name], sdk[name], name);
+  }
+  for (const name of ["QDash", "QDashConfig", "QDashApiClient"]) assert.equal(name in calibration, false, name);
+  // Follow the entry's whole static import graph in the built dist: relative chunks only, and
+  // none of them imports a package, a Node built-in, or the SDK's HTTP and config code.
+  const dist = join(root(pi, "@oqtopus-team/qdash-sdk"), "dist");
+  const seen = new Set();
+  const visit = (file) => {
+    if (seen.has(file)) return;
+    seen.add(file);
+    const source = readFileSync(join(dist, file), "utf8");
+    assert.doesNotMatch(source, /\bfetch\(|process\.env|node:|readFileSync/, file);
+    for (const [, specifier] of source.matchAll(/(?:^|\n)\s*(?:import|export)\s[^"']*?["']([^"']+)["']/g)) {
+      assert.match(specifier, /^\.\/[\w-]+\.js$/, `${file} imports ${specifier}`);
+      visit(specifier.slice(2));
+    }
+  };
+  visit("calibration.js");
+  assert.ok(seen.size >= 2);
+});
+
 test("pi-qdash depends on the SDK only: the client is neither a dependency nor resolvable", () => {
   const manifest = JSON.parse(readFileSync(join(pi, "package.json"), "utf8"));
   assert.equal(manifest.dependencies["@oqtopus-team/qdash-client"], undefined);

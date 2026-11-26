@@ -48,6 +48,24 @@ than reporting a run as started.
 Reviewed writes require user approval. Session-granted tools are limited to the approved session
 and still pass server checks. A model-provided approval flag is never authority.
 
+## Calibration builders in Code Mode
+
+`extensions/lib/script-prelude.ts` prepares scripts for both standalone `script-policy.ts` and
+`agent-runtime/src/codemode.ts`. After applying the existing deadline, it installs the SDK's
+pure builders as frozen `qdash.calibration` when the source names `qdash`. The prelude uses
+`calibrationDefinitionsSource()` from `@oqtopus-team/qdash-sdk/calibration`; it gives the script
+no credentials, tool access, or execution authority.
+
+The prelude follows the options line and adds no source lines. Persisted tool arguments retain
+the original script. Changes to the builder source also affect scripts resumed after a runtime
+upgrade; test replay behavior when changing definitions. Dynamic property names do not trigger
+installation. Existing tool gates still reject nested writes and waits.
+
+`tests/script-prelude.test.mjs` checks source preparation. The runtime's
+`test/cli-chat-parity.test.mjs` exercises both real sandboxes against a fixture API, including
+spec validation and rejection of pipeline and agent-session writes. These tests do not measure
+hardware. See the [script example](../../reference/pi-qdash.md#scripts-and-deferred-tools).
+
 ## pi-qcaleval
 
 `packages/pi-qcaleval/extensions/qcaleval.ts` owns evaluator model selection, questions, request

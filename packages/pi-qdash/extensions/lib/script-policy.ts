@@ -3,6 +3,7 @@ import { Type } from "typebox";
 
 import { createOwnershipCheck, type SourceInfoLike } from "./extension-identity.js";
 import { CODEMODE_TOOL_NAME, TOOL_SEARCH_TOOL_NAME } from "./qdash-guidance.js";
+import { prepareScriptSource } from "./script-prelude.js";
 import { withIntentSearchText } from "./tool-intents.js";
 import {
   boundScriptData,
@@ -13,7 +14,6 @@ import {
   QDASH_TOOL_NAMESPACE,
   SCRIPT_DATA_DESCRIPTION,
   scriptDataOf,
-  withScriptDeadline,
 } from "./tool-policy.js";
 import {
   branchSelection,
@@ -41,7 +41,8 @@ import {
  * - Deferred tools use `exposure: "deferred"`, and pi-qdash activates
  *   `tool_search` for them like pi's MCP extension does. Without an active
  *   `tool_search` tool they are registered again as direct tools.
- * - Scripts get the same default and maximum deadline as in QDash chat.
+ * - Scripts get the same default and maximum deadline as in QDash chat, and
+ *   the same pure `qdash.calibration` builders (script-prelude.ts).
  * - A QDash tool name keeps script access only while pi runs pi-qdash's own
  *   registration for it (extension-identity.ts); another extension's tool
  *   with an audited name is blocked from scripts.
@@ -203,7 +204,7 @@ export function installQDashToolPolicy(pi: ExtensionAPI, options: QDashToolPolic
       if (parents.size > PARENT_MEMORY) parents.delete(parents.keys().next().value as string);
       if (event.toolName === CODEMODE_TOOL_NAME) {
         const input = event.input as { code?: unknown };
-        if (typeof input.code === "string") input.code = withScriptDeadline(input.code);
+        if (typeof input.code === "string") input.code = prepareScriptSource(input.code);
       }
       return undefined;
     }

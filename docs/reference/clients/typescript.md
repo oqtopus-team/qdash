@@ -189,6 +189,31 @@ The API does not expose the result's cooldown ID, so no cooldown is inferred. Pa
 `cooldownId` to check its chip membership and time compatibility; these checks do not establish
 that the result belongs to that cooldown. Inspect failed or missing parts before drawing a conclusion.
 
+## Define a Calibration
+
+`@oqtopus-team/qdash-sdk/calibration` exports pure builders without authentication, HTTP,
+or Node.js runtime imports. The package root exports the same builders.
+
+| Python `qdash.calibration` | TypeScript builder |
+| --- | --- |
+| `QubitTargets`, `MuxTargets`, `CouplingTargets` | `qubitTargets`, `muxTargets`, `couplingTargets` |
+| `TaskCall` | `taskCall` |
+| `ConfigureAll`, `BringUp` | `configureAll`, `bringUp` |
+| `OneQubitCheck`, `OneQubitFineTune`, `CustomOneQubit` | `oneQubitCheck`, `oneQubitFineTune`, `customOneQubit` |
+| `FilterByStatus`, `FilterByMetric` | `filterByStatus`, `filterByMetric` |
+| `GenerateCRSchedule`, `TwoQubitCalibration`, `CustomTwoQubit` | `generateCRSchedule`, `twoQubitCalibration`, `customTwoQubit` |
+| `pipeline_spec`, `sweep` | `calibrationSpec`, `sweep` |
+
+Step and task fields use snake_case. `taskCall` accepts either a name and fields or one object
+containing `name`. Builders omit absent and `undefined` fields, preserve explicitly supplied
+valid defaults and `null`, and omit empty target exclusions. Valid typed inputs serialize like
+Python; TypeScript does not reproduce Pydantic's coercion of strings to numbers.
+
+Builders reject invalid local fields with `TypeError` or `RangeError`, including unknown fields,
+duplicate targets, and invalid execution modes. Existing builders now reject these invalid inputs
+before a server request. Chip, task-catalog, and cross-step checks still require server validation.
+`calibrationSpec` assembles its inputs without validating their contents.
+
 ## Run a Calibration
 
 This example measures qubits 0 and 1. Choose targets and settings suitable for your hardware;

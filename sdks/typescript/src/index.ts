@@ -99,8 +99,53 @@ export type {
 } from "./evidence.js";
 export { Run, runStatus } from "./runs.js";
 export type { RunResult, WaitOptions } from "./runs.js";
-export { calibrationSpec, customOneQubit, muxTargets, qubitTargets, sweep } from "./definitions.js";
-export type { CalibrationOptions, SweepDeclaration } from "./definitions.js";
+export {
+  bringUp,
+  calibrationDefinitionsSource,
+  calibrationSpec,
+  calibrationStep,
+  configureAll,
+  couplingTargets,
+  customOneQubit,
+  customTwoQubit,
+  filterByMetric,
+  filterByStatus,
+  generateCRSchedule,
+  muxTargets,
+  oneQubitCheck,
+  oneQubitFineTune,
+  qubitTargets,
+  SPEC_VERSION,
+  STEP_TYPES,
+  sweep,
+  taskCall,
+  twoQubitCalibration,
+} from "./calibration.js";
+export type {
+  BringUpFields,
+  CalibrationDefinitions,
+  CalibrationOptions,
+  CalibrationStep,
+  CalibrationStepFields,
+  CalibrationStepType,
+  ConfigureAllFields,
+  CustomOneQubitFields,
+  CustomTwoQubitFields,
+  FilterByMetricFields,
+  FilterByStatusFields,
+  GenerateCRScheduleFields,
+  MuxTargetOptions,
+  OneQubitCheckFields,
+  OneQubitExecutionMode,
+  OneQubitFineTuneFields,
+  OneQubitStepExecutionMode,
+  SpecVersion,
+  SweepBuilders,
+  SweepDeclaration,
+  TaskCallFields,
+  TwoQubitCalibrationFields,
+  TwoQubitExecutionMode,
+} from "./calibration.js";
 export type {
   CalibrationPipelineSpec,
   CalibrationPipelineSpecStepsItem,

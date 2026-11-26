@@ -30,10 +30,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./calibration": {
+      "types": "./dist/calibration.d.ts",
+      "import": "./dist/calibration.js"
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts src/cli.ts --format esm --sourcemap --clean --out-dir dist && tsc -p tsconfig.build.json",
+    "build": "tsup src/index.ts src/cli.ts src/calibration.ts --format esm --sourcemap --clean --out-dir dist && tsc -p tsconfig.build.json",
     "check": "tsc --noEmit && vitest run",
     "generate": "node scripts/generate.mjs",
     "generate:check": "node scripts/generate.mjs --check",

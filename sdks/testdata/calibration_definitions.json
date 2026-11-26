@@ -1,0 +1,412 @@
+{
+  "$comment": [
+    "Calibration definition cases shared by the Python qdash.calibration classes and the TypeScript @oqtopus-team/qdash-sdk/calibration builders.",
+    "fields are the snake_case fields both take. In fields, {\"$sweep\": [constructor, ...arguments]} is a sweep declaration and {\"$task\": {...}} a task call built with TaskCall / taskCall; plain objects in tasks are task calls written as data.",
+    "valid: both build exactly expected, and the server's models accept it. invalid: both refuse it locally; server_rejects says what the server's model does with the same JSON (null: not expressible as server JSON).",
+    "server_only: both build it unchanged and leave it to the server, which rejects it, because the rule needs more than one field's own value."
+  ],
+  "task_call_fields": ["name", "call_id", "run", "input", "update_calibration_parameters", "on_failure"],
+  "step_fields": {
+    "ConfigureAll": ["step_id", "mux_ids", "call"],
+    "BringUp": ["step_id", "tasks", "execution_mode"],
+    "OneQubitCheck": ["step_id", "execution_mode", "rounds", "tasks", "configure"],
+    "OneQubitFineTune": ["step_id", "execution_mode", "rounds", "tasks", "configure"],
+    "CustomOneQubit": ["step_name", "tasks", "execution_mode", "rounds", "continue_on_failure"],
+    "FilterByStatus": ["step", "call_id"],
+    "FilterByMetric": ["step", "call_id", "metric", "threshold"],
+    "GenerateCRSchedule": ["max_parallel_ops", "inverse"],
+    "TwoQubitCalibration": ["execution_mode", "rounds", "max_parallel_ops", "step_id", "tasks"],
+    "CustomTwoQubit": ["execution_mode", "rounds", "max_parallel_ops", "step_name", "tasks", "continue_on_failure"]
+  },
+  "valid": [
+    {
+      "name": "a task call with only its name",
+      "kind": "task_call",
+      "fields": { "name": "CheckT1" },
+      "expected": { "name": "CheckT1" }
+    },
+    {
+      "name": "explicit nulls on a task call are written",
+      "kind": "task_call",
+      "fields": { "name": "CheckRamsey", "call_id": null, "run": null, "input": null, "update_calibration_parameters": null, "on_failure": null },
+      "expected": { "name": "CheckRamsey", "call_id": null, "run": null, "input": null, "update_calibration_parameters": null, "on_failure": null }
+    },
+    {
+      "name": "a task call with every setting, a sweep and a wrapped value",
+      "kind": "task_call",
+      "fields": {
+        "name": "CheckRamsey",
+        "call_id": "ramsey_fine",
+        "run": { "detuning": 0.001, "time_range": { "$sweep": ["arange", 0, 10000, 100] }, "shots": { "value": 1024, "value_type": "int" } },
+        "input": { "qubit_frequency": 7.9 },
+        "update_calibration_parameters": false,
+        "on_failure": "stop"
+      },
+      "expected": {
+        "name": "CheckRamsey",
+        "call_id": "ramsey_fine",
+        "run": { "detuning": 0.001, "time_range": { "value": [0, 10000, 100], "value_type": "np.arange" }, "shots": { "value": 1024, "value_type": "int" } },
+        "input": { "qubit_frequency": 7.9 },
+        "update_calibration_parameters": false,
+        "on_failure": "stop"
+      }
+    },
+    {
+      "name": "every sweep constructor",
+      "kind": "task_call",
+      "fields": {
+        "name": "CheckT1",
+        "run": {
+          "a": { "$sweep": ["values", 1, 2.5, 4] },
+          "b": { "$sweep": ["linspace", 0, 100000, 51] },
+          "c": { "$sweep": ["logspace", 2, 5, 31] },
+          "d": { "$sweep": ["arange", 0, 1, 0.25] },
+          "e": { "$sweep": ["range", 10, 0, -2] }
+        }
+      },
+      "expected": {
+        "name": "CheckT1",
+        "run": {
+          "a": { "value": [1, 2.5, 4], "value_type": "list" },
+          "b": { "value": [0, 100000, 51], "value_type": "np.linspace" },
+          "c": { "value": [2, 5, 31], "value_type": "np.logspace" },
+          "d": { "value": [0, 1, 0.25], "value_type": "np.arange" },
+          "e": { "value": [10, 0, -2], "value_type": "range" }
+        }
+      }
+    },
+    {
+      "name": "qubit targets",
+      "kind": "targets",
+      "type": "QubitTargets",
+      "fields": { "qids": ["0", "1"] },
+      "expected": { "qids": ["0", "1"] }
+    },
+    {
+      "name": "an empty exclude_qids is the default and is left out",
+      "kind": "targets",
+      "type": "MuxTargets",
+      "fields": { "mux_ids": [0, 1], "exclude_qids": [] },
+      "expected": { "mux_ids": [0, 1] }
+    },
+    {
+      "name": "MUX targets with excluded qubits",
+      "kind": "targets",
+      "type": "MuxTargets",
+      "fields": { "mux_ids": [2], "exclude_qids": ["9"] },
+      "expected": { "mux_ids": [2], "exclude_qids": ["9"] }
+    },
+    {
+      "name": "coupling targets keep their direction",
+      "kind": "targets",
+      "type": "CouplingTargets",
+      "fields": { "pairs": [["0", "1"], ["1", "0"]] },
+      "expected": { "pairs": [["0", "1"], ["1", "0"]] }
+    },
+    {
+      "name": "a CustomOneQubit step with only its tasks",
+      "kind": "step",
+      "type": "CustomOneQubit",
+      "fields": { "tasks": [{ "name": "CheckT1" }] },
+      "expected": { "type": "CustomOneQubit", "tasks": [{ "name": "CheckT1" }] }
+    },
+    {
+      "name": "defaults given explicitly are written",
+      "kind": "step",
+      "type": "CustomOneQubit",
+      "fields": {
+        "step_name": "custom_one_qubit",
+        "tasks": [{ "$task": { "name": "CheckT1" } }],
+        "execution_mode": "parallel_by_round",
+        "rounds": null,
+        "continue_on_failure": false
+      },
+      "expected": {
+        "type": "CustomOneQubit",
+        "step_name": "custom_one_qubit",
+        "tasks": [{ "name": "CheckT1" }],
+        "execution_mode": "parallel_by_round",
+        "rounds": null,
+        "continue_on_failure": false
+      }
+    },
+    {
+      "name": "manual rounds and a repeated task with call ids",
+      "kind": "step",
+      "type": "CustomOneQubit",
+      "fields": {
+        "step_name": "coherence",
+        "execution_mode": "manual",
+        "rounds": [["0", "8"], ["1"]],
+        "tasks": [
+          { "$task": { "name": "CheckT1", "call_id": "t1_first", "run": { "time_range": { "$sweep": ["logspace", 2, 5, 31] } } } },
+          { "$task": { "name": "CheckT1", "call_id": "t1_repeat", "on_failure": "continue" } }
+        ]
+      },
+      "expected": {
+        "type": "CustomOneQubit",
+        "step_name": "coherence",
+        "execution_mode": "manual",
+        "rounds": [["0", "8"], ["1"]],
+        "tasks": [
+          { "name": "CheckT1", "call_id": "t1_first", "run": { "time_range": { "value": [2, 5, 31], "value_type": "np.logspace" } } },
+          { "name": "CheckT1", "call_id": "t1_repeat", "on_failure": "continue" }
+        ]
+      }
+    },
+    {
+      "name": "an empty ConfigureAll step",
+      "kind": "step",
+      "type": "ConfigureAll",
+      "fields": {},
+      "expected": { "type": "ConfigureAll" }
+    },
+    {
+      "name": "a ConfigureAll step with its own call",
+      "kind": "step",
+      "type": "ConfigureAll",
+      "fields": { "step_id": "configure", "mux_ids": [0, 1], "call": { "name": "ConfigureAll", "update_calibration_parameters": false } },
+      "expected": { "type": "ConfigureAll", "step_id": "configure", "mux_ids": [0, 1], "call": { "name": "ConfigureAll", "update_calibration_parameters": false } }
+    },
+    {
+      "name": "BringUp with an explicit default mode and null tasks",
+      "kind": "step",
+      "type": "BringUp",
+      "fields": { "execution_mode": "parallel_by_mux", "tasks": null },
+      "expected": { "type": "BringUp", "execution_mode": "parallel_by_mux", "tasks": null }
+    },
+    {
+      "name": "OneQubitCheck with configure",
+      "kind": "step",
+      "type": "OneQubitCheck",
+      "fields": { "step_id": "check", "configure": true },
+      "expected": { "type": "OneQubitCheck", "step_id": "check", "configure": true }
+    },
+    {
+      "name": "OneQubitFineTune with manual rounds and its own tasks",
+      "kind": "step",
+      "type": "OneQubitFineTune",
+      "fields": { "execution_mode": "manual", "rounds": [["0"], ["1"]], "tasks": [{ "name": "CheckRabi" }] },
+      "expected": { "type": "OneQubitFineTune", "execution_mode": "manual", "rounds": [["0"], ["1"]], "tasks": [{ "name": "CheckRabi" }] }
+    },
+    {
+      "name": "an empty FilterByStatus step",
+      "kind": "step",
+      "type": "FilterByStatus",
+      "fields": {},
+      "expected": { "type": "FilterByStatus" }
+    },
+    {
+      "name": "FilterByStatus with explicit nulls",
+      "kind": "step",
+      "type": "FilterByStatus",
+      "fields": { "step": null, "call_id": null },
+      "expected": { "type": "FilterByStatus", "step": null, "call_id": null }
+    },
+    {
+      "name": "FilterByStatus on one call",
+      "kind": "step",
+      "type": "FilterByStatus",
+      "fields": { "step": "check", "call_id": "CheckRabi" },
+      "expected": { "type": "FilterByStatus", "step": "check", "call_id": "CheckRabi" }
+    },
+    {
+      "name": "FilterByMetric",
+      "kind": "step",
+      "type": "FilterByMetric",
+      "fields": { "metric": "t1", "threshold": 30.5, "step": "coherence", "call_id": "t1_first" },
+      "expected": { "type": "FilterByMetric", "metric": "t1", "threshold": 30.5, "step": "coherence", "call_id": "t1_first" }
+    },
+    {
+      "name": "an empty GenerateCRSchedule step",
+      "kind": "step",
+      "type": "GenerateCRSchedule",
+      "fields": {},
+      "expected": { "type": "GenerateCRSchedule" }
+    },
+    {
+      "name": "GenerateCRSchedule with explicit defaults",
+      "kind": "step",
+      "type": "GenerateCRSchedule",
+      "fields": { "max_parallel_ops": 10, "inverse": false },
+      "expected": { "type": "GenerateCRSchedule", "max_parallel_ops": 10, "inverse": false }
+    },
+    {
+      "name": "an empty TwoQubitCalibration step",
+      "kind": "step",
+      "type": "TwoQubitCalibration",
+      "fields": {},
+      "expected": { "type": "TwoQubitCalibration" }
+    },
+    {
+      "name": "TwoQubitCalibration with a cap",
+      "kind": "step",
+      "type": "TwoQubitCalibration",
+      "fields": { "step_id": "two_qubit", "max_parallel_ops": 4 },
+      "expected": { "type": "TwoQubitCalibration", "step_id": "two_qubit", "max_parallel_ops": 4 }
+    },
+    {
+      "name": "TwoQubitCalibration with manual rounds and a null cap",
+      "kind": "step",
+      "type": "TwoQubitCalibration",
+      "fields": { "execution_mode": "manual", "rounds": [[["0", "1"], ["4", "5"]], [["1", "2"]]], "max_parallel_ops": null },
+      "expected": { "type": "TwoQubitCalibration", "execution_mode": "manual", "rounds": [[["0", "1"], ["4", "5"]], [["1", "2"]]], "max_parallel_ops": null }
+    },
+    {
+      "name": "CustomTwoQubit with only its tasks",
+      "kind": "step",
+      "type": "CustomTwoQubit",
+      "fields": { "tasks": [{ "name": "CheckCrossResonance" }] },
+      "expected": { "type": "CustomTwoQubit", "tasks": [{ "name": "CheckCrossResonance" }] }
+    },
+    {
+      "name": "CustomTwoQubit with manual rounds",
+      "kind": "step",
+      "type": "CustomTwoQubit",
+      "fields": {
+        "step_name": "cr",
+        "execution_mode": "manual",
+        "rounds": [[["0", "1"]]],
+        "continue_on_failure": true,
+        "tasks": [{ "$task": { "name": "CheckCrossResonance", "run": { "shots": 2048 } } }]
+      },
+      "expected": {
+        "type": "CustomTwoQubit",
+        "step_name": "cr",
+        "execution_mode": "manual",
+        "rounds": [[["0", "1"]]],
+        "continue_on_failure": true,
+        "tasks": [{ "name": "CheckCrossResonance", "run": { "shots": 2048 } }]
+      }
+    },
+    {
+      "name": "a coherence spec with every option",
+      "kind": "spec",
+      "targets": { "type": "QubitTargets", "fields": { "qids": ["0", "1"] } },
+      "steps": [
+        {
+          "type": "CustomOneQubit",
+          "fields": { "step_name": "t1", "tasks": [{ "$task": { "name": "CheckT1", "run": { "time_range": { "$sweep": ["linspace", 0, 100000, 51] } } } }] }
+        },
+        { "type": "FilterByStatus", "fields": { "step": "t1" } }
+      ],
+      "options": { "name": "coherence", "default_run_parameters": { "shots": 1024, "interval": { "$sweep": ["values", 100, 200] } }, "tags": ["agent"] },
+      "expected": {
+        "spec_version": 2,
+        "name": "coherence",
+        "targets": { "qids": ["0", "1"] },
+        "steps": [
+          {
+            "type": "CustomOneQubit",
+            "step_name": "t1",
+            "tasks": [{ "name": "CheckT1", "run": { "time_range": { "value": [0, 100000, 51], "value_type": "np.linspace" } } }]
+          },
+          { "type": "FilterByStatus", "step": "t1" }
+        ],
+        "default_run_parameters": { "shots": 1024, "interval": { "value": [100, 200], "value_type": "list" } },
+        "tags": ["agent"]
+      }
+    },
+    {
+      "name": "a MUX spec through every built-in step kind, without options",
+      "kind": "spec",
+      "targets": { "type": "MuxTargets", "fields": { "mux_ids": [0, 1], "exclude_qids": ["3"] } },
+      "steps": [
+        { "type": "ConfigureAll", "fields": {} },
+        { "type": "BringUp", "fields": {} },
+        { "type": "OneQubitCheck", "fields": { "step_id": "check" } },
+        { "type": "FilterByStatus", "fields": { "step": "check" } },
+        { "type": "OneQubitFineTune", "fields": {} },
+        { "type": "FilterByStatus", "fields": {} },
+        { "type": "GenerateCRSchedule", "fields": { "max_parallel_ops": 8 } },
+        { "type": "TwoQubitCalibration", "fields": {} }
+      ],
+      "options": {},
+      "expected": {
+        "spec_version": 2,
+        "targets": { "mux_ids": [0, 1], "exclude_qids": ["3"] },
+        "steps": [
+          { "type": "ConfigureAll" },
+          { "type": "BringUp" },
+          { "type": "OneQubitCheck", "step_id": "check" },
+          { "type": "FilterByStatus", "step": "check" },
+          { "type": "OneQubitFineTune" },
+          { "type": "FilterByStatus" },
+          { "type": "GenerateCRSchedule", "max_parallel_ops": 8 },
+          { "type": "TwoQubitCalibration" }
+        ]
+      }
+    },
+    {
+      "name": "a coupling spec",
+      "kind": "spec",
+      "targets": { "type": "CouplingTargets", "fields": { "pairs": [["0", "1"], ["4", "5"]] } },
+      "steps": [
+        { "type": "CustomTwoQubit", "fields": { "step_name": "cr", "tasks": [{ "name": "CheckCrossResonance" }] } }
+      ],
+      "options": { "tags": [] },
+      "expected": {
+        "spec_version": 2,
+        "targets": { "pairs": [["0", "1"], ["4", "5"]] },
+        "steps": [{ "type": "CustomTwoQubit", "step_name": "cr", "tasks": [{ "name": "CheckCrossResonance" }] }],
+        "tags": []
+      }
+    }
+  ],
+  "server_only": [
+    {
+      "name": "a task repeated in one step without a call id on every occurrence",
+      "kind": "step",
+      "type": "CustomOneQubit",
+      "fields": { "tasks": [{ "name": "CheckT1" }, { "name": "CheckT1", "call_id": "again" }] },
+      "expected": { "type": "CustomOneQubit", "tasks": [{ "name": "CheckT1" }, { "name": "CheckT1", "call_id": "again" }] }
+    },
+    {
+      "name": "a filter that references a step the spec does not have",
+      "kind": "spec",
+      "targets": { "type": "QubitTargets", "fields": { "qids": ["0"] } },
+      "steps": [{ "type": "FilterByStatus", "fields": { "step": "missing" } }],
+      "options": {},
+      "expected": { "spec_version": 2, "targets": { "qids": ["0"] }, "steps": [{ "type": "FilterByStatus", "step": "missing" }] }
+    }
+  ],
+  "invalid": [
+    { "name": "a task call without a name", "kind": "task_call", "fields": { "run": { "shots": 1 } }, "server_rejects": true },
+    { "name": "a task name that is not an identifier", "kind": "task_call", "fields": { "name": "1Check" }, "server_rejects": true },
+    { "name": "a call id with a space", "kind": "task_call", "fields": { "name": "CheckT1", "call_id": "has space" }, "server_rejects": true },
+    { "name": "an unknown task call field", "kind": "task_call", "fields": { "name": "CheckT1", "shots": 1024 }, "server_rejects": true },
+    { "name": "an unknown on_failure", "kind": "task_call", "fields": { "name": "CheckT1", "on_failure": "retry" }, "server_rejects": true },
+    { "name": "run given as a list", "kind": "task_call", "fields": { "name": "CheckT1", "run": [1, 2] }, "server_rejects": true },
+    { "name": "a sweep under input", "kind": "task_call", "fields": { "name": "CheckT1", "input": { "qubit_frequency": { "$sweep": ["values", 1, 2] } } }, "server_rejects": null },
+    { "name": "no qubits", "kind": "targets", "type": "QubitTargets", "fields": { "qids": [] }, "server_rejects": true },
+    { "name": "a repeated qubit", "kind": "targets", "type": "QubitTargets", "fields": { "qids": ["0", "0"] }, "server_rejects": true },
+    { "name": "qubit IDs written as numbers", "kind": "targets", "type": "QubitTargets", "fields": { "qids": [0, 1] }, "server_rejects": true },
+    { "name": "no MUXes", "kind": "targets", "type": "MuxTargets", "fields": { "mux_ids": [] }, "server_rejects": true },
+    { "name": "a repeated MUX", "kind": "targets", "type": "MuxTargets", "fields": { "mux_ids": [1, 1] }, "server_rejects": true },
+    { "name": "a pair coupling a qubit with itself", "kind": "targets", "type": "CouplingTargets", "fields": { "pairs": [["0", "0"]] }, "server_rejects": true },
+    { "name": "a repeated pair", "kind": "targets", "type": "CouplingTargets", "fields": { "pairs": [["0", "1"], ["0", "1"]] }, "server_rejects": true },
+    { "name": "a pair of three qubits", "kind": "targets", "type": "CouplingTargets", "fields": { "pairs": [["0", "1", "2"]] }, "server_rejects": true },
+    { "name": "CustomOneQubit without tasks", "kind": "step", "type": "CustomOneQubit", "fields": {}, "server_rejects": true },
+    { "name": "CustomOneQubit with an empty task list", "kind": "step", "type": "CustomOneQubit", "fields": { "tasks": [] }, "server_rejects": true },
+    { "name": "a plain task name in tasks", "kind": "step", "type": "CustomOneQubit", "fields": { "tasks": ["CheckT1"] }, "server_rejects": true },
+    { "name": "a step name with capitals and a dash", "kind": "step", "type": "CustomOneQubit", "fields": { "step_name": "Bad-Name", "tasks": [{ "name": "CheckT1" }] }, "server_rejects": true },
+    { "name": "rounds without the manual mode", "kind": "step", "type": "CustomOneQubit", "fields": { "rounds": [["0"]], "tasks": [{ "name": "CheckT1" }] }, "server_rejects": true },
+    { "name": "the manual mode without rounds", "kind": "step", "type": "OneQubitCheck", "fields": { "execution_mode": "manual" }, "server_rejects": true },
+    { "name": "the manual mode with null rounds", "kind": "step", "type": "CustomOneQubit", "fields": { "execution_mode": "manual", "rounds": null, "tasks": [{ "name": "CheckT1" }] }, "server_rejects": true },
+    { "name": "an unknown execution mode", "kind": "step", "type": "CustomOneQubit", "fields": { "execution_mode": "fast", "tasks": [{ "name": "CheckT1" }] }, "server_rejects": true },
+    { "name": "manual rounds on BringUp", "kind": "step", "type": "BringUp", "fields": { "execution_mode": "manual" }, "server_rejects": true },
+    { "name": "configure that is not a boolean", "kind": "step", "type": "OneQubitFineTune", "fields": { "configure": 2 }, "server_rejects": true },
+    { "name": "a null execution mode", "kind": "step", "type": "OneQubitCheck", "fields": { "execution_mode": null }, "server_rejects": true },
+    { "name": "a step id with capitals", "kind": "step", "type": "OneQubitCheck", "fields": { "step_id": "Check" }, "server_rejects": true },
+    { "name": "an unknown step field", "kind": "step", "type": "OneQubitCheck", "fields": { "qids": ["0"] }, "server_rejects": true },
+    { "name": "a ConfigureAll call naming another task", "kind": "step", "type": "ConfigureAll", "fields": { "call": { "name": "CheckT1" } }, "server_rejects": true },
+    { "name": "a filter call id without its step", "kind": "step", "type": "FilterByStatus", "fields": { "call_id": "CheckRabi" }, "server_rejects": null },
+    { "name": "FilterByMetric without a threshold", "kind": "step", "type": "FilterByMetric", "fields": { "metric": "t1" }, "server_rejects": true },
+    { "name": "FilterByMetric with an empty metric", "kind": "step", "type": "FilterByMetric", "fields": { "metric": "", "threshold": 1 }, "server_rejects": true },
+    { "name": "a CR group cap of zero", "kind": "step", "type": "GenerateCRSchedule", "fields": { "max_parallel_ops": 0 }, "server_rejects": true },
+    { "name": "a CR group cap above 100", "kind": "step", "type": "GenerateCRSchedule", "fields": { "max_parallel_ops": 101 }, "server_rejects": true },
+    { "name": "a cap with manual rounds", "kind": "step", "type": "TwoQubitCalibration", "fields": { "execution_mode": "manual", "rounds": [[["0", "1"]]], "max_parallel_ops": 4 }, "server_rejects": true },
+    { "name": "pair rounds without the manual mode", "kind": "step", "type": "CustomTwoQubit", "fields": { "rounds": [[["0", "1"]]], "tasks": [{ "name": "CheckCrossResonance" }] }, "server_rejects": true },
+    { "name": "a round pair of three qubits", "kind": "step", "type": "TwoQubitCalibration", "fields": { "execution_mode": "manual", "rounds": [[["0", "1", "2"]]] }, "server_rejects": true }
+  ]
+}

@@ -150,6 +150,17 @@ function startFixture() {
       response.writeHead(status, { "content-type": "application/json" });
       response.end(JSON.stringify(body));
     };
+    // Planning a pipeline only validates it: the one POST the fixture answers.
+    if (request.method === "POST" && url.pathname === "/calibration-pipelines/validate") {
+      const chunks = [];
+      request.on("data", (chunk) => chunks.push(chunk));
+      request.on("end", () => {
+        const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        requests[requests.length - 1].body = body;
+        json(200, { valid: true, backend_name: "fake", spec: body.spec, targets: body.spec.targets, task_run_count: 1, problems: [], warnings: [], steps: [] });
+      });
+      return;
+    }
     if (request.method !== "GET") return json(405, { detail: "fixture is read-only" });
     if (url.pathname === "/chips") {
       return json(200, { chips: [{ chip_id: "A", size: 16, activity_status: "active" }, { chip_id: "B", size: 64 }] });
@@ -489,6 +500,123 @@ out.timeseries = {
 out.badTimeseries = await fail(() => tools.qdash_get_timeseries({ chipId: "BAD", parameter: "qubit_frequency", ...window }));
 text("RESULT " + JSON.stringify(out));
 `;
+
+const SPEC_SCRIPT = `// @options: {"timeout_ms": 60000}
+const { taskCall, customOneQubit, filterByMetric, filterByStatus, muxTargets, sweep, calibrationSpec } = qdash.calibration;
+const spec = calibrationSpec(
+  muxTargets([0, 1], { exclude_qids: ["3"] }),
+  [
+    customOneQubit({
+      step_name: "coherence",
+      tasks: [
+        taskCall("CheckT1", { call_id: "t1", run: { time_range: sweep.logspace(2, 5, 31) } }),
+        taskCall("CheckT2Echo", { update_calibration_parameters: false, rounds: undefined }),
+      ],
+    }),
+    filterByStatus({ step: "coherence", call_id: "t1" }),
+  ],
+  { name: "coherence", default_run_parameters: { shots: 1024 } },
+);
+const plan = await tools.qdash_plan_pipeline({ chipId: "A", spec });
+const refusal = (run) => { try { run(); return "accepted"; } catch (error) { return error.name + ": " + error.message; } };
+const attempt = async (call) => { try { await call(); return "ran"; } catch (error) { return "refused"; } };
+const frozen = (() => { try { qdash.calibration = null; } catch (error) { return error.name; } return Object.isFrozen(qdash) && typeof qdash.calibration.taskCall === "function" ? "frozen" : "writable"; })();
+text("RESULT " + JSON.stringify({
+  valid: plan.valid,
+  backend: plan.backend_name,
+  local: refusal(() => filterByMetric({ metric: "t1" })),
+  frozen,
+  ambient: [typeof fetch, typeof process, typeof require, typeof setTimeout],
+  run: await attempt(() => tools.qdash_run_pipeline({ chipId: "A", spec, confirmWrite: true })),
+  session: await attempt(() => tools.qdash_run_agent_session_step({ sessionId: "s", confirmWrite: true })),
+}));
+`;
+
+// What both hosts must send for SPEC_SCRIPT: the builders' JSON, with only the fields given.
+const SPEC_SCRIPT_SPEC = {
+  spec_version: 2,
+  name: "coherence",
+  targets: { mux_ids: [0, 1], exclude_qids: ["3"] },
+  steps: [
+    {
+      type: "CustomOneQubit",
+      step_name: "coherence",
+      tasks: [
+        { name: "CheckT1", call_id: "t1", run: { time_range: { value: [2, 5, 31], value_type: "np.logspace" } } },
+        { name: "CheckT2Echo", update_calibration_parameters: false },
+      ],
+    },
+    { type: "FilterByStatus", step: "coherence", call_id: "t1" },
+  ],
+  default_run_parameters: { shots: 1024 },
+};
+
+test("a script composes a spec with qdash.calibration and plans it through qdash_plan_pipeline the same way in the pi CLI and in chat", async () => {
+  const outputs = {};
+  for (const host of ["cli", "chat"]) {
+    const start = fixture.requests.length;
+    const run = await (host === "cli" ? openCli : openChat)([
+      fauxAssistantMessage([fauxToolCall("codemode", { code: SPEC_SCRIPT })], { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxText("planned")),
+    ]);
+    try {
+      await run.ask("Plan a coherence check on MUX 0 and 1");
+      const script = (await run.results()).find((result) => result.name === "codemode");
+      assert.ok(script, `${host}: no codemode result`);
+      outputs[host] = { script, requests: requestsSince(start) };
+    } finally {
+      await run.close();
+    }
+  }
+  for (const host of ["cli", "chat"]) {
+    const { script, requests } = outputs[host];
+    // The rounds: undefined above is a mistake on purpose: it is unset, so it is left out, not refused.
+    assert.match(script.text, /RESULT /, `${host}: ${script.text}`);
+    assert.equal(script.isError, false, `${host}: ${script.text}`);
+    const result = scriptResult(script.text);
+    assert.deepEqual(result, {
+      valid: true,
+      backend: "fake",
+      local: "TypeError: filterByMetric: needs threshold",
+      // Scripts are sloppy-mode code: the assignment is ignored, and the helpers stay.
+      frozen: "frozen",
+      ambient: ["undefined", "undefined", "undefined", "undefined"],
+      run: "refused",
+      session: "refused",
+    }, host);
+    // The tool path sent the builders' JSON to the validate route, and nothing ran or wrote.
+    const plans = requests.filter((request) => request.method === "POST");
+    assert.deepEqual(plans.map((request) => request.path), ["/calibration-pipelines/validate"], host);
+    assert.deepEqual(plans[0].body.spec, SPEC_SCRIPT_SPEC, host);
+    assert.equal(plans[0].body.chip_id, "A", host);
+  }
+  assert.deepEqual(scriptResult(outputs.cli.script.text), scriptResult(outputs.chat.script.text));
+});
+
+test("a script error inside or after the builders keeps its own line number in both hosts", async () => {
+  const code = [
+    "const c = qdash.calibration;",
+    "const step = c.customOneQubit({ tasks: [c.taskCall('CheckT1')] });",
+    "c.customOneQubit({ tasks: [] });",
+  ].join("\n");
+  for (const host of ["cli", "chat"]) {
+    const run = await (host === "cli" ? openCli : openChat)([
+      fauxAssistantMessage([fauxToolCall("codemode", { code })], { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxText("failed")),
+    ]);
+    try {
+      await run.ask("build a step");
+      const script = (await run.results()).find((result) => result.name === "codemode");
+      assert.ok(script, `${host}: no codemode result`);
+      assert.equal(script.isError, true, host);
+      assert.match(script.text, /RangeError: customOneQubit: tasks needs at least 1 task call/, host);
+      // The deadline's options line is line 1, so the model's third line is line 4.
+      assert.match(script.text, /codemode\.js:4\b/, `${host}: ${script.text}`);
+    } finally {
+      await run.close();
+    }
+  }
+});
 
 test("task-result paging, chip metrics, and timeseries reach a script with the API's shape in the pi CLI and in chat", async () => {
   const outcomes = {};
