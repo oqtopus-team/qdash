@@ -516,6 +516,32 @@ export class QDashConnection {
     return this.read((o) => this.api.chip.getChipQubit({ chip_id: chipId, qid }, o));
   }
 
+  /**
+   * Re-run CheckResonatorSpectroscopy's analysis on a stored result. QDash only previews it:
+   * nothing is stored and no hardware is used, so it is sent as a read.
+   */
+  reanalyzeResonatorSpectroscopy(
+    chipId: string,
+    qid: string,
+    body: Omit<QDashApi.ReanalyzeResonatorSpectroscopyRequest, "chip_id" | "qid">,
+    signal?: AbortSignal,
+  ): Promise<QDashApi.ReanalyzeResponse> {
+    return this.read((o) => this.api.chip.reanalyzeResonatorSpectroscopy({ ...body, chip_id: chipId, qid }, o), signal);
+  }
+
+  /**
+   * Re-run CheckQubitSpectroscopy's analysis on a stored result. QDash only previews it:
+   * nothing is stored and no hardware is used, so it is sent as a read.
+   */
+  reanalyzeQubitSpectroscopy(
+    chipId: string,
+    qid: string,
+    body: Omit<QDashApi.ReanalyzeQubitSpectroscopyRequest, "chip_id" | "qid">,
+    signal?: AbortSignal,
+  ): Promise<QDashApi.ReanalyzeResponse> {
+    return this.read((o) => this.api.chip.reanalyzeQubitSpectroscopy({ ...body, chip_id: chipId, qid }, o), signal);
+  }
+
   listChipCouplings(chipId: string, options: PaginationOptions = {}): Promise<QDashApi.ListCouplingsResponse> {
     return this.read((o) => this.api.chip.listChipCouplings(defined({ chip_id: chipId, limit: options.limit, offset: options.offset }), o));
   }

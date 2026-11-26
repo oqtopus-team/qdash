@@ -63,6 +63,8 @@ export const ALLOWED_TOOL_NAMES = [
   "qdash_preview_forum_image_reply",
   "qdash_query",
   "qdash_read_source",
+  "qdash_reanalyze_qubit_spectroscopy",
+  "qdash_reanalyze_resonator_spectroscopy",
   "qdash_recent_calibration_figure",
   "qdash_recent_calibration_summary",
   "qdash_recommend_next_action",

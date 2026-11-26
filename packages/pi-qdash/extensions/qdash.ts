@@ -43,6 +43,7 @@ import { registerCalibrationSessionTools } from "./tools/calibration-session.js"
 import { registerCurrentTimeTool } from "./tools/current-time.js";
 import { registerFlowAuthoringTools } from "./tools/flow-authoring.js";
 import { isMetricScriptQueryAction, metricScriptQuery, registerMetricScriptTools, type MetricScriptQueryAction } from "./tools/metric-scripts.js";
+import { registerReanalysisTools } from "./tools/reanalysis.js";
 import { registerSourceCodeTools } from "./tools/source-code.js";
 import { notFound, registerTaskKnowledgeTool } from "./tools/task-knowledge.js";
 import { registerTaskResultEvidenceTool } from "./tools/task-result-evidence.js";
@@ -1597,6 +1598,10 @@ export default function qdashExtension(host: ExtensionAPI) {
       : currentContext.chipId,
   });
   registerSourceCodeTools(pi, { makeClient });
+  registerReanalysisTools(pi, {
+    makeClient,
+    resolveChipId: (client, chipId) => defaultChipId(client, chipId),
+  });
   registerAgentLoopTools(pi, { makeClient });
   registerAgentSessionEndTool(pi, { makeClient });
   registerCalibrationPipelineTools(pi, {

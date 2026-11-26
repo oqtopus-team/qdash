@@ -1,6 +1,5 @@
 import copy
 import logging
-import math
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from qubex.experiment.experiment_constants import DEFAULT_SHOTS
@@ -18,7 +17,9 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.analysis import (
     EstimateQubitFrequencyConfig,
+    compute_coarse_control_amplitude,
     estimate_and_mark_qubit_figure,
+    mark_coarse_control_amplitude,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
@@ -150,13 +151,11 @@ class CheckQubitSpectroscopy(QubexTask):
     }
 
     def _compute_coarse_control_amplitude(self, repr_db: float) -> tuple[float, float]:
-        raw_amplitude = float(10 ** (repr_db / 20))
-        headroom_db = self._seed_amplitude_headroom_db
-        max_amplitude = self._max_coarse_control_amplitude
-        uplifted_amplitude = raw_amplitude * (10 ** (headroom_db / 20))
-        coarse_control_amplitude = min(uplifted_amplitude, max_amplitude)
-        marker_db = float(20 * math.log10(coarse_control_amplitude))
-        return coarse_control_amplitude, marker_db
+        return compute_coarse_control_amplitude(
+            repr_db,
+            headroom_db=self._seed_amplitude_headroom_db,
+            max_amplitude=self._max_coarse_control_amplitude,
+        )
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
@@ -242,14 +241,8 @@ class CheckQubitSpectroscopy(QubexTask):
             )
             output_params_copy["coarse_control_amplitude"].value = coarse_control_amplitude
             if marked_fig is not None:
-                marked_fig.add_hline(
-                    y=coarse_control_marker_db,
-                    line_width=1,
-                    line_color="red",
-                    line_dash="dash",
-                    annotation_text=f"coarse A = {coarse_control_amplitude:.4f} a.u.",
-                    annotation_position="top left",
-                    annotation_font_color="red",
+                mark_coarse_control_amplitude(
+                    marked_fig, coarse_control_amplitude, coarse_control_marker_db
                 )
             print(
                 f"Coarse control amplitude for qid={qid}: "

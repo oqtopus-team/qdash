@@ -34,6 +34,7 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_list_forum_posts`, `qdash_get_forum_post`, `qdash_list_forum_replies` — inspect Forum context
    - `qdash_preview_forum_evidence_reply`, `qdash_preview_forum_image_reply` — preview evidence or image replies without writing
    - `qdash_get_figure`, `qdash_get_task_figures`, `qdash_recent_calibration_figure`, `qdash_analyze_figure_json`, `qdash_build_qcal_evidence` — inspect or package figure evidence
+   - `qdash_reanalyze_resonator_spectroscopy`, `qdash_reanalyze_qubit_spectroscopy` — re-run the analysis of a stored `CheckResonatorSpectroscopy` or `CheckQubitSpectroscopy` result with adjusted analysis parameters and return the re-estimated seeds (`readout_frequency`, `optimal_power`, `readout_amplitude`; or `coarse_qubit_frequency`, `coarse_control_amplitude`, `f01_repr_db`, `f01_quality_level`) with the marked figure as an image; a preview that stores nothing and uses no hardware (see Offline spectroscopy reanalysis)
 2. Read-only overview and planning tools:
    - `qdash_dashboard`, `qdash_dashboard_insights`, `qdash_triage_overview` — summarize status, insights, and investigation priorities
    - `qdash_investigate`, `qdash_target_report`, `qdash_compare_calibration` — investigate target history and compare calibrations
@@ -193,6 +194,15 @@ Rules:
 - A failed call stops that target's later calls in the step unless the step sets `continue_on_failure` or the call sets `on_failure: "continue"`; `on_failure: "stop"` keeps a prerequisite such as `Configure` fail-fast. Other targets are not affected.
 - A pipeline takes the project execution lock. Check `qdash_list_executions` for a running execution before starting one.
 - Prefer short pipelines (one or two steps) when the next step depends on the result: run, inspect results and figures, then compose the next spec. Calibrated parameters persist in QDash between executions, so a later spec continues from the earlier one. Retries and branches are your decision between executions, not something the spec expresses.
+
+## Offline spectroscopy reanalysis
+
+`qdash_reanalyze_resonator_spectroscopy` and `qdash_reanalyze_qubit_spectroscopy` re-read the raw figure of a stored spectroscopy result and run the task's analysis again with the overrides in `parameters` (QDash's snake_case names; a field left out keeps the stored value or the analysis default). They take `qid`, an optional `chipId`, and an optional `sourceTaskId`; without it the qubit's latest result of that task is used, so pass it when comparing several settings on one measurement. To analyze a raw Plotly figure that is not a stored result, pass it as `figure` instead of `sourceTaskId`; stored run parameters then do not apply.
+
+- They are read-only: no approval, no execution lock, and Code Mode scripts may call them. A script receives the outputs, not the image; pass `includeImage: false` from a script.
+- Direct calls return the marked figure as image content (`includeImage` defaults to true). It is recorded under the source task's name, so a following `qcal_evaluate` with the same `task_name` evaluates the reanalyzed figure. When QDash cannot render the image, the result says so and the outputs are still returned; do not call `qcal_evaluate` then, because it would evaluate an older stored figure of the task instead.
+- The outputs are candidates, not calibrated values: nothing is written. Use them as `input` overrides of a short pipeline that confirms them on hardware before anything is committed.
+- Reanalysis only helps when the stored figure shows the feature. A missing or noisy feature needs a new measurement with different run settings instead.
 
 ## Authoring a flow
 

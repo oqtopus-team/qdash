@@ -6,13 +6,18 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ReanalyzeQubitSpectroscopyParams } from './reanalyzeQubitSpectroscopyParams';
+import type { ReanalyzeQubitSpectroscopyRequestFigure } from './reanalyzeQubitSpectroscopyRequestFigure';
 import type { ReanalyzeQubitSpectroscopyRequestSourceTaskId } from './reanalyzeQubitSpectroscopyRequestSourceTaskId';
 
 /**
  * Request body for re-running CheckQubitSpectroscopy analysis.
  */
 export interface ReanalyzeQubitSpectroscopyRequest {
-  /** Task result to re-analyze. If omitted, the latest matching task result for the (chip_id, qid) is used. */
+  /** Task result to re-analyze. If omitted (and no figure is given), the latest matching task result for the (chip_id, qid) is used. Cannot be combined with figure. */
   source_task_id?: ReanalyzeQubitSpectroscopyRequestSourceTaskId;
+  /** Plotly figure JSON of a raw spectroscopy measurement to re-analyze instead of a stored task result. The first trace must have type 'heatmap' with plain lists of finite numbers: x (frequency, GHz) and y (power, dB) of at least 2 values each, and z with one row per y and one value per x. A figure labeled as marked is rejected. Only that heatmap, a named colorscale, and plain-text titles and sizes are kept; other traces and layout content (images, templates, shapes, annotations) are dropped. Stored run parameters do not apply, so unset parameters use the analysis defaults. At most 20 MiB as JSON. Cannot be combined with source_task_id. */
+  figure?: ReanalyzeQubitSpectroscopyRequestFigure;
+  /** If true, also render the marked figure as a PNG and return it base64-encoded in image_base64. Rendering adds latency, so the chip page leaves it off. */
+  include_image?: boolean;
   parameters?: ReanalyzeQubitSpectroscopyParams;
 }

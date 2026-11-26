@@ -789,14 +789,21 @@ class ChipClient:
         qid: str,
         *,
         source_task_id: typing.Optional[str] = OMIT,
+        figure: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
+        include_image: typing.Optional[bool] = OMIT,
         parameters: typing.Optional[ReanalyzeResonatorSpectroscopyParams] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ReanalyzeResponse:
         """
-        Re-run the resonator-spectroscopy analysis on a previously stored figure.
+        Re-run the resonator-spectroscopy analysis on a stored or inline figure.
 
-        Returns the marked figure and the re-estimated `readout_frequency` for
-        the requested qubit. The DB is **not** mutated; this is a preview only.
+        The figure is the stored raw figure of `source_task_id` (or the qubit's
+        latest result), or the Plotly JSON given in `figure`.
+
+        Returns the marked figure and the re-estimated `readout_frequency`,
+        `optimal_power`, and `readout_amplitude` for the requested qubit, plus a PNG
+        of the marked figure when `include_image` is true. The DB is **not**
+        mutated; this is a preview only.
 
         Parameters
         ----------
@@ -805,7 +812,13 @@ class ChipClient:
         qid : str
 
         source_task_id : typing.Optional[str]
-            Task result to re-analyze. If omitted, the latest matching task result for the (chip_id, qid) is used.
+            Task result to re-analyze. If omitted (and no figure is given), the latest matching task result for the (chip_id, qid) is used. Cannot be combined with figure.
+
+        figure : typing.Optional[typing.Dict[str, typing.Any]]
+            Plotly figure JSON of a raw spectroscopy measurement to re-analyze instead of a stored task result. The first trace must have type 'heatmap' with plain lists of finite numbers: x (frequency, GHz) and y (power, dB) of at least 2 values each, and z with one row per y and one value per x. A figure labeled as marked is rejected. Only that heatmap, a named colorscale, and plain-text titles and sizes are kept; other traces and layout content (images, templates, shapes, annotations) are dropped. Stored run parameters do not apply, so unset parameters use the analysis defaults. At most 20 MiB as JSON. Cannot be combined with source_task_id.
+
+        include_image : typing.Optional[bool]
+            If true, also render the marked figure as a PNG and return it base64-encoded in image_base64. Rendering adds latency, so the chip page leaves it off.
 
         parameters : typing.Optional[ReanalyzeResonatorSpectroscopyParams]
 
@@ -832,7 +845,13 @@ class ChipClient:
         )
         """
         _response = self._raw_client.reanalyze_resonator_spectroscopy(
-            chip_id, qid, source_task_id=source_task_id, parameters=parameters, request_options=request_options
+            chip_id,
+            qid,
+            source_task_id=source_task_id,
+            figure=figure,
+            include_image=include_image,
+            parameters=parameters,
+            request_options=request_options,
         )
         return _response.data
 
@@ -842,15 +861,22 @@ class ChipClient:
         qid: str,
         *,
         source_task_id: typing.Optional[str] = OMIT,
+        figure: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
+        include_image: typing.Optional[bool] = OMIT,
         parameters: typing.Optional[ReanalyzeQubitSpectroscopyParams] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ReanalyzeResponse:
         """
-        Re-run the qubit-spectroscopy analysis on a previously stored figure.
+        Re-run the qubit-spectroscopy analysis on a stored or inline figure.
 
-        Returns the marked figure and the re-estimated `qubit_frequency`,
-        `f01_repr_db`, `f01_quality_level`, and `qubit_anharmonicity` for the requested
-        qubit. The DB is **not** mutated; this is a preview only.
+        The figure is the stored raw figure of `source_task_id` (or the qubit's
+        latest result), or the Plotly JSON given in `figure`.
+
+        Returns the marked figure and the re-estimated `qubit_frequency`
+        (also as `coarse_qubit_frequency`), `coarse_control_amplitude`,
+        `f01_repr_db`, `f01_quality_level`, and `qubit_anharmonicity` for the
+        requested qubit, plus a PNG of the marked figure when `include_image` is
+        true. The DB is **not** mutated; this is a preview only.
 
         Parameters
         ----------
@@ -859,7 +885,13 @@ class ChipClient:
         qid : str
 
         source_task_id : typing.Optional[str]
-            Task result to re-analyze. If omitted, the latest matching task result for the (chip_id, qid) is used.
+            Task result to re-analyze. If omitted (and no figure is given), the latest matching task result for the (chip_id, qid) is used. Cannot be combined with figure.
+
+        figure : typing.Optional[typing.Dict[str, typing.Any]]
+            Plotly figure JSON of a raw spectroscopy measurement to re-analyze instead of a stored task result. The first trace must have type 'heatmap' with plain lists of finite numbers: x (frequency, GHz) and y (power, dB) of at least 2 values each, and z with one row per y and one value per x. A figure labeled as marked is rejected. Only that heatmap, a named colorscale, and plain-text titles and sizes are kept; other traces and layout content (images, templates, shapes, annotations) are dropped. Stored run parameters do not apply, so unset parameters use the analysis defaults. At most 20 MiB as JSON. Cannot be combined with source_task_id.
+
+        include_image : typing.Optional[bool]
+            If true, also render the marked figure as a PNG and return it base64-encoded in image_base64. Rendering adds latency, so the chip page leaves it off.
 
         parameters : typing.Optional[ReanalyzeQubitSpectroscopyParams]
 
@@ -886,7 +918,13 @@ class ChipClient:
         )
         """
         _response = self._raw_client.reanalyze_qubit_spectroscopy(
-            chip_id, qid, source_task_id=source_task_id, parameters=parameters, request_options=request_options
+            chip_id,
+            qid,
+            source_task_id=source_task_id,
+            figure=figure,
+            include_image=include_image,
+            parameters=parameters,
+            request_options=request_options,
         )
         return _response.data
 
@@ -2001,14 +2039,21 @@ class AsyncChipClient:
         qid: str,
         *,
         source_task_id: typing.Optional[str] = OMIT,
+        figure: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
+        include_image: typing.Optional[bool] = OMIT,
         parameters: typing.Optional[ReanalyzeResonatorSpectroscopyParams] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ReanalyzeResponse:
         """
-        Re-run the resonator-spectroscopy analysis on a previously stored figure.
+        Re-run the resonator-spectroscopy analysis on a stored or inline figure.
 
-        Returns the marked figure and the re-estimated `readout_frequency` for
-        the requested qubit. The DB is **not** mutated; this is a preview only.
+        The figure is the stored raw figure of `source_task_id` (or the qubit's
+        latest result), or the Plotly JSON given in `figure`.
+
+        Returns the marked figure and the re-estimated `readout_frequency`,
+        `optimal_power`, and `readout_amplitude` for the requested qubit, plus a PNG
+        of the marked figure when `include_image` is true. The DB is **not**
+        mutated; this is a preview only.
 
         Parameters
         ----------
@@ -2017,7 +2062,13 @@ class AsyncChipClient:
         qid : str
 
         source_task_id : typing.Optional[str]
-            Task result to re-analyze. If omitted, the latest matching task result for the (chip_id, qid) is used.
+            Task result to re-analyze. If omitted (and no figure is given), the latest matching task result for the (chip_id, qid) is used. Cannot be combined with figure.
+
+        figure : typing.Optional[typing.Dict[str, typing.Any]]
+            Plotly figure JSON of a raw spectroscopy measurement to re-analyze instead of a stored task result. The first trace must have type 'heatmap' with plain lists of finite numbers: x (frequency, GHz) and y (power, dB) of at least 2 values each, and z with one row per y and one value per x. A figure labeled as marked is rejected. Only that heatmap, a named colorscale, and plain-text titles and sizes are kept; other traces and layout content (images, templates, shapes, annotations) are dropped. Stored run parameters do not apply, so unset parameters use the analysis defaults. At most 20 MiB as JSON. Cannot be combined with source_task_id.
+
+        include_image : typing.Optional[bool]
+            If true, also render the marked figure as a PNG and return it base64-encoded in image_base64. Rendering adds latency, so the chip page leaves it off.
 
         parameters : typing.Optional[ReanalyzeResonatorSpectroscopyParams]
 
@@ -2052,7 +2103,13 @@ class AsyncChipClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.reanalyze_resonator_spectroscopy(
-            chip_id, qid, source_task_id=source_task_id, parameters=parameters, request_options=request_options
+            chip_id,
+            qid,
+            source_task_id=source_task_id,
+            figure=figure,
+            include_image=include_image,
+            parameters=parameters,
+            request_options=request_options,
         )
         return _response.data
 
@@ -2062,15 +2119,22 @@ class AsyncChipClient:
         qid: str,
         *,
         source_task_id: typing.Optional[str] = OMIT,
+        figure: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
+        include_image: typing.Optional[bool] = OMIT,
         parameters: typing.Optional[ReanalyzeQubitSpectroscopyParams] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ReanalyzeResponse:
         """
-        Re-run the qubit-spectroscopy analysis on a previously stored figure.
+        Re-run the qubit-spectroscopy analysis on a stored or inline figure.
 
-        Returns the marked figure and the re-estimated `qubit_frequency`,
-        `f01_repr_db`, `f01_quality_level`, and `qubit_anharmonicity` for the requested
-        qubit. The DB is **not** mutated; this is a preview only.
+        The figure is the stored raw figure of `source_task_id` (or the qubit's
+        latest result), or the Plotly JSON given in `figure`.
+
+        Returns the marked figure and the re-estimated `qubit_frequency`
+        (also as `coarse_qubit_frequency`), `coarse_control_amplitude`,
+        `f01_repr_db`, `f01_quality_level`, and `qubit_anharmonicity` for the
+        requested qubit, plus a PNG of the marked figure when `include_image` is
+        true. The DB is **not** mutated; this is a preview only.
 
         Parameters
         ----------
@@ -2079,7 +2143,13 @@ class AsyncChipClient:
         qid : str
 
         source_task_id : typing.Optional[str]
-            Task result to re-analyze. If omitted, the latest matching task result for the (chip_id, qid) is used.
+            Task result to re-analyze. If omitted (and no figure is given), the latest matching task result for the (chip_id, qid) is used. Cannot be combined with figure.
+
+        figure : typing.Optional[typing.Dict[str, typing.Any]]
+            Plotly figure JSON of a raw spectroscopy measurement to re-analyze instead of a stored task result. The first trace must have type 'heatmap' with plain lists of finite numbers: x (frequency, GHz) and y (power, dB) of at least 2 values each, and z with one row per y and one value per x. A figure labeled as marked is rejected. Only that heatmap, a named colorscale, and plain-text titles and sizes are kept; other traces and layout content (images, templates, shapes, annotations) are dropped. Stored run parameters do not apply, so unset parameters use the analysis defaults. At most 20 MiB as JSON. Cannot be combined with source_task_id.
+
+        include_image : typing.Optional[bool]
+            If true, also render the marked figure as a PNG and return it base64-encoded in image_base64. Rendering adds latency, so the chip page leaves it off.
 
         parameters : typing.Optional[ReanalyzeQubitSpectroscopyParams]
 
@@ -2114,7 +2184,13 @@ class AsyncChipClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.reanalyze_qubit_spectroscopy(
-            chip_id, qid, source_task_id=source_task_id, parameters=parameters, request_options=request_options
+            chip_id,
+            qid,
+            source_task_id=source_task_id,
+            figure=figure,
+            include_image=include_image,
+            parameters=parameters,
+            request_options=request_options,
         )
         return _response.data
 
