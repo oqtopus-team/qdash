@@ -51,7 +51,7 @@ export type TaskResultSummaryParams = {
 export type TaskResultSummaryDependencies = {
   makeClient(params: TaskResultSummaryParams): Promise<QDashConnection>;
   /** The chip of the active QDash context, as qdash_list_task_results uses it; none filters no chip. */
-  contextChipId?(): string | undefined;
+  contextChipId?(params: TaskResultSummaryParams): string | undefined;
   /** The SDK session for a resolved client; defaults to one with the client's settings. */
   sdk?: SdkSessionFactory;
 };
@@ -188,7 +188,7 @@ export function registerTaskResultSummaryTool(pi: Pick<ExtensionAPI, "registerTo
     }),
     outputSchema: TASK_RESULT_SUMMARY_SCHEMA,
     async execute(_toolCallId, params: TaskResultSummaryParams) {
-      const options = summaryOptions(params, deps.contextChipId?.());
+      const options = summaryOptions(params, deps.contextChipId?.(params));
       const client = await deps.makeClient(params);
       const summary = await (deps.sdk ?? sdkSession)(client).taskResults.summarize(options);
       return toTextToolResult(summaryText(summary), summary, { tool: TASK_RESULT_SUMMARY_TOOL, webBaseUrl: qdashWebBaseUrl(client) });

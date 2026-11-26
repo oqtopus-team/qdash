@@ -1583,7 +1583,12 @@ export default function qdashExtension(host: ExtensionAPI) {
   registerCurrentTimeTool(pi);
   registerTaskKnowledgeTool(pi, { makeClient });
   registerTaskResultEvidenceTool(pi, { makeClient });
-  registerTaskResultSummaryTool(pi, { makeClient, contextChipId: () => currentContext.chipId });
+  registerTaskResultSummaryTool(pi, {
+    makeClient,
+    contextChipId: (params) => params.profile !== undefined && params.profile !== currentContext.profile
+      ? undefined
+      : currentContext.chipId,
+  });
   registerSourceCodeTools(pi, { makeClient });
   registerAgentLoopTools(pi, { makeClient });
   registerAgentSessionEndTool(pi, { makeClient });

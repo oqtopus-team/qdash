@@ -112,6 +112,25 @@ describe("qdash.taskResults.summarize", () => {
     expect(summary.aggregates.byStatus).toEqual(countStatuses(rows250.slice(0, 150)));
   });
 
+  it.each([
+    [undefined, { completed: 200 }, true],
+    [undefined, { completed: 200, failed: 50 }, false],
+    ["completed", { completed: 200, failed: 50 }, true],
+    ["completed", { completed: 250, failed: 50 }, false],
+    ["unknown", { unknown: 200 }, true],
+    ["unknown", { unknown: 260 }, false],
+  ] as const)("checks partial metadata for status %s and counts %j", async (status, status_counts, mismatch) => {
+    const rows = rows250.map((item) => ({ ...item, status: status ?? item.status }));
+    const { qdash } = qdashWith(rows, ({ skip, limit }) => ({
+      items: rows.slice(skip, skip + limit), total: 250, skip, limit, status_counts,
+    }));
+    const summary = await qdash.taskResults.summarize({ maxRows: 100, status });
+    expect(summary.complete).toBe(false);
+    const codes = summary.diagnostics.map((d) => d.code);
+    expect(codes).toContain("max_rows_reached");
+    expect(codes.includes("status_counts_mismatch")).toBe(mismatch);
+  });
+
   it("is complete when maxRows equals total", async () => {
     const { qdash } = qdashWith(rows250);
     const summary = await qdash.taskResults.summarize({ maxRows: 250 });

@@ -168,3 +168,28 @@ test("the summary is an offered read tool scripts may call, and the guides route
   assert.match(extensionTools().get("qdash_list_task_results").description, /To count results across pages by status, task, or day, use qdash_summarize_task_results instead/);
   assert.match(QDASH_SCRIPT_GUIDELINE, /call `qdash_summarize_task_results` instead of paging `qdash_list_task_results`/);
 });
+
+
+test("summary chip defaults stay within their selected profile", async (t) => {
+  const { requests, connection } = await fakeTaskResults(t, []);
+  const tools = new Map();
+  const hooks = new Map();
+  qdashExtension({ registerTool: (tool) => tools.set(tool.name, tool), registerCommand() {},
+    on: (name, handler) => hooks.set(name, handler), appendEntry() {} });
+  const restore = (profile, chipId) => hooks.get("session_start")({}, {
+    sessionManager: { getEntries: () => [{ type: "custom", customType: "qdash-context", data: { profile, chipId } }] },
+    ui: { setStatus() {} },
+  });
+  // A persisted selection in another profile must not affect the HTTP request.
+  await restore("other-profile", "old-chip");
+  await tools.get(TASK_RESULT_SUMMARY_TOOL).execute("changed", connection);
+  assert.equal(requests.at(-1).chip_id, undefined);
+  await tools.get(TASK_RESULT_SUMMARY_TOOL).execute("explicit", { ...connection, chipId: "explicit-chip" });
+  assert.equal(requests.at(-1).chip_id, "explicit-chip");
+  await restore("runtime", "same-chip");
+  await tools.get(TASK_RESULT_SUMMARY_TOOL).execute("same", connection);
+  assert.equal(requests.at(-1).chip_id, "same-chip");
+  const { profile, ...implicit } = connection;
+  await tools.get(TASK_RESULT_SUMMARY_TOOL).execute("implicit", implicit);
+  assert.equal(requests.at(-1).chip_id, "same-chip");
+});

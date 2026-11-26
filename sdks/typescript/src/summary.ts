@@ -498,21 +498,26 @@ export async function summarizeTaskResults(context: Context, options: TaskResult
     if (row.execution_id) executions.add(row.execution_id);
   }
 
-  if (stoppedBy === "all_rows" && rows.length === total) {
-    // Compare under the keys status_counts uses, where an empty status is "unknown".
-    const apiKeyed = new Map<string, number>();
-    for (const [status, count] of byStatus) apiKeyed.set(apiStatusKey(status), (apiKeyed.get(apiStatusKey(status)) ?? 0) + count);
-    const counted = sortedCounts(apiKeyed);
-    const reported = Object.values(statusCounts).reduce((sum, count) => sum + count, 0);
-    if (filters.status !== undefined) {
-      const given = statusCounts[filters.status] ?? 0;
-      // QDash's "unknown" also counts empty statuses, which status=unknown does not select.
-      const agrees = filters.status === "unknown" ? given >= total : given === total;
-      if (!agrees) {
-        note("status_counts_mismatch", `status_counts gives ${given} rows of status ${JSON.stringify(filters.status)}, but total is ${total}`);
+  const reported = Object.values(statusCounts).reduce((sum, count) => sum + count, 0);
+  if (filters.status !== undefined) {
+    const given = statusCounts[filters.status] ?? 0;
+    // QDash's "unknown" also counts empty statuses, which status=unknown does not select.
+    const agrees = filters.status === "unknown" ? given >= total : given === total;
+    if (!agrees) {
+      note("status_counts_mismatch", `status_counts gives ${given} rows of status ${JSON.stringify(filters.status)}, but total is ${total}`);
+    }
+  } else {
+    if (reported !== total) {
+      note("status_counts_mismatch", `status_counts adds up to ${reported}, but total is ${total}`);
+    }
+    if (stoppedBy === "all_rows" && rows.length === total) {
+      // Compare under the keys status_counts uses, where an empty status is "unknown".
+      const apiKeyed = new Map<string, number>();
+      for (const [status, count] of byStatus) apiKeyed.set(apiStatusKey(status), (apiKeyed.get(apiStatusKey(status)) ?? 0) + count);
+      const counted = sortedCounts(apiKeyed);
+      if (!sameCounts(counted, statusCounts)) {
+        note("status_counts_mismatch", `the rows read count ${JSON.stringify(counted)}, but status_counts is ${JSON.stringify(statusCounts)} for total ${total}`);
       }
-    } else if (reported !== total || !sameCounts(counted, statusCounts)) {
-      note("status_counts_mismatch", `the rows read count ${JSON.stringify(counted)}, but status_counts is ${JSON.stringify(statusCounts)} for total ${total}`);
     }
   }
 
