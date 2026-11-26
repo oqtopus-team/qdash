@@ -56,6 +56,7 @@ import { OverviewChipNoteCard } from "./OverviewChipNoteCard";
 import { OverviewMetricModal } from "./OverviewMetricModal";
 import type { ForumLinkEntry } from "./MetricNoteTooltip";
 import { type NoteEntry, type NoteEntryWithMetric } from "./MetricNotePanel";
+import { stripAiGeneratedNoteSections } from "@/components/features/metrics/TaskResultMemo";
 
 interface MetricValueLike {
   value: number | null;
@@ -1214,12 +1215,4 @@ export function OverviewPageContent() {
       )}
     </PageContainer>
   );
-}
-
-function stripAiGeneratedNoteSections(content: string): string {
-  const aiGeneratedNotePattern = new RegExp(
-    "^\\s*(?:(?:#{1,6}\\s*)?AI\\s+(?:review|triage)|\\*\\*AI\\s+(?:review|triage)\\*\\*)\\b[\\s\\S]*?(?:\\r?\\n\\r?\\n---\\r?\\n\\r?\\n|$)",
-    "i",
-  );
-  return content.replace(aiGeneratedNotePattern, "").trim();
 }

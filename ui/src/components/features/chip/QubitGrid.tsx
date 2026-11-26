@@ -1,25 +1,28 @@
 "use client";
 
-import { Check, Download, LoaderCircle, X, Lock, Minimize, ZoomIn } from "lucide-react";
+import { Check } from "lucide-react";
 import { useMemo, useState, useRef, useCallback, memo, useEffect, type KeyboardEvent } from "react";
-import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import type { Task } from "@/schemas";
 
-import { downloadFiguresAsZip } from "@/client/task-result/task-result";
 import {
-  DownloadConfirmModal,
-  type DownloadItemCounts,
-  type DownloadOptions,
-} from "@/components/features/chip/DownloadConfirmModal";
+  GridDownloadConfirmModal,
+  GridDownloadControls,
+} from "@/components/features/chip/GridDownloadControls";
+import { GridLoadingPanel, GridTaskRequestAlerts } from "@/components/features/chip/GridTaskStatus";
+import {
+  hasDownloadableArtifacts,
+  useGridArtifactDownload,
+} from "@/components/features/chip/useGridArtifactDownload";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskHistoryModal } from "@/components/features/chip/modals/TaskHistoryModal";
+import { gridFullscreenPanelClass } from "@/components/ui/GridFullscreenButton";
 import {
-  GridFullscreenButton,
-  gridFullscreenPanelClass,
-} from "@/components/ui/GridFullscreenButton";
-import { LockedGridScroller } from "@/components/ui/LockedGridScroller";
-import { GridZoomControls } from "@/components/ui/GridZoomControls";
+  GridRegionBackBar,
+  GridTemplateRegionOverlay,
+  GridViewModeSwitch,
+  GridViewport,
+} from "@/components/ui/GridViewControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import {
   TaskTileStatusMark,
@@ -27,11 +30,9 @@ import {
   taskTileStatusFill,
 } from "@/components/ui/TaskTileStatus";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
-import { useToast } from "@/components/ui/Toast";
-import { ViewSwitch } from "@/components/ui/ViewSwitch";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
-import { getApiErrorMessage, parseBlobErrorBody } from "@/lib/utils/apiError";
 import { useGridLayout } from "@/hooks/useGridLayout";
+import { useGridViewState } from "@/hooks/useGridViewState";
 import { usePanClickGuard } from "@/hooks/usePanClickGuard";
 import { useQubitTaskResults } from "@/hooks/useQubitTaskResults";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
@@ -62,45 +63,10 @@ interface SelectedTaskInfo {
   taskName: string;
 }
 
-const DEFAULT_DOWNLOAD_OPTIONS: DownloadOptions = {
-  figureImages: false,
-  jsonFigures: false,
-  rawData: true,
-};
-
 // Memoized empty cell component
 const EmptyCell = memo(function EmptyCell({ muxBgClass }: { muxBgClass: string }) {
   return <div className={`aspect-square bg-base-300/50 rounded-lg ${muxBgClass}`} />;
 });
-
-function toPathList(paths: string[] | string | null | undefined): string[] {
-  if (!paths) return [];
-  return Array.isArray(paths) ? paths : [paths];
-}
-
-function toNetcdfPathList(paths: string[] | string | null | undefined): string[] {
-  return toPathList(paths).filter((path) => path.toLowerCase().endsWith(".nc"));
-}
-
-function requestErrorMessage(error: unknown): string | null {
-  if (!error || typeof error !== "object") return null;
-  const response = (error as { response?: { data?: unknown } }).response;
-  const data = response?.data;
-  if (!data || typeof data !== "object") return null;
-  const detail = (data as { detail?: unknown }).detail;
-  if (typeof detail === "string") return detail;
-  if (Array.isArray(detail)) return detail.map((item) => JSON.stringify(item)).join("; ");
-  return null;
-}
-
-function taskRangeLabel(
-  selectedDate: string,
-  startAt?: string | null,
-  endAt?: string | null,
-): string {
-  if (startAt || endAt) return `${startAt ?? "..."} - ${endAt ?? "..."}`;
-  return selectedDate;
-}
 
 // Memoized grid cell component for performance
 interface GridCellProps {
@@ -320,14 +286,6 @@ export function QubitGrid({
 
   const [selectedTaskInfo, setSelectedTaskInfo] = useState<SelectedTaskInfo | null>(null);
 
-  // Download selection mode state
-  const [downloadSelectionEnabled, setDownloadSelectionEnabled] = useState(false);
-  const [selectedForDownload, setSelectedForDownload] = useState<Set<string>>(new Set());
-  const toast = useToast();
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [isDownloadConfirmOpen, setIsDownloadConfirmOpen] = useState(false);
-  const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>(DEFAULT_DOWNLOAD_OPTIONS);
-
   // Fetch task results
   const {
     data: taskResponse,
@@ -342,33 +300,23 @@ export function QubitGrid({
     startAt,
     endAt,
   });
-  const downloadCounts = useMemo(() => {
-    const counts: DownloadItemCounts = {
-      figureImages: 0,
-      jsonFigures: 0,
-      rawData: 0,
-    };
-    selectedForDownload.forEach((qid) => {
-      const task = taskResponse?.data?.result?.[qid];
-      counts.figureImages += toPathList(task?.figure_path).length;
-      counts.jsonFigures += toPathList(task?.json_figure_path).length;
-      counts.rawData += toNetcdfPathList(task?.raw_data_path).length;
-    });
-    return counts;
-  }, [selectedForDownload, taskResponse?.data?.result]);
+  const taskResultMap = useMemo(
+    () => taskResponse?.data?.result ?? {},
+    [taskResponse?.data?.result],
+  );
+  const downloadableQids = useMemo(
+    () =>
+      Object.entries(taskResultMap)
+        .filter(([, task]) => hasDownloadableArtifacts(task))
+        .map(([qid]) => qid),
+    [taskResultMap],
+  );
+  const download = useGridArtifactDownload({
+    tasksById: taskResultMap,
+    downloadableIds: downloadableQids,
+    zipFilename: `${chipId}_${selectedTask}_${selectedDate}_artifacts.zip`,
+  });
 
-  // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
-  const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
-  const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
-  const [selectedRegion, setSelectedRegion] = useState<{
-    row: number;
-    col: number;
-  } | null>(null);
-  const [hoveredRegion, setHoveredRegion] = useState<{
-    row: number;
-    col: number;
-  } | null>(null);
   const { isFullscreen, toggleFullscreen, exitFullscreen } = useFullscreenPanel();
   const panClickGuard = usePanClickGuard();
 
@@ -388,15 +336,19 @@ export function QubitGrid({
   const numRegions = Math.floor(gridSize / regionSize);
   const isSquareGrid = gridRows === gridCols;
 
-  // Lock works for every topology, but region zoom assumes a square grid; leave it when the
-  // grid is not square.
-  useEffect(() => {
-    if (!isSquareGrid) {
-      setZoomMode("full");
-      setSelectedRegion(null);
-      setRegionSelectionEnabled(false);
-    }
-  }, [isSquareGrid]);
+  // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
+  const {
+    viewMode,
+    changeViewMode,
+    zoomMode,
+    selectedRegion,
+    zoomToRegion,
+    showFullGrid,
+    hoveredRegion,
+    setHoveredRegion,
+    regionSelectionEnabled,
+    setRegionSelectionEnabled,
+  } = useGridViewState(isSquareGrid);
 
   // Calculate displayed grid size based on zoom mode
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
@@ -425,32 +377,17 @@ export function QubitGrid({
 
   const initialScale = 1;
 
-  const rangeLabel = taskRangeLabel(selectedDate, startAt, endAt);
-  const errorDetail = requestErrorMessage(taskError);
-
   const containerClass = isFullscreen
     ? gridFullscreenPanelClass
     : "flex flex-col h-full space-y-2 max-w-4xl mx-auto w-full mt-8";
 
   if (isLoadingTask)
     return (
-      <div className={containerClass}>
-        {isFullscreen && (
-          <div className="flex justify-end">
-            <button
-              onClick={exitFullscreen}
-              className="btn btn-sm btn-square btn-ghost"
-              title="Exit fullscreen (Esc)"
-              aria-label="Exit fullscreen"
-            >
-              <Minimize className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-        <div className="w-full flex flex-1 items-center justify-center py-12">
-          <span className="loading loading-spinner loading-lg"></span>
-        </div>
-      </div>
+      <GridLoadingPanel
+        className={containerClass}
+        isFullscreen={isFullscreen}
+        onExitFullscreen={exitFullscreen}
+      />
     );
 
   const gridPositions: { [key: string]: { row: number; col: number } } = {};
@@ -467,94 +404,6 @@ export function QubitGrid({
   }
 
   const getTaskResult = (qid: string): Task | null => taskResponse?.data?.result?.[qid] || null;
-
-  // Download selection helpers
-  const toggleDownloadSelection = (qid: string) => {
-    setSelectedForDownload((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(qid)) {
-        newSet.delete(qid);
-      } else {
-        newSet.add(qid);
-      }
-      return newSet;
-    });
-  };
-
-  const selectAllForDownload = () => {
-    const allQids = Object.entries(taskResponse?.data?.result || {})
-      .filter(([, task]) => hasDownloadableArtifacts(task))
-      .map(([qid]) => qid);
-    setSelectedForDownload(new Set(allQids));
-  };
-
-  const clearDownloadSelection = () => {
-    setSelectedForDownload(new Set());
-  };
-
-  const handleDownload = async () => {
-    if (selectedForDownload.size === 0) return;
-
-    const paths: string[] = [];
-    selectedForDownload.forEach((qid) => {
-      const task = taskResponse?.data?.result?.[qid];
-      if (!task) return;
-      if (downloadOptions.figureImages) {
-        paths.push(...toPathList(task.figure_path));
-      }
-      if (downloadOptions.jsonFigures) {
-        paths.push(...toPathList(task.json_figure_path));
-      }
-      if (downloadOptions.rawData) {
-        paths.push(...toNetcdfPathList(task.raw_data_path));
-      }
-    });
-
-    if (paths.length === 0) return;
-
-    setIsDownloading(true);
-    try {
-      const filename = `${chipId}_${selectedTask}_${selectedDate}_artifacts.zip`;
-      const response = await downloadFiguresAsZip({ paths, filename }, { responseType: "blob" });
-
-      const blob = response.data as Blob;
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      setIsDownloadConfirmOpen(false);
-      setDownloadSelectionEnabled(false);
-      setSelectedForDownload(new Set());
-    } catch (error) {
-      // Keep the dialog, options and selection so the download can be retried.
-      toast.error(
-        getApiErrorMessage(await parseBlobErrorBody(error), "Download failed. Please try again."),
-      );
-    } finally {
-      setIsDownloading(false);
-    }
-  };
-
-  const hasDownloadableArtifacts = (task: Task | null | undefined): boolean =>
-    Boolean(
-      toPathList(task?.figure_path).length ||
-      toPathList(task?.json_figure_path).length ||
-      toPathList(task?.raw_data_path).length,
-    );
-
-  const hasJsonFigures = (qid: string): boolean => {
-    const task = taskResponse?.data?.result?.[qid];
-    return hasDownloadableArtifacts(task);
-  };
-
-  const availableForDownloadCount = Object.entries(taskResponse?.data?.result || {}).filter(
-    ([, task]) => hasDownloadableArtifacts(task),
-  ).length;
 
   // Calculate displayed grid size based on zoom mode
   const displayGridStart = selectedRegion
@@ -615,8 +464,8 @@ export function QubitGrid({
             ? task.figure_path[0]
             : task.figure_path || null
           : null;
-        const isSelectedForDownload = selectedForDownload.has(qid);
-        const canBeDownloaded = hasJsonFigures(qid);
+        const isSelectedForDownload = download.selectedIds.has(qid);
+        const canBeDownloaded = hasDownloadableArtifacts(task);
 
         return (
           <GridCell
@@ -628,13 +477,13 @@ export function QubitGrid({
             showLabels={showLabels}
             showFigures={showFigures}
             zoomMode={zoomMode}
-            isDownloadMode={downloadSelectionEnabled}
+            isDownloadMode={download.isSelecting}
             isSelectedForDownload={isSelectedForDownload}
             canBeDownloaded={canBeDownloaded}
             onClick={() => {
-              if (downloadSelectionEnabled) {
+              if (download.isSelecting) {
                 if (canBeDownloaded) {
-                  toggleDownloadSelection(qid);
+                  download.toggle(qid);
                 }
               } else {
                 setSelectedTaskInfo({ qid, taskName: selectedTask });
@@ -683,114 +532,41 @@ export function QubitGrid({
 
       {/* Region selection overlay */}
       {zoomMode === "full" && regionSelectionEnabled && isSquareGrid && viewMode === "region" && (
-        <div
-          className="absolute inset-0 pointer-events-none z-20"
-          style={{ padding: `${padding / 2}px` }}
-        >
-          <div
-            className="grid w-full h-full"
-            style={{
-              gap: `${gap}px`,
-              gridTemplateColumns: `repeat(${displayCols}, minmax(${displayCellSize}px, 1fr))`,
-              gridTemplateRows: `repeat(${displayRows}, minmax(${displayCellSize}px, 1fr))`,
-            }}
-          >
-            {Array.from({ length: numRegions * numRegions }).map((_, index) => {
-              const regionRow = Math.floor(index / numRegions);
-              const regionCol = index % numRegions;
-              const isHovered =
-                hoveredRegion?.row === regionRow && hoveredRegion?.col === regionCol;
-
-              return (
-                <button
-                  key={index}
-                  className={`pointer-events-auto transition-colors duration-200 rounded-lg flex items-center justify-center ${
-                    isHovered
-                      ? "bg-primary/30 border-2 border-primary z-10"
-                      : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
-                  }`}
-                  style={{
-                    gridColumn: `${regionCol * regionSize + 1} / span ${regionSize}`,
-                    gridRow: `${regionRow * regionSize + 1} / span ${regionSize}`,
-                  }}
-                  onMouseEnter={() => setHoveredRegion({ row: regionRow, col: regionCol })}
-                  onMouseLeave={() => setHoveredRegion(null)}
-                  onClick={() => {
-                    setSelectedRegion({
-                      row: regionRow,
-                      col: regionCol,
-                    });
-                    setZoomMode("region");
-                  }}
-                  title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
-                >
-                  <span className="text-xs font-medium text-white bg-black/50 px-2 py-1 rounded">
-                    {regionRow},{regionCol}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <GridTemplateRegionOverlay
+          numRegions={numRegions}
+          regionSize={regionSize}
+          hoveredRegion={hoveredRegion}
+          onHoverChange={setHoveredRegion}
+          onSelect={zoomToRegion}
+          padding={padding}
+          gap={gap}
+          cols={displayCols}
+          rows={displayRows}
+          cellSize={displayCellSize}
+        />
       )}
     </div>
   );
 
   return (
     <div className={containerClass}>
-      {isFetchingTask && !isLoadingTask && (
-        <div className="alert alert-info py-2 text-sm">
-          <LoaderCircle className="h-4 w-4 animate-spin" />
-          Loading {selectedTask} data for {rangeLabel}
-        </div>
-      )}
-      {isTaskError && (
-        <div className="alert alert-error text-sm">
-          <span>
-            Failed to load {selectedTask} data for {rangeLabel}
-            {errorDetail ? `: ${errorDetail}` : ""}
-          </span>
-        </div>
-      )}
+      <GridTaskRequestAlerts
+        selectedTask={selectedTask}
+        selectedDate={selectedDate}
+        startAt={startAt}
+        endAt={endAt}
+        isRefreshing={isFetchingTask && !isLoadingTask}
+        isError={isTaskError}
+        error={taskError}
+      />
       {/* View Mode Toggle and Download Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg py-2">
         <div className="flex items-center gap-4">
-          <ViewSwitch
-            ariaLabel="Grid view"
-            size="sm"
-            value={viewMode}
-            onValueChange={(mode) => {
-              setViewMode(mode);
-              if (mode === "pan-zoom") {
-                setZoomMode("full");
-                setSelectedRegion(null);
-                setRegionSelectionEnabled(false);
-              }
-            }}
-            items={[
-              {
-                value: "pan-zoom",
-                label: <span className="hidden sm:inline">Zoom</span>,
-                icon: <ZoomIn aria-hidden="true" />,
-                ariaLabel: "Zoom",
-                title: "Zoom",
-              },
-              {
-                value: "region",
-                label: <span className="hidden sm:inline">Lock</span>,
-                icon: <Lock aria-hidden="true" />,
-                ariaLabel: "Lock",
-                title: "Lock",
-              },
-            ]}
-          />
+          <GridViewModeSwitch value={viewMode} onValueChange={changeViewMode} />
 
           <div
             className={
-              viewMode !== "region" ||
-              zoomMode !== "full" ||
-              !isSquareGrid ||
-              downloadSelectionEnabled
+              viewMode !== "region" || zoomMode !== "full" || !isSquareGrid || download.isSelecting
                 ? "invisible pointer-events-none"
                 : ""
             }
@@ -804,147 +580,47 @@ export function QubitGrid({
 
         {/* Download selection controls */}
         {zoomMode === "full" && (
-          <>
-            {downloadSelectionEnabled ? (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-base-content/70">
-                  {selectedForDownload.size} / {availableForDownloadCount} selected
-                </span>
-                <button
-                  className="btn btn-sm btn-ghost"
-                  onClick={selectAllForDownload}
-                  title="Select all"
-                >
-                  All
-                </button>
-                <button
-                  className="btn btn-sm btn-ghost"
-                  onClick={clearDownloadSelection}
-                  title="Clear selection"
-                >
-                  Clear
-                </button>
-                <button
-                  className="btn btn-sm btn-primary"
-                  onClick={() => setIsDownloadConfirmOpen(true)}
-                  disabled={selectedForDownload.size === 0 || isDownloading}
-                >
-                  {isDownloading ? (
-                    <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
-                  ) : (
-                    <Download data-icon="inline-start" />
-                  )}
-                  Download
-                </button>
-                <button
-                  className="btn btn-sm btn-ghost btn-circle"
-                  onClick={() => {
-                    setDownloadSelectionEnabled(false);
-                    setSelectedForDownload(new Set());
-                  }}
-                  title="Cancel"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <button
-                  className="btn btn-sm btn-outline"
-                  onClick={() => {
-                    setDownloadSelectionEnabled(true);
-                    setRegionSelectionEnabled(false);
-                    selectAllForDownload();
-                  }}
-                  title="Select figures to download"
-                  disabled={availableForDownloadCount === 0}
-                >
-                  <Download data-icon="inline-start" />
-                  Download
-                </button>
-              </div>
-            )}
-          </>
+          <GridDownloadControls
+            download={download}
+            onStart={() => setRegionSelectionEnabled(false)}
+          />
         )}
       </div>
 
-      <DownloadConfirmModal
-        isOpen={isDownloadConfirmOpen}
-        selectedCount={selectedForDownload.size}
-        options={downloadOptions}
-        counts={downloadCounts}
-        isSubmitting={isDownloading}
-        onOptionsChange={setDownloadOptions}
-        onConfirm={handleDownload}
-        onClose={() => setIsDownloadConfirmOpen(false)}
-      />
+      <GridDownloadConfirmModal download={download} />
 
       {/* Back button */}
       {zoomMode === "region" && selectedRegion && (
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => {
-              setZoomMode("full");
-              setSelectedRegion(null);
-            }}
-            className="btn btn-sm btn-ghost"
-          >
-            ← Back to Full View
-          </button>
-          <span className="text-sm text-base-content/70">
-            Region {selectedRegion.row + 1},{selectedRegion.col + 1} (Qubits{" "}
-            {displayGridStart.row * gridSize + displayGridStart.col} -{" "}
-            {(displayGridStart.row + regionSize - 1) * gridSize +
-              displayGridStart.col +
-              regionSize -
-              1}
-            )
-          </span>
-        </div>
+        <GridRegionBackBar
+          region={selectedRegion}
+          onBack={showFullGrid}
+          detail={
+            <>
+              {" "}
+              (Qubits {displayGridStart.row * gridSize + displayGridStart.col} -{" "}
+              {(displayGridStart.row + regionSize - 1) * gridSize +
+                displayGridStart.col +
+                regionSize -
+                1}
+              )
+            </>
+          }
+        />
       )}
 
       {/* Grid display */}
-      <div
-        className={`flex-1 relative flex justify-center ${
-          viewMode === "pan-zoom"
-            ? "overflow-hidden bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
-            : "items-start overflow-hidden bg-base-200/60 rounded-lg"
-        }`}
-        style={{ padding: `${Math.max(4, padding / 4)}px` }}
-        ref={containerRef}
+      <GridViewport
+        viewMode={viewMode}
+        padding={padding}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+        onTransform={handleTransform}
+        panClickGuard={panClickGuard}
+        viewportRef={containerRef}
+        panZoomClassName="overflow-hidden"
       >
-        <GridFullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
-        {viewMode === "pan-zoom" ? (
-          <TransformWrapper
-            initialScale={initialScale}
-            minScale={Math.min(0.3, initialScale)}
-            maxScale={4}
-            wheel={{ step: 0.08 }}
-            pinch={{ step: 5 }}
-            doubleClick={{ mode: "zoomIn", step: 0.7 }}
-            panning={{ velocityDisabled: true }}
-            smooth={false}
-            limitToBounds={false}
-            centerOnInit={true}
-            onTransform={handleTransform}
-          >
-            <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
-            <TransformComponent
-              contentProps={panClickGuard}
-              wrapperStyle={{ width: "100%", height: "100%" }}
-              contentStyle={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              {gridContent}
-            </TransformComponent>
-          </TransformWrapper>
-        ) : (
-          <LockedGridScroller>{gridContent}</LockedGridScroller>
-        )}
-      </div>
+        {gridContent}
+      </GridViewport>
 
       <TaskHistoryModal
         chipId={chipId}

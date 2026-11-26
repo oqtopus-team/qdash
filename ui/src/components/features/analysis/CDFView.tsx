@@ -13,7 +13,6 @@ import { DataTable } from "@/components/ui/DataTable";
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
-import { ViewSwitch } from "@/components/ui/ViewSwitch";
 import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig, type MetricConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
@@ -21,19 +20,19 @@ import { useSelectStyles } from "@/hooks/useSelectStyles";
 import { useCDFUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
 import { useIsDarkTheme } from "@/contexts/ThemeContext";
 import { chartTheme, seriesColor } from "@/lib/chartTheme";
+import {
+  isPercentageMetric,
+  type MetricType,
+  MetricTypeSwitch,
+  SelectionModeToggle,
+  ErrorRateToggle,
+} from "./AnalysisControls";
 
 interface CumulativeDataPoint {
   value: number;
   cdf: number;
   survivalFunction: number;
   qid: string;
-}
-
-type MetricType = "qubit" | "coupling";
-
-// Helper function to check if a metric uses percentage unit
-function isPercentageMetric(unit: string | undefined): boolean {
-  return unit === "%";
 }
 
 /** Metrics in palette order, so a chart line and its statistics label share one color. */
@@ -693,16 +692,7 @@ export function CDFView() {
           <div className="flex flex-col gap-3 sm:gap-4">
             {/* Row 1a: Type + Chip + Parameters */}
             <div className="flex flex-col sm:flex-row flex-wrap items-start gap-2 sm:gap-3">
-              <ViewSwitch
-                ariaLabel="Metric target"
-                size="sm"
-                value={currentMetricType}
-                onValueChange={handleMetricTypeChange}
-                items={[
-                  { value: "qubit", label: "1Q", title: "Qubit" },
-                  { value: "coupling", label: "2Q", title: "Coupling" },
-                ]}
-              />
+              <MetricTypeSwitch value={currentMetricType} onValueChange={handleMetricTypeChange} />
 
               <div className="w-full sm:w-64">
                 <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
@@ -740,41 +730,14 @@ export function CDFView() {
 
             {/* Mode + Display Toggle + Export */}
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <div className="join">
-                <button
-                  className={`join-item btn btn-sm ${selectionMode === "latest" ? "btn-primary" : ""}`}
-                  onClick={() => setSelectionMode("latest")}
-                >
-                  Latest
-                </button>
-                <button
-                  className={`join-item btn btn-sm ${selectionMode === "best" ? "btn-primary" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
-                  onClick={() => setSelectionMode("best")}
-                  disabled={!isBestModeSupported}
-                  title={!isBestModeSupported ? "Best mode not available" : "Show best values"}
-                >
-                  Best
-                </button>
-                <button
-                  className={`join-item btn btn-sm ${selectionMode === "average" ? "btn-primary" : ""}`}
-                  onClick={() => setSelectionMode("average")}
-                  title="Show average values"
-                >
-                  Average
-                </button>
-              </div>
+              <SelectionModeToggle
+                value={selectionMode}
+                onChange={setSelectionMode}
+                isBestModeSupported={isBestModeSupported}
+              />
 
               {hasPercentageMetrics && (
-                <label className="choice-field text-sm">
-                  <span className="text-sm">Fidelity</span>
-                  <input
-                    type="checkbox"
-                    className="toggle toggle-primary toggle-xs sm:toggle-sm"
-                    checked={showAsErrorRate}
-                    onChange={(e) => setShowAsErrorRate(e.target.checked)}
-                  />
-                  <span className="text-sm">Error</span>
-                </label>
+                <ErrorRateToggle checked={showAsErrorRate} onChange={setShowAsErrorRate} />
               )}
 
               <button

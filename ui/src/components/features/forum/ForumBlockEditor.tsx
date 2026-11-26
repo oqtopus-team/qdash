@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, type MutableRefObject } from "react";
 
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
@@ -11,7 +11,7 @@ import {
 } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 
-import { DARK_THEMES, type ThemeName } from "@/constants/themes";
+import { useIsDarkTheme } from "@/contexts/ThemeContext";
 import { blockNoteSchema } from "@/lib/blocknote/codeBlock";
 import {
   useCodeBlockLanguageDetection,
@@ -22,22 +22,9 @@ import { uploadInlineFile } from "@/lib/blocknote/inlineFileUpload";
 // Reuse the cryo BlockNote theme (scoped to the `.wiring-blocknote` wrapper).
 import "../cryo/blocknote-theme.css";
 
+/** BlockNote color scheme of the active theme. */
 function useThemeScheme(): "light" | "dark" {
-  const [scheme, setScheme] = useState<"light" | "dark">("light");
-  useEffect(() => {
-    const compute = () => {
-      const t = document.documentElement.getAttribute("data-theme")?.toLowerCase() ?? "";
-      setScheme(DARK_THEMES.includes(t as ThemeName) ? "dark" : "light");
-    };
-    compute();
-    const obs = new MutationObserver(compute);
-    obs.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    });
-    return () => obs.disconnect();
-  }, []);
-  return scheme;
+  return useIsDarkTheme() ? "dark" : "light";
 }
 
 function cloneBlocks(blocks: Record<string, unknown>[]): Record<string, unknown>[] {

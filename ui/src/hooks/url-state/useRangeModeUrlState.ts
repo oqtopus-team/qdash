@@ -10,6 +10,8 @@ interface UseRangeModeUrlStateResult {
   setStartDate: (date: string) => void;
   setEndDate: (date: string) => void;
   setQuickRange: (days: number) => void;
+  /** Either URL param is set, even if it is not a valid datetime-local value. */
+  hasRangeParams: boolean;
   hasUrlRange: boolean;
 }
 
@@ -60,6 +62,7 @@ export function useRangeModeUrlState(): UseRangeModeUrlStateResult {
     setStartDate,
     setEndDate,
     setQuickRange,
+    hasRangeParams: Boolean(startDate || endDate),
     hasUrlRange:
       startDate !== null &&
       endDate !== null &&

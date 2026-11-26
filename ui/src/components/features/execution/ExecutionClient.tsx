@@ -48,6 +48,7 @@ import { ViewSwitch } from "@/components/ui/ViewSwitch";
 import { useProject } from "@/contexts/ProjectContext";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useSelectStyles } from "@/hooks/useSelectStyles";
+import { saveBlob } from "@/lib/utils/download";
 
 type FilterOption = {
   value: string;
@@ -404,14 +405,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
                           const blob = new Blob([jsonStr], {
                             type: "application/json",
                           });
-                          const url = URL.createObjectURL(blob);
-                          const link = document.createElement("a");
-                          link.href = url;
-                          link.download = `execution_note_${chipId}_${executionId}.json`;
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                          URL.revokeObjectURL(url);
+                          saveBlob(blob, `execution_note_${chipId}_${executionId}.json`);
                         }}
                         className="btn btn-sm btn-primary"
                       >
