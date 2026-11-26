@@ -6,12 +6,16 @@ spec, stores it here as a plan, and the model passes only the plan ID to
 approval to its ``review_digest``; execution names that digest and runs only when the plan
 still has it.
 
-Creating a plan validates the spec as ``/validate`` does and stores nothing when it is not
-valid; it reads the chip, the backend's tasks and calibration data, and never touches
+Creating a plan writes out every default task list and then validates the spec as
+``/validate`` does, so the written-out tasks are checked too and a spec that omits ``tasks``
+can be refused here although ``/validate`` accepts it; nothing is stored when it is not
+valid. It reads the chip, the backend's tasks and calibration data, and never touches
 hardware, a run, or a calibration session. Plans are immutable, belong to their creator in
 their project (another user's plan is not found), and expire after ``PLAN_TTL``. Expiry is
-checked on every read, independent of the TTL deletion that removes the document later; a
-plan never becomes executable again, and a new plan always gets a new ID.
+checked on every read, independent of the TTL deletion that removes the document
+``PLAN_RETENTION_AFTER_EXPIRY`` later; a plan never becomes executable again, and a new plan
+always gets a new ID. The creation key is deduplicated only while the plan is stored: after
+the deletion the same key creates a new plan, which needs its own approval.
 """
 
 from __future__ import annotations
@@ -196,8 +200,10 @@ class PipelinePlanService:
     def _materialized(spec: dict[str, Any]) -> dict[str, Any]:
         """The spec with default task lists written out; unparsable specs pass unchanged.
 
-        ``validate`` then reports the problems of a spec that does not parse, so a plan's
-        problems are exactly those of ``/validate``.
+        ``validate`` then reports the problems of a spec that does not parse as ``/validate``
+        does. A spec that parses is checked with its default tasks written out, which is
+        stricter than ``/validate``: an omitted task list whose default names a task the
+        backend does not provide is a problem here and not there.
         """
         if not isinstance(spec, dict) or spec.get("spec_version", 1) != SPEC_VERSION:
             return spec
@@ -297,11 +303,6 @@ class PipelinePlanService:
         if doc is None:
             raise _not_found(plan_id)
         return self.response(doc)
-
-    def display_name(self, project_id: str, username: str, plan_id: str) -> str:
-        """The plan's spec name for the run's display, or "" when it is gone."""
-        doc = find_plan(project_id, username, plan_id)
-        return str(doc.spec.get("name") or "") if doc is not None else ""
 
     # ------------------------------------------------------------------ execute
 

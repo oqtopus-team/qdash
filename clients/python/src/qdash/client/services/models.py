@@ -2011,7 +2011,7 @@ class CreatePipelinePlanRequest(BaseModel):
     """
     idempotency_key: Annotated[str, Field(max_length=128, min_length=1, title="Idempotency Key")]
     """
-    Identity of this creation, such as the tool call that asks for it. Repeating it with the same request returns the same plan, or reports it expired; repeating it with another request is a conflict. It never stores a second plan or changes or renews the first.
+    Identity of this creation, such as the tool call that asks for it. While the plan it created is stored (until seven days after the plan expires), repeating it with the same request returns that plan, or reports it expired, and repeating it with another request is a conflict; it never changes or renews that plan. After the plan is deleted the key is free again: the same key then creates a new plan with a new plan_id and review_digest that needs its own approval.
     """
 
 
@@ -2561,13 +2561,6 @@ class ExecuteFlowResponse(BaseModel):
 
 
 class DecisionId1(RootModel[str]):
-    root: Annotated[str, Field(max_length=200, min_length=1, title="Decision Id")]
-    """
-    As for POST /calibration-pipelines/execute; grants nothing.
-    """
-
-
-class DecisionId2(RootModel[str]):
     root: Annotated[str, Field(max_length=200, min_length=1, title="Decision Id")]
     """
     With calibration_session_id: the decision of that session this run carries out, recorded before dispatch with an experiment. QDash checks it belongs to the session and records the link on the run; it grants nothing.
@@ -4912,6 +4905,15 @@ class PipelineProblem(BaseModel):
     message: Annotated[str, Field(title="Message")]
 
 
+class PipelineProblemsDetail(BaseModel):
+    """
+    Why a calibration pipeline spec was refused, with every problem found.
+    """
+
+    message: Annotated[str, Field(title="Message")]
+    problems: Annotated[list[PipelineProblem] | None, Field(title="Problems")] = None
+
+
 class Position(BaseModel):
     """
     Position of the qubit on the device.
@@ -5539,6 +5541,22 @@ class ReportedLaunchOrigin(BaseModel):
     """
     The host or package that reports it, such as pi-qdash; empty when unnamed
     """
+
+
+class RequestFieldError(BaseModel):
+    """
+    One field of the request body that failed schema validation.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+    )
+    loc: Annotated[list[str | int], Field(title="Loc")]
+    """
+    Where in the request, e.g. ['body', 'chip_id'].
+    """
+    msg: Annotated[str, Field(title="Msg")]
+    type: Annotated[str, Field(title="Type")]
 
 
 class CallId(RootModel[str]):
@@ -9196,7 +9214,7 @@ class ExecutePipelinePlanRequest(BaseModel):
     """
     decision_id: Annotated[DecisionId1 | None, Field(title="Decision Id")] = None
     """
-    As for POST /calibration-pipelines/execute; grants nothing.
+    With calibration_session_id: the decision of that session this run carries out, recorded before dispatch with an experiment. QDash checks it belongs to the session and records the link on the run; it grants nothing.
     """
     reported_origin: ReportedLaunchOrigin | None = None
     """
@@ -9228,7 +9246,7 @@ class ExecutePipelineRequest(BaseModel):
     """
     A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run.
     """
-    decision_id: Annotated[DecisionId2 | None, Field(title="Decision Id")] = None
+    decision_id: Annotated[DecisionId1 | None, Field(title="Decision Id")] = None
     """
     With calibration_session_id: the decision of that session this run carries out, recorded before dispatch with an experiment. QDash checks it belongs to the session and records the link on the run; it grants nothing.
     """
@@ -10119,6 +10137,19 @@ class ParameterHistoryResponse(BaseModel):
     qid: Annotated[str, Field(title="Qid")]
     versions: Annotated[list[ParameterVersionResponse], Field(title="Versions")]
     total_versions: Annotated[int, Field(title="Total Versions")]
+
+
+class PipelinePlanUnprocessableResponse(BaseModel):
+    """
+    The 422 body of the stored-plan endpoints.
+
+    ``detail`` is a list when the request body does not match its schema, an object with
+    ``problems`` when the spec is not valid or its targets cannot be resolved, and a message
+    when the request does not match the plan (another chip or backend) or its calibration
+    session is on another chip.
+    """
+
+    detail: Annotated[list[RequestFieldError] | PipelineProblemsDetail | str, Field(title="Detail")]
 
 
 class PipelineStepProgress(BaseModel):

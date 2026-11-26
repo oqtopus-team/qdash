@@ -121,6 +121,11 @@ def pipeline_request_hash(
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
+def _run_name(run_name: str | Callable[[Any], str], validated: Any) -> str:
+    """The run's display name, derived from the validated request when given as a function."""
+    return run_name(validated) if callable(run_name) else run_name
+
+
 @dataclass(frozen=True)
 class RecordedPlan:
     """The stored plan a run carries out, recorded on the run for its audit."""
@@ -203,7 +208,7 @@ class RunLedger:
         username: str,
         chip_id: str,
         kind: RunKind,
-        run_name: str,
+        run_name: str | Callable[[Any], str],
         request_hash: str,
         calibration_session_id: str | None,
         idempotency_key: str | None,
@@ -220,6 +225,9 @@ class RunLedger:
         recorded_plan: Callable[[Any], RecordedPlan | None] | None = None,
     ) -> RunDispatch:
         """Launch one run at most once per idempotency key.
+
+        ``run_name`` may be a function of the validated request, called only once the request
+        was validated, so a replayed run never needs what the name is derived from.
 
         ``recorded_plan`` returns, for a run started from a stored calibration pipeline plan,
         the plan's provenance, recorded on the run with the spec.
@@ -249,6 +257,7 @@ class RunLedger:
             if replay is not None:
                 return replay
             validated = await self._validated(validate, preflight, async_preflight)
+            name = _run_name(run_name, validated)
             self._check_decision(
                 project_id, found.run.calibration_session_id, decision_id, validated
             )
@@ -262,7 +271,7 @@ class RunLedger:
                 request_hash=found.run.request_hash,
                 chip_id=chip_id,
                 kind=kind,
-                run_name=run_name,
+                run_name=name,
                 validated=validated,
                 dispatch=dispatch,
                 response=response,
@@ -289,15 +298,17 @@ class RunLedger:
                 )
             association = RunAssociation.EXPLICIT
             validated = await self._validated(validate, preflight, async_preflight)
+            name = _run_name(run_name, validated)
         else:
             validated = await self._validated(validate, preflight, async_preflight)
+            name = _run_name(run_name, validated)
             try:
                 session = insert_or_load_automatic_session(
                     calibration_session_id=automatic_session_id_for_key(project_id, username, key),
                     project_id=project_id,
                     chip_id=chip_id,
                     username=username,
-                    objective=session_name or automatic_objective(kind, run_name),
+                    objective=session_name or automatic_objective(kind, name),
                 )
             except RunMismatch as exc:
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
@@ -314,7 +325,7 @@ class RunLedger:
             request_hash=hashed,
             chip_id=chip_id,
             kind=kind,
-            run_name=run_name,
+            run_name=name,
             validated=validated,
             dispatch=dispatch,
             response=response,

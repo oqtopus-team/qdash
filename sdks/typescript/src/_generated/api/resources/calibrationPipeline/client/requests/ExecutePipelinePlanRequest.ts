@@ -22,7 +22,7 @@ export interface ExecutePipelinePlanRequest {
     calibration_session_id?: string | null;
     /** A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run. */
     idempotency_key?: string | null;
-    /** As for POST /calibration-pipelines/execute; grants nothing. */
+    /** With calibration_session_id: the decision of that session this run carries out, recorded before dispatch with an experiment. QDash checks it belongs to the session and records the link on the run; it grants nothing. */
     decision_id?: string | null;
     /** As for POST /calibration-pipelines/execute: stored as reported. */
     reported_origin?: QDashApi.ReportedLaunchOrigin | null;

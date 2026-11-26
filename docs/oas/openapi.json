@@ -5613,7 +5613,7 @@
           "calibration-pipeline"
         ],
         "summary": "Store a validated calibration pipeline spec as a plan to approve by reference",
-        "description": "Validate the spec and store it, with its review content and review digest.\n\nA plan is a proposal: it starts no run, reserves no hardware, joins no calibration\nsession, and grants nothing. An invalid spec returns 422 with the same problems as\n/validate and stores nothing. Default task lists are written into the stored spec and\nMUX targets are expanded, so what is reviewed is what runs. The plan expires after 24\nhours and is never renewed. ``idempotency_key`` names this creation: repeating it\nreturns the same plan (409 for another request, 410 once it expired).",
+        "description": "Validate the spec and store it, with its review content and review digest.\n\nA plan is a proposal: it starts no run, reserves no hardware, joins no calibration\nsession, and grants nothing. Default task lists are written into the stored spec and\nMUX targets are expanded, so what is reviewed is what runs. The spec is then validated as\n/validate does, so an invalid spec returns 422 with ``detail.problems`` and stores\nnothing; because the written-out default tasks are checked too (for example that the\nbackend provides each one), a spec that omits ``tasks`` can be refused here although\n/validate accepts it. Targets that cannot be expanded, or a MUX of the chip topology\nwithout wiring, are refused too. The plan expires after 24 hours and is never renewed.\n``idempotency_key`` names this creation while the plan is stored (until seven days after\nit expires): repeating it returns the same plan (409 for another request, 410 once it\nexpired). Once the plan is deleted, the same key creates a new plan with a new ID that\nneeds its own approval; the old plan is never revived.",
         "operationId": "createCalibrationPipelinePlan",
         "security": [
           {
@@ -5660,11 +5660,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "The request body does not match its schema (detail is a list), the spec is not valid or its targets cannot be resolved (detail.problems), or the request does not match the plan (detail is a message).",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/PipelinePlanUnprocessableResponse"
                 }
               }
             }
@@ -5798,11 +5798,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "The request body does not match its schema (detail is a list), the spec is not valid or its targets cannot be resolved (detail.problems), or the request does not match the plan (detail is a message).",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/PipelinePlanUnprocessableResponse"
                 }
               }
             }
@@ -30476,7 +30476,7 @@
             "maxLength": 128,
             "minLength": 1,
             "title": "Idempotency Key",
-            "description": "Identity of this creation, such as the tool call that asks for it. Repeating it with the same request returns the same plan, or reports it expired; repeating it with another request is a conflict. It never stores a second plan or changes or renews the first."
+            "description": "Identity of this creation, such as the tool call that asks for it. While the plan it created is stored (until seven days after the plan expires), repeating it with the same request returns that plan, or reports it expired, and repeating it with another request is a conflict; it never changes or renews that plan. After the plan is deleted the key is free again: the same key then creates a new plan with a new plan_id and review_digest that needs its own approval."
           }
         },
         "type": "object",
@@ -30490,6 +30490,7 @@
         "examples": [
           {
             "chip_id": "64Qv3",
+            "idempotency_key": "plan-request-1",
             "spec": {
               "default_run_parameters": {
                 "interval": 153600
@@ -32919,7 +32920,7 @@
               }
             ],
             "title": "Decision Id",
-            "description": "As for POST /calibration-pipelines/execute; grants nothing."
+            "description": "With calibration_session_id: the decision of that session this run carries out, recorded before dispatch with an experiment. QDash checks it belongs to the session and records the link on the run; it grants nothing."
           },
           "reported_origin": {
             "anyOf": [
@@ -41165,6 +41166,33 @@
         "title": "PipelinePlanResponse",
         "description": "A stored plan and everything an approval of it covers.\n\nA plan starts nothing and grants nothing. ``review_digest`` is a full, versioned SHA-256\nof the review content: the normalized spec with every default task list written out,\nthe qubits its targets resolve to when the run starts, the resolved calls of every step,\nand the run defaults. Running the plan names that digest, so the run is the plan that\nwas reviewed. Filters and CR schedules still select from results while the run goes;\ncalibration values, task code and hardware state are read when it runs."
       },
+      "PipelinePlanUnprocessableResponse": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RequestFieldError"
+                },
+                "type": "array"
+              },
+              {
+                "$ref": "#/components/schemas/PipelineProblemsDetail"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PipelinePlanUnprocessableResponse",
+        "description": "The 422 body of the stored-plan endpoints.\n\n``detail`` is a list when the request body does not match its schema, an object with\n``problems`` when the spec is not valid or its targets cannot be resolved, and a message\nwhen the request does not match the plan (another chip or backend) or its calibration\nsession is on another chip."
+      },
       "PipelineProblem": {
         "properties": {
           "path": {
@@ -41184,6 +41212,27 @@
         ],
         "title": "PipelineProblem",
         "description": "One reason a spec cannot run as written."
+      },
+      "PipelineProblemsDetail": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineProblem"
+            },
+            "type": "array",
+            "title": "Problems"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "PipelineProblemsDetail",
+        "description": "Why a calibration pipeline spec was refused, with every problem found."
       },
       "PipelineProgress": {
         "properties": {
@@ -42788,6 +42837,42 @@
         ],
         "title": "ReportedLaunchOrigin",
         "description": "A caller's own account of how a run was started; client reported, not verified."
+      },
+      "RequestFieldError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Loc",
+            "description": "Where in the request, e.g. ['body', 'chip_id']."
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "RequestFieldError",
+        "description": "One field of the request body that failed schema validation."
       },
       "RequestedParameterChangeModel": {
         "properties": {

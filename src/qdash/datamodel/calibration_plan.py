@@ -186,24 +186,44 @@ def review_content(
     }
 
 
+def canonical_json(value: Any) -> str:
+    """``value`` as the canonical JSON text the review digest hashes.
+
+    Comparing this text, not Python values, keeps JSON types apart: ``False == 0`` and
+    ``True == 1`` hold in Python, but ``false`` and ``0`` are different settings and give
+    different digests.
+    """
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+
+
+def same_json(left: Any, right: Any) -> bool:
+    """Whether two JSON values are equal with their JSON types, as the digest compares them."""
+    return canonical_json(left) == canonical_json(right)
+
+
 def review_digest(content: Mapping[str, Any]) -> str:
     """The versioned full SHA-256 of review content."""
-    encoded = json.dumps(content, sort_keys=True, separators=(",", ":"), default=str)
-    return REVIEW_DIGEST_PREFIX + hashlib.sha256(encoded.encode()).hexdigest()
+    return REVIEW_DIGEST_PREFIX + hashlib.sha256(canonical_json(content).encode()).hexdigest()
 
 
 def content_differences(approved: Mapping[str, Any], observed: Mapping[str, Any]) -> list[str]:
-    """The top-level parts of review content that differ, with the first differing step."""
+    """The top-level parts of review content that differ, with the first differing step.
+
+    Values are compared as canonical JSON, so a Boolean that became a number (or the
+    reverse) is a difference, at the top level and inside a step.
+    """
     differences: list[str] = []
     for key in sorted(set(approved) | set(observed)):
-        if approved.get(key) == observed.get(key):
+        if same_json(approved.get(key), observed.get(key)):
             continue
         if key == "steps":
             mine, theirs = list(approved.get(key) or []), list(observed.get(key) or [])
             changed = [
                 index + 1
                 for index in range(max(len(mine), len(theirs)))
-                if index >= len(mine) or index >= len(theirs) or mine[index] != theirs[index]
+                if index >= len(mine)
+                or index >= len(theirs)
+                or not same_json(mine[index], theirs[index])
             ]
             differences.append(f"steps (first at step {changed[0]})" if changed else "steps")
         else:

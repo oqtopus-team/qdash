@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Snapshot plan previews before CLI approval so later resolver mutations cannot change the approved content.
+
 - Store validated pipeline proposals from Code Mode and run them by reference with a preserved approval preview.
 
 - Add SDK-backed task-result summaries with bounded pagination and completeness diagnostics.

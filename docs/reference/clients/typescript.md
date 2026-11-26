@@ -264,7 +264,9 @@ SDK instead requires an explicit project before running.
 
 ### Run a Stored Plan
 
-Reuse the `qdash` connection above. Plan creation requires a key for retries and starts nothing:
+Reuse the `qdash` connection above. Plan creation requires a key for retries and starts nothing.
+Creation validates the expanded default task list, so it can reject a spec that ordinary
+validation accepts with omitted tasks. Review any reported problems before retrying:
 
 ```ts
 const spec = {

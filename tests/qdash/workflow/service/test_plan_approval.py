@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
@@ -11,6 +12,8 @@ import pytest
 from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec
 from qdash.datamodel.calibration_plan import (
     ApprovedPipelinePlan,
+    canonical_json,
+    content_differences,
     materialize_default_tasks,
     review_content,
     review_digest,
@@ -94,7 +97,10 @@ MANUAL_STEPS: list[dict[str, Any]] = [
 @pytest.mark.parametrize("steps", [EVERY_STEP, DEFAULT_STEPS, MANUAL_STEPS])
 def test_the_worker_rebuilds_the_review_of_every_step_type(steps: list[dict[str, Any]]) -> None:
     spec = _spec(steps)
-    assert observed_review_steps(build_steps(spec)) == review_steps(spec)
+    # Equal as canonical JSON, not only as Python values: no int/float/bool drift.
+    assert canonical_json(observed_review_steps(build_steps(spec))) == canonical_json(
+        review_steps(spec)
+    )
     _check(_approved(spec, ["0", "1"]), spec)
 
 
@@ -155,6 +161,45 @@ def test_the_dispatched_spec_and_digest_must_be_the_approved_ones() -> None:
     tampered = approved.model_copy(update={"review": {**approved.review, "target_qids": ["9"]}})
     with pytest.raises(PlanApprovalMismatch, match="review digest"):
         check_dispatched_plan(tampered, chip_id="chip-1", backend_name="fake", spec=dumped)
+
+
+@pytest.mark.parametrize(("approved", "observed"), [(False, 0), (True, 1), (0, False)])
+def test_a_boolean_that_became_a_number_is_a_difference(approved: Any, observed: Any) -> None:
+    # Python equality treats false and 0 as equal; the digest and the comparison do not.
+    assert approved == observed
+    top = content_differences(
+        {"task_parameters": {"CheckT1": {"flag": approved}}},
+        {"task_parameters": {"CheckT1": {"flag": observed}}},
+    )
+    assert top == ["task_parameters"]
+    step = {"index": 1, "kind": "transform", "settings": {"inverse": approved}}
+    nested = content_differences(
+        {"steps": [step, step]},
+        {"steps": [step, {**step, "settings": {"inverse": observed}}]},
+    )
+    assert nested == ["steps (first at step 2)"]
+    assert content_differences({"steps": [step]}, {"steps": [dict(step)]}) == []
+
+
+def test_the_worker_refuses_a_setting_whose_json_type_changed() -> None:
+    spec = _spec(EVERY_STEP, task_parameters={"CheckT1": {"run": {"shots": 1}}})
+    approved = _approved(spec, ["0", "1"])
+    params = approved.review["task_parameters"]
+    _check(approved, spec, task_parameters=params)
+    changed = canonical_json(params).replace(":1", ":true", 1)
+    assert changed != canonical_json(params)
+    with pytest.raises(PlanApprovalMismatch, match="task_parameters"):
+        _check(approved, spec, task_parameters=json.loads(changed))
+
+
+def test_a_dispatched_spec_with_a_boolean_for_a_number_is_refused() -> None:
+    spec = _spec(EVERY_STEP, default_run_parameters={"shots": 1})
+    approved = _approved(spec, ["0", "1"])
+    dumped = spec.model_dump(mode="json", exclude_none=True)
+    swapped = {**dumped, "default_run_parameters": {"shots": True}}
+    assert swapped == dumped  # equal as Python values
+    with pytest.raises(PlanApprovalMismatch, match="spec"):
+        check_dispatched_plan(approved, chip_id="chip-1", backend_name="fake", spec=swapped)
 
 
 def _run_flow(monkeypatch: pytest.MonkeyPatch, raw_spec: dict[str, Any], **kwargs: Any) -> Any:

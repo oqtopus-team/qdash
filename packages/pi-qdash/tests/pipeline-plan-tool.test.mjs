@@ -317,6 +317,41 @@ test("the CLI write gate fetches the plan before asking and binds the approval t
   assert.equal((await blind.toolCall({ toolName: "qdash_run_pipeline", toolCallId: "g3", input: args }, ctx)).block, true);
 });
 
+test("the CLI write gate records the plan it showed, even if the resolver changes it later", async () => {
+  const pi = gatePi();
+  const returned = await previewOf();
+  installQDashWriteGate(pi, { async resolvePreview() { return returned; } });
+  const sent = [];
+  const tools = registeredTools({ async executeCalibrationPipelinePlan(_id, body) { sent.push(body); return { ...DISPATCHED, review_digest: body.expected_review_digest }; } });
+  const shown = [];
+  const ctx = {
+    hasUI: true,
+    ui: {
+      async confirm(_title, message) {
+        shown.push(message);
+        // The resolver still holds the object it returned and changes it while asking.
+        returned.reviewDigest = OTHER_DIGEST;
+        returned.plan.review_digest = OTHER_DIGEST;
+        return true;
+      },
+    },
+  };
+  const args = { chipId: "64Qv3", planId: "cpp-1" };
+  assert.equal(await pi.toolCall({ toolName: "qdash_run_pipeline", toolCallId: "g6", input: args }, ctx), undefined);
+  assert.match(shown[0], /Review digest sha256:v1:a{64}/);
+  const result = await tools.get("qdash_run_pipeline").execute("g6", args, undefined, undefined, { hasUI: false });
+  assert.equal(sent[0].expected_review_digest, DIGEST);
+  assert.equal(result.details.reviewDigest, DIGEST);
+
+  // A preview that cannot be copied blocks the call before the user is asked.
+  const uncopyable = gatePi();
+  installQDashWriteGate(uncopyable, { async resolvePreview() { return { ...(await previewOf()), plan: { bad: () => 1 } }; } });
+  shown.length = 0;
+  const blocked = await uncopyable.toolCall({ toolName: "qdash_run_pipeline", toolCallId: "g7", input: args }, ctx);
+  assert.equal(blocked.block, true);
+  assert.equal(shown.length, 0);
+});
+
 test("a gate approval recorded without the plan does not run the plan", async () => {
   const tools = registeredTools({ async executeCalibrationPipelinePlan() { throw new Error("must not run"); } });
   const args = { chipId: "64Qv3", planId: "cpp-1" };

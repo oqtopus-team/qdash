@@ -68,7 +68,7 @@
  *                 ]
  *             }
  *         },
- *         idempotency_key: "idempotency_key"
+ *         idempotency_key: "plan-request-1"
  *     }
  */
 export interface CreatePipelinePlanRequest {
@@ -77,6 +77,6 @@ export interface CreatePipelinePlanRequest {
     spec: Record<string, unknown>;
     /** Defaults to the configured backend. */
     backend_name?: string | null;
-    /** Identity of this creation, such as the tool call that asks for it. Repeating it with the same request returns the same plan, or reports it expired; repeating it with another request is a conflict. It never stores a second plan or changes or renews the first. */
+    /** Identity of this creation, such as the tool call that asks for it. While the plan it created is stored (until seven days after the plan expires), repeating it with the same request returns that plan, or reports it expired, and repeating it with another request is a conflict; it never changes or renews that plan. After the plan is deleted the key is free again: the same key then creates a new plan with a new plan_id and review_digest that needs its own approval. */
     idempotency_key: string;
 }

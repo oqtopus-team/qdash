@@ -3,21 +3,30 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from qdash.api.schemas.calibration_pipeline import (
+    PipelinePlanUnprocessableResponse,
+    PipelineProblemsDetail,
+    RequestFieldError,
+)
 from qdash.api.services.calibration_pipeline_service import CalibrationPipelineService
 from qdash.api.services.flow_service.prefect_gateway import (
     SystemDeployment,
     SystemDeploymentUnavailable,
 )
+from qdash.common.config import topology as topology_config
+from qdash.common.config.topology import load_topology
 from qdash.common.utils.datetime import now
 from qdash.datamodel.calibration_plan import APPROVED_PLAN_CONTRACT_KEY, review_digest
 from qdash.dbmodel.calibration_pipeline_plan import CalibrationPipelinePlanDocument
 from qdash.dbmodel.calibration_session import CalibrationSessionDocument
+from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
+from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.run import RunDocument
 from tests.qdash.api.routers.test_calibration_pipeline import good_spec
 from tests.qdash.api.routers.test_calibration_sessions import (  # noqa: F401 - fixture
@@ -26,13 +35,65 @@ from tests.qdash.api.routers.test_calibration_sessions import (  # noqa: F401 - 
     GATEWAY,
     OTHER_CHIP,
     PLAN_READY_SCHEMA,
+    _chip,
     _headers,
     _release_locks,
     lab,
     prefect,
 )
 
-pytestmark = pytest.mark.usefixtures("lab")
+if TYPE_CHECKING:
+    from pathlib import Path
+
+pytestmark = pytest.mark.usefixtures("lab", "chip_config")
+
+# A chip of lab-a whose topology defines MUXes 0 and 1 while its wiring lists only MUX 0.
+TOPOLOGY_CHIP = "topo-2mux"
+TOPOLOGY_ID = "test-two-mux"
+PLAN_SERVICE = "qdash.api.services.calibration_pipeline_plan_service"
+
+
+def _wiring(chip_id: str, muxes: list[int]) -> str:
+    rows = "".join(
+        f"  - mux: {mux}\n    ctrl: [C{mux}A-0, C{mux}A-1, C{mux}A-2, C{mux}A-3]\n"
+        f"    read_out: R{mux}A-0\n    read_in: R{mux}A-1\n"
+        for mux in muxes
+    )
+    return f"{chip_id}:\n{rows}"
+
+
+@pytest.fixture
+def chip_config(lab, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):  # noqa: F811
+    """A synthetic configuration tree, so MUX targets resolve without any real chip config.
+
+    ``CONFIG_PATH`` holds the wiring (MUX 0 for both chips; the legacy chip also MUX 1) and
+    topology directory holds one topology with MUXes 0 and 1, both read by the real
+    resolution code.
+    """
+    qubex = tmp_path / "qubex-config"
+    for chip_id, muxes in ((CHIP, [0, 1]), (TOPOLOGY_CHIP, [0])):
+        wiring = qubex / chip_id / "config" / "wiring.yaml"
+        wiring.parent.mkdir(parents=True)
+        wiring.write_text(_wiring(chip_id, muxes), encoding="utf-8")
+    monkeypatch.setenv("CONFIG_PATH", str(qubex))
+    topologies = tmp_path / "topologies"
+    topologies.mkdir(parents=True)
+    qubits = ", ".join(f"{q}: {{row: {q // 4}, col: {q % 4}}}" for q in range(8))
+    (topologies / f"{TOPOLOGY_ID}.yaml").write_text(
+        f"id: {TOPOLOGY_ID}\nname: Two MUXes\ngrid_size: 4\nnum_qubits: 8\n"
+        "muxes: {0: [0, 1, 2, 3], 1: [4, 5, 6, 7]}\n"
+        f"qubits: {{{qubits}}}\ncouplings: []\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(topology_config, "_topologies_dir", lambda: topologies)
+    load_topology.cache_clear()
+    _chip("lab-a", TOPOLOGY_CHIP)
+    chip = ChipDocument.find_one({"project_id": "lab-a", "chip_id": TOPOLOGY_CHIP}).run()
+    assert chip is not None
+    chip.topology_id = TOPOLOGY_ID
+    chip.save()
+    yield
+    load_topology.cache_clear()
 
 
 def _create(test_client, spec: dict[str, Any] | None = None, key: str = "plan-1", **body: Any):
@@ -61,6 +122,12 @@ def _execute(test_client, plan: dict[str, Any], key: str | None = "run-1", **fie
         f"/calibration-pipelines/plans/{plan['plan_id']}/execute",
         headers=_headers(user),
         json=body,
+    )
+
+
+def _drop_qubit(chip_id: str, qid: str) -> None:
+    QubitDocument.get_motor_collection().delete_one(
+        {"project_id": "lab-a", "chip_id": chip_id, "qid": qid}
     )
 
 
@@ -108,6 +175,102 @@ class TestCreate:
         response = _create(test_client, spec)
         assert response.status_code == 201, response.text
         assert response.json()["target_qids"] == ["0", "1", "3"]
+
+    def test_a_legacy_chip_skips_muxes_its_wiring_does_not_list(self, test_client, tmp_path):
+        wiring = tmp_path / "qubex-config" / CHIP / "config" / "wiring.yaml"
+        wiring.write_text(_wiring(CHIP, [0]), encoding="utf-8")
+        spec = {**good_spec(), "targets": {"mux_ids": [0, 1], "exclude_qids": []}}
+        response = _create(test_client, spec)
+        assert response.status_code == 201, response.text
+        assert response.json()["target_qids"] == ["0", "1", "2", "3"]
+
+    def test_a_topology_mux_without_wiring_stores_nothing(self, test_client):
+        spec = {**good_spec(), "targets": {"mux_ids": [0, 1], "exclude_qids": []}}
+        with prefect() as create_flow_run:
+            response = _create(test_client, spec, chip_id=TOPOLOGY_CHIP)
+        assert response.status_code == 422, response.text
+        [problem] = response.json()["detail"]["problems"]
+        assert problem["path"] == "targets.mux_ids"
+        assert "MUXes [1]" in problem["message"] and "wiring" in problem["message"]
+        assert CalibrationPipelinePlanDocument.find_all().count() == 0
+        create_flow_run.assert_not_awaited()
+        # The wired MUX alone resolves through the topology, and an excluded unwired MUX
+        # needs no wiring, as on the worker.
+        wired = {**good_spec(), "targets": {"mux_ids": [0], "exclude_qids": ["0"]}}
+        assert _create(test_client, wired, chip_id=TOPOLOGY_CHIP, key="p2").json()[
+            "target_qids"
+        ] == ["1", "2", "3"]
+        excluded = {
+            **good_spec(),
+            "targets": {"mux_ids": [0, 1], "exclude_qids": ["4", "5", "6", "7"]},
+        }
+        response = _create(test_client, excluded, chip_id=TOPOLOGY_CHIP, key="p3")
+        assert response.status_code == 201, response.text
+
+    @pytest.mark.parametrize("chip_id", [TOPOLOGY_CHIP, CHIP])
+    def test_a_mux_member_without_a_qubit_record_stores_nothing(self, test_client, chip_id):
+        _drop_qubit(chip_id, "2")
+        spec = {**good_spec(), "targets": {"mux_ids": [0], "exclude_qids": []}}
+        with prefect() as create_flow_run:
+            response = _create(test_client, spec, chip_id=chip_id)
+        assert response.status_code == 422, response.text
+        [problem] = response.json()["detail"]["problems"]
+        assert problem["path"] == "targets.mux_ids"
+        assert "['2']" in problem["message"] and "qubit record" in problem["message"]
+        assert CalibrationPipelinePlanDocument.find_all().count() == 0
+        create_flow_run.assert_not_awaited()
+        assert RunDocument.find_all().count() == 0
+        # Excluding the member without a record targets the rest of its MUX.
+        excluded = {**good_spec(), "targets": {"mux_ids": [0], "exclude_qids": ["2"]}}
+        response = _create(test_client, excluded, chip_id=chip_id, key="p2")
+        assert response.status_code == 201, response.text
+        assert response.json()["target_qids"] == ["0", "1", "3"]
+        # A qubit in no selected MUX and without a record is still not on the chip.
+        stray = {**good_spec(), "targets": {"mux_ids": [0], "exclude_qids": ["99"]}}
+        response = _create(test_client, stray, chip_id=chip_id, key="p3")
+        assert response.status_code == 422, response.text
+        assert response.json()["detail"]["problems"][0]["path"] == "targets.exclude_qids[0]"
+
+    def test_a_legacy_unwired_mux_needs_no_qubit_records(self, test_client, tmp_path):
+        wiring = tmp_path / "qubex-config" / CHIP / "config" / "wiring.yaml"
+        wiring.write_text(_wiring(CHIP, [0]), encoding="utf-8")
+        _drop_qubit(CHIP, "5")
+        spec = {**good_spec(), "targets": {"mux_ids": [0, 1], "exclude_qids": []}}
+        response = _create(test_client, spec)
+        assert response.status_code == 201, response.text
+        assert response.json()["target_qids"] == ["0", "1", "2", "3"]
+
+    def test_unreadable_wiring_stores_nothing(self, test_client, tmp_path):
+        (tmp_path / "qubex-config" / CHIP / "config" / "wiring.yaml").unlink()
+        spec = {**good_spec(), "targets": {"mux_ids": [0], "exclude_qids": []}}
+        response = _create(test_client, spec)
+        assert response.status_code == 422
+        assert response.json()["detail"]["problems"][0]["path"] == "targets.mux_ids"
+        assert CalibrationPipelinePlanDocument.find_all().count() == 0
+
+    def test_written_out_default_tasks_are_checked_unlike_validate(self, test_client):
+        # /validate leaves an omitted task list to the template; a plan names its calls,
+        # so a default task the backend does not provide refuses the plan.
+        original = CalibrationPipelineService.task_types
+
+        def without_hpi(self, project_id, backend_name):
+            types = original(self, project_id, backend_name)
+            types.pop("CreateHPIPulse", None)
+            return types
+
+        with patch.object(CalibrationPipelineService, "task_types", without_hpi):
+            validated = test_client.post(
+                "/calibration-pipelines/validate",
+                headers=_headers(),
+                json={"chip_id": CHIP, "spec": good_spec()},
+            )
+            response = _create(test_client)
+        assert validated.status_code == 200 and validated.json()["valid"] is True
+        assert response.status_code == 422
+        [problem] = response.json()["detail"]["problems"]
+        assert problem["path"] == "steps[0].tasks[1]"
+        assert "CreateHPIPulse" in problem["message"]
+        assert CalibrationPipelinePlanDocument.find_all().count() == 0
 
     def test_invalid_spec_stores_nothing(self, test_client):
         spec = {**good_spec(), "targets": {"qids": ["99"]}}
@@ -372,6 +535,67 @@ class TestExecute:
         [run] = RunDocument.find_all().to_list()
         assert review_digest(run.approved_plan or {}) == plan["review_digest"]
 
+    def test_replay_never_reads_the_plan(self, test_client):
+        plan = _create(test_client).json()
+        with prefect(["flow-run-a", "flow-run-b"]) as create_flow_run:
+            first = _execute(test_client, plan)
+            _release_locks()
+            unreadable = RuntimeError("plan collection unavailable")
+            with patch(f"{PLAN_SERVICE}.find_plan", side_effect=unreadable) as lookup:
+                again = _execute(test_client, plan)
+        assert first.status_code == 202, first.text
+        assert again.status_code == 202, again.text
+        assert again.json()["replayed"] is True
+        assert again.json()["pipeline_run_id"] == first.json()["pipeline_run_id"]
+        lookup.assert_not_called()
+        assert create_flow_run.await_count == 1
+        [run] = RunDocument.find_all().to_list()
+        assert run.run_name == "coarse-then-coherence"
+
+    def test_a_mux_that_lost_its_wiring_is_never_dispatched(self, test_client, tmp_path):
+        spec = {**good_spec(), "targets": {"mux_ids": [0, 1], "exclude_qids": []}}
+        wiring = tmp_path / "qubex-config" / TOPOLOGY_CHIP / "config" / "wiring.yaml"
+        wiring.write_text(_wiring(TOPOLOGY_CHIP, [0, 1]), encoding="utf-8")
+        plan = _create(test_client, spec, chip_id=TOPOLOGY_CHIP).json()
+        assert plan["target_qids"] == [str(q) for q in range(8)]
+        wiring.write_text(_wiring(TOPOLOGY_CHIP, [0]), encoding="utf-8")
+        with prefect() as create_flow_run:
+            response = _execute(test_client, plan)
+        assert response.status_code == 422, response.text
+        assert "MUXes [1]" in response.json()["detail"]["problems"][0]["message"]
+        create_flow_run.assert_not_awaited()
+        assert RunDocument.find_all().count() == 0
+
+    def test_a_qubit_record_removed_after_approval_is_never_dispatched(self, test_client):
+        spec = {**good_spec(), "targets": {"mux_ids": [0], "exclude_qids": []}}
+        plan = _create(test_client, spec, chip_id=TOPOLOGY_CHIP).json()
+        assert plan["target_qids"] == ["0", "1", "2", "3"]
+        _drop_qubit(TOPOLOGY_CHIP, "2")
+        with prefect() as create_flow_run:
+            response = _execute(test_client, plan)
+        assert response.status_code == 422, response.text
+        [problem] = response.json()["detail"]["problems"]
+        assert problem["path"] == "targets.mux_ids"
+        assert "['2']" in problem["message"]
+        create_flow_run.assert_not_awaited()
+        assert RunDocument.find_all().count() == 0
+        assert CalibrationSessionDocument.find_all().count() == 0
+        assert ExecutionLockDocument.find_all().count() == 0
+
+    def test_replay_survives_a_qubit_record_removed_after_dispatch(self, test_client):
+        spec = {**good_spec(), "targets": {"mux_ids": [0], "exclude_qids": []}}
+        plan = _create(test_client, spec, chip_id=TOPOLOGY_CHIP).json()
+        with prefect(["flow-run-a", "flow-run-b"]) as create_flow_run:
+            first = _execute(test_client, plan)
+            _release_locks()
+            _drop_qubit(TOPOLOGY_CHIP, "2")
+            again = _execute(test_client, plan)
+        assert first.status_code == 202, first.text
+        assert again.status_code == 202, again.text
+        assert again.json()["replayed"] is True
+        assert again.json()["pipeline_run_id"] == first.json()["pipeline_run_id"]
+        assert create_flow_run.await_count == 1
+
     def test_unknown_outcome_is_never_dispatched_again(self, test_client):
         plan = _create(test_client).json()
         with prefect(side_effect=RuntimeError("prefect timed out")) as create_flow_run:
@@ -397,3 +621,39 @@ class TestExecute:
         assert spec_run.status_code == 202, spec_run.text
         assert plan_run.status_code == 409
         assert "different request" in plan_run.json()["detail"]
+
+
+class TestUnprocessableResponses:
+    def test_both_endpoints_document_every_422_shape(self, test_client):
+        paths = test_client.app.openapi()["paths"]
+        for path in (
+            "/calibration-pipelines/plans",
+            "/calibration-pipelines/plans/{plan_id}/execute",
+        ):
+            content = paths[path]["post"]["responses"]["422"]["content"]
+            ref = content["application/json"]["schema"]["$ref"]
+            assert ref.endswith("/PipelinePlanUnprocessableResponse")
+
+    def test_every_422_body_decodes_as_documented(self, test_client):
+        plan = _create(test_client).json()
+        bodies = [
+            # Body validation, domain problems, and a plan mismatch.
+            test_client.post(
+                "/calibration-pipelines/plans", headers=_headers(), json={"chip_id": CHIP}
+            ),
+            _create(test_client, {**good_spec(), "targets": {"qids": ["99"]}}, key="bad"),
+            _execute(test_client, plan, chip_id=OTHER_CHIP),
+            test_client.post(
+                f"/calibration-pipelines/plans/{plan['plan_id']}/execute",
+                headers=_headers(),
+                json={"chip_id": CHIP},
+            ),
+        ]
+        assert [body.status_code for body in bodies] == [422] * 4
+        details = [
+            PipelinePlanUnprocessableResponse.model_validate(body.json()).detail for body in bodies
+        ]
+        assert isinstance(details[0], list) and isinstance(details[0][0], RequestFieldError)
+        assert isinstance(details[1], PipelineProblemsDetail) and details[1].problems
+        assert isinstance(details[2], str) and OTHER_CHIP in details[2]
+        assert isinstance(details[3], list)

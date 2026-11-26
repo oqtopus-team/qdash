@@ -203,14 +203,18 @@ class Pipelines:
         """Validate a pipeline and store it as a plan to approve and run by reference.
 
         Nothing is run, reserved or recorded in a session; an invalid spec raises
-        ``QDashValidationError`` with the problems of :meth:`validate` and stores nothing. The
-        plan holds the normalized spec with every default task list written out, the qubits
-        its targets resolve to, the resolved calls, and its ``review_digest``; it expires
-        after 24 hours and is never renewed.
+        ``QDashValidationError`` with its problems and stores nothing. The spec is checked as
+        :meth:`validate` checks it, after every default task list is written out, so a spec
+        that omits ``tasks`` can be refused here although :meth:`validate` accepts it (for
+        example when the backend lacks a default task). The plan holds the normalized spec
+        with those task lists, the qubits its targets resolve to, the resolved calls, and its
+        ``review_digest``; it expires after 24 hours and is never renewed.
 
-        ``idempotency_key`` names this creation: repeating it with the same request returns
-        the same plan (``replayed``), with another request raises ``QDashConflictError``, and
-        once the plan expired raises an error (410). Sent once; after a transport error,
+        ``idempotency_key`` names this creation while the plan is stored (until seven days
+        after it expires): repeating it with the same request returns the same plan
+        (``replayed``), with another request raises ``QDashConflictError``, and once the plan
+        expired raises an error (410). After the plan is deleted, the same key creates a new
+        plan with a new ID that needs its own approval. Sent once; after a transport error,
         repeating the call with the same key is safe.
         """
         if not idempotency_key or not idempotency_key.strip():

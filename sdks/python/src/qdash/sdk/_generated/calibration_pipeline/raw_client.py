@@ -274,11 +274,17 @@ class RawCalibrationPipelineClient:
         Validate the spec and store it, with its review content and review digest.
 
         A plan is a proposal: it starts no run, reserves no hardware, joins no calibration
-        session, and grants nothing. An invalid spec returns 422 with the same problems as
-        /validate and stores nothing. Default task lists are written into the stored spec and
-        MUX targets are expanded, so what is reviewed is what runs. The plan expires after 24
-        hours and is never renewed. ``idempotency_key`` names this creation: repeating it
-        returns the same plan (409 for another request, 410 once it expired).
+        session, and grants nothing. Default task lists are written into the stored spec and
+        MUX targets are expanded, so what is reviewed is what runs. The spec is then validated as
+        /validate does, so an invalid spec returns 422 with ``detail.problems`` and stores
+        nothing; because the written-out default tasks are checked too (for example that the
+        backend provides each one), a spec that omits ``tasks`` can be refused here although
+        /validate accepts it. Targets that cannot be expanded, or a MUX of the chip topology
+        without wiring, are refused too. The plan expires after 24 hours and is never renewed.
+        ``idempotency_key`` names this creation while the plan is stored (until seven days after
+        it expires): repeating it returns the same plan (409 for another request, 410 once it
+        expired). Once the plan is deleted, the same key creates a new plan with a new ID that
+        needs its own approval; the old plan is never revived.
 
         Parameters
         ----------
@@ -288,7 +294,7 @@ class RawCalibrationPipelineClient:
             CalibrationPipelineSpec as JSON; see GET /calibration-pipelines/catalog.
 
         idempotency_key : str
-            Identity of this creation, such as the tool call that asks for it. Repeating it with the same request returns the same plan, or reports it expired; repeating it with another request is a conflict. It never stores a second plan or changes or renews the first.
+            Identity of this creation, such as the tool call that asks for it. While the plan it created is stored (until seven days after the plan expires), repeating it with the same request returns that plan, or reports it expired, and repeating it with another request is a conflict; it never changes or renews that plan. After the plan is deleted the key is free again: the same key then creates a new plan with a new plan_id and review_digest that needs its own approval.
 
         backend_name : typing.Optional[str]
             Defaults to the configured backend.
@@ -444,7 +450,7 @@ class RawCalibrationPipelineClient:
             A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run.
 
         decision_id : typing.Optional[str]
-            As for POST /calibration-pipelines/execute; grants nothing.
+            With calibration_session_id: the decision of that session this run carries out, recorded before dispatch with an experiment. QDash checks it belongs to the session and records the link on the run; it grants nothing.
 
         reported_origin : typing.Optional[ReportedLaunchOrigin]
             As for POST /calibration-pipelines/execute: stored as reported.
@@ -759,11 +765,17 @@ class AsyncRawCalibrationPipelineClient:
         Validate the spec and store it, with its review content and review digest.
 
         A plan is a proposal: it starts no run, reserves no hardware, joins no calibration
-        session, and grants nothing. An invalid spec returns 422 with the same problems as
-        /validate and stores nothing. Default task lists are written into the stored spec and
-        MUX targets are expanded, so what is reviewed is what runs. The plan expires after 24
-        hours and is never renewed. ``idempotency_key`` names this creation: repeating it
-        returns the same plan (409 for another request, 410 once it expired).
+        session, and grants nothing. Default task lists are written into the stored spec and
+        MUX targets are expanded, so what is reviewed is what runs. The spec is then validated as
+        /validate does, so an invalid spec returns 422 with ``detail.problems`` and stores
+        nothing; because the written-out default tasks are checked too (for example that the
+        backend provides each one), a spec that omits ``tasks`` can be refused here although
+        /validate accepts it. Targets that cannot be expanded, or a MUX of the chip topology
+        without wiring, are refused too. The plan expires after 24 hours and is never renewed.
+        ``idempotency_key`` names this creation while the plan is stored (until seven days after
+        it expires): repeating it returns the same plan (409 for another request, 410 once it
+        expired). Once the plan is deleted, the same key creates a new plan with a new ID that
+        needs its own approval; the old plan is never revived.
 
         Parameters
         ----------
@@ -773,7 +785,7 @@ class AsyncRawCalibrationPipelineClient:
             CalibrationPipelineSpec as JSON; see GET /calibration-pipelines/catalog.
 
         idempotency_key : str
-            Identity of this creation, such as the tool call that asks for it. Repeating it with the same request returns the same plan, or reports it expired; repeating it with another request is a conflict. It never stores a second plan or changes or renews the first.
+            Identity of this creation, such as the tool call that asks for it. While the plan it created is stored (until seven days after the plan expires), repeating it with the same request returns that plan, or reports it expired, and repeating it with another request is a conflict; it never changes or renews that plan. After the plan is deleted the key is free again: the same key then creates a new plan with a new plan_id and review_digest that needs its own approval.
 
         backend_name : typing.Optional[str]
             Defaults to the configured backend.
@@ -929,7 +941,7 @@ class AsyncRawCalibrationPipelineClient:
             A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run.
 
         decision_id : typing.Optional[str]
-            As for POST /calibration-pipelines/execute; grants nothing.
+            With calibration_session_id: the decision of that session this run carries out, recorded before dispatch with an experiment. QDash checks it belongs to the session and records the link on the run; it grants nothing.
 
         reported_origin : typing.Optional[ReportedLaunchOrigin]
             As for POST /calibration-pipelines/execute: stored as reported.

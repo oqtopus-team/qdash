@@ -43,6 +43,7 @@ from qdash.common.config.backend import (
 from qdash.common.manual_rounds import mux_target_qids
 from qdash.common.mux_mapping import (
     MuxMappingError,
+    canonical_qid,
     qubex_mux_mapping_errors,
     resolve_topology_mux_mapping,
 )
@@ -309,7 +310,11 @@ class CalibrationPipelineService:
 
         Qubit and pair targets name them. MUX targets are expanded with the chip's MUX
         mapping and wiring, as ``MuxTargets`` does on the worker; when that data cannot be
-        read the expansion is a problem, never a guess.
+        read the expansion is a problem, never a guess. On a chip with a topology, a
+        selected MUX without a wiring row is a problem too, as the worker refuses it; a
+        chip without a topology skips unwired MUXes, as the worker does. A resolved qubit
+        without a qubit record on the chip is a problem: the worker would schedule it, and
+        dropping it would run fewer qubits than were reviewed.
         """
         targets = spec.targets
         if targets.qids:
@@ -329,6 +334,35 @@ class CalibrationPipelineService:
         )
         if not qids:
             return None, _problem("targets.mux_ids", "the MUX targets select no qubit")
+        mapping = model.mux_mapping
+        if mapping is not None and not mapping.unbounded:
+            # The worker's scheduler refuses a topology MUX with selected qubits but no
+            # wiring row; a chip without a topology keeps skipping unwired MUXes instead.
+            wired = {entry["mux"] for entry in model.wiring}
+            unwired = sorted(
+                {
+                    mux
+                    for qid in qids
+                    if (mux := mapping.find_mux(qid)) is not None and mux not in wired
+                }
+            )
+            if unwired:
+                return None, _problem(
+                    "targets.mux_ids",
+                    f"MUXes {unwired} of the chip topology have no row in the wiring of chip "
+                    f"{chip_id}; add them to wiring.yaml or leave them out of the targets",
+                )
+        recorded = {
+            canonical_qid(doc.qid)
+            for doc in QubitDocument.find({"project_id": project_id, "chip_id": chip_id}).run()
+        }
+        missing = [qid for qid in qids if canonical_qid(qid) not in recorded]
+        if missing:
+            return None, _problem(
+                "targets.mux_ids",
+                f"qubits {missing} of the MUX targets have no qubit record on chip {chip_id}; "
+                "add their records or list them in targets.exclude_qids",
+            )
         return qids, None
 
     def _validate_manual_rounds(
@@ -594,23 +628,26 @@ class CalibrationPipelineService:
                     )
                 )
         self._validate_configure_all_mux_ids(spec, groups, chip_id, problems)
+        mux_qids = [qid for mux in targets.mux_ids or [] if mux in groups for qid in groups[mux]]
+        # A member of a selected MUX may be excluded without a qubit record: excluding it
+        # is how a MUX with a missing record is targeted.
+        members = {canonical_qid(qid) for qid in mux_qids}
         for index, qid in enumerate(targets.exclude_qids):
-            if qid not in known:
+            if qid not in known and canonical_qid(qid) not in members:
                 problems.append(
                     _problem(
                         f"targets.exclude_qids[{index}]",
                         f"qubit {qid!r} is not on chip {chip_id}",
                     )
                 )
-        excluded = set(targets.exclude_qids)
-        mux_qids = [qid for mux in targets.mux_ids or [] if mux in groups for qid in groups[mux]]
+        excluded = {canonical_qid(qid) for qid in targets.exclude_qids}
         return (
             ResolvedPipelineTargets(
                 qids=[],
                 mux_ids=list(targets.mux_ids or []),
                 exclude_qids=list(targets.exclude_qids),
             ),
-            [qid for qid in mux_qids if qid in known and qid not in excluded],
+            [qid for qid in mux_qids if qid in known and canonical_qid(qid) not in excluded],
         )
 
     def _validate_pair_targets(

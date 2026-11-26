@@ -24,6 +24,7 @@ from qdash.api.schemas.calibration_pipeline import (
     ExecutePipelineResponse,
     PipelineCatalogResponse,
     PipelinePlanResponse,
+    PipelinePlanUnprocessableResponse,
     ValidatePipelineRequest,
     ValidatePipelineResponse,
 )
@@ -45,6 +46,18 @@ from qdash.api.services.run_ledger import (
 from qdash.datamodel.run import RunIdentity, RunKind
 
 router = APIRouter(prefix="/calibration-pipelines")
+
+# The stored-plan endpoints answer 422 with three shapes of ``detail``; see the model.
+_PLAN_UNPROCESSABLE: dict[int | str, dict[str, Any]] = {
+    status.HTTP_422_UNPROCESSABLE_CONTENT: {
+        "model": PipelinePlanUnprocessableResponse,
+        "description": (
+            "The request body does not match its schema (detail is a list), the spec is not "
+            "valid or its targets cannot be resolved (detail.problems), or the request does "
+            "not match the plan (detail is a message)."
+        ),
+    }
+}
 
 
 @router.get(
@@ -199,6 +212,7 @@ async def execute_pipeline(
     "/plans",
     response_model=PipelinePlanResponse,
     status_code=status.HTTP_201_CREATED,
+    responses=_PLAN_UNPROCESSABLE,
     summary="Store a validated calibration pipeline spec as a plan to approve by reference",
     operation_id="createCalibrationPipelinePlan",
 )
@@ -210,11 +224,17 @@ def create_plan(
     """Validate the spec and store it, with its review content and review digest.
 
     A plan is a proposal: it starts no run, reserves no hardware, joins no calibration
-    session, and grants nothing. An invalid spec returns 422 with the same problems as
-    /validate and stores nothing. Default task lists are written into the stored spec and
-    MUX targets are expanded, so what is reviewed is what runs. The plan expires after 24
-    hours and is never renewed. ``idempotency_key`` names this creation: repeating it
-    returns the same plan (409 for another request, 410 once it expired)."""
+    session, and grants nothing. Default task lists are written into the stored spec and
+    MUX targets are expanded, so what is reviewed is what runs. The spec is then validated as
+    /validate does, so an invalid spec returns 422 with ``detail.problems`` and stores
+    nothing; because the written-out default tasks are checked too (for example that the
+    backend provides each one), a spec that omits ``tasks`` can be refused here although
+    /validate accepts it. Targets that cannot be expanded, or a MUX of the chip topology
+    without wiring, are refused too. The plan expires after 24 hours and is never renewed.
+    ``idempotency_key`` names this creation while the plan is stored (until seven days after
+    it expires): repeating it returns the same plan (409 for another request, 410 once it
+    expired). Once the plan is deleted, the same key creates a new plan with a new ID that
+    needs its own approval; the old plan is never revived."""
     return plans.create(
         project_id=ctx.project_id,
         username=ctx.user.username,
@@ -250,6 +270,7 @@ async def _require_plan_deployment(flows: FlowService) -> None:
     "/plans/{plan_id}/execute",
     response_model=ExecutePipelineResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    responses=_PLAN_UNPROCESSABLE,
     summary="Run a stored calibration pipeline plan exactly as it was approved",
     operation_id="executeCalibrationPipelinePlan",
 )
@@ -318,8 +339,9 @@ async def execute_plan(
         username=ctx.user.username,
         chip_id=request.chip_id,
         kind=RunKind.PIPELINE,
-        # A display name only: a replay or a refusal never depends on the plan being there.
-        run_name=plans.display_name(ctx.project_id, ctx.user.username, plan_id),
+        # Named from the validated plan only when a dispatch starts: a recorded run is
+        # replayed without reading the plan at all.
+        run_name=lambda plan: str(plan.spec.get("name") or ""),
         request_hash=plan_request_hash(
             plan_id,
             request.expected_review_digest,

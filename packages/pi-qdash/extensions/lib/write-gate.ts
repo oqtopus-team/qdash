@@ -46,8 +46,8 @@ export interface WriteGateOptions {
  * 1. `tool_call`: any earlier approval for the id is dropped. A nested call,
  *    a session without a UI, an aborted turn, or arguments that are not plain
  *    JSON data are blocked without a dialog. Otherwise the gate snapshots the
- *    canonical arguments, fetches the stored plan a call names (and blocks
- *    the call when it cannot be shown), shows all of them in a review the user can scroll
+ *    canonical arguments, fetches the stored plan a call names and snapshots it
+ *    (and blocks the call when it cannot be shown or copied), shows all of them in a review the user can scroll
  *    to the end (write-review.ts), and waits for the user with pi's abort
  *    signal. It records the snapshot, bound to the tool name, only when the
  *    user accepted, the turn was not aborted meanwhile, and the arguments
@@ -99,7 +99,9 @@ export function installQDashWriteGate(pi: ExtensionAPI, options: WriteGateOption
         return { block: true, reason: `${event.toolName} was not run: this pi session cannot fetch the stored plan to show it for approval.` };
       }
       try {
-        preview = await options.resolvePreview(event.toolName, JSON.parse(approved) as Record<string, unknown>, signal);
+        // Snapshot it at once: the dialog text and the recorded approval are both built from
+        // this copy, so a resolver that later changes the object it returned changes neither.
+        preview = structuredClone(await options.resolvePreview(event.toolName, JSON.parse(approved) as Record<string, unknown>, signal));
       } catch (error) {
         if (signal?.aborted) return { block: true, reason: cancelledApprovalMessage(event.toolName) };
         return { block: true, reason: `${event.toolName} was not run: ${error instanceof Error ? error.message : String(error)}` };

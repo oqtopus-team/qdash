@@ -25,6 +25,7 @@ from qdash.datamodel.calibration_plan import (
     content_differences,
     review_digest,
     review_step,
+    same_json,
 )
 from qdash.datamodel.task_call import calls_json
 from qdash.datamodel.task_settings import (
@@ -84,7 +85,8 @@ def check_dispatched_plan(
     differences = [
         name
         for name, value in (("chip_id", chip_id), ("backend_name", backend_name), ("spec", spec))
-        if review.get(name) != value
+        # Compared as canonical JSON: ``false`` and ``0`` are different settings.
+        if not same_json(review.get(name), value)
     ]
     if differences:
         raise PlanApprovalMismatch(

@@ -7,6 +7,6 @@
  */
 
 /**
- * As for POST /calibration-pipelines/execute; grants nothing.
+ * With calibration_session_id: the decision of that session this run carries out, recorded before dispatch with an experiment. QDash checks it belongs to the session and records the link on the run; it grants nothing.
  */
 export type ExecutePipelinePlanRequestDecisionId = string | null;

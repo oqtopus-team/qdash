@@ -395,11 +395,17 @@ export class CalibrationPipelineClient {
      * Validate the spec and store it, with its review content and review digest.
      *
      * A plan is a proposal: it starts no run, reserves no hardware, joins no calibration
-     * session, and grants nothing. An invalid spec returns 422 with the same problems as
-     * /validate and stores nothing. Default task lists are written into the stored spec and
-     * MUX targets are expanded, so what is reviewed is what runs. The plan expires after 24
-     * hours and is never renewed. ``idempotency_key`` names this creation: repeating it
-     * returns the same plan (409 for another request, 410 once it expired).
+     * session, and grants nothing. Default task lists are written into the stored spec and
+     * MUX targets are expanded, so what is reviewed is what runs. The spec is then validated as
+     * /validate does, so an invalid spec returns 422 with ``detail.problems`` and stores
+     * nothing; because the written-out default tasks are checked too (for example that the
+     * backend provides each one), a spec that omits ``tasks`` can be refused here although
+     * /validate accepts it. Targets that cannot be expanded, or a MUX of the chip topology
+     * without wiring, are refused too. The plan expires after 24 hours and is never renewed.
+     * ``idempotency_key`` names this creation while the plan is stored (until seven days after
+     * it expires): repeating it returns the same plan (409 for another request, 410 once it
+     * expired). Once the plan is deleted, the same key creates a new plan with a new ID that
+     * needs its own approval; the old plan is never revived.
      *
      * @param {QDashApi.CreatePipelinePlanRequest} request
      * @param {CalibrationPipelineClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -475,7 +481,7 @@ export class CalibrationPipelineClient {
      *                 ]
      *             }
      *         },
-     *         idempotency_key: "idempotency_key"
+     *         idempotency_key: "plan-request-1"
      *     })
      */
     public createCalibrationPipelinePlan(

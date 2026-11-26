@@ -307,7 +307,9 @@ the individual execution. See [Pipeline specs](../../developer-guide/workflow/ca
 
 ### Run a Stored Plan
 
-With the `qdash` connection above, store a proposal without starting a measurement:
+With the `qdash` connection above, store a proposal without starting a measurement.
+Creation validates the expanded default task list, so it can reject a spec that ordinary
+validation accepts with omitted tasks. Review any reported problems before retrying:
 
 ```python
 spec = {

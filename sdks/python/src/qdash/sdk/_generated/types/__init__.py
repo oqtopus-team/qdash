@@ -429,7 +429,10 @@ from .parameter_version_response_value import ParameterVersionResponseValue
 from .password_reset_response import PasswordResetResponse
 from .pipeline_catalog_response import PipelineCatalogResponse
 from .pipeline_plan_response import PipelinePlanResponse
+from .pipeline_plan_unprocessable_response import PipelinePlanUnprocessableResponse
+from .pipeline_plan_unprocessable_response_detail import PipelinePlanUnprocessableResponseDetail
 from .pipeline_problem import PipelineProblem
+from .pipeline_problems_detail import PipelineProblemsDetail
 from .pipeline_progress import PipelineProgress
 from .pipeline_step_progress import PipelineStepProgress
 from .pipeline_step_type_info import PipelineStepTypeInfo
@@ -462,6 +465,8 @@ from .recent_executions_response import RecentExecutionsResponse
 from .recommended_task_response import RecommendedTaskResponse
 from .relative_period import RelativePeriod
 from .reported_launch_origin import ReportedLaunchOrigin
+from .request_field_error import RequestFieldError
+from .request_field_error_loc_item import RequestFieldErrorLocItem
 from .requested_parameter_change_model import RequestedParameterChangeModel
 from .requested_parameter_change_model_previous import RequestedParameterChangeModelPrevious
 from .requested_parameter_change_model_value import RequestedParameterChangeModelValue
@@ -984,7 +989,10 @@ __all__ = [
     "PasswordResetResponse",
     "PipelineCatalogResponse",
     "PipelinePlanResponse",
+    "PipelinePlanUnprocessableResponse",
+    "PipelinePlanUnprocessableResponseDetail",
     "PipelineProblem",
+    "PipelineProblemsDetail",
     "PipelineProgress",
     "PipelineStepProgress",
     "PipelineStepTypeInfo",
@@ -1015,6 +1023,8 @@ __all__ = [
     "RecommendedTaskResponse",
     "RelativePeriod",
     "ReportedLaunchOrigin",
+    "RequestFieldError",
+    "RequestFieldErrorLocItem",
     "RequestedParameterChangeModel",
     "RequestedParameterChangeModelPrevious",
     "RequestedParameterChangeModelValue",

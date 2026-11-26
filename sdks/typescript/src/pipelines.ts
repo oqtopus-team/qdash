@@ -251,14 +251,18 @@ export class Pipelines {
   /**
    * Validate `spec` and store it as a plan to approve and run by reference. Nothing is run,
    * reserved or recorded in a session; an invalid spec is a `QDashValidationError` (422) with
-   * the problems of `validate` and stores nothing. The plan holds the normalized spec with
-   * every default task list written out, the qubits its targets resolve to, the resolved calls
-   * and its `review_digest`; it expires after 24 hours and is never renewed.
+   * its problems and stores nothing. The spec is checked as `validate` checks it, after every
+   * default task list is written out, so a spec that omits `tasks` can be refused here
+   * although `validate` accepts it (for example when the backend lacks a default task). The
+   * plan holds the normalized spec with those task lists, the qubits its targets resolve to,
+   * the resolved calls and its `review_digest`; it expires after 24 hours and is never renewed.
    *
-   * `idempotencyKey` names this creation (one per tool call, for example): repeating it with
-   * the same request returns the same plan (`replayed`), with another request is a
-   * `QDashConflictError`, and once the plan expired is an error (410). Sent once; a transport
-   * error is thrown, and repeating the call with the same key is then safe.
+   * `idempotencyKey` names this creation (one per tool call, for example) while the plan is
+   * stored (until seven days after it expires): repeating it with the same request returns the
+   * same plan (`replayed`), with another request is a `QDashConflictError`, and once the plan
+   * expired is an error (410). After the plan is deleted, the same key creates a new plan with
+   * a new ID that needs its own approval. Sent once; a transport error is thrown, and repeating
+   * the call with the same key is then safe.
    */
   createPlan(
     spec: PipelineSpecInput,

@@ -23,7 +23,9 @@ PLAN_COLLECTION = "calibration_pipeline_plans"
 # the deletion below; an expired plan is never made executable again.
 PLAN_TTL = timedelta(hours=24)
 # How long an expired plan is kept before MongoDB deletes it, so a late creation retry still
-# gets "expired" rather than a new plan, and its review stays readable for a while.
+# gets "expired" rather than a new plan, and its review stays readable for a while. This is
+# also the window of creation idempotency: once the document is deleted its key is free and
+# the same key creates a new plan with a new ID (the deleted plan is never revived).
 PLAN_RETENTION_AFTER_EXPIRY = timedelta(days=7)
 # The largest spec a plan stores, as UTF-8 JSON.
 MAX_PLAN_SPEC_BYTES = 256 * 1024
@@ -33,9 +35,10 @@ class CalibrationPipelinePlanDocument(Document):
     """One stored plan: the normalized spec and the review content an approval covers.
 
     ``plan_id`` is an opaque, fresh identifier. ``creation_scope`` is the creator and the
-    idempotency key the plan was created with, unique per project: a repeated creation with
-    the same key returns this plan (or reports it expired) and never stores another one or
-    changes this one. ``request_hash`` is what such a repetition must repeat. The document is
+    idempotency key the plan was created with, unique per project: while this document is
+    stored, a repeated creation with the same key returns this plan (or reports it expired)
+    and never stores another one or changes this one. After the TTL deletion the key is free
+    again and creates a new plan with a new ID. ``request_hash`` is what such a repetition must repeat. The document is
     written once and never updated.
     """
 

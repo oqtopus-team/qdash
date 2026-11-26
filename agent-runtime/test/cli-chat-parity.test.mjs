@@ -192,6 +192,8 @@ function startFixture() {
         if (planRun) {
           const plan = plans.get(planRun[1]);
           if (!plan) return json(404, { detail: "no plan" });
+          // QDash refuses a new dispatch of an expired plan, whatever its approval.
+          if (plan.expired) return json(410, { detail: `Calibration pipeline plan ${plan.plan_id} expired at ${plan.expires_at}; it cannot be run or renewed.` });
           if (body.expected_review_digest !== plan.review_digest) return json(409, { detail: "digest mismatch" });
           return json(202, { execution_id: "exec-plan", flow_run_id: "flow-plan", flow_run_url: "", qdash_ui_url: "", message: "started", steps: [], calibration_session_id: "cs-auto", pipeline_run_id: "cpr-plan", plan_id: plan.plan_id, review_digest: plan.review_digest });
         }
@@ -709,21 +711,36 @@ test("a script stores a plan and the model runs it by ID after approving the fet
         assert.deepEqual(approval.preview.targetQids, FIXTURE_PLAN.target_qids);
         assert.deepEqual(approval.preview.plan.steps, FIXTURE_PLAN.steps);
         shown.push(JSON.stringify(approval.preview));
-        // The plan expires (or is deleted) after the card was shown: the approved call still
-        // runs from the preview stored with it, without fetching the plan again.
+        const planFetches = () => fixture.requests.filter((request) => request.method === "GET" && request.path.startsWith("/calibration-pipelines/plans/")).length;
+        // The approved call runs from the preview stored with the card, without fetching the
+        // plan again (the plan is still valid here).
         plans.set("cpp-gone", plans.get(FIXTURE_PLAN.plan_id));
-        const fetchesBefore = fixture.requests.filter((request) => request.method === "GET" && request.path.startsWith("/calibration-pipelines/plans/")).length;
+        const fetchesBefore = planFetches();
         const text = await run.writeTools.runApproved(approval);
         assert.match(text, new RegExp(`Plan ${FIXTURE_PLAN.plan_id} \\(review digest ${FIXTURE_PLAN.review_digest}\\)`));
-        assert.equal(fixture.requests.filter((request) => request.method === "GET" && request.path.startsWith("/calibration-pipelines/plans/")).length, fetchesBefore);
+        assert.equal(planFetches(), fetchesBefore);
         // An approval request that lost its preview, or names another plan, runs nothing.
         await assert.rejects(run.writeTools.runApproved({ ...approval, preview: undefined }), /does not carry the stored plan/);
         await assert.rejects(run.writeTools.runApproved({ ...approval, args: { ...approval.args, planId: "cpp-gone" } }), /differs from the one the user approved/);
+        // The requests of the approved run, before the expiry case below adds its own.
+        outcomes.chatRequests = requestsSince(start);
+
+        // The plan the card showed expires after approval: the approved call still sends the
+        // saved digest, QDash refuses the new dispatch (410), the refusal is reported, and no
+        // replacement preview is fetched.
+        plans.set(FIXTURE_PLAN.plan_id, { ...plans.get(FIXTURE_PLAN.plan_id), expired: true });
+        const expiryStart = fixture.requests.length;
+        await assert.rejects(run.writeTools.runApproved(approval), /expired/);
+        const afterExpiry = fixture.requests.slice(expiryStart);
+        assert.deepEqual(afterExpiry.filter((request) => request.method === "GET" && request.path.startsWith("/calibration-pipelines/plans/")), []);
+        const refused = afterExpiry.filter((request) => request.method === "POST");
+        assert.deepEqual(refused.map((request) => request.path), [`/calibration-pipelines/plans/${FIXTURE_PLAN.plan_id}/execute`]);
+        assert.equal(refused[0].body.expected_review_digest, FIXTURE_PLAN.review_digest);
       } else {
         assert.equal(pipeline.isError, false, `${host}: ${pipeline.text}`);
         assert.equal(pipeline.details.reviewDigest, FIXTURE_PLAN.review_digest);
       }
-      outcomes[host] = { script: scriptResult(script.text), shown, requests: requestsSince(start) };
+      outcomes[host] = { script: scriptResult(script.text), shown, requests: host === "chat" ? outcomes.chatRequests : requestsSince(start) };
     } finally {
       await run.close();
     }
@@ -741,7 +758,15 @@ test("a script stores a plan and the model runs it by ID after approving the fet
     }, host);
     // What the user approved names the fetched plan's digest and its expanded qubits.
     assert.ok(shown.some((message) => message.includes(FIXTURE_PLAN.review_digest)), `${host}: ${shown.join("\n")}`);
-    assert.ok(shown.some((message) => message.includes("4") && message.includes("7")), host);
+    // The exact starting qubits, not a substring that "shots: 1024" could also match.
+    if (host === "cli") {
+      assert.ok(
+        shown.some((message) => message.includes(`Starting qubits (${FIXTURE_PLAN.target_qids.length}): ${FIXTURE_PLAN.target_qids.join(", ")} (`)),
+        `${host}: ${shown.join("\n")}`,
+      );
+    } else {
+      assert.ok(shown.some((message) => JSON.parse(message).targetQids?.join(",") === FIXTURE_PLAN.target_qids.join(",")), host);
+    }
     const posts = requests.filter((request) => request.method === "POST");
     assert.deepEqual(posts.map((request) => request.path), [
       "/calibration-pipelines/validate",

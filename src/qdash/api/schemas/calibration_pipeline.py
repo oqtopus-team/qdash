@@ -65,6 +65,35 @@ class PipelineProblem(BaseModel):
     message: str
 
 
+class RequestFieldError(BaseModel):
+    """One field of the request body that failed schema validation."""
+
+    loc: list[str | int] = Field(description="Where in the request, e.g. ['body', 'chip_id'].")
+    msg: str
+    type: str
+
+    model_config = ConfigDict(extra="allow")
+
+
+class PipelineProblemsDetail(BaseModel):
+    """Why a calibration pipeline spec was refused, with every problem found."""
+
+    message: str
+    problems: list[PipelineProblem] = Field(default_factory=list)
+
+
+class PipelinePlanUnprocessableResponse(BaseModel):
+    """The 422 body of the stored-plan endpoints.
+
+    ``detail`` is a list when the request body does not match its schema, an object with
+    ``problems`` when the spec is not valid or its targets cannot be resolved, and a message
+    when the request does not match the plan (another chip or backend) or its calibration
+    session is on another chip.
+    """
+
+    detail: list[RequestFieldError] | PipelineProblemsDetail | str
+
+
 class ResolvedTaskCall(BaseModel):
     """One call as it will run: identity and settings after per-task defaults."""
 
@@ -174,6 +203,13 @@ class ValidatePipelineResponse(BaseModel):
     task_run_count: int = Field(default=0, description="Task calls per target qubit or coupling.")
 
 
+DECISION_ID_FIELD = (
+    "With calibration_session_id: the decision of that session this run carries out, "
+    "recorded before dispatch with an experiment. QDash checks it belongs to the "
+    "session and records the link on the run; it grants nothing."
+)
+
+
 class ExecutePipelineRequest(ValidatePipelineRequest):
     """Dispatch one pipeline run with a separate execution for each step reached."""
 
@@ -188,14 +224,7 @@ class ExecutePipelineRequest(ValidatePipelineRequest):
     )
 
     decision_id: str | None = Field(
-        default=None,
-        min_length=1,
-        max_length=200,
-        description=(
-            "With calibration_session_id: the decision of that session this run carries out, "
-            "recorded before dispatch with an experiment. QDash checks it belongs to the "
-            "session and records the link on the run; it grants nothing."
-        ),
+        default=None, min_length=1, max_length=200, description=DECISION_ID_FIELD
     )
 
     reported_origin: ReportedLaunchOrigin | None = Field(
@@ -222,11 +251,21 @@ class CreatePipelinePlanRequest(ValidatePipelineRequest):
         min_length=1,
         max_length=128,
         description=(
-            "Identity of this creation, such as the tool call that asks for it. Repeating it "
-            "with the same request returns the same plan, or reports it expired; repeating it "
-            "with another request is a conflict. It never stores a second plan or changes or "
-            "renews the first."
+            "Identity of this creation, such as the tool call that asks for it. While the plan "
+            "it created is stored (until seven days after the plan expires), repeating it with "
+            "the same request returns that plan, or reports it expired, and repeating it with "
+            "another request is a conflict; it never changes or renews that plan. After the "
+            "plan is deleted the key is free again: the same key then creates a new plan with "
+            "a new plan_id and review_digest that needs its own approval."
         ),
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"chip_id": "64Qv3", "spec": _SPEC_EXAMPLE, "idempotency_key": "plan-request-1"}
+            ]
+        }
     )
 
 
@@ -300,11 +339,10 @@ class ExecutePipelinePlanRequest(BaseModel):
     idempotency_key: str | None = Field(
         default=None, min_length=1, max_length=128, description=IDEMPOTENCY_KEY_FIELD
     )
+    # The same schema as ExecutePipelineRequest.decision_id, so generated clients share one
+    # type for both fields and an existing caller's typed value stays valid for either.
     decision_id: str | None = Field(
-        default=None,
-        min_length=1,
-        max_length=200,
-        description="As for POST /calibration-pipelines/execute; grants nothing.",
+        default=None, min_length=1, max_length=200, description=DECISION_ID_FIELD
     )
     reported_origin: ReportedLaunchOrigin | None = Field(
         default=None,

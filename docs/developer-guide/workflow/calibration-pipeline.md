@@ -47,7 +47,12 @@ For unknown dispatch outcomes and audit fields, see
 
 Plan creation requires `chip_id`, `spec`, and an `idempotency_key`; `backend_name` is optional.
 It validates and saves at most 256 KiB of submitted spec without creating a run, session, or
-hardware reservation. The stored spec materializes default task lists. The preview includes
+hardware reservation. It materializes and validates default task lists, so it can reject a spec
+that `/validate` accepts with omitted tasks. On topology-backed chips, selected MUXes with
+non-excluded qubits need wiring; missing wiring returns 422. Plan creation and fresh execution
+also reject expanded MUX qubits without a record on the chip. Add the missing record or list
+that member in `targets.exclude_qids`; an excluded member does not need a database record.
+The preview includes
 resolved calls, initial MUX-expanded qubits, defaults, warnings, and a versioned SHA-256
 `review_digest`. This differs from the spec's `plan_digest` and the worker's invocation digest.
 
@@ -55,11 +60,14 @@ Plans belong to their creator in one project and expire after 24 hours. GET can 
 expired plan; new execution and creation-key replay return 410 after expiry. A new plan needs a
 new creation key and ID. Repeating an unexpired creation request with the same key returns the
 same plan; changing its payload returns 409. TTL cleanup removes plans seven days after expiry.
-After cleanup, reusing a creation key can create a new ID; it never revives the old approval.
+Creation-key deduplication lasts only while the plan is stored. After cleanup, reusing a key
+can create a new ID; it never revives the old approval.
 
 Reference execution requires `chip_id` and `expected_review_digest` from the reviewed plan.
 The API revalidates the stored definition and compares its resolved content before dispatch.
-It refuses changed content with 409 and invalid inputs with 422. The worker compares the
+It refuses changed content with 409 and invalid inputs with 422. For the new plan endpoints,
+422 responses carry `detail` as a body-validation error list, an object with `message` and
+`problems`, or a domain-error string; clients must handle all three shapes. The worker compares the
 approved content against its actual steps, expanded initial targets, and run settings before
 resource acquisition. Filters still select later targets from measured results. Calibration
 values, scientific defaults inside task code, task code, and hardware state are not frozen.
