@@ -640,49 +640,14 @@ class CalibOrchestrator:
         *,
         update_calibration_parameters: bool,
     ) -> TaskContext:
-        """Prepare a TaskContext for task execution."""
-        from copy import deepcopy
+        """Prepare a TaskContext for task execution on one qid.
 
-        from qdash.datamodel.task import CalibDataModel
-
-        config = self.config
-
-        # Create new context for this execution with optional provenance tracking
-        exec_context = TaskContext(
-            username=config.username,
-            execution_id=config.execution_id,
-            qids=[qid],
-            calib_dir=self.task_context.calib_dir,
-            history_recorder=self._create_history_recorder(),
-            snapshot_loader=self._snapshot_loader,
-            source_task_id=self._source_task_id,
-            force_update_params=config.force_update_params,
-            update_calibration_parameters=update_calibration_parameters,
-            mux_mapping=config.mux_mapping,
+        This is the batch context for ``[qid]``: the same calibration data copy
+        and upstream task dependency.
+        """
+        return self._prepare_batch_execution_context(
+            [qid], upstream_id, update_calibration_parameters=update_calibration_parameters
         )
-
-        # Copy relevant calibration data
-        relevant_qids = self._get_relevant_qubit_ids(qid)
-        exec_context.state.calib_data = CalibDataModel(
-            qubit={
-                q: deepcopy(self.task_context.calib_data.qubit[q])
-                for q in relevant_qids
-                if q in self.task_context.calib_data.qubit
-            },
-            coupling=(
-                {qid: deepcopy(self.task_context.calib_data.coupling[qid])}
-                if qid in self.task_context.calib_data.coupling
-                else {}
-            ),
-        )
-        # Set upstream task dependency
-        if upstream_id is not None:
-            exec_context.set_upstream_task_id(upstream_id)
-        else:
-            last_id = self._last_executed_task_id_by_qid.get(qid, "")
-            exec_context.set_upstream_task_id(last_id)
-
-        return exec_context
 
     def _prepare_batch_execution_context(
         self,
