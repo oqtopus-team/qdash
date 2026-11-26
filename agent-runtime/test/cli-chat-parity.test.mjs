@@ -166,6 +166,7 @@ const FIXTURE_PLAN = {
   replayed: false,
 };
 const plans = new Map();
+const planRuns = new Map();
 
 function startFixture() {
   const requests = [];
@@ -190,12 +191,16 @@ function startFixture() {
           return json(201, plans.get(FIXTURE_PLAN.plan_id));
         }
         if (planRun) {
+          const prior = planRuns.get(body.idempotency_key);
+          if (prior) return json(202, { ...prior, replayed: true });
           const plan = plans.get(planRun[1]);
           if (!plan) return json(404, { detail: "no plan" });
           // QDash refuses a new dispatch of an expired plan, whatever its approval.
           if (plan.expired) return json(410, { detail: `Calibration pipeline plan ${plan.plan_id} expired at ${plan.expires_at}; it cannot be run or renewed.` });
           if (body.expected_review_digest !== plan.review_digest) return json(409, { detail: "digest mismatch" });
-          return json(202, { execution_id: "exec-plan", flow_run_id: "flow-plan", flow_run_url: "", qdash_ui_url: "", message: "started", steps: [], calibration_session_id: "cs-auto", pipeline_run_id: "cpr-plan", plan_id: plan.plan_id, review_digest: plan.review_digest });
+          const result = { execution_id: "exec-plan", flow_run_id: "flow-plan", flow_run_url: "", qdash_ui_url: "", message: "started", steps: [], calibration_session_id: "cs-auto", pipeline_run_id: "cpr-plan", plan_id: plan.plan_id, review_digest: plan.review_digest };
+          planRuns.set(body.idempotency_key, result);
+          return json(202, result);
         }
         json(200, { valid: true, backend_name: "fake", spec: body.spec, targets: body.spec.targets, task_run_count: 1, problems: [], warnings: [], steps: [] });
       });
@@ -683,6 +688,7 @@ test("a script stores a plan and the model runs it by ID after approving the fet
   const outcomes = {};
   for (const host of ["cli", "chat"]) {
     plans.clear();
+    planRuns.clear();
     const start = fixture.requests.length;
     const shown = [];
     const steps = [
@@ -725,17 +731,16 @@ test("a script stores a plan and the model runs it by ID after approving the fet
         // The requests of the approved run, before the expiry case below adds its own.
         outcomes.chatRequests = requestsSince(start);
 
-        // The plan the card showed expires after approval: the approved call still sends the
-        // saved digest, QDash refuses the new dispatch (410), the refusal is reported, and no
-        // replacement preview is fetched.
+        // A completed dispatch replays after expiry; it does not validate the plan again.
         plans.set(FIXTURE_PLAN.plan_id, { ...plans.get(FIXTURE_PLAN.plan_id), expired: true });
-        const expiryStart = fixture.requests.length;
-        await assert.rejects(run.writeTools.runApproved(approval), /expired/);
-        const afterExpiry = fixture.requests.slice(expiryStart);
-        assert.deepEqual(afterExpiry.filter((request) => request.method === "GET" && request.path.startsWith("/calibration-pipelines/plans/")), []);
-        const refused = afterExpiry.filter((request) => request.method === "POST");
-        assert.deepEqual(refused.map((request) => request.path), [`/calibration-pipelines/plans/${FIXTURE_PLAN.plan_id}/execute`]);
-        assert.equal(refused[0].body.expected_review_digest, FIXTURE_PLAN.review_digest);
+        const replayStart = fixture.requests.length;
+        const replay = await run.writeTools.runApproved(approval);
+        assert.match(replay, /Plan cpp-fixture/);
+        assert.equal(planRuns.size, 1);
+        assert.equal(planFetches(), fetchesBefore);
+        const replayPosts = fixture.requests.slice(replayStart).filter((request) => request.method === "POST");
+        assert.equal(replayPosts.length, 1);
+        assert.equal(replayPosts[0].body.idempotency_key, outcomes.chatRequests.find((request) => request.path.endsWith("/execute")).body.idempotency_key);
       } else {
         assert.equal(pipeline.isError, false, `${host}: ${pipeline.text}`);
         assert.equal(pipeline.details.reviewDigest, FIXTURE_PLAN.review_digest);
@@ -779,6 +784,37 @@ test("a script stores a plan and the model runs it by ID after approving the fet
     assert.equal("spec" in posts[2].body, false, host);
     assert.equal(posts[2].body.expected_review_digest, FIXTURE_PLAN.review_digest, host);
     assert.equal(posts[2].body.chip_id, "A", host);
+  }
+});
+
+test("chat refuses a plan that expires after approval but before its first dispatch without fetching a replacement", async () => {
+  planRuns.clear();
+  const planId = "cpp-expire-before-dispatch";
+  plans.set(planId, { ...FIXTURE_PLAN, plan_id: planId, chip_id: "A" });
+  const run = await openChat([
+    fauxAssistantMessage([fauxToolCall("tool_search", { query: "qdash_run_pipeline run pipeline" })], { stopReason: "toolUse" }),
+    fauxAssistantMessage([fauxToolCall("qdash_run_pipeline", { chipId: "A", planId })], { stopReason: "toolUse" }),
+    fauxAssistantMessage(fauxText("done")),
+  ]);
+  try {
+    await run.ask("Run the stored plan");
+    const result = (await run.results()).find((item) => item.name === "qdash_run_pipeline");
+    assert.ok(result, JSON.stringify(await run.results()));
+    const approval = result.details.approval;
+    assert.equal(approval.preview.planId, planId);
+    assert.equal(planRuns.size, 0);
+    plans.set(planId, { ...plans.get(planId), expired: true });
+    const start = fixture.requests.length;
+    await assert.rejects(run.writeTools.runApproved(approval), /expired/);
+    const requests = fixture.requests.slice(start);
+    assert.deepEqual(requests.filter((request) => request.method === "GET" && request.path.startsWith("/calibration-pipelines/plans/")), []);
+    const posts = requests.filter((request) => request.method === "POST");
+    assert.deepEqual(posts.map((request) => request.path), [`/calibration-pipelines/plans/${planId}/execute`]);
+    assert.equal(posts[0].body.expected_review_digest, approval.preview.reviewDigest);
+    assert.equal(planRuns.size, 0);
+  } finally {
+    await run.close();
+    plans.delete(planId);
   }
 });
 
