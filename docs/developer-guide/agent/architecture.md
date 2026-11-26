@@ -2,6 +2,8 @@
 
 QDash Agent connects the chat UI to a durable Pi runtime and calls QDash tools as the signed-in user.
 For operating the assistant, see [Agent](../../user-guide/ai-chat.md).
+[Calibration Design](./calibration-design.md) explains the division between experiment reasoning,
+SDK definitions, execution authority, and recorded evidence.
 
 ## Component Diagram
 
