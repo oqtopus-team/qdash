@@ -625,4 +625,4 @@ export function buildPresentationTools(config: PresentationConfig) {
 
 /** System prompt guideline for a chat that has `present_results`. */
 export const PRESENTATION_GUIDELINE =
-  "- To show values from tool results as a calibration summary, an execution comparison, or a failure list, call `present_results` with the user's request and the values exactly as the tools returned them; it picks the layout. Use `render_ui` when it finds no layout or you need another view.";
+  "- To show values from tool results as a calibration summary, an execution comparison, or a failure list, call `present_results` first instead of composing the view with `render_ui`: pass the user's request and the values exactly as the tools returned them, and it picks a fixed layout. Use `render_ui` only when it finds no layout or the user needs a view these layouts do not cover.";

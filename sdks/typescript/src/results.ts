@@ -8,6 +8,7 @@ import { isRecord, read, type Context } from "./_http.js";
 import { QDashApiError, QDashValidationError } from "./errors.js";
 import type { TaskResultListItem, TaskResultListResponse, TaskResultResponse } from "./types.js";
 import { readTaskResultEvidence, type TaskResultEvidence, type TaskResultEvidenceOptions } from "./evidence.js";
+import { summarizeTaskResults, type TaskResultSummary, type TaskResultSummaryOptions } from "./summary.js";
 
 /** List rows `compareLatest` reads when `limit` is omitted. */
 export const COMPARE_LATEST_DEFAULT_ROWS = 20;
@@ -207,6 +208,28 @@ export class TaskResults {
    */
   evidence(taskId: string, options: TaskResultEvidenceOptions = {}): Promise<TaskResultEvidence> {
     return readTaskResultEvidence(this.context, taskId, options);
+  }
+
+  /**
+   * Count the task results matching filters such as a chip and a start-time
+   * range, by exact stored status, task name, and day, reading
+   * `GET /task-results` page by page.
+   *
+   * `total` and `statusCounts` are QDash's counts of every matching row
+   * (`statusCounts` without the status filter). `aggregates` counts only the
+   * distinct rows read, at most `maxRows` (default 1000, at most 5000) in at
+   * most 50 requests. `complete` is true only when every row was read once and
+   * the totals stayed the same and agree; otherwise `diagnostics` says why
+   * (rows left unread, an empty or short page, a repeated row, totals that
+   * changed while reading, counts that disagree). The pages are offset reads,
+   * not a snapshot, so a complete summary does not prove that no row changed.
+   *
+   * Invalid options throw `QDashValidationError` before any request; a failed
+   * page read rejects the call, and a malformed page throws `QDashApiError`.
+   * No status is mapped to success or failure: statuses are counted as stored.
+   */
+  summarize(options: TaskResultSummaryOptions = {}): Promise<TaskResultSummary> {
+    return summarizeTaskResults(this.context, options);
   }
 
   /** One page of `GET /task-results`, or an error naming what is missing; never an empty page in place of a malformed one. */

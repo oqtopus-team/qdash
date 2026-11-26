@@ -42,6 +42,11 @@ test("the evidence tool is allowlisted and deferred in the runtime", () => {
   assert.ok(DEFERRED.some((tool) => tool.name === "qdash_get_task_result_evidence"));
 });
 
+test("the task-result summary is allowlisted and offered directly in the runtime", () => {
+  assert.ok(ALLOWED_TOOL_NAMES.includes("qdash_summarize_task_results"));
+  assert.ok(!DEFERRED.some((tool) => tool.name === "qdash_summarize_task_results"));
+});
+
 /** How many tools rank before the first write. */
 const readsBeforeWrite = (loaded) => {
   const index = loaded.findIndex((name) => WRITES.has(name));

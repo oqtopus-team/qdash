@@ -26,6 +26,8 @@ for one of these purposes; keep measurement preparation free of writes.
 `qdash_get_task_result_evidence` is a presentation adapter over the SDK's
 `taskResults.evidence`: the SDK joins authorized reads; the tool bounds and redacts output and
 adds web links. Keep reusable joins in the SDK so scripts can use them without Pi.
+`qdash_summarize_task_results` similarly delegates pagination, counts, and completeness checks
+to `taskResults.summarize`; the tool maps arguments and formats the SDK result.
 
 `extensions/lib/connection.ts` resolves environment, TOML, or legacy INI settings and
 creates a TypeScript SDK session. `extensions/lib/qdash-connection.ts` adapts its generated

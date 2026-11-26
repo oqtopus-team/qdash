@@ -28,7 +28,7 @@ import { acceptsImages, newestMessages } from "./figure-context.ts";
 import { hostRecord } from "./evaluate.ts";
 import { acceptsKnowledge, fetchTaskKnowledgeResponse, referenceOf } from "./knowledge-context.ts";
 import { hydrateEvaluationArgs } from "@oqtopus-team/pi-qdash/extensions/lib/qcal-hydration.ts";
-import { QDASH_TOOL_NAMESPACE } from "@oqtopus-team/pi-qdash/extensions/lib/tool-policy.ts";
+import { QDASH_TOOL_NAMESPACE, SCRIPT_DATA_DESCRIPTION } from "@oqtopus-team/pi-qdash/extensions/lib/tool-policy.ts";
 import {
   canonicalArgs,
   HOST_WRITE_APPROVAL_KEY,
@@ -75,10 +75,7 @@ function asJson(value: unknown): JsonValue | undefined {
  * response data the tool's text summarizes, untruncated, so a script can
  * filter and aggregate it. Any JSON value.
  */
-export const QDASH_DATA_SCHEMA = {
-  description:
-    "The tool's redacted QDash response data as JSON: the data its text answer summarizes, not truncated.",
-} as const;
+export const QDASH_DATA_SCHEMA = { description: SCRIPT_DATA_DESCRIPTION } as const;
 
 /** Text blocks of a tool result, joined. */
 function textOf(content: ReadonlyArray<{ type: string; text?: string }>): string {

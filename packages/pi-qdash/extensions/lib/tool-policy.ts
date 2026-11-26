@@ -142,6 +142,7 @@ export const NESTED_READ_TOOL_NAMES = [
   "qdash_query",
   "qdash_recent_calibration_summary",
   "qdash_recommend_next_action",
+  "qdash_summarize_task_results",
   "qdash_target_report",
   "qdash_triage_overview",
   "qdash_validate_calibration",
@@ -276,6 +277,13 @@ export function nestedBlockMessage(name: string): string {
 }
 
 /**
+ * Description of the data a script receives from an audited read tool without
+ * its own output schema, shared by both hosts' declarations.
+ */
+export const SCRIPT_DATA_DESCRIPTION =
+  "The tool's redacted QDash response data, already parsed into a JavaScript value (not a JSON string; do not JSON.parse it): the data its text answer summarizes, not truncated.";
+
+/**
  * The code mode namespace of the pi-qdash tools, the same in both hosts: the
  * QDash Agent Runtime declares it on its `qdash` durable extension, and the pi
  * CLI on each tool pi-qdash registers. Code mode lists `description` once
@@ -286,10 +294,10 @@ export function nestedBlockMessage(name: string): string {
 export const QDASH_TOOL_NAMESPACE = {
   name: "qdash",
   description:
-    "QDash calibration data read as the signed-in user: chips, qubits, couplings, executions, task results, metrics, time series, flows, forum posts, and source. Each tool resolves to its redacted response data as JSON.",
+    "QDash calibration data read as the signed-in user: chips, qubits, couplings, executions, task results, metrics, time series, flows, forum posts, and source. Each tool resolves to its redacted response data as an already parsed JavaScript value.",
   instructions: [
     "Scripts can call only QDash's audited read-only tools. Write tools, figures, charts, and evaluation tools are called directly, outside a script; write tools then ask the user for approval.",
-    "A tool resolves to the response data its text answer summarizes, as JSON and not truncated; print a small sample first when you do not know its shape.",
+    "A tool resolves to the response data its text answer summarizes, not truncated, as a JavaScript value (an object or array, already parsed): read its fields directly and do not call JSON.parse on it. Print a small sample with JSON.stringify first when you do not know its shape.",
     `One call may hand a script at most ${MAX_NESTED_DATA_BYTES} bytes of JSON; a larger response fails the call. Narrow it with a chip, qubit, task, time range, or limit, or split it into several calls.`,
     "Deferred read tools can be called from a script without loading them with tool_search first.",
   ].join("\n"),

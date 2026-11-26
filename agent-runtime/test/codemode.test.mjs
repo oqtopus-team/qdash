@@ -37,8 +37,9 @@ import {
   toolPolicyExtension,
   withScriptDeadline,
 } from "../src/codemode.ts";
-import { buildQDashExtension } from "../src/durable-tools.ts";
-import { QDASH_TOOL_NAMESPACE } from "@oqtopus-team/pi-qdash/extensions/lib/tool-policy.ts";
+import { buildQDashExtension, QDASH_DATA_SCHEMA } from "../src/durable-tools.ts";
+import { QDASH_TOOL_NAMESPACE, SCRIPT_DATA_DESCRIPTION } from "@oqtopus-team/pi-qdash/extensions/lib/tool-policy.ts";
+import { TASK_RESULT_PAGE_SCHEMA } from "@oqtopus-team/pi-qdash/extensions/lib/query-contracts.ts";
 import { buildPresentationTools, PRESENT_TOOL, PRESENTATION_INTERNAL_CALLS } from "../src/presentation-tool.ts";
 import { nestedCallSummary, toNdjsonEvents } from "../src/events.ts";
 import { pendingApproval } from "../src/runtime.ts";
@@ -211,6 +212,83 @@ test("a script batches and filters read-only QDash data; only its output reaches
   // A worker is released once it exits, which can be after its result settled.
   for (let i = 0; i < 100 && runningScriptCount() > 0; i++) await new Promise((resolve) => setTimeout(resolve, 20));
   assert.equal(runningScriptCount(), 0);
+});
+
+test("a script reads task-result pages as parsed objects and pages with skip, without JSON.parse", async () => {
+  const rows = ["t5", "t4", "t3", "t2", "t1"].map((id, i) => ({
+    task_id: id,
+    task_name: "CheckT1",
+    qid: "6",
+    chip_id: "A",
+    status: i === 1 ? "failed" : "completed",
+    execution_id: "e1",
+  }));
+  const statusCounts = { completed: 4, failed: 1 };
+  const calls = [];
+  const taskResults = {
+    registered: {
+      definition: {
+        name: "qdash_list_task_results",
+        label: "qdash_list_task_results",
+        description: "List one page of task results (test).",
+        parameters: Type.Object({ limit: Type.Optional(Type.Integer()), skip: Type.Optional(Type.Integer()) }),
+        outputSchema: TASK_RESULT_PAGE_SCHEMA,
+        execute: async (_id, params) => {
+          calls.push(params);
+          const skip = params.skip ?? 0;
+          const limit = params.limit ?? 50;
+          const data = { items: rows.slice(skip, skip + limit), total: rows.length, skip, limit, status_counts: statusCounts };
+          return { content: [{ type: "text", text: JSON.stringify(data) }], details: { data } };
+        },
+      },
+    },
+  };
+  // The usage the guidance gives: await the call and read fields; parse only real JSON strings.
+  const code = [
+    "const first = await tools.qdash_list_task_results({ limit: 2 });",
+    "let parseError = null;",
+    "try { JSON.parse(first); } catch (error) { parseError = error.name; }",
+    "const items = [...first.items];",
+    "while (items.length < first.total) {",
+    "  const page = await tools.qdash_list_task_results({ limit: 2, skip: items.length });",
+    "  items.push(...page.items);",
+    "}",
+    "text(JSON.stringify({ type: typeof first, isArray: Array.isArray(first.items), parseError, ids: items.map((row) => row.task_id), status_counts: first.status_counts, mergedCounts: items.status_counts ?? null }));",
+  ].join("\n");
+  let section;
+  const chat = await openChat({
+    piExtensions: [piExtension([taskResults])],
+    responses: [
+      (transcript) => {
+        section = transcript.messages.find((message) => message.role === "system" && message.sections?.codemode)?.sections.codemode;
+        return fauxAssistantMessage([fauxToolCall(CODEMODE_TOOL_NAME, { code }, { id: "s1" })], { stopReason: "toolUse" });
+      },
+      fauxAssistantMessage(fauxText("ok")),
+    ],
+  });
+  try {
+    assert.equal((await ask(chat.conversation, "summarize T1 task results")).status, "done");
+    // The script's declaration shows the page object, with status_counts across all pages.
+    assert.match(section, /qdash_list_task_results/);
+    assert.match(section, /status_counts/);
+    assert.match(section, /Rows per status across all pages/);
+
+    const [script] = await results(chat.conversation);
+    assert.equal(script.isError, false, resultText(script));
+    const output = JSON.parse(resultText(script).slice(resultText(script).indexOf("{")));
+    // The call resolves to an object, which JSON.parse rejects: the failure the guidance warns about.
+    assert.equal(output.type, "object");
+    assert.equal(output.isArray, true);
+    assert.equal(output.parseError, "SyntaxError");
+    // Direct pagination reads every row once, in order.
+    assert.deepEqual(output.ids, ["t5", "t4", "t3", "t2", "t1"]);
+    assert.deepEqual(calls.map((call) => call.skip ?? 0), [0, 2, 4]);
+    // status_counts lives on each page object; an array of merged items has none.
+    assert.deepEqual(output.status_counts, statusCounts);
+    assert.equal(output.mergedCounts, null);
+  } finally {
+    await chat.close();
+  }
 });
 
 test("write tools and unaudited tools cannot run from a script; the direct approval path stays", async () => {
@@ -695,6 +773,13 @@ test("QDash tools form the qdash code mode namespace, limited to what scripts ma
     assert.ok(section.includes(`## qdash\n${QDASH_TOOL_NAMESPACE.description}\n`), section);
     assert.ok(section.indexOf("## qdash") < section.indexOf("qdash_list_chips"));
     assert.match(section, /qdash_get_chip_metrics/);
+    // The section tells scripts the data is a parsed value, not a JSON string; so does the
+    // schema of a tool without its own output schema (shown by describeTool()).
+    assert.match(section, /resolves to its redacted response data as an already parsed JavaScript value/);
+    assert.equal(QDASH_DATA_SCHEMA.description, SCRIPT_DATA_DESCRIPTION);
+    assert.match(QDASH_TOOL_NAMESPACE.description, /already parsed JavaScript value/);
+    assert.match(QDASH_TOOL_NAMESPACE.instructions, /already parsed\): read its fields directly and do not call JSON\.parse on it/);
+    assert.doesNotMatch(`${QDASH_TOOL_NAMESPACE.description}\n${QDASH_TOOL_NAMESPACE.instructions}`, /as JSON\b/);
     // Instructions are only for describeNamespace(); write tools stay out of the listing.
     assert.doesNotMatch(section, /audited read-only tools/);
     assert.doesNotMatch(section, /qdash_save_flow/);

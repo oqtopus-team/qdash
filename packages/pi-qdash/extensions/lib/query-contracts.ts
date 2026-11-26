@@ -45,7 +45,10 @@ export const TASK_RESULT_PAGE_SCHEMA = Type.Object({
   total: Type.Integer({ description: "Rows matching the filters across all pages." }),
   skip: Type.Integer(),
   limit: Type.Integer(),
-  status_counts: keyed(Type.Integer(), "Rows per status across all pages."),
+  status_counts: keyed(
+    Type.Integer(),
+    "Rows per status across all pages, counted without the status filter: with status set, it is not limited to that status.",
+  ),
 });
 
 const METRIC_VALUE = Type.Object({

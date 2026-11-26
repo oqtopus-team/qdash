@@ -667,6 +667,14 @@ test("without presentation, render_ui works as before and no classifier is asked
   assert.match(buildSystemPrompt("en", "en", [], null, null, false, PRESENTATION_GUIDELINE), /`present_results`/);
 });
 
+test("with present_results, the prompt prefers it to a hand-built render_ui view for its fixed layouts", () => {
+  const prompt = buildSystemPrompt("en", "en", [], null, null, false, PRESENTATION_GUIDELINE);
+  assert.match(PRESENTATION_GUIDELINE, /call `present_results` first instead of composing the view with `render_ui`/);
+  assert.match(PRESENTATION_GUIDELINE, /Use `render_ui` only when it finds no layout or the user needs a view these layouts do not cover/);
+  // The general render_ui rule stays; the present_results rule follows it and narrows it.
+  assert.ok(prompt.indexOf(PRESENTATION_GUIDELINE) > prompt.indexOf("- Use `render_ui` for a compact read-only view"));
+});
+
 test("a restart during classification does not ask the classifier again", async (t) => {
   const directory = mkdtempSync(join(tmpdir(), "presentation-replay-"));
   t.after(() => rmSync(directory, { recursive: true, force: true }));

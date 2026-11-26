@@ -95,6 +95,10 @@ test("code mode and deferred tools are explained when offered", async () => {
   });
   assert.match(prompt, /Use `codemode` when a question needs many read-only QDash calls/);
   assert.match(prompt, /Scripts can call only QDash's read-only tools/);
+  // Script results are parsed values: read fields directly, JSON.parse only real JSON strings.
+  assert.match(prompt, /already parsed\), not to its text answer/);
+  assert.match(prompt, /`const page = await tools\.qdash_list_task_results\(\{ limit: 100 \}\); text\(page\.total\)`/);
+  assert.match(prompt, /do not call `JSON\.parse` on it, which fails on an object; parse only a value that is actually a JSON string/);
   assert.match(prompt, /call `tool_search` with the tool name/);
   assert.match(prompt, /Deferred tools: qdash_list_cooldowns, qdash_list_cryostats/);
   assert.equal(deferredToolsGuideline([]), null);

@@ -66,6 +66,7 @@ export const ALLOWED_TOOL_NAMES = [
   "qdash_recent_calibration_summary",
   "qdash_recommend_next_action",
   "qdash_search_source",
+  "qdash_summarize_task_results",
   "qdash_target_report",
   "qdash_triage_overview",
   "qdash_validate_calibration",

@@ -20,6 +20,7 @@ import {
   NESTED_READ_TOOL_NAMES,
   QDASH_TOOL_NAMESPACE,
   REVIEWED_WRITE_TOOL_NAMES,
+  SCRIPT_DATA_DESCRIPTION,
   boundScriptData,
   jsonByteLength,
   scriptDataOf,
@@ -109,14 +110,19 @@ test("the shared lists name real pi-qdash tools and agree with each other", () =
     const read = NESTED_READ_TOOL_NAMES.includes(name);
     const deferred = DEFERRED_TOOL_NAMES.includes(name);
     assert.equal(definition.exposure, deferred ? "deferred" : read ? undefined : "model-only", name);
-    // A read with a checked response contract declares that shape; the others the generic data schema.
-    const contracted = ["qdash_list_task_results", "qdash_get_chip_metrics", "qdash_get_timeseries"].includes(name);
+    // A read with a checked response contract or its own output shape declares that shape; the others the generic data schema.
+    const contracted = ["qdash_list_task_results", "qdash_get_chip_metrics", "qdash_get_timeseries", "qdash_summarize_task_results"].includes(name);
     assert.equal(definition.outputSchema !== undefined && (definition.outputSchema === SCRIPT_DATA_SCHEMA) !== contracted, read, name);
     if (read) assert.equal(definition.annotations?.readOnlyHint, true, name);
     if (REVIEWED_WRITE_TOOL_NAMES.includes(name)) assert.equal(definition.annotations?.destructiveHint, true, name);
     // The same code mode namespace QDash chat declares on its qdash extension.
     assert.equal(definition.namespace, QDASH_TOOL_NAMESPACE, name);
   }
+});
+
+test("the generic script data schema says the value is already parsed", () => {
+  assert.equal(SCRIPT_DATA_SCHEMA.description, SCRIPT_DATA_DESCRIPTION);
+  assert.match(SCRIPT_DATA_DESCRIPTION, /already parsed into a JavaScript value \(not a JSON string; do not JSON\.parse it\)/);
 });
 
 test("applyToolPolicy keeps other extensions' tools and an exposure or namespace a tool states", () => {

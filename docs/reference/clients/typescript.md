@@ -98,6 +98,49 @@ The high-level client methods below are unchanged.
 Invalid options fail before a request. Collection pages are not a snapshot; rows are deduplicated
 by task ID. Check `truncated` and do not treat a failed page as a complete read.
 
+## Summarize Task Results
+
+Use the SDK to count results across pages without writing a pagination script:
+
+```ts
+import { QDash } from "@oqtopus-team/qdash-sdk";
+
+const qdash = await QDash.fromProfile("local");
+const summary = await qdash.taskResults.summarize({
+  chipId: "16Qv1",
+  startFrom: "2026-11-19T00:00:00Z",
+  startTo: "2026-11-26T00:00:00Z",
+  timezone: "Asia/Tokyo",
+  maxRows: 1000,
+});
+console.log(summary.total, summary.statusCounts);
+if (!summary.complete) console.warn(summary.diagnostics);
+console.log(summary.aggregates);
+```
+
+Replace the chip and time range with your own. `aggregates` counts distinct rows read by exact
+stored status, task, and start day, plus distinct executions. `read.rows` is the number counted.
+`total` and `statusCounts` come from the first page. `total` includes every filter;
+`statusCounts` excludes the `status` filter and combines empty statuses with `"unknown"`.
+Aggregates preserve empty statuses as `""`.
+
+The default limit is 1000 rows; `maxRows` accepts 1–5000. `pageSize` accepts 1–100 (default 100),
+and the requested row limit must fit within 50 pages. Filters also accept `taskName`, `qid`,
+`executionId`, `username`, `status`, and `messageContains` (case-insensitive literal substring).
+Days default to UTC; unreadable timestamps contribute to `aggregates.undated`.
+
+Time bounds accept `YYYY-MM-DDTHH:MM[:SS[.ffffff]]`, optionally followed by `Z`, `±HH:MM`,
+or `±HHMM`. Missing offsets mean UTC. Invalid dates and reversed ranges fail before any request.
+Returned `filters` contain normalized bounds with explicit offsets. Row-time checks use
+millisecond precision, matching database timestamps.
+With a time bound, missing or unreadable row timestamps produce `row_start_unreadable`; rows
+outside the inclusive bounds produce `row_outside_filters`. Both make `complete` false.
+
+Check `complete` before presenting aggregates as covering the full result set. It is false for
+truncation, duplicate rows, changing totals, or inconsistent results; inspect `diagnostics` and
+narrow the range or retry as appropriate. Even a complete read is not a snapshot: concurrent
+changes can escape offset-page checks. A malformed page or failed request rejects the call.
+
 ## Compare a Target's Latest Results
 
 ```ts

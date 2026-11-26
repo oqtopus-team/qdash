@@ -21,6 +21,7 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
    - `qdash_get_timeseries` — inspect one target metric over time
    - `qdash_inspect_timeseries_csv`, `qdash_compare_timeseries` — validate and compare multiple QDash or CSV timeseries
    - `qdash_list_task_results`, `qdash_get_task_result` — find and inspect calibration results
+   - `qdash_summarize_task_results` — count results across pages by exact status, task, and day; QDash's totals cover every matching row, and counts of rows read are partial unless `complete` is true
    - `qdash_get_task_result_evidence` — diagnose one result with its execution, the stored values of its target, and a cooldown you name; missing context is reported, never inferred
    - `qdash_get_task_knowledge` — interpret a task's purpose, expected result, failure modes, and check questions
    - `qdash_list_flows`, `qdash_get_flow` — list or inspect calibration flows

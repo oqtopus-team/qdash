@@ -45,6 +45,7 @@ import { isMetricScriptQueryAction, metricScriptQuery, registerMetricScriptTools
 import { registerSourceCodeTools } from "./tools/source-code.js";
 import { notFound, registerTaskKnowledgeTool } from "./tools/task-knowledge.js";
 import { registerTaskResultEvidenceTool } from "./tools/task-result-evidence.js";
+import { registerTaskResultSummaryTool } from "./tools/task-result-summary.js";
 import { agentSessionApprovalText, pausedSessionConflict } from "./lib/agent-loop.js";
 import { agentSessionPolicyProblems, agentSessionPolicySchema, type AgentSessionPolicyInput } from "./lib/agent-session-policy.js";
 import { installQDashToolPolicy } from "./lib/script-policy.js";
@@ -1582,6 +1583,12 @@ export default function qdashExtension(host: ExtensionAPI) {
   registerCurrentTimeTool(pi);
   registerTaskKnowledgeTool(pi, { makeClient });
   registerTaskResultEvidenceTool(pi, { makeClient });
+  registerTaskResultSummaryTool(pi, {
+    makeClient,
+    contextChipId: (params) => params.profile !== undefined && params.profile !== currentContext.profile
+      ? undefined
+      : currentContext.chipId,
+  });
   registerSourceCodeTools(pi, { makeClient });
   registerAgentLoopTools(pi, { makeClient });
   registerAgentSessionEndTool(pi, { makeClient });
@@ -1628,7 +1635,7 @@ export default function qdashExtension(host: ExtensionAPI) {
     description: "Run common read-only QDash queries via @oqtopus-team/qdash-sdk.",
     promptSnippet: "Query QDash chips, cryostats, cooldown wiring, metrics, tasks, files, flows, metric scripts, dashboards, executions, projects, forum posts, and provenance",
     promptGuidelines: [
-      "Prefer dedicated QDash tools such as qdash_list_chips, qdash_get_chip_metrics, qdash_list_task_results, qdash_list_forum_posts, qdash_list_flows, and qdash_list_executions when they match the task.",
+      "Prefer dedicated QDash tools such as qdash_list_chips, qdash_get_chip_metrics, qdash_list_task_results, qdash_summarize_task_results, qdash_list_forum_posts, qdash_list_flows, and qdash_list_executions when they match the task.",
       "Use qdash_query for read-only QDash data access not covered by a dedicated tool, instead of curl or scraping the UI.",
       "The task_results, chip_metrics, and timeseries actions return the same data as qdash_list_task_results, qdash_get_chip_metrics, and qdash_get_timeseries; their descriptions give the shape. task_results takes limit 1 to 100 and pages with skip.",
       "files_tree and file_content cover only the calibration config directory; for QDash or qubex source code use qdash_list_source_roots, qdash_search_source and qdash_read_source (for example qdash_read_source {\"path\":\"qdash/workflow/engine/task/executor.py\"}).",
@@ -1850,7 +1857,7 @@ export default function qdashExtension(host: ExtensionAPI) {
   registerQueryTool({
     name: "qdash_list_task_results",
     label: "QDash List Task Results",
-    description: "List one page of task results, newest first. Returns { items, total, skip, limit, status_counts }; items have task_id, task_name, qid, status, execution_id, message, start_at, end_at but no output parameters. limit is 1 to 100 (default 50): for more rows call again with skip increased by the rows already read until skip >= total. qid and couplingId match one stored ID exactly (\"6\", \"6-7\").",
+    description: "List one page of task results, newest first. Returns { items, total, skip, limit, status_counts }; items have task_id, task_name, qid, status, execution_id, message, start_at, end_at but no output parameters. limit is 1 to 100 (default 50): for more rows call again with skip increased by the rows already read until skip >= total. To count results across pages by status, task, or day, use qdash_summarize_task_results instead. qid and couplingId match one stored ID exactly (\"6\", \"6-7\").",
     promptSnippet: "List QDash task results with filters such as chip, task, status, qubit, coupling, or time range",
     action: "task_results",
     parameters: Type.Object({
