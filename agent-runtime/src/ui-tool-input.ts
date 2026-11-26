@@ -50,7 +50,11 @@ const element = (properties: Record<string, TSchema>, children: boolean) =>
       id: str("Unique element id: letters, digits, - and _."),
       ...properties,
       ...(children
-        ? { children: Type.Array(Type.String(), { description: "Ids of the child elements, in order." }) }
+        ? {
+            children: Type.Array(Type.String(), {
+              description: "Ids of the direct child elements, in order. Each element belongs to exactly one container.",
+            }),
+          }
         : {}),
     },
     { additionalProperties: false },
