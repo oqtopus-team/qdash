@@ -39,6 +39,38 @@ type MetricOption = {
 };
 
 /**
+ * Remove binary floating-point noise from a converted threshold value,
+ * e.g. (1 - 0.9) * 100 = 9.999999999999998 -> 10 and 0.999 * 100 -> 99.9.
+ */
+function normalizeThresholdNumber(value: number): number {
+  if (!Number.isFinite(value)) return value;
+  const normalized = Number(value.toPrecision(12));
+  return Math.abs(normalized) < 1e-12 ? 0 : normalized;
+}
+
+/** Number of fractional digits a slider step needs, e.g. 0.01 -> 2, 0.25 -> 2, 1 -> 0. */
+function stepDecimals(step: number): number {
+  if (!Number.isFinite(step) || step <= 0) return 0;
+  const [mantissa, exponent] = normalizeThresholdNumber(step).toExponential().split("e");
+  const fractionDigits = mantissa.split(".")[1]?.length ?? 0;
+  return Math.max(0, fractionDigits - Number(exponent));
+}
+
+/** Format a slider value with the step precision, keeping at least `minDecimals` digits. */
+function formatThresholdValue(value: number, step: number, minDecimals = 0): string {
+  const formatted = normalizeThresholdNumber(value).toFixed(
+    Math.max(stepDecimals(step), minDecimals),
+  );
+  // Avoid "-0" / "-0.00" for values that round to zero
+  return Number(formatted) === 0 ? formatted.replace(/^-/, "") : formatted;
+}
+
+/** Format a slider endpoint with the step precision, dropping trailing zeros. */
+function formatThresholdEndpoint(value: number, step: number): string {
+  return String(Number(formatThresholdValue(value, step)));
+}
+
+/**
  * Histogram view showing the distribution of a chip metric across qubits or couplings
  */
 export function HistogramView() {
@@ -563,19 +595,19 @@ export function HistogramView() {
 
     if (showAsErrorRate) {
       // Error rate: convert fidelity range to error rate
-      // fidelity 0.9 -> error rate 10%, fidelity 0.999 -> error rate 0.1%
+      // fidelity 0.9 -> error rate 10%, fidelity 1.0 -> error rate 0%
       return {
-        min: (1 - rawRange.max) * 100,
-        max: (1 - rawRange.min) * 100,
-        step: rawRange.step * 100,
+        min: normalizeThresholdNumber((1 - rawRange.max) * 100),
+        max: normalizeThresholdNumber((1 - rawRange.min) * 100),
+        step: normalizeThresholdNumber(rawRange.step * 100),
       };
     }
 
     // Fidelity percentage
     return {
-      min: rawRange.min * 100,
-      max: rawRange.max * 100,
-      step: rawRange.step * 100,
+      min: normalizeThresholdNumber(rawRange.min * 100),
+      max: normalizeThresholdNumber(rawRange.max * 100),
+      step: normalizeThresholdNumber(rawRange.step * 100),
     };
   }, [currentMetricConfig, showAsErrorRate]);
 
@@ -593,10 +625,10 @@ export function HistogramView() {
     }
 
     if (showAsErrorRate) {
-      return (1 - activeThreshold) * 100;
+      return normalizeThresholdNumber((1 - activeThreshold) * 100);
     }
 
-    return activeThreshold * 100;
+    return normalizeThresholdNumber(activeThreshold * 100);
   }, [customThreshold, currentMetricConfig, showAsErrorRate, sliderDisplayConfig]);
 
   // Convert slider value to threshold and update state
@@ -608,10 +640,10 @@ export function HistogramView() {
         setCustomThreshold(displayValue);
       } else if (showAsErrorRate) {
         // Error rate to fidelity: error 1% -> fidelity 0.99
-        setCustomThreshold(1 - displayValue / 100);
+        setCustomThreshold(normalizeThresholdNumber(1 - displayValue / 100));
       } else {
         // Percentage to raw: 99% -> 0.99
-        setCustomThreshold(displayValue / 100);
+        setCustomThreshold(normalizeThresholdNumber(displayValue / 100));
       }
     },
     [currentMetricConfig, showAsErrorRate, setCustomThreshold],
@@ -624,16 +656,24 @@ export function HistogramView() {
 
     const isPercent = isPercentageMetric(currentMetricConfig?.unit);
 
+    const { step } = sliderDisplayConfig;
+
     if (!isPercent) {
-      return `${activeThreshold.toFixed(0)} ${currentMetricConfig?.unit || ""}`;
+      return `${formatThresholdValue(activeThreshold, step)} ${currentMetricConfig?.unit || ""}`;
     }
 
+    // Percent displays keep at least two decimals (e.g. 99.00%)
     if (showAsErrorRate) {
-      return `${((1 - activeThreshold) * 100).toFixed(2)}%`;
+      return `${formatThresholdValue((1 - activeThreshold) * 100, step, 2)}%`;
     }
 
-    return `${(activeThreshold * 100).toFixed(2)}%`;
-  }, [customThreshold, currentMetricConfig, showAsErrorRate]);
+    return `${formatThresholdValue(activeThreshold * 100, step, 2)}%`;
+  }, [customThreshold, currentMetricConfig, showAsErrorRate, sliderDisplayConfig]);
+
+  // Slider endpoint labels at the step precision (e.g. 6.01 GHz, 99.99%)
+  const sliderEndpointUnit = isPercentageMetric(currentMetricConfig?.unit) ? "%" : "";
+  const sliderMinText = `${formatThresholdEndpoint(sliderDisplayConfig.min, sliderDisplayConfig.step)}${sliderEndpointUnit}`;
+  const sliderMaxText = `${formatThresholdEndpoint(sliderDisplayConfig.max, sliderDisplayConfig.step)}${sliderEndpointUnit}`;
 
   // Handle metric type change
   const handleMetricTypeChange = useCallback(
@@ -745,11 +785,7 @@ export function HistogramView() {
               Threshold: {thresholdDisplayText}
             </span>
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="text-xs text-base-content/60 shrink-0">
-                {!isPercentageMetric(currentMetricConfig?.unit)
-                  ? `${sliderDisplayConfig.min}`
-                  : `${sliderDisplayConfig.min.toFixed(0)}%`}
-              </span>
+              <span className="text-xs text-base-content/60 shrink-0">{sliderMinText}</span>
               <input
                 type="range"
                 className="range range-primary range-xs sm:range-sm flex-1 min-w-24 max-w-48"
@@ -759,11 +795,7 @@ export function HistogramView() {
                 value={sliderValue}
                 onChange={(e) => handleSliderChange(parseFloat(e.target.value))}
               />
-              <span className="text-xs text-base-content/60 shrink-0">
-                {!isPercentageMetric(currentMetricConfig?.unit)
-                  ? `${sliderDisplayConfig.max}`
-                  : `${sliderDisplayConfig.max.toFixed(0)}%`}
-              </span>
+              <span className="text-xs text-base-content/60 shrink-0">{sliderMaxText}</span>
             </div>
           </div>
 
