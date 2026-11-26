@@ -982,127 +982,85 @@ function authorized(req: IncomingMessage): boolean {
   return hasBearerToken(req.headers.authorization, RUNTIME_TOKEN);
 }
 
+/** Report liveness and load: running chat turns and planner-less evaluations. */
+function sendHealth(res: ServerResponse): void {
+  sendJson(res, 200, {
+    status: "ok",
+    running: [...stores.values()].filter((hold) => hold.kind === "chat").length,
+    evaluating,
+  });
+}
+
+/** The system prompt a chat would start with, for the user's own instructions. */
+function handleSystemPrompt(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  return readJsonBody<{ user_instructions?: unknown }>(req, MAX_BODY_BYTES).then((body) =>
+    sendJson(
+      res,
+      200,
+      runtime.chatSystemPrompt(typeof body.user_instructions === "string" ? body.user_instructions : undefined),
+    ),
+  );
+}
+
+function handleSkills(res: ServerResponse): void {
+  sendJson(res, 200, { skills: runtime.chatSkills() });
+}
+
+function handleChatModels(res: ServerResponse): Promise<void> {
+  return runtime.chatModels().then((chatModels) => sendJson(res, 200, { chat_models: chatModels }));
+}
+
+/**
+ * A route that requires the runtime bearer secret, matched on the method and the
+ * exact URL (a query string does not match). A promise `handle` returns is
+ * caught by handleRouteError and logged under `label`; an error `handle` throws
+ * synchronously is not caught and escapes the request listener.
+ */
+interface ProtectedRoute {
+  method: "GET" | "POST" | "DELETE";
+  url: string;
+  label: string;
+  handle: (req: IncomingMessage, res: ServerResponse) => Promise<void> | void;
+}
+
+const PROTECTED_ROUTES: readonly ProtectedRoute[] = [
+  { method: "POST", url: "/evaluate", label: "evaluate", handle: handleEvaluate },
+  { method: "POST", url: "/evaluation-prompts", label: "evaluation-prompts", handle: handleEvaluationPrompts },
+  { method: "POST", url: "/chat", label: "request", handle: handleChat },
+  { method: "POST", url: "/system-prompt", label: "system prompt", handle: handleSystemPrompt },
+  { method: "GET", url: "/skills", label: "skills", handle: (_req, res) => handleSkills(res) },
+  { method: "GET", url: "/chat-models", label: "chat models", handle: (_req, res) => handleChatModels(res) },
+  { method: "POST", url: "/chat/active", label: "active turn", handle: handleActiveChat },
+  { method: "POST", url: "/chat/steer/status", label: "steer status", handle: handleSteerStatus },
+  { method: "POST", url: "/chat/steer", label: "steer", handle: handleSteer },
+  { method: "POST", url: "/chat/abort", label: "abort", handle: handleAbortChat },
+  { method: "POST", url: "/chat/branch", label: "branch", handle: handleBranch },
+  { method: "DELETE", url: "/session", label: "session delete", handle: handleDeleteSession },
+];
+
+/** The protected route a request names, if any. */
+function protectedRouteFor(req: IncomingMessage): ProtectedRoute | undefined {
+  return PROTECTED_ROUTES.find((route) => route.method === req.method && route.url === req.url);
+}
+
+// Health is the only route open without the runtime bearer. Every other route is
+// refused before its body is read when the bearer is missing or wrong.
 const server = createServer((req, res) => {
   if (req.method === "GET" && req.url === "/health") {
-    sendJson(res, 200, {
-      status: "ok",
-      running: [...stores.values()].filter((hold) => hold.kind === "chat").length,
-      evaluating,
-    });
+    sendHealth(res);
     return;
   }
-  if (req.method === "POST" && req.url === "/evaluate") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleEvaluate(req, res).catch((error: unknown) => handleRouteError(res, error, "evaluate"));
+  const route = protectedRouteFor(req);
+  if (!route) {
+    res.writeHead(404).end();
     return;
   }
-  if (req.method === "POST" && req.url === "/evaluation-prompts") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleEvaluationPrompts(req, res).catch((error: unknown) => handleRouteError(res, error, "evaluation-prompts"));
+  if (!authorized(req)) {
+    sendJson(res, 401, { error: "unauthorized" });
     return;
   }
-  if (req.method === "POST" && req.url === "/chat") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleChat(req, res).catch((error: unknown) => handleRouteError(res, error, "request"));
-    return;
-  }
-  if (req.method === "POST" && req.url === "/system-prompt") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    readJsonBody<{ user_instructions?: unknown }>(req, MAX_BODY_BYTES)
-      .then((body) =>
-        sendJson(
-          res,
-          200,
-          runtime.chatSystemPrompt(
-            typeof body.user_instructions === "string" ? body.user_instructions : undefined,
-          ),
-        ),
-      )
-      .catch((error: unknown) => handleRouteError(res, error, "system prompt"));
-    return;
-  }
-  if (req.method === "GET" && req.url === "/skills") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    sendJson(res, 200, { skills: runtime.chatSkills() });
-    return;
-  }
-  if (req.method === "GET" && req.url === "/chat-models") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    runtime
-      .chatModels()
-      .then((chatModels) => sendJson(res, 200, { chat_models: chatModels }))
-      .catch((error: unknown) => handleRouteError(res, error, "chat models"));
-    return;
-  }
-  if (req.method === "POST" && req.url === "/chat/active") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleActiveChat(req, res).catch((error: unknown) => handleRouteError(res, error, "active turn"));
-    return;
-  }
-  if (req.method === "POST" && req.url === "/chat/steer/status") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleSteerStatus(req, res).catch((error: unknown) => handleRouteError(res, error, "steer status"));
-    return;
-  }
-  if (req.method === "POST" && req.url === "/chat/steer") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleSteer(req, res).catch((error: unknown) => handleRouteError(res, error, "steer"));
-    return;
-  }
-  if (req.method === "POST" && req.url === "/chat/abort") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleAbortChat(req, res).catch((error: unknown) => handleRouteError(res, error, "abort"));
-    return;
-  }
-  if (req.method === "POST" && req.url === "/chat/branch") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleBranch(req, res).catch((error: unknown) => handleRouteError(res, error, "branch"));
-    return;
-  }
-  if (req.method === "DELETE" && req.url === "/session") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleDeleteSession(req, res).catch((error: unknown) =>
-      handleRouteError(res, error, "session delete"),
-    );
-    return;
-  }
-  res.writeHead(404).end();
+  const pending = route.handle(req, res);
+  if (pending) pending.catch((error: unknown) => handleRouteError(res, error, route.label));
 });
 
 /** Map route failures without exposing internal exception details. */
