@@ -43,6 +43,31 @@ Its `qdash.calibration` namespace uses the SDK's pure builders. Calculation and 
 let an agent correct an experiment proposal before execution. A successful calculation is
 supporting evidence, not an authoritative task result or permission to commit a value.
 
+Prefer Code Mode when preparation requires several tool results, filtering, or repeated
+construction. Keep intermediate data in code and return the evidence needed for the next
+judgment. A single lookup can use its tool directly; using Code Mode is not an objective itself.
+
+This choice has three complementary sources:
+
+- Pi's [“You Said No MCP!”](https://earendil.com/posts/you-said-no-mcp/) explains its design:
+  discoverable tools return structured data that an agent composes in a JavaScript sandbox.
+  This supports QDash's choice of reusable tools and pure builders rather than a separate
+  tool for every combination of tasks.
+- [CodeAct (Wang et al., ICML 2024)](https://proceedings.mlr.press/v235/wang24h.html)
+  evaluates executable Python actions against text and JSON actions in tool-use benchmarks.
+  Control flow, intermediate variables, and execution feedback support composition and repair.
+  Its results motivate this approach; they do not establish calibration quality, fewer physical
+  measurements, or an advantage for every model and task.
+- Anthropic's engineering article
+  [“Code execution with MCP”](https://www.anthropic.com/research/code-execution-with-mcp)
+  describes loading tools on demand and processing intermediate data before returning it to
+  the model. It motivates reducing context consumption and data copying. It is an implementation
+  account, not a QDash benchmark; its reported savings are not expected QDash savings.
+
+Evaluate these benefits on QDash workloads, including correctness, model tokens, latency, and
+measurement cost. Keeping Code Mode read-only is QDash's execution-authority decision, not a
+requirement or a safety result established by these sources.
+
 Keep measurements, commits, and long waits on their existing direct tool paths. Code Mode
 currently permits only audited read-only tool calls. Adding a builder must not widen that set.
 The [extension design](./extensions.md#calibration-builders-in-code-mode) explains how both hosts
