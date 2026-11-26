@@ -4,6 +4,8 @@ Agents choose experiments and interpret evidence; QDash controls execution, auth
 accepted calibration state. This division guides changes to SDKs, tools, skills, and workers.
 The [Agent Platform](./agent-platform.md) describes the enforced session contract.
 
+<Diagram name="calibration-reasoning-boundary" caption="The agent prepares experiments with Code Mode; QDash authorizes operations and records evidence for the next decision." />
+
 ## Separate measurement, assessment, and adoption
 
 A measurement produces evidence. An assessment interprets it. Adoption commits an accepted
@@ -53,6 +55,8 @@ Use a pipeline for predetermined task ordering, scheduling, and result filters. 
 session when new evidence requires diagnosis and selection of the next measurement. Deterministic
 processing belongs in the execution engine; judgment belongs in the agent loop. A saved Python
 workflow can express custom worker-side logic outside the declarative spec.
+
+<Diagram name="calibration-execution-paths" caption="Ordinary pipelines can write task outputs directly. Agent sessions stage candidates and require a separate accepted, authorized commit." />
 
 These paths have different write semantics. Ordinary pipeline calls can update calibration values
 directly under their execution approval. Agent-session measurements stage candidates and use
