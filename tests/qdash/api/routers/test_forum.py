@@ -2,10 +2,11 @@
 
 import re
 import secrets
+from typing import Any
 
 import pytest
 from bson import ObjectId
-from pymongo.errors import DuplicateKeyError
+from pymongo.errors import AutoReconnect, DuplicateKeyError, WriteError
 from starlette.exceptions import HTTPException
 
 from qdash.api.services import forum_service
@@ -186,31 +187,441 @@ def test_forum_thread_labels_round_trip_filter_and_update(test_client, init_db):
     assert rejected_status_label.status_code == 422
 
 
-def test_list_forum_labels_is_empty_for_new_project(test_client, init_db):
-    """A new project starts with no labels."""
-    _create_user("owner", "owner_token", ProjectRole.OWNER)
-    _create_project()
-    headers = _headers("owner_token")
+DEFAULT_LABEL_KEYS = ["agent", "calibration", "hardware", "software", "question"]
+
+
+def _label_keys(test_client, headers) -> list[str]:
+    """Return the label keys listed for the request's project, in display order."""
+    response = test_client.get("/forum/labels", headers=headers)
+    assert response.status_code == 200, response.text
+    return [item["key"] for item in response.json()["labels"]]
+
+
+def test_new_project_lists_default_forum_labels(test_client, init_db):
+    """A new project starts with the default labels as ordinary hex-colored labels."""
+    headers = _setup_owner()
 
     response = test_client.get("/forum/labels", headers=headers)
 
     assert response.status_code == 200
-    assert response.json()["labels"] == []
+    labels = response.json()["labels"]
+    assert [item["key"] for item in labels] == DEFAULT_LABEL_KEYS
+    # Default names are lowercase classification terms.
+    assert [item["name"] for item in labels] == [
+        "agent",
+        "calibration",
+        "hardware",
+        "software",
+        "question",
+    ]
+    assert all(re.fullmatch(r"#[0-9a-f]{6}", item["color"]) for item in labels)
+    # Listing again does not duplicate them.
+    assert _label_keys(test_client, headers) == DEFAULT_LABEL_KEYS
 
 
-def test_deleting_all_forum_labels_leaves_list_empty(test_client, init_db):
-    """Deleting every label does not bring any label back."""
-    _create_user("owner", "owner_token", ProjectRole.OWNER)
-    _create_project()
-    headers = _headers("owner_token")
-    keys = _create_named_labels(test_client, headers, "Review", "Anomaly")
+def test_default_forum_labels_are_usable_on_threads_without_listing(test_client, init_db):
+    """Defaults exist for a project even when its first label use is a thread create."""
+    headers = _setup_owner()
 
-    for key in keys:
+    root = _create_post(test_client, headers, labels=["question", "hardware"])
+
+    assert root.status_code == 201, root.text
+    assert root.json()["labels"] == ["question", "hardware"]
+
+
+def test_default_forum_labels_are_editable(test_client, init_db):
+    """A default label can be renamed and recolored, and the edit is kept."""
+    headers = _setup_owner()
+    assert "question" in _label_keys(test_client, headers)
+
+    updated = test_client.patch(
+        "/forum/labels/question",
+        headers=headers,
+        json={"name": "Help wanted", "color": "#123ABC", "description": "Needs input"},
+    )
+    assert updated.status_code == 200, updated.text
+
+    listed = test_client.get("/forum/labels", headers=headers).json()["labels"]
+    question = next(item for item in listed if item["key"] == "question")
+    assert question == {
+        "key": "question",
+        "name": "Help wanted",
+        "description": "Needs input",
+        "color": "#123abc",
+    }
+    # The old default name is free again and does not bring the default back.
+    assert [item["name"] for item in listed].count("question") == 0
+
+
+def test_deleted_default_forum_labels_are_not_recreated(test_client, init_db):
+    """Deleting defaults is permanent across reads, label writes, and new service instances."""
+    headers = _setup_owner()
+    root = _create_post(test_client, headers, labels=["agent"])
+    assert root.status_code == 201, root.text
+
+    for key in DEFAULT_LABEL_KEYS:
         assert test_client.delete(f"/forum/labels/{key}", headers=headers).status_code == 200
 
-    response = test_client.get("/forum/labels", headers=headers)
-    assert response.status_code == 200
-    assert response.json()["labels"] == []
+    assert _label_keys(test_client, headers) == []
+    [custom] = _create_named_labels(test_client, headers, "Review")
+    assert _label_keys(test_client, headers) == [custom]
+    # A fresh service instance (as after an API restart) does not reseed either.
+    assert [
+        label.key
+        for label in forum_service.ForumService().list_labels(project_id="test_project").labels
+    ] == [custom]
+    rejected = _create_post(test_client, headers, title="old default", labels=["agent"])
+    assert rejected.status_code == 422
+    fetched = test_client.get(f"/forum/posts/{root.json()['id']}", headers=headers)
+    assert fetched.json()["labels"] == []
+
+
+def test_default_label_rejected_insert_is_retried_by_a_later_request(
+    test_client, init_db, monkeypatch
+):
+    """A default whose insert the server rejected is created by the next request instead."""
+    headers = _setup_owner()
+    real_insert = ForumLabelDocument.insert
+
+    def reject_question(self, *args, **kwargs):
+        if self.key == "question":
+            raise WriteError("rejected", code=121)
+        return real_insert(self, *args, **kwargs)
+
+    monkeypatch.setattr(ForumLabelDocument, "insert", reject_question)
+    with pytest.raises(WriteError):
+        forum_service.ForumService._ensure_default_labels("test_project")
+    monkeypatch.undo()
+
+    assert _label_keys(test_client, headers) == DEFAULT_LABEL_KEYS
+    assert ForumLabelDocument.find({"project_id": "test_project"}).count() == len(
+        DEFAULT_LABEL_KEYS
+    )
+
+
+def test_default_label_ambiguous_insert_failure_is_retried_without_duplicates(
+    test_client, init_db, monkeypatch
+):
+    """A default whose insert outcome is unknown is retried, and the retry cannot duplicate it."""
+    headers = _setup_owner()
+    real_insert = ForumLabelDocument.insert
+
+    def write_then_lose_connection(self, *args, **kwargs):
+        result = real_insert(self, *args, **kwargs)
+        if self.key == "question":
+            raise AutoReconnect("connection lost after the write")
+        return result
+
+    monkeypatch.setattr(ForumLabelDocument, "insert", write_then_lose_connection)
+    with pytest.raises(AutoReconnect):
+        forum_service.ForumService._ensure_default_labels("test_project")
+    monkeypatch.undo()
+
+    assert _label_keys(test_client, headers) == DEFAULT_LABEL_KEYS
+    assert ForumLabelDocument.find({"project_id": "test_project"}).count() == len(
+        DEFAULT_LABEL_KEYS
+    )
+
+
+def _label_rows(key: str) -> list[dict[str, Any]]:
+    """Return every stored row for a label key in the test project, deleted ones included."""
+    return list(
+        ForumLabelDocument.get_motor_collection().find({"project_id": "test_project", "key": key})
+    )
+
+
+def _pause_default_insert(monkeypatch, key, on_pause):
+    """Run ``on_pause`` once when a seeder is about to insert the default ``key``.
+
+    This replays a seeder that read the project's labels, found ``key`` missing, and
+    then stalled before its insert while other requests ran.
+    """
+    real_insert = ForumLabelDocument.insert
+    paused = False
+
+    def insert(self, *args, **kwargs):
+        nonlocal paused
+        if not paused and self.key == key:
+            paused = True
+            on_pause()
+        return real_insert(self, *args, **kwargs)
+
+    monkeypatch.setattr(ForumLabelDocument, "insert", insert)
+
+
+def _fail_reads(monkeypatch):
+    """Make every later find or find_one on any collection raise a connection error."""
+    collection_type = type(ForumLabelDocument.get_motor_collection())
+
+    def lost(*args, **kwargs):
+        raise AutoReconnect("connection lost")
+
+    monkeypatch.setattr(collection_type, "find", lost)
+    monkeypatch.setattr(collection_type, "find_one", lost)
+
+
+def _set_thread_labels(test_client, headers, post, labels):
+    """Replace a root thread's labels and return the HTTP response."""
+    return test_client.patch(
+        f"/forum/posts/{post['id']}",
+        headers=headers,
+        json={
+            "category": post["category"],
+            "title": post["title"],
+            "content": post["content"],
+            "labels": labels,
+        },
+    )
+
+
+def test_delayed_seeder_cannot_undo_default_delete_even_when_reads_fail(
+    test_client, init_db, monkeypatch
+):
+    """A delete that succeeded stays in effect against a seeder that stalled before inserting.
+
+    Seeder B reads an empty project and stalls. Meanwhile request A creates the defaults,
+    a thread is tagged ``agent``, and a user deletes ``agent``. From then on every
+    database read fails. B resumes; its insert hits the deleted row's key, so nothing it
+    does, and nothing it fails to read, can bring the default back.
+    """
+    headers = _setup_owner()
+    thread: dict[str, Any] = {}
+
+    def other_requests_run() -> None:
+        assert _label_keys(test_client, headers) == DEFAULT_LABEL_KEYS
+        created = _create_post(test_client, headers, labels=["agent"])
+        assert created.status_code == 201, created.text
+        thread.update(created.json())
+        assert test_client.delete("/forum/labels/agent", headers=headers).status_code == 200
+        _fail_reads(monkeypatch)
+
+    _pause_default_insert(monkeypatch, "agent", other_requests_run)
+
+    forum_service.ForumService._ensure_default_labels("test_project")
+    monkeypatch.undo()
+
+    [row] = _label_rows("agent")
+    assert row["is_deleted"] is True
+    assert "agent" not in _label_keys(test_client, headers)
+    fetched = test_client.get(f"/forum/posts/{thread['id']}", headers=headers)
+    assert fetched.json()["labels"] == []
+    assert _create_post(test_client, headers, title="stale", labels=["agent"]).status_code == 422
+
+
+def test_delayed_seeder_preserves_explicitly_recreated_default_and_its_threads(
+    test_client, init_db, monkeypatch
+):
+    """A user's recreation of a deleted default survives a seeder that stalled before it."""
+    headers = _setup_owner()
+    thread: dict[str, Any] = {}
+
+    def other_requests_run() -> None:
+        assert _label_keys(test_client, headers) == DEFAULT_LABEL_KEYS
+        assert test_client.delete("/forum/labels/agent", headers=headers).status_code == 200
+        recreated = test_client.post(
+            "/forum/labels", headers=headers, json={"name": "Agent", "color": "#AA0011"}
+        )
+        assert recreated.status_code == 201, recreated.text
+        assert recreated.json()["key"] == "agent"
+        created = _create_post(test_client, headers, labels=["agent", "question"])
+        assert created.status_code == 201, created.text
+        thread.update(created.json())
+
+    _pause_default_insert(monkeypatch, "agent", other_requests_run)
+
+    forum_service.ForumService._ensure_default_labels("test_project")
+    monkeypatch.undo()
+
+    [row] = _label_rows("agent")
+    assert (row["is_deleted"], row["color"]) == (False, "#aa0011")
+    fetched = test_client.get(f"/forum/posts/{thread['id']}", headers=headers)
+    assert fetched.json()["labels"] == ["agent", "question"]
+    stored = ForumPostDocument.get_motor_collection().find_one({"title": thread["title"]})
+    assert stored is not None
+    assert stored["labels"] == ["agent", "question"]
+
+
+def test_delayed_seeder_keeps_default_renamed_during_stall(test_client, init_db, monkeypatch):
+    """A seeder stalled before its insert leaves a default that a user edited meanwhile."""
+    headers = _setup_owner()
+
+    def other_requests_run() -> None:
+        assert _label_keys(test_client, headers) == DEFAULT_LABEL_KEYS
+        renamed = test_client.patch(
+            "/forum/labels/agent", headers=headers, json={"name": "Renamed", "color": "#040506"}
+        )
+        assert renamed.status_code == 200, renamed.text
+
+    _pause_default_insert(monkeypatch, "agent", other_requests_run)
+    forum_service.ForumService._ensure_default_labels("test_project")
+    monkeypatch.undo()
+
+    [row] = _label_rows("agent")
+    assert (row["name"], row["color"], row["is_deleted"]) == ("Renamed", "#040506", False)
+
+
+def test_label_update_racing_a_delete_does_not_restore_the_label(test_client, init_db, monkeypatch):
+    """An update that read the label before a delete cannot write the deleted label back."""
+    headers = _setup_owner()
+    assert _label_keys(test_client, headers) == DEFAULT_LABEL_KEYS
+    real_find = ForumLabelDocument.find
+    deleted = False
+
+    def find(*args, **kwargs):
+        # The update's duplicate-name check runs after it read the label.
+        nonlocal deleted
+        if not deleted:
+            deleted = True
+            assert test_client.delete("/forum/labels/agent", headers=headers).status_code == 200
+        return real_find(*args, **kwargs)
+
+    monkeypatch.setattr(ForumLabelDocument, "find", find)
+    response = test_client.patch("/forum/labels/agent", headers=headers, json={"name": "Later"})
+    monkeypatch.undo()
+
+    assert deleted
+    assert response.status_code == 404
+    [row] = _label_rows("agent")
+    assert (row["name"], row["is_deleted"]) == ("agent", True)
+
+
+def test_recreating_deleted_default_restores_its_key(test_client, init_db):
+    """Creating a label named like a deleted default reuses the deleted row and its key."""
+    headers = _setup_owner()
+    root = _create_post(test_client, headers, labels=["agent"])
+    assert root.status_code == 201, root.text
+    assert test_client.delete("/forum/labels/agent", headers=headers).status_code == 200
+
+    recreated = test_client.post(
+        "/forum/labels",
+        headers=headers,
+        json={"name": "AGENT", "color": "#ABCDEF", "description": "Ours"},
+    )
+
+    assert recreated.status_code == 201, recreated.text
+    assert recreated.json() == {
+        "key": "agent",
+        "name": "AGENT",
+        "description": "Ours",
+        "color": "#abcdef",
+    }
+    assert len(_label_rows("agent")) == 1
+    assert _label_keys(test_client, headers)[-1] == "agent"
+    # The delete removed the old tag; the restored label starts with no threads.
+    assert (
+        test_client.get(f"/forum/posts/{root.json()['id']}", headers=headers).json()["labels"] == []
+    )
+    tagged = _set_thread_labels(test_client, headers, root.json(), ["agent"])
+    assert tagged.status_code == 200, tagged.text
+    assert tagged.json()["labels"] == ["agent"]
+    duplicate = test_client.post(
+        "/forum/labels", headers=headers, json={"name": "agent", "color": "#111111"}
+    )
+    assert duplicate.status_code == 409
+    # Deleting the restored label hides it again without losing the reserved key.
+    assert test_client.delete("/forum/labels/agent", headers=headers).status_code == 200
+    assert "agent" not in _label_keys(test_client, headers)
+    assert [row["is_deleted"] for row in _label_rows("agent")] == [True]
+
+
+def test_recreate_falls_back_to_new_key_when_deleted_row_was_restored_first(
+    test_client, init_db, monkeypatch
+):
+    """If another request restores the deleted row first, the create gets a fresh key."""
+    headers = _setup_owner()
+    assert test_client.delete("/forum/labels/agent", headers=headers).status_code == 200
+    monkeypatch.setattr(
+        forum_service.ForumService,
+        "_restore_deleted_label",
+        staticmethod(lambda doc, key: False),
+    )
+
+    created = test_client.post(
+        "/forum/labels", headers=headers, json={"name": "Agent", "color": "#111111"}
+    )
+
+    assert created.status_code == 201, created.text
+    assert created.json()["key"] == "agent-2"
+    [row] = _label_rows("agent")
+    assert row["is_deleted"] is True
+
+
+def test_deleting_custom_label_removes_its_row(test_client, init_db):
+    """Only default keys are kept as deleted rows; other labels are removed outright."""
+    headers = _setup_owner()
+    [key] = _create_named_labels(test_client, headers, "Review")
+
+    assert test_client.delete(f"/forum/labels/{key}", headers=headers).status_code == 200
+
+    assert _label_rows(key) == []
+    assert test_client.delete(f"/forum/labels/{key}", headers=headers).status_code == 404
+    assert test_client.delete("/forum/labels/agent", headers=headers).status_code == 200
+    assert test_client.delete("/forum/labels/agent", headers=headers).status_code == 404
+    assert (
+        test_client.patch("/forum/labels/agent", headers=headers, json={"name": "Back"}).status_code
+        == 404
+    )
+
+
+def test_default_forum_labels_preserve_existing_project_labels(test_client, init_db):
+    """Seeding an existing project keeps its labels and skips defaults whose key or name is taken."""
+    headers = _setup_owner()
+    for key, name, color in (
+        ("hardware", "Cryo hardware", "#010203"),
+        ("triage", "Question", "#040506"),
+        ("review", "Review", "#070809"),
+    ):
+        ForumLabelDocument(project_id="test_project", key=key, name=name, color=color).insert()
+
+    listed = test_client.get("/forum/labels", headers=headers).json()["labels"]
+
+    by_key = {item["key"]: item for item in listed}
+    assert set(by_key) == {"hardware", "triage", "review", "agent", "calibration", "software"}
+    assert (by_key["hardware"]["name"], by_key["hardware"]["color"]) == (
+        "Cryo hardware",
+        "#010203",
+    )
+    assert (by_key["triage"]["name"], by_key["triage"]["color"]) == ("Question", "#040506")
+    assert (by_key["review"]["name"], by_key["review"]["color"]) == ("Review", "#070809")
+    # The default "question" is reserved as deleted because its name is taken.
+    [question] = _label_rows("question")
+    assert question["is_deleted"] is True
+    assert _label_keys(test_client, headers) == [item["key"] for item in listed]
+
+
+def test_default_forum_labels_are_project_scoped(test_client, init_db):
+    """Each project gets its own defaults; deleting one in a project leaves others alone."""
+    headers = _setup_owner()
+    owner = UserDocument.find_one({"username": "owner"}).run()
+    assert owner is not None
+    ProjectDocument(
+        project_id="other_project",
+        name="Other Project",
+        owner_user_id=owner.user_id,
+        owner_username="owner",
+    ).insert()
+    ProjectMembershipDocument(
+        project_id="other_project",
+        user_id=owner.user_id,
+        username="owner",
+        role=ProjectRole.OWNER,
+        status="active",
+        invited_by_user_id=owner.user_id,
+        invited_by="owner",
+    ).insert()
+    other_headers = {**headers, "X-Project-Id": "other_project"}
+
+    assert _label_keys(test_client, headers) == DEFAULT_LABEL_KEYS
+    assert test_client.delete("/forum/labels/agent", headers=headers).status_code == 200
+    updated = test_client.patch("/forum/labels/hardware", headers=headers, json={"name": "Fridge"})
+    assert updated.status_code == 200, updated.text
+
+    other = test_client.get("/forum/labels", headers=other_headers).json()["labels"]
+    assert [item["key"] for item in other] == DEFAULT_LABEL_KEYS
+    assert next(item for item in other if item["key"] == "hardware")["name"] == "hardware"
+    assert _label_keys(test_client, headers) == [
+        key for key in DEFAULT_LABEL_KEYS if key != "agent"
+    ]
 
 
 def test_owner_can_create_update_and_delete_forum_label(test_client, init_db):
@@ -222,35 +633,35 @@ def test_owner_can_create_update_and_delete_forum_label(test_client, init_db):
     created = test_client.post(
         "/forum/labels",
         headers=headers,
-        json={"name": "Hardware", "color": "#ABCDEF"},
+        json={"name": "Cryostat", "color": "#ABCDEF"},
     )
     assert created.status_code == 201, created.text
     body = created.json()
-    assert body["key"] == "hardware"
+    assert body["key"] == "cryostat"
     assert body["color"] == "#abcdef"
     assert "is_system" not in body
 
     duplicate = test_client.post(
         "/forum/labels",
         headers=headers,
-        json={"name": "hardware", "color": "#111111"},
+        json={"name": "cryostat", "color": "#111111"},
     )
     assert duplicate.status_code == 409
 
     updated = test_client.patch(
-        "/forum/labels/hardware",
+        "/forum/labels/cryostat",
         headers=headers,
-        json={"name": "Hardware Issue", "color": "#222222"},
+        json={"name": "Cryostat Issue", "color": "#222222"},
     )
     assert updated.status_code == 200, updated.text
-    assert updated.json()["name"] == "Hardware Issue"
+    assert updated.json()["name"] == "Cryostat Issue"
     assert updated.json()["color"] == "#222222"
 
-    deleted = test_client.delete("/forum/labels/hardware", headers=headers)
+    deleted = test_client.delete("/forum/labels/cryostat", headers=headers)
     assert deleted.status_code == 200
 
     listed = test_client.get("/forum/labels", headers=headers)
-    assert "hardware" not in {item["key"] for item in listed.json()["labels"]}
+    assert "cryostat" not in {item["key"] for item in listed.json()["labels"]}
 
 
 def test_update_forum_label_rejects_case_insensitive_duplicate_name(test_client, init_db):
@@ -261,11 +672,11 @@ def test_update_forum_label_rejects_case_insensitive_duplicate_name(test_client,
     _create_named_labels(test_client, headers, "Review")
 
     created = test_client.post(
-        "/forum/labels", headers=headers, json={"name": "Hardware", "color": "#111111"}
+        "/forum/labels", headers=headers, json={"name": "Cryostat", "color": "#111111"}
     )
     assert created.status_code == 201, created.text
 
-    response = test_client.patch("/forum/labels/hardware", headers=headers, json={"name": "REVIEW"})
+    response = test_client.patch("/forum/labels/cryostat", headers=headers, json={"name": "REVIEW"})
     assert response.status_code == 409
 
 
@@ -276,15 +687,15 @@ def test_update_forum_label_allows_case_variant_of_own_name(test_client, init_db
     headers = _headers("owner_token")
 
     created = test_client.post(
-        "/forum/labels", headers=headers, json={"name": "Hardware", "color": "#111111"}
+        "/forum/labels", headers=headers, json={"name": "Cryostat", "color": "#111111"}
     )
     assert created.status_code == 201, created.text
 
     response = test_client.patch(
-        "/forum/labels/hardware", headers=headers, json={"name": "HARDWARE"}
+        "/forum/labels/cryostat", headers=headers, json={"name": "CRYOSTAT"}
     )
     assert response.status_code == 200, response.text
-    assert response.json()["name"] == "HARDWARE"
+    assert response.json()["name"] == "CRYOSTAT"
 
 
 def test_forum_label_rejects_whitespace_only_name(test_client, init_db):
@@ -299,12 +710,12 @@ def test_forum_label_rejects_whitespace_only_name(test_client, init_db):
     assert blank.status_code == 422
 
     created = test_client.post(
-        "/forum/labels", headers=headers, json={"name": "  Hardware  ", "color": "#111111"}
+        "/forum/labels", headers=headers, json={"name": "  Cryostat  ", "color": "#111111"}
     )
     assert created.status_code == 201, created.text
-    assert created.json()["name"] == "Hardware"
+    assert created.json()["name"] == "Cryostat"
 
-    renamed = test_client.patch("/forum/labels/hardware", headers=headers, json={"name": "   "})
+    renamed = test_client.patch("/forum/labels/cryostat", headers=headers, json={"name": "   "})
     assert renamed.status_code == 422
 
 
@@ -369,16 +780,16 @@ def test_editor_can_create_update_and_delete_forum_label(test_client, init_db):
     headers = _headers("editor_token")
 
     created = test_client.post(
-        "/forum/labels", headers=headers, json={"name": "Hardware", "color": "#123456"}
+        "/forum/labels", headers=headers, json={"name": "Cryostat", "color": "#123456"}
     )
     assert created.status_code == 201, created.text
     key = created.json()["key"]
 
     updated = test_client.patch(
-        f"/forum/labels/{key}", headers=headers, json={"name": "Hardware v2"}
+        f"/forum/labels/{key}", headers=headers, json={"name": "Cryostat v2"}
     )
     assert updated.status_code == 200, updated.text
-    assert updated.json()["name"] == "Hardware v2"
+    assert updated.json()["name"] == "Cryostat v2"
 
     deleted = test_client.delete(f"/forum/labels/{key}", headers=headers)
     assert deleted.status_code == 200, deleted.text
@@ -391,9 +802,7 @@ def test_editor_can_create_update_and_delete_forum_label(test_client, init_db):
     deleted_owner_label = test_client.delete(f"/forum/labels/{owner_key}", headers=headers)
     assert deleted_owner_label.status_code == 200, deleted_owner_label.text
 
-    listed = test_client.get("/forum/labels", headers=headers)
-    assert listed.status_code == 200, listed.text
-    assert listed.json()["labels"] == []
+    assert _label_keys(test_client, headers) == DEFAULT_LABEL_KEYS
 
 
 def test_viewer_cannot_manage_forum_labels(test_client, init_db):
@@ -405,7 +814,7 @@ def test_viewer_cannot_manage_forum_labels(test_client, init_db):
     viewer_headers = _headers("viewer_token")
 
     created = test_client.post(
-        "/forum/labels", headers=owner_headers, json={"name": "Hardware", "color": "#123456"}
+        "/forum/labels", headers=owner_headers, json={"name": "Cryostat", "color": "#123456"}
     )
     assert created.status_code == 201, created.text
     key = created.json()["key"]
