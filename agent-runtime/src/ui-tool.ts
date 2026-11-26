@@ -12,6 +12,7 @@ import {
   uiSpecToText,
   validateUiSpec,
   type UiBlockPayload,
+  type UiSpec,
 } from "../../ui/src/lib/agentUiSpec.ts";
 import {
   UI_INPUT_GROUPS,
@@ -20,6 +21,7 @@ import {
   toolArgsFromSpec,
   type UiToolArgs,
 } from "./ui-tool-input.ts";
+import { normalizeUiTopology } from "./ui-topology.ts";
 
 export {
   UI_BLOCK_VERSION,
@@ -173,9 +175,7 @@ export function prepareUiArguments(args: unknown): UiToolArgs {
   if (!isRecord(args)) return args as UiToolArgs;
   if ("spec" in args) {
     const spec = typeof args.spec === "string" ? parseSpecString(args.spec) : args.spec;
-    const result = validateUiSpec(spec);
-    if (!result.ok) throw invalidSpecError(result.errors);
-    return toolArgsFromSpec(result.spec);
+    return toolArgsFromSpec(validateModelSpec(spec).spec);
   }
   const prepared: Record<string, unknown> = { ...args };
   for (const group of Object.values(UI_INPUT_GROUPS)) {
@@ -191,13 +191,40 @@ function invalidSpecError(errors: string[]): Error {
   return new Error(`render_ui spec is invalid:\n- ${errors.slice(0, 12).join("\n- ")}`);
 }
 
+/**
+ * The model's spec validated by the shared catalog, after the tree-shape
+ * repairs in ui-topology.ts. The repairs are kept only when the repaired spec
+ * is valid; otherwise the problems of the spec as sent are reported, with any
+ * reason the shape could not be repaired. Throws when the spec is invalid.
+ */
+export function validateModelSpec(spec: unknown): { spec: UiSpec; repairs: string[] } {
+  const topology = normalizeUiTopology(spec);
+  if (topology.repairs.length > 0) {
+    const repaired = validateUiSpec(topology.spec);
+    if (repaired.ok) return { spec: repaired.spec, repairs: topology.repairs };
+  }
+  const result = validateUiSpec(spec);
+  if (!result.ok) throw invalidSpecError([...result.errors, ...topology.problems]);
+  return { spec: result.spec, repairs: [] };
+}
+
+const MAX_REPORTED_REPAIRS = 8;
+
+function repairNote(repairs: string[]): string {
+  if (repairs.length === 0) return "";
+  const shown = repairs.slice(0, MAX_REPORTED_REPAIRS).join("; ");
+  const more = repairs.length > MAX_REPORTED_REPAIRS ? `; and ${repairs.length - MAX_REPORTED_REPAIRS} more` : "";
+  return ` The element tree was repaired: ${shown}${more}. Next time list each element in the children of exactly one container, and place every element under root.`;
+}
+
 const DESCRIPTION = [
   "Render a compact, read-only UI in the QDash chat: metric cards, tables, alerts, short text, Plotly charts and links to QDash pages.",
   "Use it to present values you already have from QDash tool results; never invent or estimate values, and say in your text answer where they came from.",
   "Keep your explanation in the text answer; the UI is for scanning numbers and status. Prefer `render_chart` for a single plot.",
   "",
   "List each element under its type (`stacks`, `cards`, `metrics`, `tables`, `alerts`, `texts`, `charts`, `links`) with a unique `id`; send an empty list for a type you do not use. `root` names the top element.",
-  "Only Stack and Card have `children`, the ids of their child elements; every other element is a leaf. Each element has exactly one parent.",
+  "Only Stack and Card have `children`, the ids of their direct child elements; every other element is a leaf.",
+  "Each element other than `root` appears in the `children` of exactly one container: list it only under its nearest container (a table inside a card goes in the card's `children`, not also in the stack holding the card), and do not leave an element out of every `children` list. `root` itself is in no `children` list.",
   "A table row lists one cell per column, in column order. A chart's `data` and `layout` are JSON text.",
   "Only literal values: no state, visibility, repeat, watch, actions, or `$` expressions. No HTML, no Markdown, no external URLs.",
   `Limits: ${UI_SPEC_LIMITS.maxElements} elements, depth ${UI_SPEC_LIMITS.maxDepth}, ${UI_SPEC_LIMITS.maxChildren} children per element, ${UI_SPEC_LIMITS.maxTableRows} table rows, ${UI_SPEC_LIMITS.maxTableColumns} columns, ${UI_SPEC_LIMITS.maxBytes} characters in all.`,
@@ -232,8 +259,7 @@ export const uiTool = defineTool({
   execute: async (params) => {
     const mapped = specFromToolArgs(params);
     if (!mapped.ok) throw invalidSpecError(mapped.errors);
-    const result = validateUiSpec(mapped.spec);
-    if (!result.ok) throw invalidSpecError(result.errors);
+    const result = validateModelSpec(mapped.spec);
     const ui: UiBlockPayload = {
       version: UI_BLOCK_VERSION,
       spec: result.spec,
@@ -244,7 +270,7 @@ export const uiTool = defineTool({
       output: [
         {
           type: "text" as const,
-          text: `UI rendered in the chat (${count} element${count === 1 ? "" : "s"}). Do not repeat its values in full; summarize what they mean.`,
+          text: `UI rendered in the chat (${count} element${count === 1 ? "" : "s"}). Do not repeat its values in full; summarize what they mean.${repairNote(result.repairs)}`,
         },
       ],
       details: { ui } as unknown as JsonValue,
