@@ -53,6 +53,33 @@ export function boxed(title: string, body: string[], color = false): string[] {
   ];
 }
 
+/**
+ * A box sized to its longest line (at most 100 columns) without clipping, for tool text
+ * read by the model as well as shown; `color` adds ANSI colors to the title and frame.
+ */
+export function simpleBox(title: string, body: string[], color = false): string[] {
+  const rawLines = [` ${title} `, ...body];
+  const width = Math.min(100, Math.max(...rawLines.map((line) => stripAnsi(line).length), title.length + 4));
+  const border = (text: string) => color ? ansi("90", text) : text;
+  const top = `${border("╭")}${color ? ansi("1;36", ` ${title} `) : ` ${title} `}${border("─".repeat(Math.max(0, width - title.length - 2)))}${border("╮")}`;
+  const bottom = border(`╰${"─".repeat(width)}╯`);
+  const middle = body.map((line) => `│ ${line}${" ".repeat(Math.max(0, width - stripAnsi(line).length - 2))} │`);
+  return [top, ...middle, bottom];
+}
+
+/**
+ * A plain box sized to the raw length of its longest line (at most 100 columns) without
+ * clipping; unlike `simpleBox`, ANSI escapes count toward the width.
+ */
+export function plainBox(title: string, body: string[]): string[] {
+  const rawLines = [` ${title} `, ...body];
+  const width = Math.min(100, Math.max(...rawLines.map((line) => line.length), title.length + 4));
+  const top = `╭${` ${title} `.padEnd(width, "─")}╮`;
+  const bottom = `╰${"─".repeat(width)}╯`;
+  const middle = body.map((line) => `│ ${line.padEnd(width - 2)} │`);
+  return [top, ...middle, bottom];
+}
+
 export function wrapPlainLine(line: string, width: number): string[] {
   if (width <= 0 || visibleWidth(line) <= width) return [line];
   const output: string[] = [];

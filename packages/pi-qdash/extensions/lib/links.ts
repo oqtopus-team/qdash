@@ -1,13 +1,5 @@
+import { firstString } from "./payload.js";
 import type { QDashConnection } from "./qdash-connection.js";
-
-function firstString(object: Record<string, unknown>, keys: string[]): string | undefined {
-  for (const key of keys) {
-    const value = object[key];
-    if (typeof value === "string" && value.length > 0) return value;
-    if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  }
-  return undefined;
-}
 
 /**
  * Where the QDash web UI lives, for links in tool output.

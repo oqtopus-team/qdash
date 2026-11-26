@@ -183,6 +183,32 @@ test("an execution wait times out with the SDK's timeout error and leaves the ru
   assert.equal(step.status, "completed");
 });
 
+test("an execution not listed yet is pending only when the wait says so", async () => {
+  const answers = () => {
+    let polls = 0;
+    return () => (++polls === 1 ? json({ detail: "not found" }, 404) : json({ execution_id: "e-1", status: "completed" }));
+  };
+  await assert.rejects(connectionWith(answers()).client.waitForExecution("e-1", { pollIntervalSeconds: 0 }), QDashNotFoundError);
+  const pending = connectionWith(answers());
+  const execution = await pending.client.waitForExecution("e-1", { pollIntervalSeconds: 0, notFoundAsPending: true });
+  assert.equal(execution.status, "completed");
+  assert.equal(pending.requests.length, 2);
+});
+
+test("a candidate apply wait polls until the backend applies or fails it, within its timeout", async () => {
+  let polls = 0;
+  const { client } = connectionWith(() => json({ commit_id: "c-1", backend_status: ++polls < 3 ? "pending" : "applied" }));
+  const commit = await client.waitForAgentCandidateApply("s-1", "c-1", { pollIntervalSeconds: 0 });
+  assert.equal(commit.backend_status, "applied");
+  assert.equal(polls, 3);
+  const stuck = connectionWith(() => json({ commit_id: "c-1", backend_status: "pending" }));
+  await assert.rejects(
+    stuck.client.waitForAgentCandidateApply("s-1", "c-1", { timeoutSeconds: 0, pollIntervalSeconds: 0 }),
+    /Agent candidate commit 'c-1' was not applied within 0 seconds/,
+  );
+  await assert.rejects(stuck.client.waitForAgentCandidateApply("s-1", "c-1", { pollIntervalSeconds: -1 }), RangeError);
+});
+
 test("waiting for an action's execution keeps its 600 s default when the timeout is passed as undefined", async () => {
   const { client } = connectionWith(() => json({ action_id: "a-1", execution_status: "failed" }));
   const action = await client.waitForAgentActionExecution("s-1", "a-1", { timeoutSeconds: undefined });

@@ -12,6 +12,7 @@ import { hostModelIdentity } from "../lib/host-model.js";
 import { qdashWebUrl } from "../lib/links.js";
 import { toTextToolResult } from "../lib/results.js";
 import { requireWriteApproval } from "../lib/write-approval.js";
+import { errorText, sdkStatusCode } from "../lib/errors.js";
 
 export const END_AGENT_SESSION_TOOL = "qdash_end_agent_session";
 
@@ -20,15 +21,6 @@ type Outcome = "stopped" | "completed";
 
 export interface AgentSessionEndDependencies {
   makeClient(params: ConnectionParams): Promise<QDashConnection>;
-}
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function statusOf(error: unknown): number | undefined {
-  const status = (error as { statusCode?: unknown } | null)?.statusCode;
-  return typeof status === "number" ? status : undefined;
 }
 
 /** The session page, scoped to the session's own project. */
@@ -163,7 +155,7 @@ export function registerAgentSessionEndTool(pi: ExtensionAPI, deps: AgentSession
         }
       } catch (error) {
         if (signal?.aborted) throw error;
-        const status = statusOf(error);
+        const status = sdkStatusCode(error);
         const unconfirmed = status === undefined || status >= 500;
         const text = unconfirmed
           ? `Not confirmed: QDash did not confirm the ${params.outcome === "stopped" ? "stop" : "completion"} (${errorText(error)}); the session may or may not have ended. Read it with qdash_get_agent_session before saying either.`

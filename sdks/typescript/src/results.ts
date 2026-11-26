@@ -4,7 +4,7 @@
  */
 import { isDeepStrictEqual } from "node:util";
 
-import { read, type Context } from "./_http.js";
+import { isRecord, read, type Context } from "./_http.js";
 import { QDashApiError, QDashValidationError } from "./errors.js";
 import type { TaskResultListItem, TaskResultListResponse, TaskResultResponse } from "./types.js";
 import { readTaskResultEvidence, type TaskResultEvidence, type TaskResultEvidenceOptions } from "./evidence.js";
@@ -57,10 +57,6 @@ export interface TaskResultComparison {
   compared: ComparedTaskResults[];
   /** Task names with fewer than two results among the rows read. */
   insufficient: Array<{ task: string; results: number }>;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function checkCompareLatestOptions(options: CompareLatestOptions): number {

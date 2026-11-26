@@ -7,11 +7,10 @@
  * the token. The `qdash` command of the Python SDK writes the same file for the same options.
  */
 import { mkdirSync, openSync, writeSync, closeSync, unlinkSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, extname, join, resolve } from "node:path";
+import { dirname, extname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
-import { defaultConfigPath, RESERVED_PROFILE_NAMES } from "./config.js";
+import { defaultConfigPath, expandUser, RESERVED_PROFILE_NAMES } from "./config.js";
 
 export const PROG = "qdash";
 export const DEFAULT_INIT_PROFILE = "local";
@@ -150,10 +149,6 @@ function text(option: string, value: string): string {
   if (!value) throw new UsageError(`${option} must not be empty.`);
   if (/\p{Cs}/u.test(value)) throw new UsageError(`${option} must be valid Unicode text.`);
   return value;
-}
-
-function expandUser(path: string): string {
-  return path === "~" || path.startsWith("~/") ? join(homedir(), path.slice(1)) : path;
 }
 
 const HELP = `usage: ${PROG} config init [--profile NAME] [--base-url URL] [--project-id ID]

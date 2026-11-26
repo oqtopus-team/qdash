@@ -25,6 +25,7 @@ import type {
 } from "./qdash-connection.js";
 
 import { compareServerTimestamps, parseServerTimestamp, serverTimestampText } from "./server-time.js";
+import { errorText } from "./errors.js";
 
 /** Action execution statuses after which nothing more happens to the run. */
 export const SETTLED_EXECUTION_STATUSES: ReadonlySet<string> = new Set([
@@ -761,6 +762,10 @@ export interface PausedSessionLister {
   listAgentSessions(options: { chipId?: string; statuses?: Array<"waiting_for_human">; mine?: boolean; limit?: number }): Promise<AgentSessionResponse[]>;
 }
 
+/**
+ * The HTTP status of a failed session listing: a present `status` wins over `statusCode`, and
+ * a present non-numeric `status` means no status even when `statusCode` is numeric.
+ */
 function statusOf(error: unknown): number | undefined {
   const status = (error as { status?: unknown; statusCode?: unknown } | null)?.status ?? (error as { statusCode?: unknown } | null)?.statusCode;
   return typeof status === "number" ? status : undefined;
@@ -801,7 +806,7 @@ export async function pausedSessionConflict(
     if (status === 404 || status === 405) {
       return `Nothing was started: this QDash server cannot list agent sessions (HTTP ${status}; it predates GET /agent-sessions), so pi cannot tell whether one of your agent sessions on ${where} is paused for an expert. A flow or pipeline could bypass such a pause and the session's candidate gate. Upgrade QDash to a release with the agent session list, or start the run from QDash itself.`;
     }
-    return `QDash could not tell whether one of your agent sessions on ${where} is paused for an expert (${error instanceof Error ? error.message : String(error)}), so nothing was started. Try again once QDash answers.`;
+    return `QDash could not tell whether one of your agent sessions on ${where} is paused for an expert (${errorText(error)}), so nothing was started. Try again once QDash answers.`;
   }
   const wanted = qids ? new Set(qids) : undefined;
   const blocking = paused.filter(

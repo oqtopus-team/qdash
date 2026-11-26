@@ -1,6 +1,6 @@
-function shortId(value: string, length = 10): string {
-  if (value.length <= length) return value;
-  return `${value.slice(0, length)}…`;
+/** `value` cut to `length` characters with an ellipsis when longer. */
+export function shortId(value: string, length = 10): string {
+  return value.length > length ? `${value.slice(0, length)}…` : value;
 }
 
 export function arrayFromPayload(payload: unknown): unknown[] {

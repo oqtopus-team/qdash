@@ -24,7 +24,7 @@ import { forumDetailComponent, forumDetailLines, forumListLines, forumPostTitle,
 import { hostModelIdentity } from "./lib/host-model.js";
 import { investigationContextSummary, validateInvestigationContext, type TimeseriesInvestigationContext } from "./lib/investigation-context.js";
 import { executionPagePath, forumPostPagePath, qdashObjectLinks, qdashWebBaseUrl, qdashWebUrl, safeConfig, withQDashLinks } from "./lib/links.js";
-import { arrayFromPayload, compactItems, firstNumber, firstString, formatItem, payloadTotal, statusIcon } from "./lib/payload.js";
+import { arrayFromPayload, compactItems, firstNumber, firstString, formatItem, payloadTotal, shortId, statusIcon } from "./lib/payload.js";
 import { toFigureToolResult, toTextToolResult, toToolResult } from "./lib/results.js";
 import { ansi, boxLinesToWidth, boxed, formatNumber, textComponent } from "./lib/render.js";
 import { installQDashWriteGate } from "./lib/write-gate.js";
@@ -54,6 +54,7 @@ import { registerTimeseriesComparisonTool } from "./tools/timeseries.js";
 import { checkQueryResponse, isContractedAction, QUERY_CONTRACTS, TASK_RESULTS_PAGE_LIMIT, targetHistoryProblem, taskResultPageProblem } from "./lib/query-contracts.js";
 import { analyzeWiringMarkdown, wiringInsightLines, type WiringInsights } from "./lib/wiring-analysis.js";
 import { sdkSession } from "./lib/sdk-session.js";
+import { errorText } from "./lib/errors.js";
 
 type QDashQueryParams = {
   profile?: string;
@@ -292,10 +293,6 @@ function adoptContextFromToolInput(input: unknown): boolean {
   }
 
   return changed;
-}
-
-function shortId(value: string, length = 10): string {
-  return value.length > length ? `${value.slice(0, length)}…` : value;
 }
 
 const QueryAction = Type.Union([
@@ -1554,7 +1551,7 @@ function fileContentSourceMiss(params: QDashQueryParams, error: unknown) {
   if (params.action !== "file_content" || !path || !looksLikeSourcePath(path)) return undefined;
   const status = errorStatus(error);
   if (status !== 400 && status !== 404) return undefined;
-  const reason = `config file API: ${error instanceof Error ? error.message : String(error)}`;
+  const reason = `config file API: ${errorText(error)}`;
   return toTextToolResult(fileContentSourceGuidance(path, reason), { error: reason }, { action: params.action, path, misdirected: true });
 }
 
@@ -1620,7 +1617,7 @@ export default function qdashExtension(host: ExtensionAPI) {
         const client = await makeClient(params);
         return toToolResult({ profiles, active: safeConfig(client, connectionSource(applyQDashContext(params))) });
       } catch (error) {
-        return toToolResult({ profiles, error: error instanceof Error ? error.message : String(error) });
+        return toToolResult({ profiles, error: errorText(error) });
       }
     },
   });
@@ -2654,8 +2651,8 @@ export default function qdashExtension(host: ExtensionAPI) {
         return toTextToolResult(boxed("QDash Task Figures", [
           `task ${params.taskId}`,
           "",
-          error instanceof Error ? error.message : String(error),
-        ]).join("\n"), { taskId: params.taskId, error: error instanceof Error ? error.message : String(error) }, { tool: "qdash_get_task_figures", taskId: params.taskId, path: "", mediaType: "", sizeBytes: 0 } satisfies FigureDetails);
+          errorText(error),
+        ]).join("\n"), { taskId: params.taskId, error: errorText(error) }, { tool: "qdash_get_task_figures", taskId: params.taskId, path: "", mediaType: "", sizeBytes: 0 } satisfies FigureDetails);
       }
     },
     renderResult(result, _options, theme) {
@@ -2738,7 +2735,7 @@ export default function qdashExtension(host: ExtensionAPI) {
             if (analysis.warnings.length) notes.push("Warnings:", ...analysis.warnings.map((line) => `- ${line}`));
             figures.push({ path: file.path ?? jsonFigurePaths[index], role: "plotly", data: figure });
           } catch (error) {
-            notes.push(`Figure JSON analysis #${index + 1} failed: ${error instanceof Error ? error.message : String(error)}`);
+            notes.push(`Figure JSON analysis #${index + 1} failed: ${errorText(error)}`);
           }
         }
       }
@@ -2756,7 +2753,7 @@ export default function qdashExtension(host: ExtensionAPI) {
               images.push({ type: "image", data: base64, mimeType: mediaType });
             }
           } catch (error) {
-            notes.push(`Figure image #${index + 1} embedding failed: ${error instanceof Error ? error.message : String(error)}`);
+            notes.push(`Figure image #${index + 1} embedding failed: ${errorText(error)}`);
           }
         }
       }
@@ -3197,7 +3194,7 @@ export default function qdashExtension(host: ExtensionAPI) {
         ctx.ui.setWidget("qdash", (_tui, theme) => dashboardComponent(dashboard, theme));
         ctx.ui.notify(`QDash setup complete: profile ${profile}, chip ${chipId}`, "info");
       } catch (error) {
-        ctx.ui.notify(`QDash setup failed: ${error instanceof Error ? error.message : String(error)}`, "error");
+        ctx.ui.notify(`QDash setup failed: ${errorText(error)}`, "error");
       }
     },
   });
@@ -3292,7 +3289,7 @@ export default function qdashExtension(host: ExtensionAPI) {
         ctx.ui.setWidget("qdash", ["QDash Investigation", investigationContextSummary(investigation)]);
         ctx.ui.notify(`Investigation context saved: ${investigationContextSummary(investigation)}`, "info");
       } catch (error) {
-        ctx.ui.notify(`Invalid investigation context: ${error instanceof Error ? error.message : String(error)}`, "error");
+        ctx.ui.notify(`Invalid investigation context: ${errorText(error)}`, "error");
       }
     },
   });
@@ -3328,7 +3325,7 @@ export default function qdashExtension(host: ExtensionAPI) {
         ctx.ui.setWidget("qdash", (_tui, theme) => textComponent(degradationReportLines(report).slice(1, -1), theme, true));
         ctx.ui.notify(`QDash degradation report updated: ${report.context.chipId}`, "info");
       } catch (error) {
-        ctx.ui.notify(`QDash degradation report failed: ${error instanceof Error ? error.message : String(error)}`, "error");
+        ctx.ui.notify(`QDash degradation report failed: ${errorText(error)}`, "error");
       }
     },
   });
@@ -3343,7 +3340,7 @@ export default function qdashExtension(host: ExtensionAPI) {
         ctx.ui.setWidget("qdash", (_tui, theme) => textComponent(calibrationPlanLines(plan).slice(1, -1), theme, true));
         ctx.ui.notify(`QDash dry-run plan prepared: ${plan.target.label}`, "info");
       } catch (error) {
-        ctx.ui.notify(`QDash plan failed: ${error instanceof Error ? error.message : String(error)}`, "error");
+        ctx.ui.notify(`QDash plan failed: ${errorText(error)}`, "error");
       }
     },
   });
@@ -3361,7 +3358,7 @@ export default function qdashExtension(host: ExtensionAPI) {
         ctx.ui.setWidget("qdash", (_tui, theme) => textComponent(targetOperationsReportLines(report).slice(1, -1), theme, true));
         ctx.ui.notify(`QDash target report updated: ${report.target.label}`, "info");
       } catch (error) {
-        ctx.ui.notify(`QDash target report failed: ${error instanceof Error ? error.message : String(error)}`, "error");
+        ctx.ui.notify(`QDash target report failed: ${errorText(error)}`, "error");
       }
     },
   });
@@ -3381,7 +3378,7 @@ export default function qdashExtension(host: ExtensionAPI) {
           ctx.ui.notify("QDash wiring insights unavailable: no markdown table", "warning");
         }
       } catch (error) {
-        ctx.ui.notify(`QDash wiring insights failed: ${error instanceof Error ? error.message : String(error)}`, "error");
+        ctx.ui.notify(`QDash wiring insights failed: ${errorText(error)}`, "error");
       }
     },
   });
@@ -3437,7 +3434,7 @@ export default function qdashExtension(host: ExtensionAPI) {
         ctx.ui.setWidget("qdash", JSON.stringify({ profiles, active: safeConfig(client, connectionSource(applyQDashContext({ profile }))) }, null, 2).split("\n"));
         ctx.ui.notify("QDash config shown in widget", "info");
       } catch (error) {
-        ctx.ui.notify(`QDash config error: ${error instanceof Error ? error.message : String(error)}`, "error");
+        ctx.ui.notify(`QDash config error: ${errorText(error)}`, "error");
       }
     },
   });

@@ -1,5 +1,6 @@
 import { readFileSync, statSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
+import { errorText } from "./errors.js";
 
 export type NumericTimeseriesPoint = { at: string | number | Date; value: number };
 export type NumericTimeseries = {
@@ -317,7 +318,7 @@ export function loadExternalCsvSeries(spec: ExternalCsvSpec, cwd: string): Numer
     try {
       at = parseCsvTimestamp(row[timeIndex] ?? "", timeFormat, spec.timezoneOffsetMinutes);
     } catch (error) {
-      throw new Error(`CSV row ${rowIndex + 1}: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(`CSV row ${rowIndex + 1}: ${errorText(error)}`);
     }
     columns.forEach((column, columnIndex) => {
       const value = Number((row[column.index] ?? "").trim());
