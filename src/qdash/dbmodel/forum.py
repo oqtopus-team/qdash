@@ -49,13 +49,22 @@ class ForumCategoryDocument(Document):
 
 
 class ForumLabelDocument(Document):
-    """Project-scoped custom forum label."""
+    """Project-scoped forum label.
+
+    A deleted label whose key is a default label key stays as a row with ``is_deleted``
+    set. The row keeps the key taken in the unique project/key index, so default label
+    seeding, which only ever inserts, cannot bring the deleted default back. Creating a
+    label whose generated key matches such a row reuses the row.
+    """
 
     project_id: str = Field(..., description="Owning project identifier")
     key: str = Field(..., description="Stable label key")
     name: str = Field(..., description="Display name")
     description: str = Field(default="", description="Short label description")
     color: str = Field(..., description="Display color as a lowercase hex string")
+    is_deleted: bool = Field(
+        default=False, description="Whether this row only reserves a deleted default label key"
+    )
     system_info: SystemInfoModel = Field(
         default_factory=SystemInfoModel, description="System timestamps"
     )

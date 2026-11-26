@@ -29,6 +29,15 @@ target summary for context that should remain visible across measurements. Notes
 Select **New thread** on the result to keep the discussion linked to its evidence. Use **Forum**
 for replies, mentions, and project-wide discussions; close a thread when resolved.
 
+Use labels to organize discussions. Each project receives **Agent**, **Calibration**,
+**Hardware**, **Software**, and **Question** on first use of labels, including existing projects.
+Existing labels are preserved. For a calibration question involving an agent, select
+**Agent**, **Calibration**, and **Question**.
+
+Project owners and editors can open **Forum** > **Labels** to add, edit, or delete labels.
+Default labels work like other labels; deleting one removes it from threads and does not
+automatically recreate it. Use the **Label** filter in **Forum** to find matching discussions.
+
 ## Reuse the Finding
 
 **Knowledge** is read-only. To improve a task reference:
