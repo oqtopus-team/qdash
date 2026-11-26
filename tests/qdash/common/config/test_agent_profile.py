@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import shutil
 from pathlib import Path
@@ -624,3 +625,201 @@ def test_config_paths_select_the_files_the_runtime_reads(
     assert [model.name for model in config.evaluation_models] == case["evaluation"]
     if "warning" in case:
         assert case["warning"] in caplog.text
+
+
+def _model_error(fields: dict[Any, Any]) -> str | None:
+    """Validate one chat model with ``fields`` and return its message without the path."""
+    model = {"provider": "p", "name": "m", **fields}
+    try:
+        validate_agent_profile_document("chat", {"chat_models": [model]}, Path("chat.yaml"))
+    except AgentProfileError as error:
+        prefix = "chat.yaml: chat_models[0]"
+        message = str(error)
+        assert message.startswith(prefix)
+        return message[len(prefix) :]
+    return None
+
+
+_URL = {"base_url": "http://host"}
+_EFFORTS = "none, minimal, low, medium, high"
+_LEVELS = "off, minimal, low, medium, high, xhigh, max"
+_URL_ERROR = ".base_url must be an http:// or https:// URL or env:NAME"
+
+
+@pytest.mark.parametrize(
+    ("fields", "expected"),
+    [
+        # Nullable fields accept null; every other field rejects it.
+        *[
+            ({field: None}, None)
+            for field in (
+                "temperature",
+                "base_url",
+                "api_key_env",
+                "keep_alive",
+                "num_ctx",
+                "top_p",
+                "top_k",
+                "reasoning_effort",
+            )
+        ],
+        *[
+            ({field: None, **_URL}, f".{field} must not be null")
+            for field in (
+                "api_style",
+                "max_output_tokens",
+                "disable_thinking_instruction",
+                "strict_tool_schemas",
+                "prompt_cache_key_mode",
+                "requires_non_null_assistant_content",
+                "requires_tools_with_tool_history",
+                "sampling_params",
+                "sampling_params_by_thinking_level",
+            )
+        ],
+        ({"name": None}, ".name must not be null"),
+        # Non-empty strings.
+        ({"provider": ""}, ".provider must be a non-empty string"),
+        ({"name": 5}, ".name must be a non-empty string"),
+        ({"keep_alive": ""}, ".keep_alive must be a non-empty string"),
+        ({"keep_alive": 300}, ".keep_alive must be a non-empty string"),
+        ({"keep_alive": "5m", **_URL}, None),
+        # Tuple membership compares by equality, so unhashable values fail cleanly.
+        ({"api_style": "completion"}, None),
+        ({"api_style": ["responses"]}, ".api_style must be one of responses, completion"),
+        ({"api_style": {"a": 1}}, ".api_style must be one of responses, completion"),
+        ({"reasoning_effort": "minimal"}, None),
+        ({"reasoning_effort": ["low"]}, f".reasoning_effort must be one of {_EFFORTS}"),
+        ({"reasoning_effort": "xhigh"}, f".reasoning_effort must be one of {_EFFORTS}"),
+        ({"prompt_cache_key_mode": "disabled", **_URL}, None),
+        (
+            {"prompt_cache_key_mode": {}, **_URL},
+            ".prompt_cache_key_mode must be one of auto, enabled, disabled",
+        ),
+        # base_url.
+        ({"base_url": "env:QDASH_URL"}, None),
+        ({"base_url": "env:_x1"}, None),
+        ({"base_url": "https://h/v1"}, None),
+        ({"base_url": "env:"}, _URL_ERROR),
+        ({"base_url": "env:1BAD"}, _URL_ERROR),
+        ({"base_url": "env:A-B"}, _URL_ERROR),
+        ({"base_url": "http://"}, _URL_ERROR),
+        ({"base_url": "ftp://h"}, _URL_ERROR),
+        ({"base_url": "HTTP://h"}, _URL_ERROR),
+        ({"base_url": 5}, _URL_ERROR),
+        ({"base_url": ["http://h"]}, _URL_ERROR),
+        # api_key_env.
+        ({"api_key_env": "_KEY1"}, None),
+        ({"api_key_env": "1KEY"}, ".api_key_env must be an environment variable name"),
+        ({"api_key_env": "env:KEY"}, ".api_key_env must be an environment variable name"),
+        ({"api_key_env": 1}, ".api_key_env must be an environment variable name"),
+        # Finite numbers exclude bool, NaN and infinity.
+        ({"temperature": 0}, None),
+        ({"temperature": 1.5}, None),
+        ({"temperature": True}, ".temperature must be a finite number"),
+        ({"temperature": math.nan}, ".temperature must be a finite number"),
+        ({"temperature": math.inf}, ".temperature must be a finite number"),
+        ({"temperature": "1"}, ".temperature must be a finite number"),
+        ({"temperature": -0.1}, ".temperature must be at least 0"),
+        ({"top_p": 1}, None),
+        ({"top_p": 1e-9}, None),
+        ({"top_p": 0}, ".top_p must be greater than 0 and at most 1"),
+        ({"top_p": 1.01}, ".top_p must be greater than 0 and at most 1"),
+        ({"top_p": False}, ".top_p must be a finite number"),
+        ({"top_p": -math.inf}, ".top_p must be a finite number"),
+        # Whole numbers stay within the safe-integer range.
+        ({"max_output_tokens": 1}, None),
+        ({"max_output_tokens": 4096.0}, None),
+        ({"max_output_tokens": 2**53 - 1}, None),
+        ({"max_output_tokens": 2**53}, ".max_output_tokens must be a whole number"),
+        ({"max_output_tokens": 1e300}, ".max_output_tokens must be a whole number"),
+        ({"max_output_tokens": True}, ".max_output_tokens must be a whole number"),
+        ({"max_output_tokens": math.nan}, ".max_output_tokens must be a whole number"),
+        ({"max_output_tokens": 0}, ".max_output_tokens must be at least 1"),
+        ({"max_output_tokens": -(2**53 - 1)}, ".max_output_tokens must be at least 1"),
+        ({"num_ctx": 1.5}, ".num_ctx must be a whole number"),
+        ({"num_ctx": 0}, ".num_ctx must be at least 1"),
+        ({"num_ctx": 2**53 - 1}, None),
+        ({"top_k": -1}, None),
+        ({"top_k": 0}, None),
+        ({"top_k": -2}, ".top_k must be at least -1"),
+        ({"top_k": True}, ".top_k must be a whole number"),
+        ({"top_k": -(2**53)}, ".top_k must be a whole number"),
+        # Booleans.
+        ({"disable_thinking_instruction": False}, None),
+        ({"strict_tool_schemas": True, **_URL}, None),
+        ({"requires_non_null_assistant_content": True, **_URL}, None),
+        ({"requires_tools_with_tool_history": False, **_URL}, None),
+        (
+            {"disable_thinking_instruction": 1},
+            ".disable_thinking_instruction must be true or false",
+        ),
+        ({"strict_tool_schemas": "true", **_URL}, ".strict_tool_schemas must be true or false"),
+        (
+            {"requires_non_null_assistant_content": 0, **_URL},
+            ".requires_non_null_assistant_content must be true or false",
+        ),
+        (
+            {"requires_tools_with_tool_history": [], **_URL},
+            ".requires_tools_with_tool_history must be true or false",
+        ),
+        # Mappings.
+        ({"sampling_params": {}}, None),
+        ({"sampling_params": []}, ".sampling_params must be a mapping"),
+        ({"sampling_params_by_thinking_level": {}}, None),
+        ({"sampling_params_by_thinking_level": {"off": {}, "max": {"a": 1}}}, None),
+        (
+            {"sampling_params_by_thinking_level": []},
+            ".sampling_params_by_thinking_level must be a mapping",
+        ),
+        (
+            {"sampling_params_by_thinking_level": {"zeta": {}, "high": 1, "alpha": {}, 1: {}}},
+            f".sampling_params_by_thinking_level has unknown level(s) 1, alpha, zeta; use {_LEVELS}",
+        ),
+        (
+            {"sampling_params_by_thinking_level": {"low": 2, "high": 1}},
+            ".sampling_params_by_thinking_level low must be a mapping",
+        ),
+        (
+            {"sampling_params_by_thinking_level": {"high": [], "low": 2}},
+            ".sampling_params_by_thinking_level high must be a mapping",
+        ),
+        # Fields fail in sorted order, before any cross-field rule.
+        ({"top_p": 2, "temperature": -1}, ".temperature must be at least 0"),
+        ({"num_ctx": 0, "max_output_tokens": 0}, ".max_output_tokens must be at least 1"),
+        ({"max_output_tokens": 8, "num_ctx": 8}, ".max_output_tokens must be less than num_ctx"),
+        ({"max_output_tokens": 8, "num_ctx": None}, None),
+        (
+            {"strict_tool_schemas": 1},
+            ".strict_tool_schemas must be true or false",
+        ),
+        (
+            {"strict_tool_schemas": True, "base_url": None},
+            ".strict_tool_schemas applies only to a model with base_url",
+        ),
+        (
+            {"api_style": "responses", "requires_tools_with_tool_history": True, **_URL},
+            ".requires_tools_with_tool_history applies only to api_style completion",
+        ),
+    ],
+)
+def test_profile_model_field_rules(fields: dict[Any, Any], expected: str | None) -> None:
+    """Each field's accepted values and exact message, checked through the public validator."""
+    assert _model_error(fields) == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"), [(None, "must not be null"), ("x", None), ([], None)]
+)
+def test_unlisted_field_has_no_value_rule(value: object, expected: str | None) -> None:
+    """The unknown-field check owns unlisted names; the value rules leave them alone."""
+    from qdash.common.config.agent_profile import _model_field_error
+
+    assert _model_field_error("not_a_field", value) == expected
+
+
+def test_every_profile_model_field_has_a_value_rule() -> None:
+    """A field without a rule would accept any non-null value."""
+    from qdash.common.config.agent_profile import _FIELD_RULES
+
+    assert set(_FIELD_RULES) == PROFILE_MODEL_FIELDS
