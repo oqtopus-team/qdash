@@ -30,6 +30,7 @@ import {
 import { parse as parseToml, TomlError } from "smol-toml";
 
 import { QDashConnection } from "./qdash-connection.js";
+import { errorText } from "./errors.js";
 
 export interface ConnectionParams {
   useEnv?: boolean;
@@ -122,7 +123,7 @@ export function configProfiles(configPath?: string, env: Environment = process.e
     const selected = document.default_profile;
     return { ...base, exists: true, profiles, defaultProfile: typeof selected === "string" && selected ? selected : DEFAULT_PROFILE };
   } catch (error) {
-    return { ...base, exists: true, profiles: [], error: error instanceof Error ? error.message : String(error) };
+    return { ...base, exists: true, profiles: [], error: errorText(error) };
   }
 }
 
@@ -144,7 +145,7 @@ async function tomlConfig(file: ConfigFile, profile: string | undefined, env: En
   try {
     return await SdkConfig.fromFile(profile, file.path, { env });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorText(error);
     const legacy = legacyClientConfigPath(env);
     if (!file.explicit && message.startsWith("Config profile not found") && existsSync(legacy)) {
       throw new QDashConfigError(
@@ -190,7 +191,7 @@ export async function connectClient(
     if (file.format !== "toml") throw error;
     // The SDK's messages name fields, never values.
     const name = params.profile ?? configProfiles(file.path, env).defaultProfile;
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorText(error);
     throw new QDashConfigError(`Profile '${name}' in config file ${file.path} cannot be used by pi-qdash: ${message}`, { cause: error });
   }
 }

@@ -1,15 +1,11 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import BaseModel, Field, field_serializer
 
-from qdash.common.utils.datetime import (
-    ensure_timezone,
-    format_elapsed_time,
-    format_iso,
-    parse_elapsed_time,
-)
+from qdash.common.utils.datetime import format_iso
+from qdash.datamodel.field_types import ElapsedTime, TimezoneAwareDatetime
 from qdash.datamodel.system_info import SystemInfoModel
 
 __all__ = [
@@ -68,37 +64,14 @@ class ExecutionModel(BaseModel):
     status: str = Field(..., description="The status of the execution")
     tags: list[str] = Field(..., description="The tags")
     chip_id: str = Field(..., description="The chip ID")
-    start_at: datetime | None = Field(None, description="The time when the execution started")
-    end_at: datetime | None = Field(None, description="The time when the execution ended")
-    elapsed_time: timedelta | None = Field(None, description="The elapsed time")
+    start_at: TimezoneAwareDatetime = Field(None, description="The time when the execution started")
+    end_at: TimezoneAwareDatetime = Field(None, description="The time when the execution ended")
+    elapsed_time: ElapsedTime = Field(None, description="The elapsed time")
     message: str = Field(..., description="The message")
     system_info: SystemInfoModel = Field(..., description="The system information")
-
-    @field_validator("start_at", "end_at", mode="before")
-    @classmethod
-    def _ensure_timezone(cls, v: Any) -> datetime | Any:
-        """Ensure datetime fields are timezone-aware."""
-        if v is None:
-            return None
-        if isinstance(v, datetime):
-            return ensure_timezone(v)
-        # For other inputs (e.g., strings), let pydantic handle the conversion
-        return v
-
-    @field_validator("elapsed_time", mode="before")
-    @classmethod
-    def _parse_elapsed_time(cls, v: Any) -> timedelta | None:
-        """Parse elapsed_time from various formats."""
-        return parse_elapsed_time(v)
 
     @field_serializer("start_at", "end_at")
     @classmethod
     def _serialize_datetime(cls, v: datetime | None) -> str | None:
         """Serialize datetime to ISO format for JSON compatibility."""
         return format_iso(v)
-
-    @field_serializer("elapsed_time")
-    @classmethod
-    def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
-        """Serialize elapsed_time to H:MM:SS format."""
-        return format_elapsed_time(v) if v else None

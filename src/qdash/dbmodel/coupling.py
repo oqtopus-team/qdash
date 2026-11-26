@@ -8,7 +8,7 @@ from qdash.datamodel.coupling import CouplingModel
 from qdash.datamodel.note import NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.coupling_history import CouplingHistoryDocument
-from qdash.dbmodel.user import UserDocument
+from qdash.dbmodel.lookups import user_id_for_username
 
 
 class CouplingDocument(Document):
@@ -90,7 +90,7 @@ class CouplingDocument(Document):
 
         if coupling_doc is None:
             raise ValueError(f"Coupling {qid} not found in chip {chip_id}")
-        coupling_doc.user_id = cls._user_id_for_username(username)
+        coupling_doc.user_id = user_id_for_username(username)
         coupling_doc.username = username
         coupling_doc.data = CouplingDocument.merge_calib_data(coupling_doc.data, output_parameters)
         coupling_doc.system_info.update_time()
@@ -128,7 +128,7 @@ class CouplingDocument(Document):
         if parameter_name not in coupling_doc.data:
             raise ValueError(f"Parameter {parameter_name} not found for coupling {qid}")
 
-        coupling_doc.user_id = cls._user_id_for_username(username)
+        coupling_doc.user_id = user_id_for_username(username)
         coupling_doc.username = username
         coupling_doc.data.pop(parameter_name)
         coupling_doc.system_info.update_time()
@@ -154,8 +154,3 @@ class CouplingDocument(Document):
         coupling_doc.status = status
         coupling_doc.save()
         return coupling_doc
-
-    @staticmethod
-    def _user_id_for_username(username: str) -> str | None:
-        user = UserDocument.find_one({"username": username}).run()
-        return user.user_id if user else None

@@ -14,6 +14,7 @@ import {
 } from "@/components/features/execution/agentSessionDisplay";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime } from "@/lib/utils/datetime";
+import { saveBlob } from "@/lib/utils/download";
 
 export const AUDIT_PAGE_SIZE = 50;
 
@@ -331,14 +332,7 @@ function downloadJson(audit: AuditPageLike, filename: string) {
   const blob = new Blob([JSON.stringify(audit, null, 2)], {
     type: "application/json;charset=utf-8",
   });
-  const url = window.URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  window.URL.revokeObjectURL(url);
+  saveBlob(blob, filename);
 }
 
 function statusOf(error: unknown): number | undefined {

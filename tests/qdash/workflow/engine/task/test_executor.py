@@ -1,8 +1,9 @@
 """Tests for TaskExecutor."""
 
-from typing import Any
-from unittest.mock import MagicMock
+from typing import Any, cast
+from unittest.mock import ANY, MagicMock
 
+import plotly.graph_objects as go
 import pytest
 
 from qdash.datamodel.task import (
@@ -1340,3 +1341,154 @@ class TestMergeOverrides:
         original_snapshot: dict[str, Any] = {"a": {"value": 1, "unit": "V"}}
         TaskExecutor._merge_overrides(snapshot, {"a": 2})
         assert snapshot == original_snapshot
+
+
+class TestPostprocessResultParity:
+    """Single-qid and batch execution apply one postprocess result policy."""
+
+    @pytest.fixture
+    def state_manager(self) -> MagicMock:
+        state_manager = MagicMock()
+        state_manager.get_task.return_value = QubitTaskModel(
+            name="CheckRabi", qid="0", task_id="task-001", status=TaskStatusModel.RUNNING
+        )
+        return state_manager
+
+    @pytest.fixture
+    def result_processor(self) -> MagicMock:
+        processor = MagicMock()
+        processor.process_output_parameters.return_value = {
+            "qubit_frequency": ParameterModel(value=5.0)
+        }
+        return processor
+
+    @pytest.fixture
+    def executor(self, state_manager: MagicMock, result_processor: MagicMock) -> TaskExecutor:
+        saver = MagicMock()
+        saver.save_figures.return_value = ([], [])
+        saver.save_raw_data.return_value = []
+        executor = TaskExecutor(
+            state_manager=state_manager,
+            calib_dir="/tmp/calib",
+            execution_id="exec-001",
+            task_manager_id="tm-001",
+            result_processor=result_processor,
+            data_saver=saver,
+        )
+        executor.history_recorder = MagicMock()
+        executor._backend_saver = MagicMock()
+        return executor
+
+    @staticmethod
+    def _execution_service() -> MagicMock:
+        service = MagicMock(project_id="proj-1", chip_id="chip-1")
+        service.merge_calib_data.return_value = service
+        return service
+
+    @staticmethod
+    def _run(
+        executor: TaskExecutor, task: MockTask, mode: str, service: MagicMock
+    ) -> tuple[bool, str]:
+        session: Any = MockSession()
+        if mode == "single":
+            try:
+                _, result = executor.execute(task, session, "0", service)
+            except ValueError as e:
+                return False, str(e)
+            return result.success, result.message
+        _, results = executor.execute_batch(task, session, ["0"], service)
+        return results["0"].success, results["0"].message
+
+    @staticmethod
+    def _task(run_result: RunResult, postprocess_result: PostProcessResult) -> MockTask:
+        task = MockTask()
+        task.run = MagicMock(return_value=run_result)  # type: ignore[method-assign]
+        task.batch_run = MagicMock(return_value=run_result)  # type: ignore[method-assign]
+        task.postprocess = MagicMock(return_value=postprocess_result)  # type: ignore[method-assign]
+        return task
+
+    @pytest.mark.parametrize("mode", ["single", "batch"])
+    def test_r2_failure_clears_outputs_and_saves_backend_as_failed(
+        self,
+        executor: TaskExecutor,
+        state_manager: MagicMock,
+        result_processor: MagicMock,
+        mode: str,
+    ) -> None:
+        result_processor.validate_r2.side_effect = R2ValidationError("low")
+        task = self._task(
+            RunResult(raw_result={}, r2={"0": 0.2}),
+            PostProcessResult(
+                output_parameters={"qubit_frequency": OutputParameterModel(value=5.0)}
+            ),
+        )
+        service = self._execution_service()
+
+        success, message = self._run(executor, task, mode, service)
+
+        assert success is False
+        assert message == "CheckRabi R² value too low: 0.2000 (threshold = 0.7)"
+        state_manager.put_output_parameters.assert_called_once()
+        state_manager.clear_output_parameters.assert_called_with("CheckRabi", "qubit", "0")
+        executor._backend_saver.save.assert_called_once_with(  # type: ignore[attr-defined]
+            task, service, "0", ANY, False
+        )
+
+    @pytest.mark.parametrize("mode", ["single", "batch"])
+    def test_validation_error_saves_artifacts_then_fails(
+        self, executor: TaskExecutor, state_manager: MagicMock, mode: str
+    ) -> None:
+        task = self._task(
+            RunResult(raw_result={}),
+            PostProcessResult(
+                output_parameters={"qubit_frequency": OutputParameterModel(value=5.0)},
+                figures=[go.Figure()],
+                validation_error="out of range",
+            ),
+        )
+        service = self._execution_service()
+
+        success, message = self._run(executor, task, mode, service)
+
+        assert (success, message) == (False, "out of range")
+        executor.data_saver.save_figures.assert_called_once()  # type: ignore[attr-defined]
+        state_manager.clear_output_parameters.assert_called_once_with("CheckRabi", "qubit", "0")
+        backend_save = cast("MagicMock", executor._backend_saver.save)
+        backend_save.assert_called_once()
+        assert backend_save.call_args.args[-1] is False
+
+    @pytest.mark.parametrize("mode", ["single", "batch"])
+    def test_missing_r2_saves_backend_as_failed_without_raising(
+        self, executor: TaskExecutor, state_manager: MagicMock, mode: str
+    ) -> None:
+        task = self._task(
+            RunResult(raw_result={}, r2={"4": 0.99}),
+            PostProcessResult(
+                output_parameters={"qubit_frequency": OutputParameterModel(value=5.0)}
+            ),
+        )
+        service = self._execution_service()
+
+        success, _ = self._run(executor, task, mode, service)
+
+        assert success is True
+        state_manager.clear_output_parameters.assert_called_once_with("CheckRabi", "qubit", "0")
+        backend_save = cast("MagicMock", executor._backend_saver.save)
+        assert backend_save.call_args.args[-1] is False
+
+    @pytest.mark.parametrize("mode", ["single", "batch"])
+    def test_start_is_recorded_with_source_task_id(self, executor: TaskExecutor, mode: str) -> None:
+        executor._source_task_id = "parent-task"
+        task = self._task(
+            RunResult(raw_result={}),
+            PostProcessResult(output_parameters={}),
+        )
+        task.run_parameters = {"shots": RunParameterModel(value=1024)}
+
+        success, _ = self._run(executor, task, mode, self._execution_service())
+
+        assert success is True
+        executor.state_manager.put_run_parameters.assert_called_once()  # type: ignore[attr-defined]
+        executor.history_recorder.set_source_task_id.assert_called_once_with(  # type: ignore[attr-defined]
+            project_id="proj-1", task_id="task-001", source_task_id="parent-task"
+        )

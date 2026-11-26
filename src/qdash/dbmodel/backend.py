@@ -7,7 +7,7 @@ from pymongo import ASCENDING, IndexModel
 
 from qdash.datamodel.backend import BackendModel
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.dbmodel.user import UserDocument
+from qdash.dbmodel.lookups import user_id_for_username
 
 logger = logging.getLogger(__name__)
 
@@ -48,17 +48,12 @@ class BackendDocument(Document):
             IndexModel([("project_id", ASCENDING), ("username", ASCENDING)]),
         ]
 
-    @staticmethod
-    def _user_id_for_username(username: str) -> str | None:
-        user = UserDocument.find_one({"username": username}).run()
-        return user.user_id if user else None
-
     @classmethod
     def from_backend_model(cls, model: BackendModel) -> "BackendDocument":
         """Create a BackendDocument from a BackendModel."""
         return cls(
             project_id=model.project_id,
-            user_id=cls._user_id_for_username(model.username),
+            user_id=user_id_for_username(model.username),
             username=model.username,
             name=model.name,
         )

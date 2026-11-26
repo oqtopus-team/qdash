@@ -284,7 +284,8 @@ export function legacyConfigPath(env: Environment = process.env): string {
   return join(configDir(env), "config.ini");
 }
 
-function expandUser(path: string): string {
+/** `path` with a leading `~` or `~/` replaced by the home directory. */
+export function expandUser(path: string): string {
   return path === "~" || path.startsWith("~/") ? join(homedir(), path.slice(1)) : path;
 }
 

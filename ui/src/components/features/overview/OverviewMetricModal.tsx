@@ -15,6 +15,7 @@ import {
 } from "./MetricNotePanel";
 import type { GetChipNotesSummaryParams } from "@/schemas";
 import type { MentionCandidate } from "@/components/ui/MarkdownEditor";
+import { formatNoteTarget } from "@/components/features/overview/targetForumLinks";
 
 interface OverviewMetricModalProps {
   chipId: string;
@@ -37,14 +38,6 @@ interface OverviewMetricModalProps {
   legacyMetricNotes?: NoteEntryWithMetric[];
   mentionCandidates?: MentionCandidate[];
   onClose: () => void;
-}
-
-function formatTarget(targetId: string): string {
-  if (targetId.includes("-")) {
-    const [a, b] = targetId.split("-");
-    return `Q${a} → Q${b}`;
-  }
-  return `Q${targetId}`;
 }
 
 /**
@@ -81,7 +74,7 @@ export function OverviewMetricModal({
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
           <div className="min-w-0 flex-1">
             <DialogTitle className="text-sm font-medium truncate">
-              {formatTarget(targetId)} · {metricTitle}
+              {formatNoteTarget(targetId)} · {metricTitle}
             </DialogTitle>
             <DialogDescription className="text-sm text-base-content/70 mt-0.5">
               Metric history, per-task notes, and shared target context.

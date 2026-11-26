@@ -26,3 +26,22 @@ def test_qubit_targets_pass_project_id_to_cr_scheduler() -> None:
         project_id="proj-1",
         mux_mapping=None,
     )
+
+
+def test_mux_targets_schedule_pairs_among_resolved_qids_on_given_mapping() -> None:
+    scheduler = MagicMock()
+    scheduler.generate.return_value.parallel_groups = [[("0", "1"), ("2", "3")], [("1", "2")]]
+    mapping = MagicMock()
+
+    with (
+        patch.object(MuxTargets, "to_qids", return_value=["0", "1", "2", "3"]) as to_qids,
+        patch("qdash.workflow.engine.CRScheduler", return_value=scheduler) as scheduler_cls,
+    ):
+        result = MuxTargets([0]).to_coupling_ids("chip-1", project_id="proj-1", mux_mapping=mapping)
+
+    assert result == ["0-1", "2-3", "1-2"]
+    to_qids.assert_called_once_with("chip-1", mux_mapping=mapping)
+    assert scheduler_cls.call_args.kwargs["mux_mapping"] is mapping
+    scheduler.generate.assert_called_once_with(
+        candidate_qubits=["0", "1", "2", "3"], max_parallel_ops=100
+    )

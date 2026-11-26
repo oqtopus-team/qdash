@@ -24,6 +24,7 @@ from qdash.api.schemas.agent_session import (
     RecordAgentDecisionRequest,
     SubmitAgentActionRequest,
 )
+from qdash.api.services.agent_candidate_commit import AgentCandidateCommitService
 from qdash.api.services.agent_session_audit import AgentSessionAuditService
 from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.common.utils.datetime import now
@@ -1479,7 +1480,7 @@ def test_an_external_write_after_validation_is_never_overwritten(
     session_id = _session(service)
     chevron = _measure(service, session_id, "CheckChevron")
     decision = _decide(session_id, chevron)
-    reserve = AgentSessionService._reserve_commit
+    reserve = AgentCandidateCommitService._reserve_commit
 
     def reserve_then_external_write(*args: Any, **kwargs: Any) -> Any:
         result = reserve(*args, **kwargs)
@@ -1487,7 +1488,7 @@ def test_an_external_write_after_validation_is_never_overwritten(
         return result
 
     monkeypatch.setattr(
-        AgentSessionService, "_reserve_commit", staticmethod(reserve_then_external_write)
+        AgentCandidateCommitService, "_reserve_commit", staticmethod(reserve_then_external_write)
     )
     _refused(lambda: _commit(service, session_id, chevron, decision), 409, "nothing was written")
     assert _stored_frequency() == {"value": 7.3, "unit": "GHz"}
@@ -1511,7 +1512,7 @@ def test_a_reviewed_commit_also_writes_with_compare_and_set(
         return stored
 
     monkeypatch.setattr(
-        "qdash.api.services.agent_session_service.read_parameter", read_then_external_write
+        "qdash.api.services.agent_candidate_commit.read_parameter", read_then_external_write
     )
     _refused(
         lambda: _commit(service, session_id, chevron, None, autonomous=False),
@@ -1527,7 +1528,7 @@ def test_a_commit_leaves_other_parameters_written_meanwhile(
     session_id = _session(service)
     chevron = _measure(service, session_id, "CheckChevron")
     decision = _decide(session_id, chevron)
-    reserve = AgentSessionService._reserve_commit
+    reserve = AgentCandidateCommitService._reserve_commit
 
     def reserve_then_other_write(*args: Any, **kwargs: Any) -> Any:
         result = reserve(*args, **kwargs)
@@ -1537,7 +1538,7 @@ def test_a_commit_leaves_other_parameters_written_meanwhile(
         return result
 
     monkeypatch.setattr(
-        AgentSessionService, "_reserve_commit", staticmethod(reserve_then_other_write)
+        AgentCandidateCommitService, "_reserve_commit", staticmethod(reserve_then_other_write)
     )
     committed = _commit(service, session_id, chevron, decision)
     assert committed.status == "committed"

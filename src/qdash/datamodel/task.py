@@ -18,7 +18,8 @@ from pydantic import (
     model_validator,
 )
 
-from qdash.common.utils.datetime import format_elapsed_time, format_iso, now, parse_elapsed_time
+from qdash.common.utils.datetime import format_iso, now
+from qdash.datamodel.field_types import ElapsedTime
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task_invocation import TaskInvocation
 
@@ -668,7 +669,7 @@ class BaseTaskResultModel(BaseModel):
     raw_data_path: list[str] = []
     start_at: datetime | None = None
     end_at: datetime | None = None
-    elapsed_time: timedelta | None = None
+    elapsed_time: ElapsedTime = None
     task_type: str = "global"
     system_info: SystemInfoModel = SystemInfoModel()
     invocation: TaskInvocation | None = Field(
@@ -676,23 +677,11 @@ class BaseTaskResultModel(BaseModel):
         description="Planned step and call this result executed; None outside a step.",
     )
 
-    @field_validator("elapsed_time", mode="before")
-    @classmethod
-    def _parse_elapsed_time(cls, v: Any) -> timedelta | None:
-        """Parse elapsed_time from various formats including human-readable strings."""
-        return parse_elapsed_time(v)
-
     @field_serializer("start_at", "end_at")
     @classmethod
     def _serialize_datetime(cls, v: datetime | None) -> str | None:
         """Serialize datetime to ISO format for JSON compatibility."""
         return format_iso(v)
-
-    @field_serializer("elapsed_time")
-    @classmethod
-    def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
-        """Serialize elapsed_time to H:MM:SS format."""
-        return format_elapsed_time(v) if v else None
 
     def diagnose(self) -> None:
         """Diagnose the task result and raise an error if the task failed."""

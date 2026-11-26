@@ -7,6 +7,7 @@ import { toTextToolResult } from "../lib/results.js";
 import { requireWriteApproval } from "../lib/write-approval.js";
 import { isResultUnknown, resultUnknownToolError, sdkSession, unknownLaunchGuidance, type SdkSessionFactory } from "../lib/sdk-session.js";
 import { CONFIG_PATH_DESCRIPTION, PROFILE_DESCRIPTION } from "../lib/connection.js";
+import { errorText, statusCodeOrStatus } from "../lib/errors.js";
 
 /**
  * Declarative calibration pipelines.
@@ -347,12 +348,6 @@ export function problemsFromError(error: unknown): PipelineProblem[] | null {
     .map((item) => ({ path: item.path, message: String(item.message ?? "") }));
 }
 
-function statusOf(error: unknown): number | undefined {
-  if (!error || typeof error !== "object") return undefined;
-  const value = error as { statusCode?: unknown; status?: unknown };
-  return typeof value.statusCode === "number" ? value.statusCode : typeof value.status === "number" ? value.status : undefined;
-}
-
 const connectionParams = {
   profile: Type.Optional(Type.String({ description: PROFILE_DESCRIPTION })),
   configPath: Type.Optional(Type.String({ description: CONFIG_PATH_DESCRIPTION })),
@@ -391,7 +386,7 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
         try {
           declared = ((await client.listTasks(catalog.backend_name)) as { tasks?: TaskParameters[] }).tasks ?? [];
         } catch (error) {
-          declared = error instanceof Error ? error.message : String(error);
+          declared = errorText(error);
         }
       }
       const text = [formatPipelineCatalog(catalog, taskNames), ...formatTaskParameters(declared, taskNames)].join("\n");
@@ -503,7 +498,7 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
           ].join("\n");
           return toTextToolResult(text, { problems }, { tool: "qdash_run_pipeline", chipId: params.chipId, started: false, problemCount: problems.length });
         }
-        if (statusOf(error) === 503) {
+        if (statusCodeOrStatus(error) === 503) {
           throw new Error("QDash cannot run pipelines right now: the worker has not registered the calibration-pipeline deployment. Ask an operator to restart the worker, then try again.");
         }
         const detail = errorDetail(error);

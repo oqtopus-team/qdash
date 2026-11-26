@@ -300,12 +300,25 @@ function WrittenFiles({ files }: { files: WrittenFile[] }) {
   );
 }
 
+/**
+ * Whether an answer's work is history behind it: the answer ended and has text of
+ * its own, apart from the updates in its work. Partial text of an answer that was
+ * stopped, cut off, or still runs is not an answer to fold the work behind.
+ */
+function workIsHistory(blocks: AgentBlocksResult): boolean {
+  if (blocks.in_progress || blocks.stopped || blocks.interrupted) return false;
+  return blocks.blocks.some((b) => b.type === "text" && Boolean(b.content?.trim()));
+}
+
 function BlocksContent({
   blocks,
   interaction,
+  finishedHere = false,
 }: {
   blocks: AgentBlocksResult;
   interaction: InteractionState;
+  /** The answer of a turn this view streamed, now ended. */
+  finishedHere?: boolean;
 }) {
   const figures = blocks.trace ? figuresInSteps(blocks.trace.steps) : [];
   const files = writtenFiles(blocks.trace?.steps);
@@ -320,7 +333,14 @@ function BlocksContent({
     : interaction;
   return (
     <>
-      {blocks.trace && <ChatTraceSummary trace={blocks.trace} />}
+      {blocks.trace && (
+        // With an answer of its own, the work and its updates are history behind it.
+        <ChatTraceSummary
+          trace={blocks.trace}
+          foldable={workIsHistory(blocks)}
+          finishedHere={finishedHere}
+        />
+      )}
       {figures.length > 0 && <FigureStrip paths={figures} className="mb-3" />}
       <ImageSentBadge imagesSent={blocks.images_sent} />
       {blocks.assessment && (
@@ -580,9 +600,12 @@ export const AssistantMessage = memo(function AssistantMessage({
   canBranch = false,
   branching = false,
   onBranch,
+  finishedHere = false,
 }: {
   message: AgentMessage;
   isLast: boolean;
+  /** The answer of a turn this view streamed, now ended, rather than one loaded with the chat. */
+  finishedHere?: boolean;
   canRetry: boolean;
   onRetry: () => void;
   /** The answer stopped or failed and can go on from where it ended, without a new message. */
@@ -642,6 +665,7 @@ export const AssistantMessage = memo(function AssistantMessage({
         <BlocksContent
           blocks={blocks}
           interaction={{ active: isLast && canRetry, answer, onAnswer, onDecide, onOther }}
+          finishedHere={finishedHere}
         />
       ) : (
         <ChatMarkdown>{message.content}</ChatMarkdown>

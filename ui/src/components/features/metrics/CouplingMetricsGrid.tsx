@@ -1,20 +1,22 @@
 "use client";
 
-import { useMemo, useRef, useState, useCallback, useEffect } from "react";
-import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import { useMemo, useRef, useState, useCallback } from "react";
 
-import { ArrowRightLeft, GitBranch, Lock, ZoomIn } from "lucide-react";
+import { ArrowRightLeft, GitBranch } from "lucide-react";
 
 import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
-import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
-import { LockedGridScroller } from "@/components/ui/LockedGridScroller";
-import { GridZoomControls } from "@/components/ui/GridZoomControls";
+import {
+  GridRegionBackBar,
+  PositionedRegionOverlay,
+  GridViewModeSwitch,
+  GridViewport,
+} from "@/components/ui/GridViewControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
-import { ViewSwitch } from "@/components/ui/ViewSwitch";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
+import { useGridViewState } from "@/hooks/useGridViewState";
 import { usePanClickGuard } from "@/hooks/usePanClickGuard";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import {
@@ -142,24 +144,21 @@ export function CouplingMetricsGrid({
   const [isDirectionReversed, setIsDirectionReversed] = useState(false);
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
-
-  // Lock works for every topology, but region zoom assumes a square grid; leave it when the
-  // grid is not square.
-  useEffect(() => {
-    if (!isSquareGrid) {
-      setZoomMode("full");
-      setSelectedRegion(null);
-      setRegionSelectionEnabled(false);
-    }
-  }, [isSquareGrid]);
+  const {
+    viewMode,
+    changeViewMode,
+    zoomMode,
+    selectedRegion,
+    zoomToRegion,
+    showFullGrid,
+    hoveredRegion,
+    setHoveredRegion,
+    regionSelectionEnabled,
+    setRegionSelectionEnabled,
+  } = useGridViewState(isSquareGrid);
 
   const { isFullscreen, toggleFullscreen } = useFullscreenPanel();
   const panClickGuard = usePanClickGuard();
-
-  // Region selection state
-  const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
-  const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
 
   // LOD (Level of Detail) state for pan-zoom mode
   const [lodLevel, setLodLevel] = useState<"high" | "medium" | "low">("high");
@@ -180,14 +179,6 @@ export function CouplingMetricsGrid({
   // LOD-based visibility flags
   const showValues = lodLevel !== "low" || viewMode === "region";
   const showUnits = lodLevel === "high" || viewMode === "region";
-  const [selectedRegion, setSelectedRegion] = useState<{
-    row: number;
-    col: number;
-  } | null>(null);
-  const [hoveredRegion, setHoveredRegion] = useState<{
-    row: number;
-    col: number;
-  } | null>(null);
 
   // Modal state
   const [selectedCouplingInfo, setSelectedCouplingInfo] = useState<SelectedCouplingInfo | null>(
@@ -510,46 +501,15 @@ export function CouplingMetricsGrid({
 
       {/* Region selection overlay - only for square grids */}
       {zoomMode === "full" && regionSelectionEnabled && isSquareGrid && (
-        <>
-          {Array.from({ length: numRegions * numRegions }).map((_, index) => {
-            const regionRow = Math.floor(index / numRegions);
-            const regionCol = index % numRegions;
-            const isHovered = hoveredRegion?.row === regionRow && hoveredRegion?.col === regionCol;
-
-            const regionX = regionCol * regionSize * (displayCellSize + gap);
-            const regionY = regionRow * regionSize * (displayCellSize + gap);
-            const regionWidth = regionSize * (displayCellSize + gap) - gap;
-            const regionHeight = regionSize * (displayCellSize + gap) - gap;
-
-            return (
-              <button
-                key={index}
-                className={`absolute transition-colors duration-200 rounded-lg flex items-center justify-center z-20 ${
-                  isHovered
-                    ? "bg-primary/30 border-2 border-primary"
-                    : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
-                }`}
-                style={{
-                  top: regionY,
-                  left: regionX,
-                  width: regionWidth,
-                  height: regionHeight,
-                }}
-                onMouseEnter={() => setHoveredRegion({ row: regionRow, col: regionCol })}
-                onMouseLeave={() => setHoveredRegion(null)}
-                onClick={() => {
-                  setSelectedRegion({ row: regionRow, col: regionCol });
-                  setZoomMode("region");
-                }}
-                title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
-              >
-                <span className="text-xs font-medium text-white bg-black/50 px-2 py-1 rounded">
-                  {regionRow},{regionCol}
-                </span>
-              </button>
-            );
-          })}
-        </>
+        <PositionedRegionOverlay
+          numRegions={numRegions}
+          regionSize={regionSize}
+          hoveredRegion={hoveredRegion}
+          onHoverChange={setHoveredRegion}
+          onSelect={zoomToRegion}
+          cellSize={displayCellSize}
+          gap={gap}
+        />
       )}
     </div>
   );
@@ -565,35 +525,7 @@ export function CouplingMetricsGrid({
     >
       {/* View mode toggle */}
       <div className="flex items-center justify-between px-1 md:px-4 py-2">
-        <ViewSwitch
-          ariaLabel="Grid view"
-          size="sm"
-          value={viewMode}
-          onValueChange={(mode) => {
-            setViewMode(mode);
-            if (mode === "pan-zoom") {
-              setZoomMode("full");
-              setSelectedRegion(null);
-              setRegionSelectionEnabled(false);
-            }
-          }}
-          items={[
-            {
-              value: "pan-zoom",
-              label: <span className="hidden sm:inline">Zoom</span>,
-              icon: <ZoomIn aria-hidden="true" />,
-              ariaLabel: "Zoom",
-              title: "Zoom",
-            },
-            {
-              value: "region",
-              label: <span className="hidden sm:inline">Lock</span>,
-              icon: <Lock aria-hidden="true" />,
-              ariaLabel: "Lock",
-              title: "Lock",
-            },
-          ]}
-        />
+        <GridViewModeSwitch value={viewMode} onValueChange={changeViewMode} />
 
         <div className="flex items-center gap-2">
           <div
@@ -621,63 +553,24 @@ export function CouplingMetricsGrid({
 
       {/* Back button when in region mode */}
       {viewMode === "region" && zoomMode === "region" && selectedRegion && (
-        <div className="flex items-center gap-4 px-1 md:px-4 py-2">
-          <button
-            onClick={() => {
-              setZoomMode("full");
-              setSelectedRegion(null);
-            }}
-            className="btn btn-sm btn-ghost"
-          >
-            ← Back to Full View
-          </button>
-          <span className="text-sm text-base-content/70">
-            Region {selectedRegion.row + 1},{selectedRegion.col + 1}
-          </span>
-        </div>
+        <GridRegionBackBar
+          region={selectedRegion}
+          onBack={showFullGrid}
+          className="px-1 md:px-4 py-2"
+        />
       )}
 
       {/* Grid display */}
-      <div
-        className={`flex-1 relative flex justify-center ${
-          viewMode === "pan-zoom"
-            ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
-            : "items-start overflow-hidden bg-base-200/60 rounded-lg"
-        }`}
-        style={{ padding: `${Math.max(4, padding / 4)}px` }}
+      <GridViewport
+        viewMode={viewMode}
+        padding={padding}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+        onTransform={handleTransform}
+        panClickGuard={panClickGuard}
       >
-        <GridFullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
-        {viewMode === "pan-zoom" ? (
-          <TransformWrapper
-            initialScale={1}
-            minScale={0.3}
-            maxScale={4}
-            wheel={{ step: 0.08 }}
-            pinch={{ step: 5 }}
-            doubleClick={{ mode: "zoomIn", step: 0.7 }}
-            panning={{ velocityDisabled: true }}
-            smooth={false}
-            limitToBounds={false}
-            centerOnInit={true}
-            onTransform={handleTransform}
-          >
-            <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
-            <TransformComponent
-              contentProps={panClickGuard}
-              wrapperStyle={{ width: "100%", height: "100%" }}
-              contentStyle={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              {gridContent}
-            </TransformComponent>
-          </TransformWrapper>
-        ) : (
-          <LockedGridScroller>{gridContent}</LockedGridScroller>
-        )}
-      </div>
+        {gridContent}
+      </GridViewport>
 
       {/* Coupling Detail Modal with History */}
       <Dialog open={isModalOpen} onOpenChange={(open) => !open && setSelectedCouplingInfo(null)}>

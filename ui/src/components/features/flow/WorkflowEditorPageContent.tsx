@@ -1,9 +1,8 @@
 "use client";
 
-import type { OnMount } from "@monaco-editor/react";
 import dynamic from "next/dynamic";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { FieldErrors } from "react-hook-form";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -37,7 +36,6 @@ import {
   executeFlow,
   getListFlowsQueryKey,
   useListFlows,
-  formatFlowSource,
   listFlowSchedules,
 } from "@/client/flow/flow";
 import {
@@ -81,23 +79,28 @@ import { FlowExecuteConfirmModal } from "@/components/features/flow/FlowExecuteC
 import { FlowExplorer } from "@/components/features/flow/FlowExplorer";
 import { FlowSchedulePanel } from "@/components/features/flow/FlowSchedulePanel";
 import type { FlowPropertiesFormInput } from "@/components/features/flow/flowMetadataSchema";
+import { DiscardChangesDialog } from "@/components/features/flow/DiscardChangesDialog";
+import { useDiscardConfirmation } from "@/components/features/flow/useDiscardConfirmation";
+import type { FlowPropertyField } from "@/components/features/flow/useFlowDocument";
 import {
-  type FlowDocument,
-  type FlowPropertyField,
-  useFlowDocument,
-} from "@/components/features/flow/useFlowDocument";
+  EDITOR_OPTIONS,
+  useWorkflowEditorMonaco,
+} from "@/components/features/flow/useWorkflowEditorMonaco";
+import {
+  PANE_LABEL,
+  type Pane,
+  useWorkflowEditorPanes,
+} from "@/components/features/flow/useWorkflowEditorPanes";
 import { WorkflowExecutionHelpDialog } from "@/components/features/flow/WorkflowExecutionHelpDialog";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { isExecutionTerminal } from "@/lib/executionStatus";
 import { calibrationSessionHref } from "@/lib/chatCalibrationSession";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime } from "@/lib/utils/datetime";
 import { createRequestId } from "@/lib/utils/requestId";
-import { monoFontFamily, remeasureMonacoFontsWhenLoaded } from "@/lib/fonts";
 import {
-  attachPythonFormatter,
   describeFormatProblem,
+  FORMAT_DOCUMENT_ACTION,
   formatEditorDocument,
   type FormatRun,
 } from "@/lib/pythonFormatter";
@@ -105,53 +108,7 @@ import {
 // Monaco Editor is only available on client side
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
-const EDITOR_OPTIONS = {
-  minimap: { enabled: true, renderCharacters: false, maxColumn: 80, scale: 2 },
-  fontSize: 14,
-  fontFamily: monoFontFamily,
-  fontLigatures: true,
-  lineNumbers: "on" as const,
-  automaticLayout: true,
-  scrollBeyondLastLine: true,
-  padding: { top: 16, bottom: 16 },
-  wordWrap: "on" as const,
-  folding: true,
-  foldingHighlight: true,
-  renderLineHighlight: "all" as const,
-  cursorStyle: "line" as const,
-  cursorBlinking: "smooth" as const,
-  cursorSmoothCaretAnimation: "on" as const,
-  smoothScrolling: true,
-  bracketPairColorization: { enabled: true },
-  guides: {
-    bracketPairs: true,
-    indentation: true,
-    highlightActiveIndentation: true,
-  },
-  renderWhitespace: "selection" as const,
-  stickyScroll: { enabled: true },
-  suggest: { showKeywords: true, showSnippets: true },
-  quickSuggestions: { other: true, comments: false, strings: false },
-  parameterHints: { enabled: true },
-  matchBrackets: "always" as const,
-  occurrencesHighlight: "singleFile" as const,
-  selectionHighlight: true,
-  linkedEditing: true,
-  colorDecorators: true,
-  scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
-};
-
 type SidePanel = "explorer" | "properties";
-/** The left pane shows the page's workflow (the URL); the right pane, in split view, another. */
-type Pane = "primary" | "secondary";
-
-/** Workflows whose unsaved drafts an action would drop, and the action to run once confirmed. */
-interface DiscardPrompt {
-  names: string[];
-  action: () => void;
-}
-
-const PANE_LABEL: Record<Pane, string> = { primary: "Left", secondary: "Right" };
 
 /** Input ids of each property field in the side panel and in the properties modal, in form order. */
 const PROPERTY_INPUT_IDS: Record<FlowPropertyField, { side: string; modal: string }> = {
@@ -191,36 +148,51 @@ export function WorkflowEditorPageContent() {
     chipId: string;
     username: string;
   } | null>(null);
-  const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [showPropertiesModal, setShowPropertiesModal] = useState(false);
   const [showExecutionHelp, setShowExecutionHelp] = useState(false);
   const [isEditorLocked, setIsEditorLocked] = useState(true);
-  const [isSplitView, setIsSplitView] = useState(Boolean(initialSplit));
-  const [splitName, setSplitName] = useState<string | null>(
-    initialSplit && initialSplit !== routeName ? initialSplit : null,
-  );
-  const [activePane, setActivePane] = useState<Pane>("primary");
-  const [discardPrompt, setDiscardPrompt] = useState<DiscardPrompt | null>(null);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [activeSidePanel, setActiveSidePanel] = useState<SidePanel>("explorer");
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [fontSize, setFontSize] = useState(14);
-  const [selection, setSelection] = useState({ lines: 0, chars: 0 });
   const [isBottomPanelOpen, setIsBottomPanelOpen] = useState(false);
-  const [wordWrap, setWordWrap] = useState<"on" | "off">("on");
   const reportedTerminalExecution = useRef<string | null>(null);
   const pendingPropertyFocus = useRef<FlowPropertyField | null>(null);
   const [propertyFocusRequest, setPropertyFocusRequest] = useState(0);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const editorRefs = useRef<Record<Pane, any>>({ primary: null, secondary: null });
 
+  const openSidePanel = (panel: SidePanel) => {
+    setActiveSidePanel(panel);
+    setIsSidebarVisible(true);
+  };
+
+  const discard = useDiscardConfirmation();
+  const { confirmDiscard } = discard;
   // Each pane edits and saves its own workflow.
-  const primary = useFlowDocument(routeName);
-  const secondary = useFlowDocument(isSplitView ? splitName : null);
-  const docs: Record<Pane, FlowDocument> = { primary, secondary };
-  // The pane that header actions, Properties, the status bar and the Explorer act on.
-  const currentPane: Pane = isSplitView && activePane === "secondary" ? "secondary" : "primary";
+  const {
+    primary,
+    secondary,
+    docs,
+    isSplitView,
+    // The pane that header actions, Properties, the status bar and the Explorer act on.
+    currentPane,
+    setActivePane,
+    openFlow,
+    toggleSplit,
+    leaveTo,
+    forgetSplitFlow,
+  } = useWorkflowEditorPanes({
+    routeName,
+    initialSplit,
+    confirmDiscard,
+    onSplitOpened: () => openSidePanel("explorer"),
+  });
+  const editor = useWorkflowEditorMonaco({
+    currentPane,
+    onSave: (pane) => savePane(pane),
+    onFormatRun: (run) => reportFormatRun(run),
+  });
+  const { cursorPosition, selection, wordWrap, zoomIn, zoomOut, resetZoom, toggleWordWrap } =
+    editor;
   const active = docs[currentPane];
   const ready = active.isReady;
   const name = active.name ?? "";
@@ -323,7 +295,7 @@ export function WorkflowEditorPageContent() {
       // The right pane's workflow is gone; the left pane stays open.
       queryClient.invalidateQueries({ queryKey: getListFlowsQueryKey() });
       queryClient.invalidateQueries({ queryKey: ["flows"] });
-      setSplitName((current) => (current === flowName ? null : current));
+      forgetSplitFlow(flowName);
     },
   });
 
@@ -493,7 +465,7 @@ export function WorkflowEditorPageContent() {
   // the draft as written when it cannot be formatted (a syntax error is then reported by the
   // save). A draft edited while the formatter ran is not saved.
   const formatForSave = async (pane: Pane, draft: string): Promise<string | null> => {
-    const run = await formatEditorDocument(editorRefs.current[pane], draft);
+    const run = await formatEditorDocument(editor.editorFor(pane), draft);
     if (run.status === "stale") {
       toast.warning("Not saved: the workflow changed while it was being formatted", {
         description: "Save again to save the current text.",
@@ -522,88 +494,14 @@ export function WorkflowEditorPageContent() {
     const problem = describeFormatProblem(run);
     if (problem) toast.error("Could not format the workflow", { description: problem });
   };
-  const reportFormatRunRef = useRef(reportFormatRun);
-  useEffect(() => {
-    reportFormatRunRef.current = reportFormatRun;
-  });
   const handleSave = () => savePane(currentPane);
 
-  // Keep a ref to savePane for Monaco commands (avoids stale closure)
-  const savePaneRef = useRef(savePane);
-  useEffect(() => {
-    savePaneRef.current = savePane;
-  });
-
-  // Warn before leaving with unsaved changes in either pane
-  const hasUnsavedChanges = primary.isDirty || secondary.isDirty;
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
-        e.preventDefault();
-      }
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [hasUnsavedChanges]);
-
-  /** Run `action`, first asking to discard any unsaved draft among `candidates`. */
-  const confirmDiscard = (candidates: FlowDocument[], action: () => void) => {
-    const names = candidates
-      .filter((doc) => doc.isDirty && doc.name)
-      .map((doc) => doc.name as string);
-    if (names.length === 0) {
-      action();
-      return;
-    }
-    setDiscardPrompt({ names, action });
-  };
-
-  const leaveEditor = () => confirmDiscard([primary, secondary], () => router.push("/workflow"));
-
-  // Open a workflow from the Explorer in the active pane.
-  const openFlow = (flowName: string) => {
-    const target = currentPane;
-    const other: Pane = target === "primary" ? "secondary" : "primary";
-    // A workflow already open in the other pane is focused there, never opened twice.
-    if (isSplitView && docs[other].name === flowName) {
-      setActivePane(other);
-      return;
-    }
-    if (docs[target].name === flowName) return;
-    if (target === "secondary") {
-      confirmDiscard([secondary], () => setSplitName(flowName));
-      return;
-    }
-    // The left pane is the page's workflow: opening another navigates, keeping the right pane's
-    // workflow open; the page reloads both, so either pane's draft is confirmed first.
-    confirmDiscard(isSplitView ? [primary, secondary] : [primary], () => {
-      const split = isSplitView && splitName ? `?split=${encodeURIComponent(splitName)}` : "";
-      router.push(`/workflow/${encodeURIComponent(flowName)}${split}`);
-    });
-  };
-
-  const toggleSplit = () => {
-    if (!isSplitView) {
-      // The new right pane waits for a workflow picked in the Explorer.
-      setIsSplitView(true);
-      setActivePane("secondary");
-      setActiveSidePanel("explorer");
-      setIsSidebarVisible(true);
-      return;
-    }
-    confirmDiscard([secondary], () => {
-      setIsSplitView(false);
-      setSplitName(null);
-      setActivePane("primary");
-    });
-  };
+  const leaveEditor = () => leaveTo("/workflow");
 
   const openExecute = () => {
     if (executeDisabledReason) return;
     setExecuteTarget(currentPane);
   };
-
-  const activeEditor = () => editorRefs.current[currentPane];
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -616,17 +514,17 @@ export function WorkflowEditorPageContent() {
       // Ctrl/Cmd + = → Zoom In
       if ((e.metaKey || e.ctrlKey) && (e.key === "=" || e.key === "+")) {
         e.preventDefault();
-        setFontSize((prev) => Math.min(prev + 2, 32));
+        zoomIn();
       }
       // Ctrl/Cmd + - → Zoom Out
       if ((e.metaKey || e.ctrlKey) && e.key === "-") {
         e.preventDefault();
-        setFontSize((prev) => Math.max(prev - 2, 8));
+        zoomOut();
       }
       // Ctrl/Cmd + 0 → Reset Zoom
       if ((e.metaKey || e.ctrlKey) && e.key === "0") {
         e.preventDefault();
-        setFontSize(14);
+        resetZoom();
       }
       // Ctrl/Cmd + ` → Toggle Bottom Panel
       if ((e.metaKey || e.ctrlKey) && e.key === "`") {
@@ -636,25 +534,7 @@ export function WorkflowEditorPageContent() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  // Sync fontSize and wordWrap to both editors
-  useEffect(() => {
-    for (const editor of Object.values(editorRefs.current)) {
-      editor?.updateOptions({ fontSize, wordWrap });
-    }
-  }, [fontSize, wordWrap]);
-
-  // The status bar follows the active pane's cursor.
-  const activePaneRef = useRef<Pane>(currentPane);
-  useEffect(() => {
-    activePaneRef.current = currentPane;
-    const position = editorRefs.current[currentPane]?.getPosition?.();
-    setCursorPosition(
-      position ? { line: position.lineNumber, column: position.column } : { line: 1, column: 1 },
-    );
-    setSelection({ lines: 0, chars: 0 });
-  }, [currentPane]);
+  }, [zoomIn, zoomOut, resetZoom]);
 
   // Command palette actions
   const commands = [
@@ -663,7 +543,7 @@ export function WorkflowEditorPageContent() {
       label: "Save Flow",
       shortcut: "⌘S",
       icon: Save,
-      action: () => savePaneRef.current(currentPane),
+      action: () => savePane(currentPane),
       enabled: !isEditorLocked && ready,
     },
     {
@@ -735,13 +615,7 @@ export function WorkflowEditorPageContent() {
       label: "Toggle Minimap",
       shortcut: "",
       icon: FileCode,
-      action: () => {
-        const ed = activeEditor();
-        if (ed) {
-          const current = ed.getOption(72);
-          ed.updateOptions({ minimap: { enabled: !current?.enabled } });
-        }
-      },
+      action: editor.toggleMinimap,
       enabled: true,
     },
     {
@@ -749,7 +623,7 @@ export function WorkflowEditorPageContent() {
       label: wordWrap === "on" ? "Disable Word Wrap" : "Enable Word Wrap",
       shortcut: "⌥Z",
       icon: WrapText,
-      action: () => setWordWrap((prev) => (prev === "on" ? "off" : "on")),
+      action: toggleWordWrap,
       enabled: true,
     },
     {
@@ -757,7 +631,7 @@ export function WorkflowEditorPageContent() {
       label: "Zoom In",
       shortcut: "⌘+",
       icon: ZoomIn,
-      action: () => setFontSize((prev) => Math.min(prev + 2, 32)),
+      action: zoomIn,
       enabled: true,
     },
     {
@@ -765,7 +639,7 @@ export function WorkflowEditorPageContent() {
       label: "Zoom Out",
       shortcut: "⌘-",
       icon: ZoomOut,
-      action: () => setFontSize((prev) => Math.max(prev - 2, 8)),
+      action: zoomOut,
       enabled: true,
     },
     {
@@ -773,7 +647,7 @@ export function WorkflowEditorPageContent() {
       label: "Reset Zoom",
       shortcut: "⌘0",
       icon: Minus,
-      action: () => setFontSize(14),
+      action: resetZoom,
       enabled: true,
     },
     {
@@ -781,10 +655,7 @@ export function WorkflowEditorPageContent() {
       label: "Go to Line...",
       shortcut: "⌘G",
       icon: ChevronRight,
-      action: () => {
-        activeEditor()?.focus();
-        activeEditor()?.getAction("editor.action.gotoLine")?.run();
-      },
+      action: () => editor.runActiveEditorAction("editor.action.gotoLine"),
       enabled: true,
     },
     {
@@ -792,10 +663,7 @@ export function WorkflowEditorPageContent() {
       label: "Find and Replace",
       shortcut: "⌘F",
       icon: Search,
-      action: () => {
-        activeEditor()?.focus();
-        activeEditor()?.getAction("actions.find")?.run();
-      },
+      action: () => editor.runActiveEditorAction("actions.find"),
       enabled: true,
     },
     {
@@ -803,10 +671,7 @@ export function WorkflowEditorPageContent() {
       label: "Format Document",
       shortcut: "⇧⌥F",
       icon: FileCode,
-      action: () => {
-        activeEditor()?.focus();
-        void activeEditor()?.getAction("editor.action.formatDocument")?.run();
-      },
+      action: () => editor.runActiveEditorAction(FORMAT_DOCUMENT_ACTION),
       enabled: !isEditorLocked && ready && !active.isSaving,
     },
   ];
@@ -832,78 +697,6 @@ export function WorkflowEditorPageContent() {
     },
   ];
 
-  const openSidePanel = (panel: SidePanel) => {
-    setActiveSidePanel(panel);
-    setIsSidebarVisible(true);
-  };
-
-  const mountEditor = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (pane: Pane, editor: any, monaco: any) => {
-      editorRefs.current[pane] = editor;
-      // A pane that opens another workflow remounts its editor; forget the disposed one.
-      editor.onDidDispose(() => {
-        if (editorRefs.current[pane] === editor) editorRefs.current[pane] = null;
-      });
-      remeasureMonacoFontsWhenLoaded(monaco);
-      // Format Document formats with the project's Ruff settings; detached when the editor goes.
-      attachPythonFormatter(monaco, editor, {
-        format: async (source) => (await formatFlowSource({ source })).data,
-        onRun: (run) => reportFormatRunRef.current(run),
-      });
-      editor.onDidChangeCursorPosition(
-        (e: { position: { lineNumber: number; column: number } }) => {
-          if (activePaneRef.current !== pane) return;
-          setCursorPosition({
-            line: e.position.lineNumber,
-            column: e.position.column,
-          });
-        },
-      );
-      editor.onDidChangeCursorSelection(
-        (e: {
-          selection: {
-            startLineNumber: number;
-            endLineNumber: number;
-            startColumn: number;
-            endColumn: number;
-          };
-        }) => {
-          if (activePaneRef.current !== pane) return;
-          const sel = e.selection;
-          if (sel.startLineNumber === sel.endLineNumber && sel.startColumn === sel.endColumn) {
-            setSelection({ lines: 0, chars: 0 });
-          } else {
-            const model = editor.getModel();
-            if (model) {
-              const text = model.getValueInRange(sel);
-              const lines = sel.endLineNumber - sel.startLineNumber + 1;
-              setSelection({ lines, chars: text.length });
-            }
-          }
-        },
-      );
-      // Cmd/Ctrl+S saves the workflow of the pane it was pressed in.
-      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () =>
-        savePaneRef.current(pane),
-      );
-      // Alt+Z → toggle word wrap
-      editor.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.KeyZ, () =>
-        setWordWrap((prev) => (prev === "on" ? "off" : "on")),
-      );
-    },
-    [],
-  );
-  // Each pane's editor reports to its own pane.
-  const handlePrimaryMount = useCallback<OnMount>(
-    (editor, monaco) => mountEditor("primary", editor, monaco),
-    [mountEditor],
-  );
-  const handleSecondaryMount = useCallback<OnMount>(
-    (editor, monaco) => mountEditor("secondary", editor, monaco),
-    [mountEditor],
-  );
-
   const deleteDoc = deleteTarget ? docs[deleteTarget] : null;
   const showDeleteConfirm = deleteTarget !== null;
   const handleDelete = () => {
@@ -920,29 +713,10 @@ export function WorkflowEditorPageContent() {
   // Unsaved draft confirmation before a pane's workflow is replaced, closed or deleted. Both the
   // editor and the load-error view render it, since either can defer an action behind it.
   const discardDialog = (
-    <ConfirmDialog
-      open={discardPrompt !== null}
-      title="Discard unsaved changes?"
-      description={
-        <>
-          Unsaved changes to{" "}
-          {discardPrompt?.names.map((draft, index) => (
-            <span key={draft}>
-              {index > 0 && " and "}
-              <strong>{draft}.py</strong>
-            </span>
-          ))}{" "}
-          will be lost. Save first to keep them.
-        </>
-      }
-      confirmLabel="Discard changes"
-      destructive
-      onConfirm={() => {
-        const action = discardPrompt?.action;
-        setDiscardPrompt(null);
-        action?.();
-      }}
-      onOpenChange={(open) => !open && setDiscardPrompt(null)}
+    <DiscardChangesDialog
+      prompt={discard.prompt}
+      onConfirm={discard.confirm}
+      onDismiss={discard.dismiss}
     />
   );
 
@@ -1033,10 +807,10 @@ export function WorkflowEditorPageContent() {
         theme="vs-dark"
         value={doc.code}
         onChange={(value) => doc.setCode(value || "")}
-        onMount={pane === "primary" ? handlePrimaryMount : handleSecondaryMount}
+        onMount={editor.handleMount[pane]}
         options={{
           ...EDITOR_OPTIONS,
-          fontSize,
+          fontSize: editor.fontSize,
           wordWrap,
           readOnly: isEditorLocked,
           domReadOnly: isEditorLocked,
@@ -1414,9 +1188,7 @@ export function WorkflowEditorPageContent() {
                   <div className="border-t border-base-300 p-2">
                     <button
                       type="button"
-                      onClick={() =>
-                        confirmDiscard([primary, secondary], () => router.push("/workflow/new"))
-                      }
+                      onClick={() => leaveTo("/workflow/new")}
                       className="btn btn-primary btn-xs w-full"
                     >
                       <FilePlus2 data-icon="inline-start" />
@@ -1732,10 +1504,7 @@ export function WorkflowEditorPageContent() {
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => {
-                activeEditor()?.focus();
-                activeEditor()?.getAction("editor.action.gotoLine")?.run();
-              }}
+              onClick={() => editor.runActiveEditorAction("editor.action.gotoLine")}
               className="hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
               title="Go to Line (⌘G)"
             >
@@ -1758,7 +1527,7 @@ export function WorkflowEditorPageContent() {
             <span className="px-1.5 py-0.5">{ready ? code.split("\n").length : 0} lines</span>
             <button
               type="button"
-              onClick={() => setWordWrap((prev) => (prev === "on" ? "off" : "on"))}
+              onClick={toggleWordWrap}
               className={`hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer hidden sm:flex items-center gap-1 ${wordWrap === "off" ? "opacity-50" : ""}`}
               title="Toggle Word Wrap (⌥Z)"
             >
@@ -1772,14 +1541,14 @@ export function WorkflowEditorPageContent() {
             >
               <Terminal size={10} />
             </button>
-            {fontSize !== 14 && (
+            {editor.isZoomed && (
               <button
                 type="button"
-                onClick={() => setFontSize(14)}
+                onClick={resetZoom}
                 className="hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer hidden sm:block"
                 title="Reset Zoom (⌘0)"
               >
-                {Math.round((fontSize / 14) * 100)}%
+                {editor.zoomPercent}%
               </button>
             )}
             {isEditorLocked ? (

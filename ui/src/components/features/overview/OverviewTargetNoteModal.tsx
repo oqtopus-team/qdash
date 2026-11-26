@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { useListForumPosts } from "@/client/forum/forum";
 import {
   getGetChipNotesSummaryQueryKey,
   useCreateCouplingNoteComment,
@@ -34,6 +33,7 @@ import type { GetChipNotesSummaryParams, NoteCommentModel, SystemRole } from "@/
 
 import { formatForumPostTitle, getForumLabel } from "../forum/categories";
 import { ForumLabelBadge } from "../forum/ForumLabelBadge";
+import { formatNoteTarget, forumDraftHref, useLinkedForumPosts } from "./targetForumLinks";
 
 export interface TargetNoteEntry {
   targetId: string;
@@ -53,75 +53,6 @@ interface OverviewTargetNoteModalProps {
   currentUsername?: string | null;
   currentSystemRole?: SystemRole | null;
   onClose: () => void;
-}
-
-function formatTarget(targetId: string): string {
-  if (targetId.includes("-")) {
-    const [a, b] = targetId.split("-");
-    return `Q${a} -> Q${b}`;
-  }
-  return `Q${targetId}`;
-}
-
-function forumDraftHref(chipId: string, targetId: string, cooldownId?: string | null): string {
-  const isCoupling = targetId.includes("-");
-  const targetLabel = formatTarget(targetId);
-  const params = new URLSearchParams({
-    category: isCoupling ? "coupling" : "qubit",
-    chip_id: chipId,
-    target_id: targetId,
-    target_type: isCoupling ? "coupling" : "qubit",
-    target_label: targetLabel,
-    title: `${targetLabel}: `,
-    content: [`Chip: ${chipId}`, `Target: ${targetLabel}`, "", "Notes:"].join("\n"),
-  });
-  if (cooldownId) params.set("cooldown_id", cooldownId);
-  return `/forum/new?${params.toString()}`;
-}
-
-function normalizeQid(value: string): string {
-  const normalized = Number.parseInt(value, 10);
-  return Number.isNaN(normalized) ? value : String(normalized);
-}
-
-function normalizeTargetId(
-  value: string | null | undefined,
-  targetType: "qubit" | "coupling",
-): string | null {
-  const raw = value?.trim();
-  if (!raw) return null;
-  const qids = Array.from(raw.matchAll(/Q?\s*(\d+)/gi)).map((match) => normalizeQid(match[1]));
-  if (targetType === "coupling") {
-    if (qids.length >= 2) return `${qids[0]}-${qids[1]}`;
-    return raw.replace(/\s+/g, "");
-  }
-  if (qids.length >= 1) return qids[0];
-  return raw.replace(/^Q/i, "").replace(/\s+/g, "");
-}
-
-function matchesForumTarget(
-  post: {
-    chip_id?: string | null;
-    target_type?: string | null;
-    target_id?: string | null;
-    content?: string;
-  },
-  chipId: string,
-  targetId: string,
-): boolean {
-  const targetType = targetId.includes("-") ? "coupling" : "qubit";
-  if (post.chip_id && post.target_id) {
-    return (
-      post.chip_id === chipId &&
-      post.target_type === targetType &&
-      normalizeTargetId(post.target_id, targetType) === targetId
-    );
-  }
-
-  const content = post.content ?? "";
-  const contentChipId = content.match(/^Chip:\s*(.+)$/m)?.[1]?.trim();
-  const contentTarget = content.match(/^Target:\s*(.+)$/m)?.[1]?.trim();
-  return contentChipId === chipId && normalizeTargetId(contentTarget, targetType) === targetId;
 }
 
 export function OverviewTargetNoteModal({
@@ -148,20 +79,7 @@ export function OverviewTargetNoteModal({
       updateCouplingComment.isPending ||
       deleteCouplingComment.isPending
     : createQubitComment.isPending || updateQubitComment.isPending || deleteQubitComment.isPending;
-  const { data: forumPostsResponse } = useListForumPosts(
-    {
-      chip_id: chipId,
-      target_type: isCoupling ? "coupling" : "qubit",
-      target_id: targetId,
-      cooldown_id: cooldownId || undefined,
-      status: null,
-      limit: 50,
-    },
-    { query: { staleTime: 30_000 } },
-  );
-  const relatedForumPosts =
-    forumPostsResponse?.data.posts.filter((post) => matchesForumTarget(post, chipId, targetId)) ??
-    [];
+  const relatedForumPosts = useLinkedForumPosts(chipId, targetId, cooldownId);
   const { labels: forumLabels } = useForumLabels();
 
   const [entryDraft, setEntryDraft] = useState("");
@@ -274,7 +192,7 @@ export function OverviewTargetNoteModal({
             <DialogTitle className="flex items-center gap-2">
               <StickyNote className="h-5 w-5 text-warning" />
               <span className="truncate">
-                Summary notes · {formatTarget(targetId)}
+                Summary notes · {formatNoteTarget(targetId, "->")}
                 {cooldownId ? ` · ${cooldownId}` : ""}
               </span>
             </DialogTitle>
@@ -304,7 +222,12 @@ export function OverviewTargetNoteModal({
                 </p>
               </div>
               <Link
-                href={forumDraftHref(chipId, targetId, cooldownId)}
+                href={forumDraftHref(
+                  chipId,
+                  targetId,
+                  cooldownId,
+                  formatNoteTarget(targetId, "->"),
+                )}
                 className="btn btn-xs btn-outline"
               >
                 <MessageSquarePlus data-icon="inline-start" />

@@ -5,6 +5,7 @@ import {
   appendDelta,
   appendLiveBlock,
   endTool,
+  failedTurnPayload,
   progressTool,
   startDraft,
   startTool,
@@ -361,5 +362,31 @@ describe("agentChatStream", () => {
     )!;
     expect(tool(again.steps, 0).args).toEqual({ path: "a.txt", content: large });
     expect(tool(again.steps, 5).interrupted).toBe(true);
+  });
+
+  it("keeps a failed turn's progress updates in its trace, apart from the answer so far", () => {
+    let turn: LiveTurn = { steps: [], startedAt: 0 };
+    turn = { ...turn, steps: appendDelta(turn.steps, "text", "Checking the latest T1 results.") };
+    turn = { ...turn, steps: startTool(turn.steps, { id: "c1", tool: "qdash_get_task_results" }) };
+    turn = { ...turn, steps: endTool(turn.steps, { id: "c1", tool: "qdash_get_task_results" }) };
+    turn = { ...turn, steps: appendDelta(turn.steps, "thinking", "compare Q3") };
+    turn = { ...turn, steps: appendDelta(turn.steps, "text", "Q3 looks low; comparing") };
+
+    const payload = failedTurnPayload(turn, 5_000)!;
+    expect(payload.interrupted).toBe(true);
+    expect(payload.stopped).toBeUndefined();
+    // The update before the tool is work; thinking stays its own step; the tail is the answer so far.
+    expect(payload.trace?.steps.map((s) => s.kind)).toEqual(["text", "tool", "thinking"]);
+    expect(payload.trace?.steps[0]).toEqual({
+      kind: "text",
+      text: "Checking the latest T1 results.",
+    });
+    expect(payload.blocks).toEqual([
+      { type: "text", content: "Q3 looks low; comparing", chart: null },
+    ]);
+    // Same key order as the server's copy, so both serialize alike.
+    expect(Object.keys(payload)).toEqual(["blocks", "assessment", "interrupted", "trace"]);
+
+    expect(failedTurnPayload({ steps: [], startedAt: 0 }, 1)).toBeNull();
   });
 });

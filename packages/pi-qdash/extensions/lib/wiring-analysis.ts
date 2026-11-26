@@ -1,3 +1,5 @@
+import { ansi, simpleBox } from "./render.js";
+
 export type AttenuationEntry = {
   mux: string;
   line: "control" | "readout_send";
@@ -14,20 +16,6 @@ export type WiringInsights = {
   readoutSend: { commonTotalDb?: number; anomalies: AttenuationEntry[]; totals: Record<string, number> };
   suggestions: string[];
 };
-
-function ansi(code: string, text: string): string {
-  return `\u001b[${code}m${text}\u001b[0m`;
-}
-
-function boxed(title: string, body: string[], color = false): string[] {
-  const rawLines = [` ${title} `, ...body];
-  const width = Math.min(100, Math.max(...rawLines.map((line) => line.replace(/\u001b\[[0-9;]*m/g, "").length), title.length + 4));
-  const border = (text: string) => color ? ansi("90", text) : text;
-  const top = `${border("╭")}${color ? ansi("1;36", ` ${title} `) : ` ${title} `}${border("─".repeat(Math.max(0, width - title.length - 2)))}${border("╮")}`;
-  const bottom = border(`╰${"─".repeat(width)}╯`);
-  const middle = body.map((line) => `│ ${line}${" ".repeat(Math.max(0, width - line.replace(/\u001b\[[0-9;]*m/g, "").length - 2))} │`);
-  return [top, ...middle, bottom];
-}
 
 function markdownTableRows(markdown: string): string[][] {
   return markdown.split("\n")
@@ -155,7 +143,7 @@ export function wiringInsightLines(insights: WiringInsights, color = false): str
   const muted = (text: string) => color ? ansi("90", text) : text;
   const warning = (text: string) => color ? ansi("33", text) : text;
   const formatEntry = (entry: AttenuationEntry) => `${entry.qid ? `q${entry.qid}` : `MUX${entry.mux}`} ${muted(`MUX${entry.mux}`)} ${entry.panel ?? ""}${entry.hardwarePort ? `/${entry.hardwarePort}` : ""}: ${warning(`${entry.totalDb} dB`)} (${entry.components.join("+")})`;
-  return boxed("QDash Wiring Insights", [
+  return simpleBox("QDash Wiring Insights", [
     ...insights.suggestions.map((line) => `• ${line}`),
     "",
     accent("Control totals"),

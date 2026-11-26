@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
   monaco: {
     KeyMod: { CtrlCmd: 2048, Alt: 512 },
     KeyCode: { KeyS: 49, KeyZ: 56 },
-    editor: { remeasureFonts: () => undefined },
+    editor: { remeasureFonts: () => undefined, EditorOption: { minimap: 81 } },
   },
   // Commands the mounted editor registered, such as Cmd/Ctrl+S, by keybinding.
   editorCommands: new Map<number, () => void>(),
@@ -1000,5 +1000,56 @@ describe("WorkflowEditorPageContent formatting", () => {
     await waitFor(() => expect(screen.getByLabelText("Code")).toHaveValue(`${SAVED}\n# f\n`));
     expect(mocks.formatSource).toHaveBeenCalledWith({ source: SAVED });
     expect(saveFlow).not.toHaveBeenCalled();
+  });
+});
+
+describe("WorkflowEditorPageContent editor settings", () => {
+  beforeEach(() => {
+    mocks.projectId = "project-1";
+    mocks.disabledReason = null;
+    window.localStorage.setItem(PROJECT_STORAGE_KEY, "project-1");
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    window.localStorage.clear();
+    mocks.editorExtras = null;
+  });
+
+  it("applies zoom shortcuts to the editor and resets from the status bar", async () => {
+    const updateOptions = vi.fn();
+    mocks.editorExtras = () => ({ updateOptions });
+    renderEditor();
+    await screen.findByTestId("editor");
+
+    fireEvent.keyDown(window, { key: "=", metaKey: true });
+
+    await waitFor(() =>
+      expect(updateOptions).toHaveBeenLastCalledWith({ fontSize: 16, wordWrap: "on" }),
+    );
+    const reset = screen.getByTitle("Reset Zoom (⌘0)");
+    expect(reset).toHaveTextContent("114%");
+
+    fireEvent.click(reset);
+
+    await waitFor(() =>
+      expect(updateOptions).toHaveBeenLastCalledWith({ fontSize: 14, wordWrap: "on" }),
+    );
+    expect(screen.queryByTitle("Reset Zoom (⌘0)")).toBeNull();
+  });
+
+  it("toggles the active editor's minimap from the command palette", async () => {
+    const updateOptions = vi.fn();
+    const getOption = vi.fn(() => ({ enabled: true }));
+    mocks.editorExtras = () => ({ updateOptions, getOption });
+    renderEditor();
+    await screen.findByTestId("editor");
+
+    fireEvent.keyDown(window, { key: "p", ctrlKey: true, shiftKey: true });
+    fireEvent.click(await screen.findByRole("option", { name: /Toggle Minimap/ }));
+
+    expect(getOption).toHaveBeenCalledWith(mocks.monaco.editor.EditorOption.minimap);
+    expect(updateOptions).toHaveBeenLastCalledWith({ minimap: { enabled: false } });
   });
 });

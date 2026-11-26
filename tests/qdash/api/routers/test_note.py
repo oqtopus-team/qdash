@@ -15,6 +15,7 @@ from qdash.dbmodel.migration import (
     migrate_metric_notes_to_latest_cooldown_target_notes,
     migrate_metric_notes_to_target_notes,
 )
+from qdash.dbmodel.note_event import NoteEventDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.qubit import QubitDocument
@@ -1103,3 +1104,112 @@ def test_migrate_metric_notes_to_target_notes_reports_missing_targets(test_clien
     assert stats["targets_missing"] == 1
     assert stats["targets_updated"] == 0
     assert stats["targets"][0]["action"] == "missing_target"
+
+
+def _insert_coupling(**fields: object) -> None:
+    CouplingDocument(
+        project_id="note_project",
+        username="note_user",
+        chip_id="chip-1",
+        qid="21-22",
+        data={},
+        system_info=SystemInfoModel(),
+        **fields,
+    ).insert()
+
+
+def test_coupling_metric_note_delete_removes_legacy_embedded_entry(test_client, init_db):
+    headers = _create_project_user()
+    _create_chip(cooldown_id=None)
+    _insert_coupling(metric_notes={"zx90_gate_fidelity": NoteModel(content="legacy")})
+
+    response = test_client.delete(
+        "/chips/chip-1/couplings/21-22/metric-notes/zx90_gate_fidelity",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Coupling metric note deleted"
+    doc = CouplingDocument.find_one(CouplingDocument.qid == "21-22").run()
+    assert doc is not None
+    assert doc.metric_notes == {}
+    event = NoteEventDocument.find_one(NoteEventDocument.target_id == "21-22").run()
+    assert event is not None
+    assert (event.scope, event.metric_key, event.action) == (
+        "coupling_metric",
+        "zx90_gate_fidelity",
+        "delete",
+    )
+    assert event.extra == {"scope_key": "global", "scope_type": "global", "cooldown_id": ""}
+
+
+def test_metric_note_delete_for_missing_target_returns_404(test_client, init_db):
+    headers = _create_project_user()
+    _create_chip(cooldown_id=None)
+
+    response = test_client.delete("/chips/chip-1/qubits/21/metric-notes/t1", headers=headers)
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Metric note not found"
+
+
+def test_scoped_coupling_note_delete_without_note_returns_404(test_client, init_db):
+    headers = _create_project_user()
+    _create_chip(cooldown_id="cd-1")
+    _create_cooldown(cooldown_id="cd-1")
+    _insert_coupling()
+
+    response = test_client.delete(
+        "/chips/chip-1/couplings/21-22/note",
+        headers=headers,
+        params={"cooldown_id": "cd-1"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Coupling note not found"
+
+
+def test_coupling_note_comment_lifecycle_records_scope(test_client, init_db):
+    headers = _create_project_user()
+    _create_chip(cooldown_id="cd-1")
+    _create_cooldown(cooldown_id="cd-1")
+    _insert_coupling()
+
+    missing = test_client.put(
+        "/chips/chip-1/couplings/21-22/note/comments/unknown",
+        headers=headers,
+        json={"content": "edit"},
+    )
+    assert missing.status_code == 404
+    assert missing.json()["detail"] == "Target note comment not found"
+
+    created = test_client.post(
+        "/chips/chip-1/couplings/21-22/note/comments",
+        headers=headers,
+        json={"content": "first"},
+    )
+    assert created.status_code == 200
+    comment_id = created.json()["comment_id"]
+    target_note = TargetNoteDocument.find_one(TargetNoteDocument.target_id == "21-22").run()
+    assert target_note is not None
+    assert (target_note.target_type, target_note.scope_key, target_note.cooldown_id) == (
+        "coupling",
+        "cooldown:cd-1",
+        "cd-1",
+    )
+
+    deleted = test_client.delete(
+        f"/chips/chip-1/couplings/21-22/note/comments/{comment_id}", headers=headers
+    )
+    assert deleted.status_code == 200
+    assert deleted.json()["message"] == "Target note comment deleted"
+    events = list(NoteEventDocument.find(NoteEventDocument.target_id == "21-22").run())
+    assert [(e.scope, e.action) for e in events] == [("coupling", "upsert"), ("coupling", "delete")]
+    for event in events:
+        assert event.extra == {
+            "kind": "comment",
+            "comment_id": comment_id,
+            "scope_key": "cooldown:cd-1",
+            "scope_type": "cooldown",
+            "cooldown_id": "cd-1",
+        }

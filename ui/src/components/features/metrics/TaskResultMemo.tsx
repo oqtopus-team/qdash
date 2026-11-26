@@ -171,7 +171,8 @@ export function TaskResultMemo({ taskId, chipId, hideWhenEmpty = false }: TaskRe
   );
 }
 
-function stripAiGeneratedNoteSections(content: string): string {
+/** Removes a leading AI review or triage section, which the UI shows separately. */
+export function stripAiGeneratedNoteSections(content: string): string {
   const aiGeneratedNotePattern = new RegExp(
     "^\\s*(?:(?:#{1,6}\\s*)?AI\\s+(?:review|triage)|\\*\\*AI\\s+(?:review|triage)\\*\\*)\\b[\\s\\S]*?(?:\\r?\\n\\r?\\n---\\r?\\n\\r?\\n|$)",
     "i",

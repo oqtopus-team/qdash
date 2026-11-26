@@ -48,6 +48,54 @@ def _sync_local_repo(
         logger.error(f"Unexpected error during local repo sync: {e}")
 
 
+NO_CHANGES = "No changes to commit"
+
+
+def _authenticated_repo_url() -> str:
+    """Build the config repository URL with GitHub credentials from the environment."""
+    github_user = os.getenv("GITHUB_USER")
+    github_token = os.getenv("GITHUB_TOKEN")
+    repo_url = os.getenv("CONFIG_REPO_URL")
+
+    if not all([github_user, github_token, repo_url]):
+        raise RuntimeError("Missing required environment variables")
+
+    parsed = urlparse(repo_url)
+    # Ensure all URL components are strings
+    scheme = str(parsed.scheme)
+    netloc = str(parsed.netloc)
+    path = str(parsed.path)
+    auth_netloc = f"{github_user}:{github_token}@{netloc}"
+    return str(urlunparse((scheme, auth_netloc, path, "", "", "")))
+
+
+def _commit_and_push(
+    repo: Repo,
+    commit_message: str,
+    branch: str,
+    sync_local: bool,
+    logger: logging.Logger | logging.LoggerAdapter[logging.Logger],
+) -> str:
+    """Commit the staged files as the bot, push, and return the short commit SHA.
+
+    Returns ``NO_CHANGES`` without committing when the index matches ``HEAD``.
+    The local qubex-config repository is synced only after a successful push.
+    """
+    if not repo.index.diff("HEAD"):
+        logger.info(NO_CHANGES)
+        return NO_CHANGES
+    repo.git.config("user.name", "github-actions[bot]")
+    repo.git.config("user.email", "github-actions[bot]@users.noreply.github.com")
+    repo.index.commit(format_machine_commit_message(commit_message, now_iso()))
+
+    repo.remotes.origin.push()
+
+    commit_sha = str(repo.head.commit.hexsha[:8])
+    if sync_local:
+        _sync_local_repo(branch, logger)
+    return commit_sha
+
+
 # Default source path for calib_note.json (example chip: 64Qv1)
 DEFAULT_CALIB_NOTE_PATH = str(QUBEX_CONFIG_BASE / "64Qv1" / "calibration" / "calib_note.json")
 
@@ -79,24 +127,10 @@ def push_github(
 
     try:
         logger = get_run_logger()
-        github_user = os.getenv("GITHUB_USER")
-        github_token = os.getenv("GITHUB_TOKEN")
-        repo_url = os.getenv("CONFIG_REPO_URL")
-
-        if not all([github_user, github_token, repo_url]):
-            raise RuntimeError("Missing required environment variables")
-
-        parsed = urlparse(repo_url)
-        # Ensure all URL components are strings
-        scheme = str(parsed.scheme)
-        netloc = str(parsed.netloc)
-        path = str(parsed.path)
-        auth_netloc = f"{github_user}:{github_token}@{netloc}"
-        auth_url = urlunparse((scheme, auth_netloc, path, "", "", ""))
+        auth_url = _authenticated_repo_url()
 
         # Clone repository (shallow clone for efficiency)
         temp_dir = tempfile.mkdtemp()
-
         repo = Repo.clone_from(auth_url, temp_dir, branch=branch, depth=1)
 
         # Replace file
@@ -106,22 +140,7 @@ def push_github(
 
         # Git operations
         repo.index.add([str(target_file_path.relative_to(temp_dir))])
-        # Skip if no changes
-        diff = repo.index.diff("HEAD")
-        if not diff:
-            logger.info("No changes to commit")
-            return "No changes to commit"
-        now_jst = now_iso()
-        repo.git.config("user.name", "github-actions[bot]")
-        repo.git.config("user.email", "github-actions[bot]@users.noreply.github.com")
-        repo.index.commit(format_machine_commit_message(commit_message, now_jst))
-
-        repo.remotes.origin.push()
-
-        commit_sha = str(repo.head.commit.hexsha[:8])
-        if sync_local:
-            _sync_local_repo(branch, logger)
-        return commit_sha
+        return _commit_and_push(repo, commit_message, branch, sync_local, logger)
 
     except GitCommandError as e:
         raise RuntimeError(f"Git push failed: {e.stderr}")
@@ -159,21 +178,9 @@ def push_github_batch(
 
     try:
         logger = get_run_logger()
-        github_user = os.getenv("GITHUB_USER")
-        github_token = os.getenv("GITHUB_TOKEN")
-        repo_url = os.getenv("CONFIG_REPO_URL")
+        auth_url = _authenticated_repo_url()
 
-        if not all([github_user, github_token, repo_url]):
-            raise RuntimeError("Missing required environment variables")
-
-        parsed = urlparse(repo_url)
-        scheme = str(parsed.scheme)
-        netloc = str(parsed.netloc)
-        path = str(parsed.path)
-        auth_netloc = f"{github_user}:{github_token}@{netloc}"
-        auth_url = urlunparse((scheme, auth_netloc, path, "", "", ""))
-
-        # Clone repository once (shallow clone for efficiency)
+        # Clone repository (shallow clone for efficiency)
         temp_dir = tempfile.mkdtemp()
         repo = Repo.clone_from(auth_url, temp_dir, branch=branch, depth=1)
 
@@ -196,23 +203,9 @@ def push_github_batch(
         # Git operations - add all files
         repo.index.add(added_files)
 
-        # Check for changes
-        diff = repo.index.diff("HEAD")
-        if not diff:
-            logger.info("No changes to commit")
-            return "No changes to commit"
-
-        now_jst = now_iso()
-        repo.git.config("user.name", "github-actions[bot]")
-        repo.git.config("user.email", "github-actions[bot]@users.noreply.github.com")
-        repo.index.commit(format_machine_commit_message(commit_message, now_jst))
-
-        repo.remotes.origin.push()
-
-        logger.info(f"Pushed {len(added_files)} files in single commit")
-        commit_sha = str(repo.head.commit.hexsha[:8])
-        if sync_local:
-            _sync_local_repo(branch, logger)
+        commit_sha = _commit_and_push(repo, commit_message, branch, sync_local, logger)
+        if commit_sha != NO_CHANGES:
+            logger.info(f"Pushed {len(added_files)} files in single commit")
         return commit_sha
 
     except GitCommandError as e:

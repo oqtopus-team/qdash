@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -16,6 +16,7 @@ from pydantic import ValidationError
 from qdash.api.schemas.agent_session import (
     AgentCandidateReference,
     AgentCandidateResponse,
+    AgentCandidateSetCommitResponse,
     ApplyAgentCandidateRequest,
     CommitAgentCandidateRequest,
     CommitAgentCandidateSetRequest,
@@ -39,7 +40,11 @@ from qdash.datamodel.calibration_session import (
     CalibrationRunKind,
 )
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.dbmodel.agent_session import AgentActionDocument, AgentSessionDocument
+from qdash.dbmodel.agent_session import (
+    AgentActionDocument,
+    AgentCandidateSetCommitDocument,
+    AgentSessionDocument,
+)
 from qdash.dbmodel.calibration_session import (
     CalibrationPipelineRunDocument,
     CalibrationSessionDocument,
@@ -880,6 +885,226 @@ def test_commit_candidate_set_rejects_set_before_any_write(
     assert qubit is not None
     assert "drive_amplitude" not in qubit.data
     assert "qubit_frequency" not in qubit.data
+
+
+def _candidate_set(
+    service: AgentSessionService, *, key: str = "candidate-set-commit-1"
+) -> tuple[str, CommitAgentCandidateSetRequest]:
+    """A session at state version 2 with two accepted candidates, and a set commit of both."""
+    session = _create_session(service, max_actions=2)
+    first = service.submit_action(
+        project_id="project-1", session_id=session.session_id, body=_run_task_action()
+    )
+    second = service.submit_action(
+        project_id="project-1",
+        session_id=session.session_id,
+        body=_run_task_action(idempotency_key="action-2", expected_state_version=1),
+    )
+    _attach_completed_task_result(
+        session_id=session.session_id,
+        action_id=first.action_id,
+        output_parameters={"drive_amplitude": {"value": 0.12, "unit": "a.u."}},
+    )
+    _attach_completed_task_result(
+        session_id=session.session_id,
+        action_id=second.action_id,
+        output_parameters={"qubit_frequency": {"value": 4.8, "unit": "GHz"}},
+        sequence=2,
+    )
+    body = CommitAgentCandidateSetRequest(
+        idempotency_key=key,
+        expected_state_version=2,
+        candidates=[
+            AgentCandidateReference(
+                action_id=first.action_id,
+                parameter_name="drive_amplitude",
+                task_id="task-result-1",
+            ),
+            AgentCandidateReference(
+                action_id=second.action_id,
+                parameter_name="qubit_frequency",
+                task_id="task-result-2",
+            ),
+        ],
+    )
+    return session.session_id, body
+
+
+def _commit_set(
+    service: AgentSessionService, session_id: str, body: CommitAgentCandidateSetRequest
+) -> AgentCandidateSetCommitResponse:
+    return service.commit_candidate_set(
+        project_id="project-1", session_id=session_id, username="reviewer", body=body
+    )
+
+
+def _state_version(service: AgentSessionService, session_id: str) -> int:
+    return service.get_session(project_id="project-1", session_id=session_id).state_version
+
+
+def test_commit_candidate_set_refuses_a_reused_idempotency_key(
+    service: AgentSessionService,
+) -> None:
+    """A key already committed for one set never commits a different set."""
+    session_id, body = _candidate_set(service)
+    committed = _commit_set(service, session_id, body)
+    other = body.model_copy(update={"candidates": body.candidates[:1], "expected_state_version": 3})
+
+    with pytest.raises(HTTPException) as refused:
+        _commit_set(service, session_id, other)
+
+    assert refused.value.status_code == 409
+    assert "different candidate set commit" in str(refused.value.detail)
+    assert AgentCandidateSetCommitDocument.count() == 1
+    assert _commit_set(service, session_id, body).commit_id == committed.commit_id
+    assert _state_version(service, session_id) == 3
+
+
+def test_commit_candidate_set_refuses_a_stale_state_version(
+    service: AgentSessionService,
+) -> None:
+    """A set checked against an older session state reserves and writes nothing."""
+    session_id, body = _candidate_set(service)
+
+    with pytest.raises(HTTPException) as refused:
+        _commit_set(service, session_id, body.model_copy(update={"expected_state_version": 1}))
+
+    assert refused.value.status_code == 409
+    assert "state version mismatch" in str(refused.value.detail)
+    assert AgentCandidateSetCommitDocument.count() == 0
+    assert _state_version(service, session_id) == 2
+
+
+def test_a_session_change_before_the_set_reservation_frees_the_key(
+    service: AgentSessionService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A set whose reservation loses to a session change leaves no record, so a retry works."""
+    session_id, body = _candidate_set(service)
+    candidates = service.list_action_candidates
+    bumped: list[bool] = []
+
+    def change_session_after_check(**kwargs: Any) -> Any:
+        result = candidates(**kwargs)
+        if not bumped:
+            bumped.append(True)
+            AgentSessionDocument.get_motor_collection().update_one(
+                {"session_id": session_id}, {"$inc": {"state_version": 1}}
+            )
+        return result
+
+    monkeypatch.setattr(service, "list_action_candidates", change_session_after_check)
+    with pytest.raises(HTTPException) as refused:
+        _commit_set(service, session_id, body)
+
+    assert refused.value.status_code == 409
+    assert "changed while the candidate set commit was being reserved" in str(refused.value.detail)
+    assert AgentCandidateSetCommitDocument.count() == 0
+    qubit = QubitDocument.find_one({"qid": "Q00"}).run()
+    assert qubit is not None
+    assert qubit.data == {}
+
+    retried = _commit_set(
+        service, session_id, body.model_copy(update={"expected_state_version": 3})
+    )
+    assert retried.status == "committed"
+    assert _state_version(service, session_id) == 4
+
+
+@pytest.mark.parametrize("same_request", [True, False])
+def test_a_concurrent_set_commit_with_the_same_key_is_replayed_or_refused(
+    service: AgentSessionService, monkeypatch: pytest.MonkeyPatch, same_request: bool
+) -> None:
+    """A request that loses the insert race replays the winner's record, never a second write."""
+    session_id, body = _candidate_set(service)
+    racing = body if same_request else body.model_copy(update={"candidates": body.candidates[:1]})
+    candidates = service.list_action_candidates
+    winners: list[AgentCandidateSetCommitResponse] = []
+
+    raced: list[bool] = []
+
+    def concurrent_commit_wins(**kwargs: Any) -> Any:
+        result = candidates(**kwargs)
+        if not raced:
+            raced.append(True)
+            winners.append(
+                service.candidate_commits.commit_candidate_set(
+                    project_id="project-1", session_id=session_id, username="other", body=racing
+                )
+            )
+        return result
+
+    monkeypatch.setattr(service, "list_action_candidates", concurrent_commit_wins)
+    if same_request:
+        replayed = _commit_set(service, session_id, body)
+        assert replayed.commit_id == winners[0].commit_id
+        assert replayed.committed_by == "other"
+    else:
+        with pytest.raises(HTTPException) as refused:
+            _commit_set(service, session_id, body)
+        assert refused.value.status_code == 409
+        assert "Idempotency key was already used" in str(refused.value.detail)
+
+    assert AgentCandidateSetCommitDocument.count() == 1
+    assert _state_version(service, session_id) == 3
+
+
+def test_a_failed_set_write_retains_a_failed_audit_record(
+    service: AgentSessionService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A write that fails after the reservation settles its record as failed, never in flight."""
+
+    def fail(**kwargs: Any) -> Any:
+        raise RuntimeError("storage unavailable")
+
+    session_id, body = _candidate_set(service)
+    monkeypatch.setattr(QubitDocument, "update_calib_data", fail)
+
+    with pytest.raises(HTTPException) as refused:
+        _commit_set(service, session_id, body)
+
+    record = AgentCandidateSetCommitDocument.find_one({"session_id": session_id}).run()
+    assert refused.value.status_code == 500
+    assert record is not None
+    assert record.commit_id in str(refused.value.detail)
+    assert record.status == "failed"
+    assert record.reason == "Candidate persistence failed: storage unavailable"
+    assert not record.after_snapshot
+    assert _commit_set(service, session_id, body).commit_id == record.commit_id
+
+
+def test_commit_action_candidate_refuses_a_reused_idempotency_key(
+    service: AgentSessionService,
+) -> None:
+    """A key already used for one candidate never commits another task's value."""
+    session = _create_session(service)
+    action = service.submit_action(
+        project_id="project-1", session_id=session.session_id, body=_run_task_action()
+    )
+    _attach_completed_task_result(
+        session_id=session.session_id,
+        action_id=action.action_id,
+        output_parameters={"drive_amplitude": {"value": 0.12}},
+    )
+
+    def commit(task_id: str, version: int) -> Any:
+        return service.commit_action_candidate(
+            project_id="project-1",
+            session_id=session.session_id,
+            action_id=action.action_id,
+            parameter_name="drive_amplitude",
+            username="reviewer",
+            body=CommitAgentCandidateRequest(
+                idempotency_key="commit-1", expected_state_version=version, task_id=task_id
+            ),
+        )
+
+    commit("task-result-1", 1)
+    with pytest.raises(HTTPException) as refused:
+        commit("task-result-other", 2)
+
+    assert refused.value.status_code == 409
+    assert "different candidate commit" in str(refused.value.detail)
+    assert _state_version(service, session.session_id) == 2
 
 
 @pytest.mark.asyncio

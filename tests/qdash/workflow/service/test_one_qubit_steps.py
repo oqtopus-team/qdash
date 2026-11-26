@@ -5,7 +5,7 @@ import pytest
 
 from qdash.common.mux_mapping import MuxMapping
 from qdash.datamodel.task_call import TaskCall
-from qdash.workflow.service.steps.one_qubit import CustomOneQubit
+from qdash.workflow.service.steps.one_qubit import CustomOneQubit, OneQubitCheck, OneQubitFineTune
 
 if TYPE_CHECKING:
     from qdash.workflow.service._internal.session import ExecutionRuntime
@@ -141,7 +141,7 @@ def test_fine_tune_respects_coarse_status_filter(monkeypatch, successful_qids) -
     ctx = FilterByStatus().execute(session, targets, ctx)
     execute = MagicMock(return_value={})
     step = OneQubitFineTune()
-    monkeypatch.setattr(step, "_execute_with_qids", execute)
+    monkeypatch.setattr(step, "_execute_scheduled", execute)
 
     step.execute(session, targets, ctx)
 
@@ -151,3 +151,42 @@ def test_fine_tune_respects_coarse_status_filter(monkeypatch, successful_qids) -
         execute.assert_not_called()
         assert ctx.one_qubit_fine_tune is not None
         assert ctx.one_qubit_fine_tune.qubits == {}
+
+
+@pytest.mark.parametrize(
+    ("step_factory", "stage_name"),
+    [
+        (lambda: CustomOneQubit(step_name="custom", tasks=[TaskCall(name="CheckRabi")]), "custom"),
+        (OneQubitCheck, "one_qubit_check"),
+        (
+            lambda: OneQubitFineTune(execution_mode="sequential"),
+            "one_qubit_fine_tune",
+        ),
+    ],
+)
+def test_one_qubit_steps_schedule_explicit_qids_with_their_mode(
+    monkeypatch, step_factory, stage_name
+) -> None:
+    calls = []
+
+    def scheduled(session, **kwargs):
+        calls.append(kwargs)
+        return {}
+
+    monkeypatch.setattr(
+        "qdash.workflow.service.steps.one_qubit._execute_scheduled_one_qubit", scheduled
+    )
+    step = step_factory()
+    session = cast("ExecutionRuntime", SimpleNamespace(chip_id="64Qv3"))
+    plan = object()
+
+    step._execute_scheduled(session, ["1", "4"], plan)
+
+    assert calls == [
+        {
+            "qids": ["1", "4"],
+            "plan": plan,
+            "stage_name": stage_name,
+            "execution_mode": step.execution_mode,
+        }
+    ]

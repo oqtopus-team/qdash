@@ -668,6 +668,17 @@ class TurnTranscript:
             )
         self.turn = LiveTurn(now, self._clock)
 
+    def _unfinished(self, now: int) -> AgentChatMessage | None:
+        """The answer so far of a failed turn, marked ``interrupted``; None if nothing streamed."""
+        blocks = self.turn.stopped_blocks()
+        trace = self.turn.trace(now)
+        if not blocks and not trace:
+            return None
+        payload: dict[str, Any] = {"blocks": blocks, "assessment": None, "interrupted": True}
+        return self._message(
+            "assistant", to_json({**payload, "trace": trace} if trace else payload)
+        )
+
     def _streamed(self) -> bool:
         return bool(self.turn.steps or self.turn.blocks)
 
@@ -688,7 +699,11 @@ class TurnTranscript:
             if self.user_message is None and not head and not self._streamed():
                 # A refused continue changed nothing.
                 return head
-            return [*head, self._message("assistant", f"Error: {self.error}")]
+            error = self._message("assistant", f"Error: {self.error}")
+            # What streamed before the failure (progress updates, steps, the answer so far)
+            # is kept as an unfinished answer ahead of the error, as a stopped turn keeps it.
+            partial = self._unfinished(now)
+            return [*head, *([partial] if partial is not None else []), error]
         blocks = self.turn.stopped_blocks()
         trace = self.turn.trace(now, settle=self.end == "stopped")
         if self.end == "stopped":

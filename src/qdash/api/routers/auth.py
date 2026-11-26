@@ -218,17 +218,7 @@ def update_current_user_profile(
 ) -> User:
     """Update the current user's editable profile fields."""
     user = auth_service.update_profile(current_user.username, profile_data)
-    return User(
-        user_id=user.user_id,
-        username=user.username,
-        display_name=user.display_name,
-        organization=user.organization,
-        avatar_key=user.avatar_key,
-        disabled=user.disabled,
-        default_project_id=user.default_project_id,
-        must_change_password=user.must_change_password,
-        system_role=user.system_role,
-    )
+    return User.model_validate(user, from_attributes=True)
 
 
 @router.post("/logout", summary="Logout user", operation_id="logout")

@@ -27,6 +27,22 @@ test("only the steps of an approved auto agent session run without a card, and n
   assert.match(prompt, /A stopped conversation does not continue by itself/);
 });
 
+test("nontrivial work gets brief progress updates in the reply language, apart from the final answer", () => {
+  const prompt = buildSystemPrompt("ja", "en");
+  assert.match(prompt, /first write one short sentence on what you will check/);
+  assert.match(prompt, /After a milestone .* what you found and what you do next/);
+  assert.match(prompt, /Write updates in the reply language/);
+  // No per-tool chatter, invented progress or reasoning disclosure; simple answers stay direct.
+  assert.match(prompt, /Do not narrate every tool call/);
+  assert.match(prompt, /results or time estimates that no tool returned/);
+  assert.match(prompt, /do not share your internal reasoning in updates/);
+  assert.match(prompt, /answer directly or with one quick tool call gets the answer without updates/);
+  assert.match(prompt, /The final answer stands on its own/);
+  // The update rules come after the direct-answer rule and before the language rule.
+  assert.ok(prompt.indexOf("short direct answer") < prompt.indexOf("Progress updates:"));
+  assert.ok(prompt.indexOf("Progress updates:") < prompt.indexOf("Reason internally"));
+});
+
 test("choices go through ask_user", () => {
   assert.match(buildSystemPrompt("auto", "en"), /call `ask_user` with 2-4 short options/);
 });

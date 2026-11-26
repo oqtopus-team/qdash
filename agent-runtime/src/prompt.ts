@@ -56,6 +56,7 @@ export function buildSystemPrompt(
     ...investigationPolicyBullets(),
     ...requestPolicyBullets(),
     "- Prefer a short direct answer over an exhaustive report. Expand only when asked.",
+    ...progressUpdateBullets(),
     "- Use `render_chart` when a plot communicates better than text.",
     "- Use `render_ui` for a compact read-only view of values from tool results (metric cards, a comparison table, a status alert, links to QDash pages). Only show values a tool returned, and still answer in text.",
     ...(presentationGuideline ? [presentationGuideline] : []),
@@ -96,6 +97,19 @@ export function buildSystemPrompt(
         ]
       : []),
   ].join("\n");
+}
+
+/**
+ * How the model narrates its work. Text written between tool calls is shown live
+ * as progress updates and kept with the answer as its work history; the text
+ * after the last tool call is the final answer.
+ */
+export function progressUpdateBullets(): string[] {
+  return [
+    "- Progress updates: text you write between tool calls is shown to the user as it arrives and kept as the answer's work history; the text after your last tool call is the final answer. When a request needs several tool calls or a long-running tool, first write one short sentence on what you will check. After a milestone (a finding that changes the plan, a failed step, a switch of approach), write one or two sentences on what you found and what you do next. Write updates in the reply language.",
+    "- Do not narrate every tool call, do not announce progress, results or time estimates that no tool returned, and do not share your internal reasoning in updates. A simple question you can answer directly or with one quick tool call gets the answer without updates.",
+    "- The final answer stands on its own: give the conclusion and the values it rests on, and do not repeat the updates.",
+  ];
 }
 
 function responseInstruction(language: string): string {

@@ -37,9 +37,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence
+    from collections.abc import Callable, Iterator, Sequence
 
     from qdash.datamodel.task_invocation import TaskInvocation
+    from qdash.repository import MongoTaskResultHistoryRepository
     from qdash.repository.protocols import (
         ExecutionCounterRepository,
         ExecutionLockRepository,
@@ -96,6 +97,10 @@ from qdash.workflow.service.execution_id import generate_execution_id
 from qdash.workflow.service.github import GitHubIntegration, GitHubPushConfig
 
 logger = logging.getLogger(__name__)
+
+# Progressive backoff (seconds) between passes that finalize tasks Dask workers
+# may still be writing.
+_FINALIZE_RETRY_DELAYS = (0.5, 1, 2, 3, 5)
 
 
 def _with_settings(
@@ -864,47 +869,14 @@ class ExecutionRuntime:
             message: Failure message to set on stale tasks
 
         """
-        if self.execution_service is None or self.execution_id is None:
-            return
-
-        project_id = self.execution_service.project_id
-        if project_id is None:
-            return
-
-        try:
-            from qdash.repository import MongoTaskResultHistoryRepository
-
-            repo = MongoTaskResultHistoryRepository()
-
-            # Progressive backoff delays (in seconds) to handle MongoDB write latency
-            # from Dask workers. Starts short to minimize latency in the common case,
-            # then increases to handle slower edge cases.
-            retry_delays = [0.5, 1, 2, 3, 5]
-
-            for attempt, delay in enumerate(retry_delays):
-                count = repo.finalize_running_tasks(
-                    project_id=project_id,
-                    execution_id=self.execution_id,
-                    message=message,
-                )
-                if count > 0:
-                    logger.warning(
-                        f"[attempt {attempt + 1}/{len(retry_delays)}] "
-                        f"Finalized {count} stale task(s) still in RUNNING status "
-                        f"for execution {self.execution_id}"
-                    )
-                    if attempt < len(retry_delays) - 1:
-                        # Wait before re-checking in case more tasks
-                        # are still being written by Dask workers
-                        time.sleep(delay)
-                else:
-                    if attempt == 0:
-                        logger.info(
-                            f"All tasks in terminal state for execution {self.execution_id}"
-                        )
-                    break
-        except Exception as e:
-            logger.warning(f"Failed to finalize stale running tasks: {e}")
+        self._finalize_tasks_with_retry(
+            logger,
+            lambda repo, project_id, execution_id: repo.finalize_running_tasks(
+                project_id=project_id, execution_id=execution_id, message=message
+            ),
+            finalized="Finalized {count} stale task(s) still in RUNNING status",
+            failure="Failed to finalize stale running tasks",
+        )
 
     def _finalize_tasks_on_cancel(
         self,
@@ -921,6 +893,37 @@ class ExecutionRuntime:
             message: Cancellation message to set on tasks
 
         """
+        self._finalize_tasks_with_retry(
+            logger,
+            lambda repo, project_id, execution_id: repo.finalize_tasks_on_cancel(
+                project_id=project_id, execution_id=execution_id, message=message
+            ),
+            finalized="Cancelled {count} non-terminal task(s)",
+            failure="Failed to finalize tasks on cancel",
+        )
+
+    def _finalize_tasks_with_retry(
+        self,
+        logger: Any,
+        finalize: Callable[[MongoTaskResultHistoryRepository, str, str], int],
+        *,
+        finalized: str,
+        failure: str,
+    ) -> None:
+        """Run a task finalization until it finds no task left to finalize.
+
+        Dask workers may still be writing a task's final status, so each pass
+        that finalizes tasks waits with progressive backoff and checks again.
+        Delays start short to minimize latency in the common case, then
+        increase to handle slower edge cases. Errors are logged, not raised.
+
+        Args:
+            logger: Logger instance for output
+            finalize: Marks this execution's matching tasks and returns their count
+            finalized: Log message for a pass that finalized ``{count}`` tasks
+            failure: Log message prefix when finalization raises
+
+        """
         if self.execution_service is None or self.execution_id is None:
             return
 
@@ -932,22 +935,19 @@ class ExecutionRuntime:
             from qdash.repository import MongoTaskResultHistoryRepository
 
             repo = MongoTaskResultHistoryRepository()
-
-            retry_delays = [0.5, 1, 2, 3, 5]
+            retry_delays = _FINALIZE_RETRY_DELAYS
 
             for attempt, delay in enumerate(retry_delays):
-                count = repo.finalize_tasks_on_cancel(
-                    project_id=project_id,
-                    execution_id=self.execution_id,
-                    message=message,
-                )
+                count = finalize(repo, project_id, self.execution_id)
                 if count > 0:
                     logger.warning(
                         f"[attempt {attempt + 1}/{len(retry_delays)}] "
-                        f"Cancelled {count} non-terminal task(s) "
+                        f"{finalized.format(count=count)} "
                         f"for execution {self.execution_id}"
                     )
                     if attempt < len(retry_delays) - 1:
+                        # Wait before re-checking in case more tasks
+                        # are still being written by Dask workers
                         time.sleep(delay)
                 else:
                     if attempt == 0:
@@ -956,7 +956,7 @@ class ExecutionRuntime:
                         )
                     break
         except Exception as e:
-            logger.warning(f"Failed to finalize tasks on cancel: {e}")
+            logger.warning(f"{failure}: {e}")
 
     def _sync_backend_params_before_push(self, logger: Any) -> GitHubPushConfig:
         """Sync recent calibration results into backend YAML params prior to GitHub push.

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from starlette.exceptions import HTTPException
 
@@ -32,6 +32,7 @@ from qdash.repository.note_event import MongoNoteEventRepository
 
 if TYPE_CHECKING:
     from qdash.api.services.notification_service import NotificationService
+    from qdash.dbmodel.chip_note import ChipNoteDocument
     from qdash.dbmodel.note_event import NoteEventDocument
 
 
@@ -339,7 +340,123 @@ class NoteService:
 
     # ---------- target summary notes ----------
 
-    def _upsert_target_note(
+    @staticmethod
+    def _scope_extra(scope: MetricNoteScope) -> dict[str, str]:
+        """Event-log fields that record the scope a note was written in."""
+        return {
+            "scope_key": scope.scope_key,
+            "scope_type": scope.scope_type,
+            "cooldown_id": scope.cooldown_id or "",
+        }
+
+    @staticmethod
+    def _scope_fields(scope: MetricNoteScope) -> dict[str, Any]:
+        """Document fields that store a resolved scope."""
+        return {
+            "scope_type": scope.scope_type,
+            "scope_key": scope.scope_key,
+            "cooldown_id": scope.cooldown_id,
+            "scope_started_at": scope.started_at,
+            "scope_ended_at": scope.ended_at,
+            "scope_source": scope.source,
+        }
+
+    @classmethod
+    def _apply_scope(
+        cls, doc: ChipNoteDocument | TargetNoteDocument | MetricNoteDocument, scope: MetricNoteScope
+    ) -> None:
+        for field, value in cls._scope_fields(scope).items():
+            setattr(doc, field, value)
+
+    def _target_note_scope(
+        self,
+        *,
+        project_id: str,
+        chip_id: str,
+        cooldown_id: str | None,
+        start_at: datetime | None,
+        end_at: datetime | None,
+    ) -> MetricNoteScope:
+        """Scope of a summary note: the legacy global note when no scope is requested."""
+        if cooldown_id is None and start_at is None and end_at is None:
+            return MetricNoteScope(
+                scope_type="global",
+                scope_key="global",
+                cooldown_id=None,
+                started_at=None,
+                ended_at=None,
+                source="legacy_global",
+            )
+        return self._resolve_metric_note_scope(
+            project_id=project_id,
+            chip_id=chip_id,
+            cooldown_id=cooldown_id,
+            start_at=start_at,
+            end_at=end_at,
+        )
+
+    @staticmethod
+    def _ensure_target_document(
+        *, project_id: str, chip_id: str, target_type: str, target_id: str
+    ) -> None:
+        """Create a missing topology-valid qubit or coupling row, or raise 404."""
+        try:
+            if target_type == "qubit":
+                ChipInitializer.ensure_qubit_document(
+                    project_id=project_id, chip_id=chip_id, qid=target_id
+                )
+            else:
+                ChipInitializer.ensure_coupling_document(
+                    project_id=project_id, chip_id=chip_id, coupling_id=target_id
+                )
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+
+    @staticmethod
+    def _find_target_document(
+        *, project_id: str, chip_id: str, target_type: str, target_id: str
+    ) -> QubitDocument | CouplingDocument | None:
+        model: type[QubitDocument] | type[CouplingDocument] = (
+            QubitDocument if target_type == "qubit" else CouplingDocument
+        )
+        return model.find_one(
+            model.project_id == project_id,
+            model.chip_id == chip_id,
+            model.qid == target_id,
+        ).run()
+
+    @staticmethod
+    def _find_target_note(
+        *, project_id: str, chip_id: str, target_type: str, target_id: str, scope_key: str
+    ) -> TargetNoteDocument | None:
+        return TargetNoteDocument.find_one(
+            TargetNoteDocument.project_id == project_id,
+            TargetNoteDocument.chip_id == chip_id,
+            TargetNoteDocument.target_type == target_type,
+            TargetNoteDocument.target_id == target_id,
+            TargetNoteDocument.scope_key == scope_key,
+        ).run()
+
+    @staticmethod
+    def _find_metric_note(
+        *,
+        project_id: str,
+        chip_id: str,
+        target_type: str,
+        target_id: str,
+        metric_key: str,
+        scope_key: str,
+    ) -> MetricNoteDocument | None:
+        return MetricNoteDocument.find_one(
+            MetricNoteDocument.project_id == project_id,
+            MetricNoteDocument.chip_id == chip_id,
+            MetricNoteDocument.target_type == target_type,
+            MetricNoteDocument.target_id == target_id,
+            MetricNoteDocument.metric_key == metric_key,
+            MetricNoteDocument.scope_key == scope_key,
+        ).run()
+
+    def upsert_target_note(
         self,
         *,
         project_id: str,
@@ -352,44 +469,34 @@ class NoteService:
         start_at: datetime | None = None,
         end_at: datetime | None = None,
     ) -> NoteModel:
+        self._ensure_target_document(
+            project_id=project_id, chip_id=chip_id, target_type=target_type, target_id=target_id
+        )
         note = _make_note(content, username)
-        if cooldown_id is None and start_at is None and end_at is None:
-            scope = MetricNoteScope(
-                scope_type="global",
-                scope_key="global",
-                cooldown_id=None,
-                started_at=None,
-                ended_at=None,
-                source="legacy_global",
-            )
-        else:
-            scope = self._resolve_metric_note_scope(
-                project_id=project_id,
-                chip_id=chip_id,
-                cooldown_id=cooldown_id,
-                start_at=start_at,
-                end_at=end_at,
-            )
+        scope = self._target_note_scope(
+            project_id=project_id,
+            chip_id=chip_id,
+            cooldown_id=cooldown_id,
+            start_at=start_at,
+            end_at=end_at,
+        )
         if scope.scope_type == "global":
-            model = QubitDocument if target_type == "qubit" else CouplingDocument
-            doc = model.find_one(
-                model.project_id == project_id,
-                model.chip_id == chip_id,
-                model.qid == target_id,
-            ).run()
+            doc = self._find_target_document(
+                project_id=project_id, chip_id=chip_id, target_type=target_type, target_id=target_id
+            )
             if doc is None:
                 raise HTTPException(status_code=404, detail=f"{target_type.title()} not found")
             doc.note = note
             doc.system_info.update_time()
             doc.save()
         else:
-            target_note = TargetNoteDocument.find_one(
-                TargetNoteDocument.project_id == project_id,
-                TargetNoteDocument.chip_id == chip_id,
-                TargetNoteDocument.target_type == target_type,
-                TargetNoteDocument.target_id == target_id,
-                TargetNoteDocument.scope_key == scope.scope_key,
-            ).run()
+            target_note = self._find_target_note(
+                project_id=project_id,
+                chip_id=chip_id,
+                target_type=target_type,
+                target_id=target_id,
+                scope_key=scope.scope_key,
+            )
             if target_note is None:
                 target_note = TargetNoteDocument(
                     project_id=project_id,
@@ -397,21 +504,12 @@ class NoteService:
                     target_type=target_type,
                     target_id=target_id,
                     note=note,
-                    scope_type=scope.scope_type,
-                    scope_key=scope.scope_key,
-                    cooldown_id=scope.cooldown_id,
-                    scope_started_at=scope.started_at,
-                    scope_ended_at=scope.ended_at,
-                    scope_source=scope.source,
+                    **self._scope_fields(scope),
                 )
                 target_note.insert()
             else:
                 target_note.note = note
-                target_note.scope_type = scope.scope_type
-                target_note.cooldown_id = scope.cooldown_id
-                target_note.scope_started_at = scope.started_at
-                target_note.scope_ended_at = scope.ended_at
-                target_note.scope_source = scope.source
+                self._apply_scope(target_note, scope)
                 target_note.system_info.update_time()
                 target_note.save()
         self._log(
@@ -423,15 +521,11 @@ class NoteService:
             action="upsert",
             actor=username,
             content=content,
-            extra={
-                "scope_key": scope.scope_key,
-                "scope_type": scope.scope_type,
-                "cooldown_id": scope.cooldown_id or "",
-            },
+            extra=self._scope_extra(scope),
         )
         return note
 
-    def _delete_target_note(
+    def delete_target_note(
         self,
         *,
         project_id: str,
@@ -443,43 +537,30 @@ class NoteService:
         start_at: datetime | None = None,
         end_at: datetime | None = None,
     ) -> SuccessResponse:
-        if cooldown_id is None and start_at is None and end_at is None:
-            scope = MetricNoteScope(
-                scope_type="global",
-                scope_key="global",
-                cooldown_id=None,
-                started_at=None,
-                ended_at=None,
-                source="legacy_global",
-            )
-        else:
-            scope = self._resolve_metric_note_scope(
-                project_id=project_id,
-                chip_id=chip_id,
-                cooldown_id=cooldown_id,
-                start_at=start_at,
-                end_at=end_at,
-            )
+        scope = self._target_note_scope(
+            project_id=project_id,
+            chip_id=chip_id,
+            cooldown_id=cooldown_id,
+            start_at=start_at,
+            end_at=end_at,
+        )
         if scope.scope_type == "global":
-            model = QubitDocument if target_type == "qubit" else CouplingDocument
-            doc = model.find_one(
-                model.project_id == project_id,
-                model.chip_id == chip_id,
-                model.qid == target_id,
-            ).run()
+            doc = self._find_target_document(
+                project_id=project_id, chip_id=chip_id, target_type=target_type, target_id=target_id
+            )
             if doc is None:
                 raise HTTPException(status_code=404, detail=f"{target_type.title()} not found")
             doc.note = NoteModel()
             doc.system_info.update_time()
             doc.save()
         else:
-            target_note = TargetNoteDocument.find_one(
-                TargetNoteDocument.project_id == project_id,
-                TargetNoteDocument.chip_id == chip_id,
-                TargetNoteDocument.target_type == target_type,
-                TargetNoteDocument.target_id == target_id,
-                TargetNoteDocument.scope_key == scope.scope_key,
-            ).run()
+            target_note = self._find_target_note(
+                project_id=project_id,
+                chip_id=chip_id,
+                target_type=target_type,
+                target_id=target_id,
+                scope_key=scope.scope_key,
+            )
             if target_note is None:
                 raise HTTPException(status_code=404, detail=f"{target_type.title()} note not found")
             if target_note.comments:
@@ -497,30 +578,9 @@ class NoteService:
             action="delete",
             actor=username,
             content="",
-            extra={
-                "scope_key": scope.scope_key,
-                "scope_type": scope.scope_type,
-                "cooldown_id": scope.cooldown_id or "",
-            },
+            extra=self._scope_extra(scope),
         )
         return SuccessResponse(message=f"{target_type.title()} note cleared")
-
-    def _target_note_scope_for_comments(
-        self,
-        *,
-        project_id: str,
-        chip_id: str,
-        cooldown_id: str | None = None,
-        start_at: datetime | None = None,
-        end_at: datetime | None = None,
-    ) -> MetricNoteScope:
-        return self._resolve_metric_note_scope(
-            project_id=project_id,
-            chip_id=chip_id,
-            cooldown_id=cooldown_id,
-            start_at=start_at,
-            end_at=end_at,
-        )
 
     def _get_or_create_target_note_for_comment(
         self,
@@ -531,13 +591,13 @@ class NoteService:
         target_id: str,
         scope: MetricNoteScope,
     ) -> TargetNoteDocument:
-        target_note = TargetNoteDocument.find_one(
-            TargetNoteDocument.project_id == project_id,
-            TargetNoteDocument.chip_id == chip_id,
-            TargetNoteDocument.target_type == target_type,
-            TargetNoteDocument.target_id == target_id,
-            TargetNoteDocument.scope_key == scope.scope_key,
-        ).run()
+        target_note = self._find_target_note(
+            project_id=project_id,
+            chip_id=chip_id,
+            target_type=target_type,
+            target_id=target_id,
+            scope_key=scope.scope_key,
+        )
         if target_note is not None:
             return target_note
 
@@ -548,14 +608,29 @@ class NoteService:
             target_id=target_id,
             note=NoteModel(),
             comments=[],
-            scope_type=scope.scope_type,
-            scope_key=scope.scope_key,
-            cooldown_id=scope.cooldown_id,
-            scope_started_at=scope.started_at,
-            scope_ended_at=scope.ended_at,
-            scope_source=scope.source,
+            **self._scope_fields(scope),
         )
         target_note.insert()
+        return target_note
+
+    def _find_commented_target_note(
+        self,
+        *,
+        project_id: str,
+        chip_id: str,
+        target_type: str,
+        target_id: str,
+        scope: MetricNoteScope,
+    ) -> TargetNoteDocument:
+        target_note = self._find_target_note(
+            project_id=project_id,
+            chip_id=chip_id,
+            target_type=target_type,
+            target_id=target_id,
+            scope_key=scope.scope_key,
+        )
+        if target_note is None:
+            raise HTTPException(status_code=404, detail="Target note comment not found")
         return target_note
 
     @staticmethod
@@ -579,7 +654,7 @@ class NoteService:
             detail="Only the author or system admin can modify this target note comment",
         )
 
-    def _create_target_note_comment(
+    def create_target_note_comment(
         self,
         *,
         project_id: str,
@@ -592,7 +667,10 @@ class NoteService:
         start_at: datetime | None = None,
         end_at: datetime | None = None,
     ) -> NoteCommentModel:
-        scope = self._target_note_scope_for_comments(
+        self._ensure_target_document(
+            project_id=project_id, chip_id=chip_id, target_type=target_type, target_id=target_id
+        )
+        scope = self._resolve_metric_note_scope(
             project_id=project_id,
             chip_id=chip_id,
             cooldown_id=cooldown_id,
@@ -623,17 +701,11 @@ class NoteService:
             action="upsert",
             actor=username,
             content=content,
-            extra={
-                "kind": "comment",
-                "comment_id": comment.comment_id,
-                "scope_key": scope.scope_key,
-                "scope_type": scope.scope_type,
-                "cooldown_id": scope.cooldown_id or "",
-            },
+            extra={"kind": "comment", "comment_id": comment.comment_id, **self._scope_extra(scope)},
         )
         return comment
 
-    def _update_target_note_comment(
+    def update_target_note_comment(
         self,
         *,
         project_id: str,
@@ -648,22 +720,20 @@ class NoteService:
         start_at: datetime | None = None,
         end_at: datetime | None = None,
     ) -> NoteCommentModel:
-        scope = self._target_note_scope_for_comments(
+        scope = self._resolve_metric_note_scope(
             project_id=project_id,
             chip_id=chip_id,
             cooldown_id=cooldown_id,
             start_at=start_at,
             end_at=end_at,
         )
-        target_note = TargetNoteDocument.find_one(
-            TargetNoteDocument.project_id == project_id,
-            TargetNoteDocument.chip_id == chip_id,
-            TargetNoteDocument.target_type == target_type,
-            TargetNoteDocument.target_id == target_id,
-            TargetNoteDocument.scope_key == scope.scope_key,
-        ).run()
-        if target_note is None:
-            raise HTTPException(status_code=404, detail="Target note comment not found")
+        target_note = self._find_commented_target_note(
+            project_id=project_id,
+            chip_id=chip_id,
+            target_type=target_type,
+            target_id=target_id,
+            scope=scope,
+        )
         index = self._comment_index(target_note, comment_id)
         current = target_note.comments[index]
         self._ensure_can_modify_comment(
@@ -690,17 +760,11 @@ class NoteService:
             action="upsert",
             actor=username,
             content=content,
-            extra={
-                "kind": "comment",
-                "comment_id": comment_id,
-                "scope_key": scope.scope_key,
-                "scope_type": scope.scope_type,
-                "cooldown_id": scope.cooldown_id or "",
-            },
+            extra={"kind": "comment", "comment_id": comment_id, **self._scope_extra(scope)},
         )
         return updated
 
-    def _delete_target_note_comment(
+    def delete_target_note_comment(
         self,
         *,
         project_id: str,
@@ -714,22 +778,20 @@ class NoteService:
         start_at: datetime | None = None,
         end_at: datetime | None = None,
     ) -> SuccessResponse:
-        scope = self._target_note_scope_for_comments(
+        scope = self._resolve_metric_note_scope(
             project_id=project_id,
             chip_id=chip_id,
             cooldown_id=cooldown_id,
             start_at=start_at,
             end_at=end_at,
         )
-        target_note = TargetNoteDocument.find_one(
-            TargetNoteDocument.project_id == project_id,
-            TargetNoteDocument.chip_id == chip_id,
-            TargetNoteDocument.target_type == target_type,
-            TargetNoteDocument.target_id == target_id,
-            TargetNoteDocument.scope_key == scope.scope_key,
-        ).run()
-        if target_note is None:
-            raise HTTPException(status_code=404, detail="Target note comment not found")
+        target_note = self._find_commented_target_note(
+            project_id=project_id,
+            chip_id=chip_id,
+            target_type=target_type,
+            target_id=target_id,
+            scope=scope,
+        )
         index = self._comment_index(target_note, comment_id)
         self._ensure_can_modify_comment(
             comment=target_note.comments[index],
@@ -748,164 +810,19 @@ class NoteService:
             action="delete",
             actor=username,
             content="",
-            extra={
-                "kind": "comment",
-                "comment_id": comment_id,
-                "scope_key": scope.scope_key,
-                "scope_type": scope.scope_type,
-                "cooldown_id": scope.cooldown_id or "",
-            },
+            extra={"kind": "comment", "comment_id": comment_id, **self._scope_extra(scope)},
         )
         return SuccessResponse(message="Target note comment deleted")
 
-    # ---------- qubit ----------
+    # ---------- metric notes ----------
 
-    def upsert_qubit_note(
+    def upsert_metric_note(
         self,
         *,
         project_id: str,
         chip_id: str,
-        qid: str,
-        content: str,
-        username: str,
-        cooldown_id: str | None = None,
-        start_at: datetime | None = None,
-        end_at: datetime | None = None,
-    ) -> NoteModel:
-        try:
-            ChipInitializer.ensure_qubit_document(
-                project_id=project_id,
-                chip_id=chip_id,
-                qid=qid,
-            )
-        except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e)) from e
-        return self._upsert_target_note(
-            project_id=project_id,
-            chip_id=chip_id,
-            target_type="qubit",
-            target_id=qid,
-            content=content,
-            username=username,
-            cooldown_id=cooldown_id,
-            start_at=start_at,
-            end_at=end_at,
-        )
-
-    def delete_qubit_note(
-        self,
-        *,
-        project_id: str,
-        chip_id: str,
-        qid: str,
-        username: str,
-        cooldown_id: str | None = None,
-        start_at: datetime | None = None,
-        end_at: datetime | None = None,
-    ) -> SuccessResponse:
-        return self._delete_target_note(
-            project_id=project_id,
-            chip_id=chip_id,
-            target_type="qubit",
-            target_id=qid,
-            username=username,
-            cooldown_id=cooldown_id,
-            start_at=start_at,
-            end_at=end_at,
-        )
-
-    def create_qubit_note_comment(
-        self,
-        *,
-        project_id: str,
-        chip_id: str,
-        qid: str,
-        content: str,
-        username: str,
-        cooldown_id: str | None = None,
-        start_at: datetime | None = None,
-        end_at: datetime | None = None,
-    ) -> NoteCommentModel:
-        try:
-            ChipInitializer.ensure_qubit_document(
-                project_id=project_id,
-                chip_id=chip_id,
-                qid=qid,
-            )
-        except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e)) from e
-        return self._create_target_note_comment(
-            project_id=project_id,
-            chip_id=chip_id,
-            target_type="qubit",
-            target_id=qid,
-            content=content,
-            username=username,
-            cooldown_id=cooldown_id,
-            start_at=start_at,
-            end_at=end_at,
-        )
-
-    def update_qubit_note_comment(
-        self,
-        *,
-        project_id: str,
-        chip_id: str,
-        qid: str,
-        comment_id: str,
-        content: str,
-        username: str,
-        actor_system_role: SystemRole = SystemRole.USER,
-        cooldown_id: str | None = None,
-        start_at: datetime | None = None,
-        end_at: datetime | None = None,
-    ) -> NoteCommentModel:
-        return self._update_target_note_comment(
-            project_id=project_id,
-            chip_id=chip_id,
-            target_type="qubit",
-            target_id=qid,
-            comment_id=comment_id,
-            content=content,
-            username=username,
-            actor_system_role=actor_system_role,
-            cooldown_id=cooldown_id,
-            start_at=start_at,
-            end_at=end_at,
-        )
-
-    def delete_qubit_note_comment(
-        self,
-        *,
-        project_id: str,
-        chip_id: str,
-        qid: str,
-        comment_id: str,
-        username: str,
-        actor_system_role: SystemRole = SystemRole.USER,
-        cooldown_id: str | None = None,
-        start_at: datetime | None = None,
-        end_at: datetime | None = None,
-    ) -> SuccessResponse:
-        return self._delete_target_note_comment(
-            project_id=project_id,
-            chip_id=chip_id,
-            target_type="qubit",
-            target_id=qid,
-            comment_id=comment_id,
-            username=username,
-            actor_system_role=actor_system_role,
-            cooldown_id=cooldown_id,
-            start_at=start_at,
-            end_at=end_at,
-        )
-
-    def upsert_qubit_metric_note(
-        self,
-        *,
-        project_id: str,
-        chip_id: str,
-        qid: str,
+        target_type: str,
+        target_id: str,
         metric_key: str,
         content: str,
         username: str,
@@ -913,14 +830,9 @@ class NoteService:
         start_at: datetime | None = None,
         end_at: datetime | None = None,
     ) -> NoteModel:
-        try:
-            ChipInitializer.ensure_qubit_document(
-                project_id=project_id,
-                chip_id=chip_id,
-                qid=qid,
-            )
-        except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e)) from e
+        self._ensure_target_document(
+            project_id=project_id, chip_id=chip_id, target_type=target_type, target_id=target_id
+        )
         note = _make_note(content, username)
         scope = self._resolve_metric_note_scope(
             project_id=project_id,
@@ -929,73 +841,59 @@ class NoteService:
             start_at=start_at,
             end_at=end_at,
         )
-        metric_note = MetricNoteDocument.find_one(
-            MetricNoteDocument.project_id == project_id,
-            MetricNoteDocument.chip_id == chip_id,
-            MetricNoteDocument.target_type == "qubit",
-            MetricNoteDocument.target_id == qid,
-            MetricNoteDocument.metric_key == metric_key,
-            MetricNoteDocument.scope_key == scope.scope_key,
-        ).run()
+        metric_note = self._find_metric_note(
+            project_id=project_id,
+            chip_id=chip_id,
+            target_type=target_type,
+            target_id=target_id,
+            metric_key=metric_key,
+            scope_key=scope.scope_key,
+        )
         if metric_note is None:
             metric_note = MetricNoteDocument(
                 project_id=project_id,
                 chip_id=chip_id,
-                target_type="qubit",
-                target_id=qid,
+                target_type=target_type,
+                target_id=target_id,
                 metric_key=metric_key,
                 note=note,
-                scope_type=scope.scope_type,
-                scope_key=scope.scope_key,
-                cooldown_id=scope.cooldown_id,
-                scope_started_at=scope.started_at,
-                scope_ended_at=scope.ended_at,
-                scope_source=scope.source,
+                **self._scope_fields(scope),
             )
             metric_note.insert()
         else:
             metric_note.note = note
-            metric_note.scope_type = scope.scope_type
-            metric_note.cooldown_id = scope.cooldown_id
-            metric_note.scope_started_at = scope.started_at
-            metric_note.scope_ended_at = scope.ended_at
-            metric_note.scope_source = scope.source
+            self._apply_scope(metric_note, scope)
             metric_note.system_info.update_time()
             metric_note.save()
         self._log(
             project_id=project_id,
             chip_id=chip_id,
-            scope="qubit_metric",
-            target_id=qid,
+            scope=f"{target_type}_metric",
+            target_id=target_id,
             metric_key=metric_key,
             action="upsert",
             actor=username,
             content=content,
-            extra={
-                "scope_key": scope.scope_key,
-                "scope_type": scope.scope_type,
-                "cooldown_id": scope.cooldown_id or "",
-            },
+            extra=self._scope_extra(scope),
         )
         return note
 
-    def delete_qubit_metric_note(
+    def delete_metric_note(
         self,
         *,
         project_id: str,
         chip_id: str,
-        qid: str,
+        target_type: str,
+        target_id: str,
         metric_key: str,
         username: str,
         cooldown_id: str | None = None,
         start_at: datetime | None = None,
         end_at: datetime | None = None,
     ) -> SuccessResponse:
-        doc = QubitDocument.find_one(
-            QubitDocument.project_id == project_id,
-            QubitDocument.chip_id == chip_id,
-            QubitDocument.qid == qid,
-        ).run()
+        doc = self._find_target_document(
+            project_id=project_id, chip_id=chip_id, target_type=target_type, target_id=target_id
+        )
         if doc is None:
             raise HTTPException(status_code=404, detail="Metric note not found")
         scope = self._resolve_metric_note_scope(
@@ -1005,14 +903,14 @@ class NoteService:
             start_at=start_at,
             end_at=end_at,
         )
-        metric_note = MetricNoteDocument.find_one(
-            MetricNoteDocument.project_id == project_id,
-            MetricNoteDocument.chip_id == chip_id,
-            MetricNoteDocument.target_type == "qubit",
-            MetricNoteDocument.target_id == qid,
-            MetricNoteDocument.metric_key == metric_key,
-            MetricNoteDocument.scope_key == scope.scope_key,
-        ).run()
+        metric_note = self._find_metric_note(
+            project_id=project_id,
+            chip_id=chip_id,
+            target_type=target_type,
+            target_id=target_id,
+            metric_key=metric_key,
+            scope_key=scope.scope_key,
+        )
         if metric_note is None:
             if scope.scope_type != "global" or metric_key not in doc.metric_notes:
                 raise HTTPException(status_code=404, detail="Metric note not found")
@@ -1024,299 +922,15 @@ class NoteService:
         self._log(
             project_id=project_id,
             chip_id=chip_id,
-            scope="qubit_metric",
-            target_id=qid,
+            scope=f"{target_type}_metric",
+            target_id=target_id,
             metric_key=metric_key,
             action="delete",
             actor=username,
             content="",
-            extra={
-                "scope_key": scope.scope_key,
-                "scope_type": scope.scope_type,
-                "cooldown_id": scope.cooldown_id or "",
-            },
+            extra=self._scope_extra(scope),
         )
-        return SuccessResponse(message="Qubit metric note deleted")
-
-    # ---------- coupling ----------
-
-    def upsert_coupling_note(
-        self,
-        *,
-        project_id: str,
-        chip_id: str,
-        coupling_id: str,
-        content: str,
-        username: str,
-        cooldown_id: str | None = None,
-        start_at: datetime | None = None,
-        end_at: datetime | None = None,
-    ) -> NoteModel:
-        try:
-            ChipInitializer.ensure_coupling_document(
-                project_id=project_id,
-                chip_id=chip_id,
-                coupling_id=coupling_id,
-            )
-        except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e)) from e
-        return self._upsert_target_note(
-            project_id=project_id,
-            chip_id=chip_id,
-            target_type="coupling",
-            target_id=coupling_id,
-            content=content,
-            username=username,
-            cooldown_id=cooldown_id,
-            start_at=start_at,
-            end_at=end_at,
-        )
-
-    def delete_coupling_note(
-        self,
-        *,
-        project_id: str,
-        chip_id: str,
-        coupling_id: str,
-        username: str,
-        cooldown_id: str | None = None,
-        start_at: datetime | None = None,
-        end_at: datetime | None = None,
-    ) -> SuccessResponse:
-        return self._delete_target_note(
-            project_id=project_id,
-            chip_id=chip_id,
-            target_type="coupling",
-            target_id=coupling_id,
-            username=username,
-            cooldown_id=cooldown_id,
-            start_at=start_at,
-            end_at=end_at,
-        )
-
-    def create_coupling_note_comment(
-        self,
-        *,
-        project_id: str,
-        chip_id: str,
-        coupling_id: str,
-        content: str,
-        username: str,
-        cooldown_id: str | None = None,
-        start_at: datetime | None = None,
-        end_at: datetime | None = None,
-    ) -> NoteCommentModel:
-        try:
-            ChipInitializer.ensure_coupling_document(
-                project_id=project_id,
-                chip_id=chip_id,
-                coupling_id=coupling_id,
-            )
-        except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e)) from e
-        return self._create_target_note_comment(
-            project_id=project_id,
-            chip_id=chip_id,
-            target_type="coupling",
-            target_id=coupling_id,
-            content=content,
-            username=username,
-            cooldown_id=cooldown_id,
-            start_at=start_at,
-            end_at=end_at,
-        )
-
-    def update_coupling_note_comment(
-        self,
-        *,
-        project_id: str,
-        chip_id: str,
-        coupling_id: str,
-        comment_id: str,
-        content: str,
-        username: str,
-        actor_system_role: SystemRole = SystemRole.USER,
-        cooldown_id: str | None = None,
-        start_at: datetime | None = None,
-        end_at: datetime | None = None,
-    ) -> NoteCommentModel:
-        return self._update_target_note_comment(
-            project_id=project_id,
-            chip_id=chip_id,
-            target_type="coupling",
-            target_id=coupling_id,
-            comment_id=comment_id,
-            content=content,
-            username=username,
-            actor_system_role=actor_system_role,
-            cooldown_id=cooldown_id,
-            start_at=start_at,
-            end_at=end_at,
-        )
-
-    def delete_coupling_note_comment(
-        self,
-        *,
-        project_id: str,
-        chip_id: str,
-        coupling_id: str,
-        comment_id: str,
-        username: str,
-        actor_system_role: SystemRole = SystemRole.USER,
-        cooldown_id: str | None = None,
-        start_at: datetime | None = None,
-        end_at: datetime | None = None,
-    ) -> SuccessResponse:
-        return self._delete_target_note_comment(
-            project_id=project_id,
-            chip_id=chip_id,
-            target_type="coupling",
-            target_id=coupling_id,
-            comment_id=comment_id,
-            username=username,
-            actor_system_role=actor_system_role,
-            cooldown_id=cooldown_id,
-            start_at=start_at,
-            end_at=end_at,
-        )
-
-    def upsert_coupling_metric_note(
-        self,
-        *,
-        project_id: str,
-        chip_id: str,
-        coupling_id: str,
-        metric_key: str,
-        content: str,
-        username: str,
-        cooldown_id: str | None = None,
-        start_at: datetime | None = None,
-        end_at: datetime | None = None,
-    ) -> NoteModel:
-        try:
-            ChipInitializer.ensure_coupling_document(
-                project_id=project_id,
-                chip_id=chip_id,
-                coupling_id=coupling_id,
-            )
-        except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e)) from e
-        note = _make_note(content, username)
-        scope = self._resolve_metric_note_scope(
-            project_id=project_id,
-            chip_id=chip_id,
-            cooldown_id=cooldown_id,
-            start_at=start_at,
-            end_at=end_at,
-        )
-        metric_note = MetricNoteDocument.find_one(
-            MetricNoteDocument.project_id == project_id,
-            MetricNoteDocument.chip_id == chip_id,
-            MetricNoteDocument.target_type == "coupling",
-            MetricNoteDocument.target_id == coupling_id,
-            MetricNoteDocument.metric_key == metric_key,
-            MetricNoteDocument.scope_key == scope.scope_key,
-        ).run()
-        if metric_note is None:
-            metric_note = MetricNoteDocument(
-                project_id=project_id,
-                chip_id=chip_id,
-                target_type="coupling",
-                target_id=coupling_id,
-                metric_key=metric_key,
-                note=note,
-                scope_type=scope.scope_type,
-                scope_key=scope.scope_key,
-                cooldown_id=scope.cooldown_id,
-                scope_started_at=scope.started_at,
-                scope_ended_at=scope.ended_at,
-                scope_source=scope.source,
-            )
-            metric_note.insert()
-        else:
-            metric_note.note = note
-            metric_note.scope_type = scope.scope_type
-            metric_note.cooldown_id = scope.cooldown_id
-            metric_note.scope_started_at = scope.started_at
-            metric_note.scope_ended_at = scope.ended_at
-            metric_note.scope_source = scope.source
-            metric_note.system_info.update_time()
-            metric_note.save()
-        self._log(
-            project_id=project_id,
-            chip_id=chip_id,
-            scope="coupling_metric",
-            target_id=coupling_id,
-            metric_key=metric_key,
-            action="upsert",
-            actor=username,
-            content=content,
-            extra={
-                "scope_key": scope.scope_key,
-                "scope_type": scope.scope_type,
-                "cooldown_id": scope.cooldown_id or "",
-            },
-        )
-        return note
-
-    def delete_coupling_metric_note(
-        self,
-        *,
-        project_id: str,
-        chip_id: str,
-        coupling_id: str,
-        metric_key: str,
-        username: str,
-        cooldown_id: str | None = None,
-        start_at: datetime | None = None,
-        end_at: datetime | None = None,
-    ) -> SuccessResponse:
-        doc = CouplingDocument.find_one(
-            CouplingDocument.project_id == project_id,
-            CouplingDocument.chip_id == chip_id,
-            CouplingDocument.qid == coupling_id,
-        ).run()
-        if doc is None:
-            raise HTTPException(status_code=404, detail="Metric note not found")
-        scope = self._resolve_metric_note_scope(
-            project_id=project_id,
-            chip_id=chip_id,
-            cooldown_id=cooldown_id,
-            start_at=start_at,
-            end_at=end_at,
-        )
-        metric_note = MetricNoteDocument.find_one(
-            MetricNoteDocument.project_id == project_id,
-            MetricNoteDocument.chip_id == chip_id,
-            MetricNoteDocument.target_type == "coupling",
-            MetricNoteDocument.target_id == coupling_id,
-            MetricNoteDocument.metric_key == metric_key,
-            MetricNoteDocument.scope_key == scope.scope_key,
-        ).run()
-        if metric_note is None:
-            if scope.scope_type != "global" or metric_key not in doc.metric_notes:
-                raise HTTPException(status_code=404, detail="Metric note not found")
-            del doc.metric_notes[metric_key]
-            doc.system_info.update_time()
-            doc.save()
-        else:
-            metric_note.delete()
-        self._log(
-            project_id=project_id,
-            chip_id=chip_id,
-            scope="coupling_metric",
-            target_id=coupling_id,
-            metric_key=metric_key,
-            action="delete",
-            actor=username,
-            content="",
-            extra={
-                "scope_key": scope.scope_key,
-                "scope_type": scope.scope_type,
-                "cooldown_id": scope.cooldown_id or "",
-            },
-        )
-        return SuccessResponse(message="Coupling metric note deleted")
+        return SuccessResponse(message=f"{target_type.title()} metric note deleted")
 
     # ---------- task result ----------
 

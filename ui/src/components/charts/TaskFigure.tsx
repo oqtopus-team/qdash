@@ -7,6 +7,7 @@ import { FigureStrip } from "@/components/charts/FigureStrip";
 import { useGetTaskResult } from "@/client/task/task";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { FigureLightbox } from "./FigureLightbox";
+import { executionFigureUrl } from "@/lib/utils/executionFiles";
 
 interface TaskFigureProps {
   path?: string | string[];
@@ -21,10 +22,6 @@ interface TaskFigureProps {
    * the horizontally scrolling strips most pages put figures in.
    */
   fit?: boolean;
-}
-
-function figureUrl(path: string): string {
-  return `/api/executions/figure?path=${encodeURIComponent(path)}`;
 }
 
 /** Delays before each automatic reload of a figure that failed to load, in milliseconds. */
@@ -242,7 +239,7 @@ export function TaskFigure({
   if (normalizedPaths.length === 1) {
     return (
       <ExpandableImage
-        src={figureUrl(normalizedPaths[0])}
+        src={executionFigureUrl(normalizedPaths[0])}
         alt={`Result for QID ${qid}`}
         className={className}
         jsonFigurePath={normalizedJsonPaths[0]}
@@ -257,7 +254,7 @@ export function TaskFigure({
       {normalizedPaths.map((p, i) => (
         <ExpandableImage
           key={p}
-          src={figureUrl(p)}
+          src={executionFigureUrl(p)}
           alt={`Result for QID ${qid}`}
           className={className}
           jsonFigurePath={normalizedJsonPaths[i]}

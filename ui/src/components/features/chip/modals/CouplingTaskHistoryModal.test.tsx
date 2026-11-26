@@ -125,6 +125,19 @@ describe("CouplingTaskHistoryModal figures", () => {
     expect(figures.map((f) => f.dataset.jsonPath)).toEqual(["/fig/a.json", "", ""]);
   });
 
+  it("describes the coupling target and its empty execution in coupling terms", () => {
+    mocks.task.qid = "1-0";
+    try {
+      renderModal();
+      expect(screen.getByText("Coupling 0-1")).not.toBeNull();
+      expect(
+        screen.getAllByText("This execution may not include calibration for this coupling"),
+      ).not.toHaveLength(0);
+    } finally {
+      mocks.task.qid = "0-1";
+    }
+  });
+
   it("falls back to loading the figure by task ID when the task has no figure paths", () => {
     mocks.task.figure_path = [];
     renderModal();

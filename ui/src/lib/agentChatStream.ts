@@ -3,6 +3,7 @@
  */
 
 import type {
+  AgentBlocksResult,
   ChatTrace,
   ContentBlock,
   CreatedCalibrationSession,
@@ -402,6 +403,19 @@ export function stoppedBlocks(turn: LiveTurn): ContentBlock[] {
     ...(turn.blocks ?? []),
     ...(partial ? [{ type: "text" as const, content: partial, chart: null }] : []),
   ];
+}
+
+/**
+ * What a failed turn streamed before it failed (progress updates, steps, the answer so
+ * far), kept as an unfinished answer ahead of its error, as the server stores it
+ * (`TurnTranscript._unfinished`). Null when nothing streamed.
+ */
+export function failedTurnPayload(turn: LiveTurn, now: number): AgentBlocksResult | null {
+  const blocks = stoppedBlocks(turn);
+  const trace = toPersistedTrace(turn, now);
+  if (blocks.length === 0 && !trace) return null;
+  const payload: AgentBlocksResult = { blocks, assessment: null, interrupted: true };
+  return trace ? { ...payload, trace } : payload;
 }
 
 function streamedAnswer(turn: LiveTurn): string {
