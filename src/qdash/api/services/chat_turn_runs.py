@@ -26,11 +26,8 @@ from typing import TYPE_CHECKING, Any, Literal
 from qdash.api.lib.sse import sse_event
 from qdash.api.services import agent_chat_session_service as sessions
 from qdash.api.services.chat_transcript import TurnTranscript
-from qdash.api.services.pi_chat_service import (
-    STREAM_LOST,
-    TURN_BOUNDARY_UNKNOWN,
-    parse_sse,
-)
+from qdash.api.services.pi_chat_service import TURN_BOUNDARY_UNKNOWN, parse_sse
+from qdash.api.services.runtime_presentation import STREAM_LOST
 from qdash.dbmodel.agent_chat_session import AgentChatMessage
 
 if TYPE_CHECKING:

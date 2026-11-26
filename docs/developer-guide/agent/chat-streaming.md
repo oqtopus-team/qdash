@@ -1,14 +1,15 @@
 # Chat Streaming
 
-QDash translates runtime events into Server-Sent Events (SSE) while saving each turn independently
-of the browser connection.
+The runtime prepares chat presentation events; the API validates and relays them as
+Server-Sent Events (SSE) while saving each turn independently of the browser connection.
 
 ## Responsibility Boundary
 
 | Layer | Responsibility |
 | --- | --- |
-| Agent Runtime | Durable model and tool execution |
-| `pi_chat_service.py` | HTTP bridge, event translation, and final response |
+| Agent Runtime | Durable model and tool execution, presentation events, and answer blocks |
+| `pi_chat_service.py` | Authenticated HTTP bridge and contract negotiation |
+| `runtime_presentation.py` | Envelope validation, SSE relay, and evaluation recording |
 | `chat_turn_runs.py` | Background stream and server-side chat recording |
 | Chat UI | Live rendering, reconnecting, and explicit stop requests |
 
@@ -18,6 +19,24 @@ Text, reasoning, tool arguments, tool results, and rendered blocks stream as the
 `ViewEventTranslator` reads durable conversation revisions, including result entries, so skipped
 intermediate updates do not lose tool output. Preserve event identity and ordering when changing
 translation; the final response must agree with the streamed blocks.
+
+`agent-runtime/src/presentation.ts` owns tool labels, display fields, and answer-block assembly.
+The API requests version 1 with `Accept: application/vnd.qdash.agent-presentation+x-ndjson; version=1`.
+Each NDJSON envelope has `v`, `event`, and `data`; optional `internal` fields carry evaluation
+records and answer text for API recording and never reach the browser. The API adds evaluation
+IDs, an error's `step`, and task-chat result metadata. Authentication and project checks remain
+on the existing request and tool-call paths.
+
+`src/qdash/agent/contracts/presentation.py` validates the envelope and event payload before relay.
+Unsupported versions, unknown events, malformed payloads, and lines over 16 Mi characters end
+the stream with an explicit error. New event shapes require contract validation and UI support;
+display mapping belongs in the runtime. Shared cases in
+`agent-runtime/testdata/presentation-v1.json` check runtime output, API relay, and UI folding.
+
+Each subscriber rebuilds presentation state from the turn's replay, preserving segment order
+on reattach. Older runtimes returning plain NDJSON use `pi_runtime_legacy.py`; retain this adapter
+until deployed runtimes all support the presentation contract. Existing saved message formats
+and the API/UI transcript reducers are unchanged.
 
 Text before or between tool calls becomes work history; text after the last tool call becomes
 the final answer. `agent-runtime/src/prompt.ts` requests concise progress updates at meaningful
@@ -65,7 +84,8 @@ Start with these files:
 | --- | --- |
 | `agent-runtime/src/server.ts` | Runtime stream and abort routes |
 | `agent-runtime/src/view-events.ts` | Durable-view translation |
-| `src/qdash/api/services/pi_chat_service.py` | Runtime-to-SSE bridge |
+| `agent-runtime/src/presentation.ts` | Runtime-owned presentation mapping |
+| `src/qdash/api/services/runtime_presentation.py` | Validated runtime-to-SSE relay |
 | `src/qdash/api/services/chat_turn_runs.py` | Server recording |
 | `ui/src/lib/agentTurnStore.ts` | Reload recovery pointers |
 
