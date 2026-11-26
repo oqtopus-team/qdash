@@ -1,8 +1,10 @@
 import ast
 import json
+import os
 from pathlib import Path
 
 import pytest
+from fastapi import HTTPException
 
 from qdash.api.dependencies import get_task_file_service
 from qdash.api.services.chip.service import _get_task_names_cached, get_task_names
@@ -11,6 +13,7 @@ from qdash.api.services.task_file_service import (
     TaskFileService,
 )
 from qdash.common.config.backend import clear_cache as clear_backend_config_cache
+from tests.qdash.api._fs_swaps import swap_after_listing, swap_dir_for_link
 
 
 def test_uses_calib_tasks_path_from_environment(monkeypatch, tmp_path: Path) -> None:
@@ -649,3 +652,192 @@ def test_catalog_publishes_the_same_documentation_for_fake_and_qubex_tasks() -> 
         documentation = fake[name].documentation
         assert documentation is not None, name
         assert fake[name].description == documentation.description
+
+
+# --- Backend path confinement ---
+
+_TASK_SOURCE = 'class {cls}:\n    name: str = "{name}"\n'
+
+
+def _write_task(path: Path, name: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(_TASK_SOURCE.format(cls=name, name=name), encoding="utf-8")
+
+
+@pytest.fixture
+def calibtasks(tmp_path: Path) -> Path:
+    base = tmp_path / "calibtasks"
+    _write_task(base / "fake" / "one_qubit" / "rabi.py", "FakeRabi")
+    _write_task(base / "fakeextra" / "secret.py", "SiblingTask")
+    _write_task(tmp_path / "outside" / "outside.py", "OutsideTask")
+    return base
+
+
+@pytest.mark.parametrize(
+    "backend",
+    ["../outside", "..", ".", "", "fake/one_qubit", "fake/../fake", ".hidden", "__pycache__"],
+)
+def test_list_task_info_rejects_backend_that_is_not_a_single_name(
+    calibtasks: Path, backend: str
+) -> None:
+    with pytest.raises(HTTPException) as exc_info:
+        TaskFileService(calibtasks).list_task_info(backend)
+
+    assert exc_info.value.status_code == 400
+
+
+def test_list_task_info_rejects_absolute_backend(calibtasks: Path) -> None:
+    with pytest.raises(HTTPException) as exc_info:
+        TaskFileService(calibtasks).list_task_info(str(calibtasks.parent / "outside"))
+
+    assert exc_info.value.status_code == 400
+
+
+def test_list_task_info_rejects_backend_link_outside_base(calibtasks: Path) -> None:
+    (calibtasks / "escape").symlink_to(calibtasks.parent / "outside", target_is_directory=True)
+
+    with pytest.raises(HTTPException) as exc_info:
+        TaskFileService(calibtasks).list_task_info("escape")
+
+    assert exc_info.value.status_code == 400
+
+
+def test_list_task_info_reports_missing_backend(calibtasks: Path) -> None:
+    with pytest.raises(HTTPException) as exc_info:
+        TaskFileService(calibtasks).list_task_info("missing")
+
+    assert exc_info.value.status_code == 404
+
+
+def test_list_task_info_reads_only_the_named_backend(calibtasks: Path) -> None:
+    """A sibling sharing the name as a prefix ("fakeextra") is not part of "fake"."""
+    tasks = TaskFileService(calibtasks).list_task_info("fake").tasks
+
+    assert [(task.name, task.file_path) for task in tasks] == [("FakeRabi", "one_qubit/rabi.py")]
+
+
+def test_list_task_info_accepts_discovered_backend_without_config(calibtasks: Path) -> None:
+    clear_backend_config_cache()
+    service = TaskFileService(calibtasks)
+
+    assert "fakeextra" in [backend.name for backend in service.list_backends().backends]
+    tasks = service.list_task_info("fakeextra").tasks
+
+    assert [task.name for task in tasks] == ["SiblingTask"]
+    assert tasks[0].enabled is False
+
+
+def test_list_task_info_does_not_follow_links_out_of_backend(calibtasks: Path) -> None:
+    backend = calibtasks / "fake"
+    outside = calibtasks.parent / "outside"
+    (backend / "linked_dir").symlink_to(outside, target_is_directory=True)
+    (backend / "linked_file.py").symlink_to(outside / "outside.py")
+    (backend / "one_qubit" / "loop").symlink_to(backend, target_is_directory=True)
+    (backend / "sibling.py").symlink_to(calibtasks / "fakeextra" / "secret.py")
+
+    tasks = TaskFileService(calibtasks).list_task_info("fake").tasks
+
+    assert [task.name for task in tasks] == ["FakeRabi"]
+
+
+def test_list_task_info_keeps_file_links_inside_backend(calibtasks: Path) -> None:
+    backend = calibtasks / "fake"
+    (backend / "alias.py").symlink_to(backend / "one_qubit" / "rabi.py")
+
+    tasks = TaskFileService(calibtasks).list_task_info("fake", sort_order="file_path").tasks
+
+    assert [task.file_path for task in tasks] == ["alias.py", "one_qubit/rabi.py"]
+
+
+def test_list_task_info_skips_link_cycles(calibtasks: Path) -> None:
+    backend = calibtasks / "fake"
+    (backend / "alias.py").symlink_to(backend / "one_qubit" / "rabi.py")
+    (backend / "self.py").symlink_to("self.py")
+    (backend / "ping.py").symlink_to("pong.py")
+    (backend / "pong.py").symlink_to("ping.py")
+    (backend / "one_qubit" / "loop").symlink_to("loop")
+
+    tasks = TaskFileService(calibtasks).list_task_info("fake", sort_order="file_path").tasks
+
+    assert [(task.name, task.file_path) for task in tasks] == [
+        ("FakeRabi", "alias.py"),
+        ("FakeRabi", "one_qubit/rabi.py"),
+    ]
+
+
+@pytest.fixture
+def swap_backend(calibtasks: Path) -> tuple[Path, Path]:
+    """A backend with sibling directories and an outside directory with the same layout."""
+    backend = calibtasks / "fake"
+    for name in ("a", "b", "c"):
+        _write_task(backend / name / "task.py", f"Inside{name.upper()}")
+    outside = calibtasks.parent / "outside"
+    _write_task(outside / "task.py", "OutsideTask")
+    return backend, outside
+
+
+def test_list_task_info_refuses_backend_replaced_after_validation(
+    calibtasks: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service = TaskFileService(calibtasks)
+    resolve = service._resolve_backend_path
+
+    def resolve_then_swap(backend: str) -> Path:
+        checked = resolve(backend)
+        checked.rename(calibtasks / "original")
+        checked.symlink_to(calibtasks.parent / "outside", target_is_directory=True)
+        return checked
+
+    monkeypatch.setattr(service, "_resolve_backend_path", resolve_then_swap)
+
+    assert service.list_task_info("fake").tasks == []
+
+
+def test_task_discovery_refuses_directory_swapped_for_link_before_descent(
+    swap_backend: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend, outside = swap_backend
+    # "b" is listed as a directory, then swapped for a link while a sibling is read.
+    swapped = swap_after_listing(
+        monkeypatch, [backend / "a", backend / "c"], swap_dir_for_link(backend / "b", outside)
+    )
+
+    tasks = TaskFileService(backend.parent)._collect_tasks_from_directory(backend, backend)
+
+    assert swapped == [True]
+    names = {task.name for task in tasks}
+    assert "OutsideTask" not in names
+    assert {"FakeRabi", "InsideA", "InsideC"} <= names
+
+
+def test_task_discovery_parses_files_from_the_listed_directory(
+    swap_backend: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend, outside = swap_backend
+    # "b" is swapped for a link after its own entries were listed, before they are parsed.
+    swapped = swap_after_listing(
+        monkeypatch, [backend / "b"], swap_dir_for_link(backend / "b", outside)
+    )
+
+    tasks = TaskFileService(backend.parent)._collect_tasks_from_directory(backend, backend)
+
+    assert swapped == [True]
+    assert [(task.name, task.file_path) for task in tasks] == [
+        ("InsideA", "a/task.py"),
+        ("InsideB", "b/task.py"),
+        ("InsideC", "c/task.py"),
+        ("FakeRabi", "one_qubit/rabi.py"),
+    ]
+
+
+def test_task_discovery_closes_descriptors_when_stopped_early(
+    swap_backend: tuple[Path, Path],
+) -> None:
+    backend, _ = swap_backend
+    baseline = len(os.listdir("/dev/fd"))
+
+    files = TaskFileService(backend.parent)._iter_python_files(backend)
+    assert next(files).parts == ("a", "task.py")
+    files.close()
+
+    assert len(os.listdir("/dev/fd")) == baseline
