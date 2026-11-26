@@ -52,10 +52,7 @@ Example:
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
-
-import yaml
 
 from qdash.common.manual_rounds import channel_box_type, channel_module_id
 from qdash.common.mux_mapping import (
@@ -64,7 +61,7 @@ from qdash.common.mux_mapping import (
     canonical_qid,
     normalize_qid,
 )
-from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
+from qdash.workflow.engine.scheduler.cr_utils import build_qubit_to_mux_map
 from qdash.workflow.engine.scheduler.one_qubit_types import (
     BOX_A,
     BOX_B,
@@ -77,8 +74,11 @@ from qdash.workflow.engine.scheduler.one_qubit_types import (
     OneQubitScheduleResult,
     OneQubitStageInfo,
 )
+from qdash.workflow.engine.scheduler.wiring import load_wiring_config
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from qdash.workflow.engine.scheduler.one_qubit_plugins import (
         MuxOrderingStrategy,
     )
@@ -136,25 +136,9 @@ class OneQubitScheduler:
         self._box_b_module_to_muxes: dict[str, list[int]] | None = None
 
     def _load_wiring_config(self) -> list[dict[str, Any]]:
-        """Load wiring configuration from YAML file."""
+        """Load wiring configuration from YAML file (cached per instance)."""
         if self._wiring_config is None:
-            if self.wiring_config_path is not None:
-                wiring_path = Path(self.wiring_config_path)
-            else:
-                wiring_path = get_qubex_paths().wiring_yaml(self.chip_id)
-
-            if not wiring_path.exists():
-                msg = f"Wiring config not found: {wiring_path}"
-                raise FileNotFoundError(msg)
-
-            yaml_data = yaml.safe_load(wiring_path.read_text())
-            if self.chip_id in yaml_data:
-                self._wiring_config = yaml_data[self.chip_id]
-            else:
-                # New YAML format: top-level keys are group names (e.g., "A2"),
-                # each mapping to a list of MUX configs. Flatten all lists.
-                self._wiring_config = [entry for group in yaml_data.values() for entry in group]
-
+            self._wiring_config = load_wiring_config(self.chip_id, self.wiring_config_path)
         return self._wiring_config
 
     @staticmethod
@@ -242,16 +226,9 @@ class OneQubitScheduler:
         Raises:
             MuxMappingError: If a member slot has no control port in the wiring
         """
-        if self._qid_to_mux is not None:
-            return self._qid_to_mux
-
-        self.mux_mapping.check_wiring(wiring_config)
-        qid_to_mux = self.mux_mapping.qid_to_mux(
-            entry["mux"] for entry in wiring_config if self.mux_mapping.has_mux(entry["mux"])
-        )
-
-        self._qid_to_mux = qid_to_mux
-        return qid_to_mux
+        if self._qid_to_mux is None:
+            self._qid_to_mux = build_qubit_to_mux_map(wiring_config, self.mux_mapping)
+        return self._qid_to_mux
 
     @staticmethod
     def _extract_module_id(module_name: str) -> str | None:

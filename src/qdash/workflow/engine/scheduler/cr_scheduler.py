@@ -41,13 +41,9 @@ Example:
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import yaml
-
 from qdash.common.mux_mapping import MuxMapping, resolve_topology_mux_mapping
-from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.engine.scheduler.cr_utils import (
     build_mux_conflict_map,
     build_qubit_to_mux_map,
@@ -57,8 +53,11 @@ from qdash.workflow.engine.scheduler.cr_utils import (
     infer_direction_from_design,
     split_fast_slow_pairs,
 )
+from qdash.workflow.engine.scheduler.wiring import load_wiring_config
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from qdash.common.config.topology import TopologyDefinition
     from qdash.datamodel.chip import ChipModel
     from qdash.repository.protocols import ChipRepository
@@ -276,26 +275,9 @@ class CRScheduler:
             return {f"{c[0]}-{c[1]}" for c in topology.couplings}
 
     def _load_wiring_config(self) -> list[dict[str, Any]]:
-        """Load wiring configuration from YAML file."""
+        """Load wiring configuration from YAML file (cached per instance)."""
         if self._wiring_config is None:
-            # Use provided path or default path
-            if self.wiring_config_path is not None:
-                wiring_path = Path(self.wiring_config_path)
-            else:
-                wiring_path = get_qubex_paths().wiring_yaml(self.chip_id)
-
-            if not wiring_path.exists():
-                msg = f"Wiring config not found: {wiring_path}"
-                raise FileNotFoundError(msg)
-
-            yaml_data = yaml.safe_load(wiring_path.read_text())
-            if self.chip_id in yaml_data:
-                self._wiring_config = yaml_data[self.chip_id]
-            else:
-                # New YAML format: top-level keys are group names (e.g., "A2"),
-                # each mapping to a list of MUX configs. Flatten all lists.
-                self._wiring_config = [entry for group in yaml_data.values() for entry in group]
-
+            self._wiring_config = load_wiring_config(self.chip_id, self.wiring_config_path)
         return self._wiring_config
 
     def _load_mux_wiring(self) -> list[dict[str, Any]]:

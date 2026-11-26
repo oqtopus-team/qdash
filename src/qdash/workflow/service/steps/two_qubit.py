@@ -189,6 +189,35 @@ def _run_automatic(
     return _run_coupling_groups(session, coupling_groups, plan)
 
 
+def _run_two_qubit_step(
+    step: Any,
+    session: ExecutionRuntime,
+    targets: Target,
+    ctx: StepContext,
+    plan: StepCalls,
+) -> TwoQubitResult:
+    """Run a two-qubit step's manual rounds or automatic groups and build its result.
+
+    The raw results are recorded as the step's stage result. Automatic mode
+    with no pair to run returns an empty result and records no stage.
+    """
+    if step._rounds is not None:
+        raw_results = _execute_manual_two_qubit(step, session, ctx, plan)
+    else:
+        automatic = _run_automatic(step, session, targets, ctx, plan)
+        if automatic is None:
+            return TwoQubitResult(step_id=step.resolved_step_id)
+        raw_results = automatic
+
+    session.record_stage_result(step.name, raw_results)
+    result: TwoQubitResult = step._build_result(raw_results)
+    get_run_logger().info(
+        f"[{step.name}] Completed. "
+        f"{len(result.successful_couplings())}/{len(raw_results)} successful"
+    )
+    return result
+
+
 def _init_mode(step: Any) -> PairRounds | None:
     """Validate ``execution_mode``, ``rounds`` and ``max_parallel_ops``; store pairs as tuples."""
     step.execution_mode = validate_two_qubit_execution_mode(step.execution_mode)
@@ -320,35 +349,9 @@ class CustomTwoQubit(CalibrationStep):
             f"{[call.resolved_call_id for call in self.tasks]}"
         )
 
-        if self._rounds is not None:
-            manual_results = _execute_manual_two_qubit(self, session, ctx, plan)
-            session.record_stage_result(self.name, manual_results)
-            result = self._build_result(manual_results)
-            ctx.metadata[self.step_name] = result
-            ctx.record_step_result(self.resolved_step_id, result)
-            logger.info(
-                f"[{self.name}] Completed. "
-                f"{len(result.successful_couplings())}/{len(manual_results)} successful"
-            )
-            return ctx
-
-        all_raw_results = _run_automatic(self, session, targets, ctx, plan)
-        if all_raw_results is None:
-            ctx.metadata[self.step_name] = TwoQubitResult(step_id=self.resolved_step_id)
-            ctx.record_step_result(self.resolved_step_id, ctx.metadata[self.step_name])
-            return ctx
-
-        session.record_stage_result(self.name, all_raw_results)
-
-        # Build typed result
-        result = self._build_result(all_raw_results)
+        result = _run_two_qubit_step(self, session, targets, ctx, plan)
         ctx.metadata[self.step_name] = result
         ctx.record_step_result(self.resolved_step_id, result)
-
-        logger.info(
-            f"[{self.name}] Completed. "
-            f"{len(result.successful_couplings())}/{len(all_raw_results)} successful"
-        )
         return ctx
 
     def _build_result(self, raw_results: dict[str, Any]) -> TwoQubitResult:
@@ -515,37 +518,10 @@ class TwoQubitCalibration(CalibrationStep):
         ctx: StepContext,
     ) -> StepContext:
         """Execute 2-qubit calibration."""
-        logger = get_run_logger()
         plan = self.step_calls(session)
-
-        if self._rounds is not None:
-            manual_results = _execute_manual_two_qubit(self, session, ctx, plan)
-            session.record_stage_result(self.name, manual_results)
-            ctx.two_qubit = self._build_result(manual_results)
-            ctx.record_step_result(self.resolved_step_id, ctx.two_qubit)
-            logger.info(
-                f"[{self.name}] Completed. "
-                f"{len(ctx.two_qubit.successful_couplings())}/{len(manual_results)} successful"
-            )
-            return ctx
-
-        all_raw_results = _run_automatic(self, session, targets, ctx, plan)
-        if all_raw_results is None:
-            ctx.two_qubit = TwoQubitResult(step_id=self.resolved_step_id)
-            ctx.record_step_result(self.resolved_step_id, ctx.two_qubit)
-            return ctx
-
-        session.record_stage_result(self.name, all_raw_results)
-
-        # Build typed result
-        result = self._build_result(all_raw_results)
+        result = _run_two_qubit_step(self, session, targets, ctx, plan)
         ctx.two_qubit = result
         ctx.record_step_result(self.resolved_step_id, result)
-
-        logger.info(
-            f"[{self.name}] Completed. "
-            f"{len(result.successful_couplings())}/{len(all_raw_results)} successful"
-        )
         return ctx
 
     def _build_result(self, raw_results: dict[str, Any]) -> TwoQubitResult:
