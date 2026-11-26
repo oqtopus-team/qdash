@@ -530,10 +530,13 @@ class AgentInterventionForumService:
             return full
 
         # Room left after the fixed parts, with the "shortened" notes and the "more" line
-        # reserved, so every part's pointer to the intervention page always fits.
+        # reserved, so every part's pointer to the intervention page always fits. Each note
+        # follows its text after a blank line ("\n\n"), and so does the "more" line after
+        # the kept entries. Nonempty evidence also adds one line break after the heading,
+        # which ``fixed`` does not count because ``assemble`` strips the trailing blank line.
         fixed = len(assemble("", "", []))
-        more_line = len(more(len(doc.attempts))) + 1
-        reserve = 2 * (len(shortened) + 2) + more_line
+        more_line = len(more(len(doc.attempts))) + 2
+        reserve = 2 * (len(shortened) + 2) + more_line + 1
         question_share, summary_share, evidence_share = _share(
             [len(question_full), len(summary_full), len("\n".join(evidence_full))],
             MAX_CONTENT_CHARS - fixed - reserve,

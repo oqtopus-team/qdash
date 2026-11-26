@@ -41,6 +41,7 @@ from qdash.datamodel.agent_session import (
     AgentSessionStopRecord,
 )
 from qdash.datamodel.calibration_session import CalibrationAdmission  # noqa: TC001
+from qdash.datamodel.field_types import TimezoneAwareDatetime  # noqa: TC001
 from qdash.datamodel.quality_metrics import RECORDED_QUALITY_METRICS
 
 MODEL_FIELD_DESCRIPTION = (
@@ -638,11 +639,12 @@ class AgentInterventionForumThreadResponse(BaseModel):
     status: AgentForumThreadStatus
     attempts: int
     last_error: str = ""
-    last_attempt_at: datetime | None = None
-    next_attempt_at: datetime | None = None
+    # Stored timestamps come back from MongoDB naive; they are UTC, so mark them as such.
+    last_attempt_at: TimezoneAwareDatetime = None
+    next_attempt_at: TimezoneAwareDatetime = None
     post_id: str | None = Field(default=None, description="The root Forum post, once created")
     number: int | None = Field(default=None, description="The project's Forum thread number")
-    created_at: datetime | None = None
+    created_at: TimezoneAwareDatetime = None
 
 
 class AgentResumeOption(BaseModel):

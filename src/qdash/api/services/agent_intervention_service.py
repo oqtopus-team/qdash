@@ -1768,9 +1768,14 @@ def run_notification_sweeper(
     async def sweep() -> None:
         while True:
             await asyncio.sleep(interval_seconds)
+            # Each step has its own error boundary, so one failure does not skip the rest.
             try:
-                # Writes the records of crashed pauses, so their threads are opened too.
+                # Runs first: it writes the records of crashed pauses, so their threads are
+                # opened in the same pass.
                 await asyncio.to_thread(sweeper_service.materialize_pending_pauses)
+            except Exception:
+                logger.exception("Agent intervention pending pause recovery failed")
+            try:
                 await asyncio.to_thread(forum_threads.sweep)
             except Exception:
                 logger.exception("Agent intervention Forum thread sweep failed")

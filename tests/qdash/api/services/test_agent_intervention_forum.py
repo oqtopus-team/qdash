@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import re
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -21,6 +21,9 @@ from qdash.api.services.agent_intervention_service import (
 )
 from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.api.services.forum_service import ForumService
+from qdash.client.services.models import (
+    AgentInterventionForumThreadResponse as ClientForumThread,
+)
 from qdash.common.utils.datetime import now
 from qdash.datamodel.agent_session import AgentActionType
 from qdash.datamodel.project import ProjectRole
@@ -593,6 +596,67 @@ def test_the_sweeper_opens_threads_when_slack_is_off(
     assert thread.agent_intervention_id == opened.intervention_id
 
 
+def test_a_failing_pause_recovery_does_not_stop_thread_delivery(
+    sessions: AgentSessionService,
+    interventions: AgentInterventionService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, opened = _open(sessions, interventions)
+    recoveries: list[int] = []
+
+    def failing_recovery() -> int:
+        recoveries.append(1)
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(interventions, "materialize_pending_pauses", failing_recovery)
+
+    async def run() -> None:
+        task = run_notification_sweeper(interventions, interval_seconds=0.01)
+        for _ in range(200):
+            await asyncio.sleep(0.01)
+            if _threads():
+                break
+        task.cancel()
+
+    asyncio.run(run())
+
+    assert recoveries
+    [thread] = _threads()
+    assert thread.agent_intervention_id == opened.intervention_id
+
+
+def test_stored_naive_thread_timestamps_parse_in_the_python_client(
+    sessions: AgentSessionService,
+    interventions: AgentInterventionService,
+    forum_threads: AgentInterventionForumService,
+) -> None:
+    session, opened = _open(sessions, interventions)
+    forum_threads.ensure_thread(opened.intervention_id)
+    naive = datetime(2026, 11, 26, 9, 30)
+    AgentInterventionDocument.get_motor_collection().update_one(
+        {"intervention_id": opened.intervention_id},
+        {
+            "$set": {
+                "forum_thread.last_attempt_at": naive,
+                "forum_thread.next_attempt_at": naive,
+                "forum_thread.created_at": naive,
+            }
+        },
+    )
+
+    shown = interventions.get_intervention(
+        project_id=PROJECT, session_id=session.session_id, intervention_id=opened.intervention_id
+    )
+    payload = shown.forum_thread.model_dump(mode="json") if shown.forum_thread else None
+    assert payload is not None
+
+    parsed = ClientForumThread.model_validate(payload)
+    expected = naive.replace(tzinfo=UTC)
+    assert parsed.last_attempt_at == expected
+    assert parsed.next_attempt_at == expected
+    assert parsed.created_at == expected
+
+
 def _expire_lease(intervention_id: str) -> None:
     AgentInterventionDocument.get_motor_collection().update_one(
         {"intervention_id": intervention_id},
@@ -742,3 +806,39 @@ def test_the_whole_body_fits_the_forum_limit_in_the_worst_case(
         "execution",
         session.session_id.replace("-", "\\-"),
     }
+
+
+@pytest.mark.parametrize(
+    ("task_name_length", "note_length"), [(14, 337), (15, 228), (24, 336), (32, 227)]
+)
+def test_a_body_at_the_limit_keeps_its_sections_instead_of_the_links_only_fallback(
+    sessions: AgentSessionService,
+    interventions: AgentInterventionService,
+    forum_threads: AgentInterventionForumService,
+    task_name_length: int,
+    note_length: int,
+) -> None:
+    _, opened = _open(sessions, interventions)
+    doc = _record(opened.intervention_id)
+    attempt = doc.attempts[0].model_copy(update={"reason": "r" * note_length})
+    # The task name moves the fixed part and the note moves where whole evidence entries
+    # end; these pairs make the kept evidence and both shortened texts fill their shares
+    # exactly, which used to overrun the limit by the uncounted separators.
+    candidate = doc.model_copy(
+        update={
+            "question": "a@" * 1000,
+            "summary": "b@" * 1000,
+            "task_name": "t" * task_name_length,
+            "attempts": [attempt] * 30,
+        }
+    )
+
+    content = AgentInterventionForumService.content(candidate, forum_threads._evidence(doc))
+
+    assert len(content) <= MAX_CONTENT_CHARS
+    assert "did not fit in a Forum post" not in content
+    assert content.count("(Shortened. The full text is on the [intervention page]") == 2
+    evidence = content.split("### Evidence", 1)[1]
+    shown = len(re.findall(r"^(\d+)\. ", evidence, flags=re.M))
+    assert shown > 0
+    assert f"{30 - shown} more attempts are on the [intervention page]" in evidence
