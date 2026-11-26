@@ -640,3 +640,147 @@ async def test_a_runtime_that_cannot_say_whether_a_turn_runs_never_replaces_it(
     assert after.turn.status == "running"
     assert [m.model_dump(mode="json") for m in after.messages] == progress
     assert json.loads(after.messages[-1].content)["in_progress"] is True
+
+
+_CLAIM_REFUSALS: list[tuple[str, dict[str, Any]]] = [
+    (
+        "conflict",
+        {
+            "step": "init",
+            "detail": (
+                "This chat changed in another window, so the message was not sent. "
+                "Check the chat and send it again."
+            ),
+            "code": chat_turn_runs.TRANSCRIPT_CONFLICT,
+        },
+    ),
+    (
+        "busy",
+        {
+            "step": "init",
+            "detail": (
+                "Another answer is still running in this chat. Wait for it to end, "
+                "or stop it, then send the message again."
+            ),
+            "code": chat_turn_runs.TURN_RUNNING,
+        },
+    ),
+    (
+        "unknown",
+        {
+            "step": "init",
+            "detail": (
+                "Could not check whether an earlier answer still runs in this chat, "
+                "so the message was not sent. Send it again shortly."
+            ),
+            "code": chat_turn_runs.TURN_RUNNING,
+        },
+    ),
+    ("gone", {"step": "init", "detail": "Chat session not found"}),
+]
+
+
+async def _refused_turn(
+    monkeypatch: pytest.MonkeyPatch, claim: Any
+) -> tuple[list[str], Runtime, chat_turn_runs.TurnRun]:
+    """Stream r1 with ``_claim`` replaced; returns the chunks, the runtime and the run."""
+    runs: list[chat_turn_runs.TurnRun] = []
+
+    async def claiming(*args: Any) -> Any:
+        run = chat_turn_runs.running(USER, SESSION, "r1")
+        assert run is not None
+        runs.append(run)
+        return await claim(*args)
+
+    monkeypatch.setattr(chat_turn_runs, "_claim", claiming)
+    read: list[tuple[Any, ...]] = []
+
+    def recorded_turn(*args: Any) -> None:
+        read.append(args)
+
+    monkeypatch.setattr(sessions, "recorded_turn", recorded_turn)
+    runtime = Runtime()
+    chunks = await asyncio.wait_for(
+        _collect(
+            chat_turn_runs.stream_turn(
+                _request(), username=USER, project_id="p1", source=runtime.source
+            )
+        ),
+        5,
+    )
+    assert read == []
+    [run] = runs
+    return chunks, runtime, run
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("outcome", "payload"), _CLAIM_REFUSALS)
+async def test_a_refused_claim_reports_its_reason_and_sends_nothing(
+    monkeypatch: pytest.MonkeyPatch, outcome: str, payload: dict[str, Any]
+) -> None:
+    async def claim(*args: Any) -> tuple[str, None]:
+        return outcome, None
+
+    chunks, runtime, run = await _refused_turn(monkeypatch, claim)
+
+    assert chunks == [sse_event("error", payload)]
+    assert list(_events(chunks)[0][1]) == list(payload)
+    assert runtime.opened == []
+    assert run.done
+    assert run.subscribers == set()
+    assert chat_turn_runs.running(USER, SESSION, "r1") is None
+
+
+@pytest.mark.asyncio
+async def test_a_claim_that_fails_reports_that_the_chat_was_not_saved(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    async def claim(*args: Any) -> tuple[str, None]:
+        raise RuntimeError("database down")
+
+    with caplog.at_level("ERROR", logger=chat_turn_runs.logger.name):
+        chunks, runtime, run = await _refused_turn(monkeypatch, claim)
+
+    payload = {"step": "init", "detail": "Could not save the chat; try again"}
+    assert chunks == [sse_event("error", payload)]
+    assert list(_events(chunks)[0][1]) == list(payload)
+    assert runtime.opened == []
+    assert run.done
+    assert chat_turn_runs.running(USER, SESSION, "r1") is None
+    [record] = [r for r in caplog.records if r.name == chat_turn_runs.logger.name]
+    assert record.getMessage() == "Could not record the start of turn r1"
+    assert record.exc_info is not None
+    assert isinstance(record.exc_info[1], RuntimeError)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", ["claimed", "same_turn", "unexpected"])
+async def test_a_claim_that_is_not_refused_streams_the_turn(
+    monkeypatch: pytest.MonkeyPatch, outcome: str
+) -> None:
+    async def claim(*args: Any) -> tuple[str, None]:
+        return outcome, None
+
+    read: list[tuple[Any, ...]] = []
+
+    def recorded_turn(*args: Any) -> None:
+        read.append(args)
+
+    monkeypatch.setattr(chat_turn_runs, "_claim", claim)
+    monkeypatch.setattr(sessions, "recorded_turn", recorded_turn)
+    runtime = Runtime()
+    runtime.send("result", _answer())
+    runtime.end()
+    chunks = await asyncio.wait_for(
+        _collect(
+            chat_turn_runs.stream_turn(
+                _request(), username=USER, project_id="p1", source=runtime.source
+            )
+        ),
+        5,
+    )
+
+    assert [name for name, _ in _events(chunks)] == ["result"]
+    assert read == [(USER, SESSION, "r1")]
+    assert len(runtime.opened) == 1
+    assert chat_turn_runs.running(USER, SESSION, "r1") is None
