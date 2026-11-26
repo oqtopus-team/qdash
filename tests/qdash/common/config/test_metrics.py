@@ -54,17 +54,53 @@ def test_color_scale_requires_at_least_two_colors() -> None:
         )
 
 
-def test_average_readout_fidelity_threshold_range_reaches_one(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    ("group", "key", "expected"),
+    [
+        (
+            "qubit_metrics",
+            "average_readout_fidelity",
+            ThresholdConfig(value=0.99, range=ThresholdRange(min=0.9, max=1.0, step=0.001)),
+        ),
+        (
+            "qubit_metrics",
+            "average_gate_fidelity",
+            ThresholdConfig(value=0.999, range=ThresholdRange(min=0.9, max=1.0, step=0.0001)),
+        ),
+        (
+            "qubit_metrics",
+            "x90_gate_fidelity",
+            ThresholdConfig(value=0.999, range=ThresholdRange(min=0.9, max=1.0, step=0.0001)),
+        ),
+        (
+            "qubit_metrics",
+            "x180_gate_fidelity",
+            ThresholdConfig(value=0.999, range=ThresholdRange(min=0.9, max=1.0, step=0.0001)),
+        ),
+        (
+            "coupling_metrics",
+            "zx90_gate_fidelity",
+            ThresholdConfig(value=0.99, range=ThresholdRange(min=0.9, max=1.0, step=0.001)),
+        ),
+        (
+            "coupling_metrics",
+            "bell_state_fidelity",
+            ThresholdConfig(value=0.95, range=ThresholdRange(min=0.8, max=1.0, step=0.001)),
+        ),
+    ],
+)
+def test_fidelity_threshold_range_reaches_one(
+    monkeypatch: pytest.MonkeyPatch, group: str, key: str, expected: ThresholdConfig
+) -> None:
     """The histogram threshold slider can select 100% fidelity (0% error), see issue #594."""
     monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", ConfigLoader.LOCAL_CONFIG_DIR)
     ConfigLoader.clear_cache()
     clear_metrics_config_cache()
     try:
-        metadata = load_metrics_config().qubit_metrics["average_readout_fidelity"]
+        config = load_metrics_config()
     finally:
         ConfigLoader.clear_cache()
         clear_metrics_config_cache()
 
-    assert metadata.threshold == ThresholdConfig(
-        value=0.99, range=ThresholdRange(min=0.9, max=1.0, step=0.001)
-    )
+    metrics = config.qubit_metrics if group == "qubit_metrics" else config.coupling_metrics
+    assert metrics[key].threshold == expected

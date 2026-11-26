@@ -203,7 +203,7 @@ qubit_metrics:
       value: 0.999 # Raw value (99.9%)
       range:
         min: 0.9
-        max: 0.9999
+        max: 1.0
         step: 0.0001
     error_rate_range:
       min: 0.001
@@ -221,7 +221,7 @@ qubit_metrics:
       value: 0.999 # Raw value (99.9%)
       range:
         min: 0.9
-        max: 0.9999
+        max: 1.0
         step: 0.0001
     error_rate_range:
       min: 0.001
@@ -239,7 +239,7 @@ qubit_metrics:
       value: 0.999 # Raw value (99.9%)
       range:
         min: 0.9
-        max: 0.9999
+        max: 1.0
         step: 0.0001
     error_rate_range:
       min: 0.001
@@ -346,7 +346,7 @@ coupling_metrics:
       value: 0.99 # Raw value (99%)
       range:
         min: 0.9
-        max: 0.999
+        max: 1.0
         step: 0.001
     error_rate_range:
       min: 0.001
@@ -364,7 +364,7 @@ coupling_metrics:
       value: 0.95 # Raw value (95%)
       range:
         min: 0.8
-        max: 0.999
+        max: 1.0
         step: 0.001
     error_rate_range:
       min: 0.001
