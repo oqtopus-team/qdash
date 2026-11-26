@@ -54,6 +54,11 @@ from qdash.api.schemas.agent_session import (
 )
 from qdash.api.services.agent_execution_links import resolve_chip_links
 from qdash.api.services.agent_intervention_slack import AgentInterventionSlackNotifier
+from qdash.api.services.agent_resume_policy import (
+    PlanResumeFacts,
+    node_budget_blocker,
+    resume_blockers,
+)
 from qdash.api.services.agent_session_gate import (
     ADMITTED_FILTER,
     admission_refusal,
@@ -466,18 +471,6 @@ class AgentInterventionService:
 
     # ------------------------------------------------------------------ resume checks
 
-    @staticmethod
-    def _node_budget_blocker(
-        checkpoint: AgentPlanCheckpoint, node_visits: dict[str, int], node_id: str
-    ) -> str | None:
-        visits = node_visits.get(node_id, 0)
-        if checkpoint.max_node_visits is not None and visits >= checkpoint.max_node_visits:
-            return (
-                f"Node {node_id} already ran {visits} times, the plan's limit; "
-                "choose another node or start a newly authorized session"
-            )
-        return None
-
     def _resume_blockers(
         self,
         doc: AgentInterventionDocument,
@@ -487,56 +480,30 @@ class AgentInterventionService:
         expected_status: AgentInterventionStatus,
     ) -> list[str]:
         """Why a resume cannot happen now, in words an expert can act on."""
-        blockers: list[str] = []
-        if doc.status != expected_status:
-            blockers.append(f"The intervention is {doc.status.value.replace('_', ' ')}")
-        if session.status == AgentSessionStatus.EXPIRED:
-            blockers.append("The session expired; a newly authorized session is needed to continue")
-        elif session.status in {AgentSessionStatus.COMPLETED, AgentSessionStatus.CANCELLED}:
-            blockers.append(
-                f"The session is {session.status.value}; it is not reactivated, so a newly "
-                "authorized session is needed to continue"
-            )
-        elif (
-            session.status != AgentSessionStatus.WAITING_FOR_HUMAN
-            or session.active_intervention_id != doc.intervention_id
-        ):
-            blockers.append("The session is not paused on this intervention")
-        remaining_actions = session.policy.max_actions - session.action_count
-        if remaining_actions <= 0:
-            blockers.append(
-                f"The session used all {session.policy.max_actions} of its actions; "
-                "a newly authorized session is needed to measure again"
-            )
+        plan: PlanResumeFacts | None = None
         checkpoint = doc.checkpoint
         if checkpoint is not None:
             binding = session.plan_binding
-            if binding is None or binding.get("identity") != plan_identity(checkpoint):
-                blockers.append(
-                    "The checkpoint is not the plan this session approved; a newly "
-                    "authorized session is needed to run it"
-                )
             history = PlanHistory.load(session, checkpoint)
-            blockers.extend(history.errors)
-            node_visits = history.node_visits(checkpoint)
-            remaining_nodes = checkpoint.max_node_executions - history.node_executions(checkpoint)
-            if remaining_nodes <= 0:
-                blockers.append(
-                    f"The plan used all {checkpoint.max_node_executions} of its node "
-                    "executions; a newly authorized plan is needed"
-                )
-            elif 0 < remaining_actions < remaining_nodes:
-                blockers.append(
-                    f"The plan may still run {remaining_nodes} nodes but the session has "
-                    f"{remaining_actions} actions left"
-                )
-            node_id = resume_node_id or checkpoint.stopped_node_id
-            if node_id not in {node.id for node in checkpoint.nodes}:
-                blockers.append(f"Node {node_id} is not part of the approved plan")
-            else:
-                node_blocker = self._node_budget_blocker(checkpoint, node_visits, node_id)
-                if node_blocker:
-                    blockers.append(node_blocker)
+            plan = PlanResumeFacts(
+                checkpoint=checkpoint,
+                approved=binding is not None
+                and binding.get("identity") == plan_identity(checkpoint),
+                history_errors=history.errors,
+                node_visits=history.node_visits(checkpoint),
+                node_executions=history.node_executions(checkpoint),
+            )
+        blockers = resume_blockers(
+            intervention_id=doc.intervention_id,
+            intervention_status=doc.status,
+            expected_status=expected_status,
+            session_status=session.status,
+            active_intervention_id=session.active_intervention_id,
+            action_count=session.action_count,
+            max_actions=session.policy.max_actions,
+            plan=plan,
+            resume_node_id=resume_node_id,
+        )
         # Read while the session is paused: no operation passes the execution gate between
         # this read and the update that resumes the session.
         blockers.extend(in_flight_blockers(doc.project_id, doc.session_id))
@@ -554,7 +521,7 @@ class AgentInterventionService:
         node_visits = PlanHistory.load(session, checkpoint).node_visits(checkpoint)
         options = []
         for node in checkpoint.nodes:
-            blocker = self._node_budget_blocker(checkpoint, node_visits, node.id)
+            blocker = node_budget_blocker(checkpoint, node_visits, node.id)
             options.append(
                 AgentResumeOption(
                     node_id=node.id,

@@ -19,6 +19,7 @@ from qdash.datamodel.quality_metrics import QUALITY_METRIC_R2
 from qdash.repository import FilesystemCalibDataSaver
 from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.progress import ProgressPlan
+from qdash.workflow.engine.task import snapshot_parameters
 from qdash.workflow.engine.task.backend_saver import BackendSaver, resolve_publish_targets
 from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
 from qdash.workflow.engine.task.mux_distributor import MuxDistributor
@@ -782,24 +783,6 @@ class TaskExecutor:
 
         return dict(self.state_manager.get_task(task_name, task_type, qid).output_parameters)
 
-    @staticmethod
-    def _reconstruct_param(
-        model_cls: type,
-        key: str,
-        value: Any,
-    ) -> Any | None:
-        """Reconstruct a single parameter model from snapshot data.
-
-        Returns the model instance, or None if the data is invalid.
-        """
-        try:
-            if isinstance(value, dict):
-                return model_cls(**value)
-            return model_cls(value=value)
-        except (TypeError, ValueError) as e:
-            logger.error("Invalid snapshot parameter %s=%r: %s", key, value, e)
-            return None
-
     def _apply_snapshot_overrides(
         self,
         task: TaskProtocol,
@@ -810,13 +793,10 @@ class TaskExecutor:
         """Apply snapshot parameter overrides from a previous execution.
 
         Replaces the task's input_parameters and run_parameters with values
-        from the snapshot, and updates state_manager accordingly.
+        from the snapshot, and updates state_manager accordingly. The snapshot
+        data itself is resolved by :mod:`snapshot_parameters`.
         """
-        from qdash.datamodel.task import (
-            InputParameterModel,
-            InputParameterSpec,
-            RunParameterModel,
-        )
+        from qdash.datamodel.task import InputParameterModel, RunParameterModel
 
         assert self._snapshot_loader is not None
         invocation = self.state_manager.get_task(task_name, task_type, qid).invocation
@@ -836,48 +816,16 @@ class TaskExecutor:
         snap_input, snap_run = snapshot
         # Explicit overrides are part of the requested execution conditions, so
         # they replace the recorded values before the snapshot is applied.
-        snap_input = self._merge_overrides(snap_input, task.input_overrides)
-        if task.run_overrides:
-            # Seed parameters missing from older snapshots with the current
-            # declaration so explicit overrides retain their value_type and
-            # unrelated declared defaults remain available.
-            snap_run = {
-                **{name: model.model_dump() for name, model in task.run_parameters.items()},
-                **snap_run,
-            }
-        snap_run = self._merge_overrides(snap_run, task.run_overrides)
+        snap_input = snapshot_parameters.merge_overrides(snap_input, task.input_overrides)
+        snap_run = snapshot_parameters.apply_run_overrides(
+            snap_run, task.run_overrides, task.run_parameters
+        )
         declarations = getattr(task.__class__, "input_spec", {})
-        normalized_input = dict(snap_input)
-        for param_name, declaration in declarations.items():
-            if not isinstance(declaration, InputParameterSpec):
-                continue
-            lookup_key = declaration.parameter_name or param_name
-            prefix = param_name[: -len(lookup_key)] if param_name.endswith(lookup_key) else ""
-            compatible_names = (
-                *declaration.parameter_aliases,
-                *declaration.fallback_parameter_names,
-            )
-            for compatible_name in compatible_names:
-                compatible_key = f"{prefix}{compatible_name}"
-                if param_name not in normalized_input and compatible_key in snap_input:
-                    compatible_value = snap_input[compatible_key]
-                    if isinstance(compatible_value, dict):
-                        compatible_value = dict(compatible_value)
-                        if not compatible_value.get("parameter_name"):
-                            compatible_value["parameter_name"] = compatible_name
-                    normalized_input[param_name] = compatible_value
-                if compatible_key not in declarations:
-                    normalized_input.pop(compatible_key, None)
-        snap_input = normalized_input
+        snap_input = snapshot_parameters.normalize_snapshot_inputs(snap_input, declarations)
         if self._snapshot_loader.requires_snapshot(task_name):
-            missing_inputs = set(declarations) - set(snap_input)
-            if missing_inputs:
-                missing = ", ".join(sorted(missing_inputs))
-                raise ValueError(
-                    f"Snapshot inputs for task '{task_name}' and qid '{qid}' are incompatible "
-                    f"with the current task definition; run a fresh calibration instead. "
-                    f"Missing inputs: {missing}"
-                )
+            snapshot_parameters.ensure_snapshot_inputs_compatible(
+                task_name, qid, snap_input, declarations
+            )
         logger.info(
             "Applying snapshot overrides for task=%s, qid=%s (input_params=%d, run_params=%d)",
             task_name,
@@ -888,11 +836,9 @@ class TaskExecutor:
 
         # Override input_parameters on the task instance
         if snap_input:
-            reconstructed_input = {
-                k: m
-                for k, v in snap_input.items()
-                if (m := self._reconstruct_param(InputParameterModel, k, v)) is not None
-            }
+            reconstructed_input = snapshot_parameters.reconstruct_params(
+                InputParameterModel, snap_input
+            )
             task.input_parameters = reconstructed_input
             # Re-record in state_manager
             self.state_manager.put_input_parameters(task_name, reconstructed_input, task_type, qid)
@@ -902,11 +848,7 @@ class TaskExecutor:
 
         # Override run_parameters on the task instance
         if snap_run:
-            reconstructed_run = {
-                k: m
-                for k, v in snap_run.items()
-                if (m := self._reconstruct_param(RunParameterModel, k, v)) is not None
-            }
+            reconstructed_run = snapshot_parameters.reconstruct_params(RunParameterModel, snap_run)
             task.run_parameters = reconstructed_run
             # Re-record in state_manager
             run_params_dict = {k: v.model_dump() for k, v in reconstructed_run.items()}
@@ -948,28 +890,6 @@ class TaskExecutor:
             task_type,
             qid,
         )
-
-    @staticmethod
-    def _merge_overrides(
-        snapshot_dict: dict[str, Any], overrides: dict[str, Any]
-    ) -> dict[str, Any]:
-        """Merge explicit overrides on top of snapshot parameters.
-
-        For each key in *overrides*, if the snapshot entry is a dict with a
-        ``"value"`` key the override replaces only the ``"value"`` field
-        (preserving ``unit``, ``value_type``, ``description``, etc.).
-        Otherwise the entry is replaced entirely.
-        """
-        if not overrides:
-            return snapshot_dict
-        merged = {**snapshot_dict}
-        for key, new_value in overrides.items():
-            existing = merged.get(key)
-            if isinstance(existing, dict) and "value" in existing:
-                merged[key] = {**existing, "value": new_value}
-            else:
-                merged[key] = new_value
-        return merged
 
     @staticmethod
     def _validate_effective_inputs(task: TaskProtocol) -> None:
