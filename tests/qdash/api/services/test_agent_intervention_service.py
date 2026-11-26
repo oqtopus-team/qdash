@@ -546,6 +546,50 @@ def test_running_measurement_and_visit_limit_block_resume(
     assert chosen.response.resume_node_id == "chevron"
 
 
+def test_resume_blockers_keep_policy_order_before_in_flight_operations(
+    sessions: AgentSessionService, interventions: AgentInterventionService
+) -> None:
+    """Policy blockers come in a fixed order, then operations still in flight.
+
+    Resume options stay a per-node view: a node under its visit limit is offered even
+    while the session as a whole cannot resume.
+    """
+    session = _session(sessions, max_actions=2)
+    action = _run_task(sessions, session.session_id)
+    doc = AgentActionDocument.find_one({"action_id": action.action_id}).run()
+    assert doc is not None
+    doc.execution_status = "running"
+    doc.save()
+
+    opened = _create(
+        interventions,
+        session.session_id,
+        _request(checkpoint=_checkpoint(visit_counts={"rabi": 2}, node_path=["rabi", "rabi"])),
+    )
+
+    assert opened.can_resume is False
+    assert opened.resume_blockers == [
+        "The plan may still run 2 nodes but the session has 1 actions left",
+        "Node rabi already ran 2 times, the plan's limit; "
+        "choose another node or start a newly authorized session",
+        f"A measurement is still running (action {action.action_id}); wait for it to finish",
+    ]
+    assert [
+        (option.node_id, option.visits, option.max_visits, option.available, option.reason)
+        for option in opened.resume_options
+    ] == [
+        (
+            "rabi",
+            2,
+            2,
+            False,
+            "Node rabi already ran 2 times, the plan's limit; "
+            "choose another node or start a newly authorized session",
+        ),
+        ("chevron", 0, 2, True, ""),
+    ]
+
+
 def test_references_outside_the_session_are_rejected(
     sessions: AgentSessionService, interventions: AgentInterventionService
 ) -> None:

@@ -847,49 +847,6 @@ class TestCouplingTask:
         assert result["success"] is True
 
 
-class TestReconstructParam:
-    """Test TaskExecutor._reconstruct_param static method."""
-
-    def test_reconstruct_from_dict(self) -> None:
-        """Test reconstructing a ParameterModel from a dict."""
-        result = TaskExecutor._reconstruct_param(
-            ParameterModel, "freq", {"value": 5.0, "unit": "GHz"}
-        )
-        assert result is not None
-        assert result.value == 5.0
-        assert result.unit == "GHz"
-
-    def test_reconstruct_from_scalar(self) -> None:
-        """Test reconstructing a ParameterModel from a scalar value."""
-        result = TaskExecutor._reconstruct_param(ParameterModel, "freq", 5.0)
-        assert result is not None
-        assert result.value == 5.0
-
-    def test_reconstruct_run_parameter_from_dict(self) -> None:
-        """Test reconstructing a RunParameterModel from a dict."""
-        result = TaskExecutor._reconstruct_param(
-            RunParameterModel, "shots", {"value": 1024, "value_type": "int"}
-        )
-        assert result is not None
-        assert result.value == 1024
-
-    def test_reconstruct_returns_none_on_invalid_data(self) -> None:
-        """Test that invalid data returns None instead of raising."""
-        result = TaskExecutor._reconstruct_param(
-            ParameterModel, "bad", {"invalid_field_only": True}
-        )
-        # ParameterModel requires 'value', so this should log error and return None
-        # or succeed depending on model validation - either way it shouldn't raise
-        # The method catches TypeError and ValueError
-        assert result is None or isinstance(result, ParameterModel)
-
-    def test_reconstruct_returns_none_on_type_error(self) -> None:
-        """Test that TypeError returns None."""
-        # Passing something that can't be unpacked as kwargs
-        result = TaskExecutor._reconstruct_param(ParameterModel, "bad", [1, 2, 3])
-        assert result is None
-
-
 class TestSnapshotOverrides:
     """Test TaskExecutor snapshot override integration."""
 
@@ -1199,6 +1156,115 @@ class TestSnapshotOverrides:
         mock_state_manager.put_input_parameters.assert_not_called()
         mock_state_manager.put_run_parameters.assert_not_called()
 
+    def test_snapshot_run_parameters_are_not_seeded_without_run_overrides(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        """Declared run defaults are seeded only when explicit run overrides exist."""
+        mock_snapshot_loader.get_snapshot.return_value = (
+            {},
+            {"shots": {"value": 512, "value_type": "int"}},
+        )
+        task = MockTask()
+        task.run_parameters = {
+            "shots": RunParameterModel(value=1024, value_type="int"),
+            "interval": RunParameterModel(value=8, value_type="int"),
+        }
+
+        executor_with_snapshot._apply_snapshot_overrides(task, "Task", "qubit", "0")
+
+        assert set(task.run_parameters) == {"shots"}
+        assert task.run_parameters["shots"].value == 512
+        recorded_run = mock_state_manager.put_run_parameters.call_args[0][1]
+        assert set(recorded_run) == {"shots"}
+        mock_state_manager.put_input_parameters.assert_not_called()
+
+    def test_explicit_input_override_takes_precedence_over_alias_value(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+    ) -> None:
+        """An override on the declared name wins and the legacy alias is dropped."""
+
+        class AliasedTask(MockTask):
+            input_spec = {
+                "control_drag_pi_duration": InputParameterSpec.required_database(
+                    parameter_name="drag_pi_duration",
+                    parameter_aliases=("drag_pi_length",),
+                    qid_role="control",
+                )
+            }
+
+        mock_snapshot_loader.has_snapshot_source = True
+        mock_snapshot_loader.get_snapshot.return_value = (
+            {"control_drag_pi_length": {"value": 32, "unit": "ns"}},
+            {},
+        )
+        task = AliasedTask()
+        task.input_overrides = {"control_drag_pi_duration": 40}
+
+        executor_with_snapshot._apply_snapshot_overrides(task, "Task", "coupling", "0-1")
+
+        assert set(task.input_parameters) == {"control_drag_pi_duration"}
+        assert task.input_parameters["control_drag_pi_duration"].value == 40
+        assert task.input_parameters_from_snapshot is True
+
+    def test_optional_snapshot_with_missing_inputs_is_applied_without_snapshot_flag(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+    ) -> None:
+        """Only a required snapshot is checked against the declared inputs."""
+
+        class ExpandedTask(MockTask):
+            input_spec = {
+                "existing": InputParameterSpec.required_database(),
+                "new_dependency": InputParameterSpec.required_database(),
+            }
+
+        mock_snapshot_loader.get_snapshot.return_value = ({"existing": {"value": 1.0}}, {})
+        task = ExpandedTask()
+
+        executor_with_snapshot._apply_snapshot_overrides(task, "ExpandedTask", "qubit", "0")
+
+        assert set(task.input_parameters) == {"existing"}
+        assert task.input_parameters_from_snapshot is False
+
+    def test_incompatible_snapshot_lists_missing_inputs_before_state_changes(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        class ExpandedTask(MockTask):
+            input_spec = {
+                "existing": InputParameterSpec.required_database(),
+                "z_dependency": InputParameterSpec.required_database(),
+                "a_dependency": InputParameterSpec.required_database(),
+            }
+
+        mock_snapshot_loader.has_snapshot_source = True
+        mock_snapshot_loader.get_snapshot.return_value = (
+            {"existing": {"value": 1.0}},
+            {"shots": {"value": 512}},
+        )
+        task = ExpandedTask()
+
+        with pytest.raises(ValueError) as exc_info:
+            executor_with_snapshot._apply_snapshot_overrides(task, "ExpandedTask", "qubit", "0")
+
+        assert str(exc_info.value) == (
+            "Snapshot inputs for task 'ExpandedTask' and qid '0' are incompatible "
+            "with the current task definition; run a fresh calibration instead. "
+            "Missing inputs: a_dependency, z_dependency"
+        )
+        assert task.input_parameters == {}
+        assert task.input_parameters_from_snapshot is False
+        mock_state_manager.put_input_parameters.assert_not_called()
+        mock_state_manager.put_run_parameters.assert_not_called()
+
     def test_apply_snapshot_overrides_filters_invalid_params(
         self,
         executor_with_snapshot: TaskExecutor,
@@ -1302,45 +1368,6 @@ class TestSnapshotOverrides:
 
         assert results["0"].r2 == {"0": 0.91}
         assert results["4"].r2 == {"4": 0.87}
-
-
-class TestMergeOverrides:
-    """Test TaskExecutor._merge_overrides static method."""
-
-    def test_empty_overrides_returns_snapshot(self) -> None:
-        snapshot: dict[str, Any] = {"a": 1, "b": 2}
-        result = TaskExecutor._merge_overrides(snapshot, {})
-        assert result == snapshot
-
-    def test_override_replaces_simple_value(self) -> None:
-        snapshot: dict[str, Any] = {"a": 1, "b": 2}
-        result = TaskExecutor._merge_overrides(snapshot, {"a": 10})
-        assert result == {"a": 10, "b": 2}
-
-    def test_override_replaces_value_key_in_dict(self) -> None:
-        """When snapshot has {"value": ...}, override replaces only the value."""
-        snapshot: dict[str, Any] = {
-            "freq": {"value": 5.0, "unit": "GHz", "description": "Frequency"},
-        }
-        result = TaskExecutor._merge_overrides(snapshot, {"freq": 6.0})
-        assert result["freq"] == {"value": 6.0, "unit": "GHz", "description": "Frequency"}
-
-    def test_override_replaces_entire_entry_without_value_key(self) -> None:
-        """When snapshot dict lacks 'value' key, override replaces entirely."""
-        snapshot: dict[str, Any] = {"config": {"mode": "fast", "retries": 3}}
-        result = TaskExecutor._merge_overrides(snapshot, {"config": "simple"})
-        assert result["config"] == "simple"
-
-    def test_override_adds_new_key(self) -> None:
-        snapshot: dict[str, Any] = {"a": 1}
-        result = TaskExecutor._merge_overrides(snapshot, {"b": 2})
-        assert result == {"a": 1, "b": 2}
-
-    def test_does_not_mutate_original(self) -> None:
-        snapshot: dict[str, Any] = {"a": {"value": 1, "unit": "V"}}
-        original_snapshot: dict[str, Any] = {"a": {"value": 1, "unit": "V"}}
-        TaskExecutor._merge_overrides(snapshot, {"a": 2})
-        assert snapshot == original_snapshot
 
 
 class TestPostprocessResultParity:
