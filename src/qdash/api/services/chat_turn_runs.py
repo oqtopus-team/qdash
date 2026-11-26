@@ -280,6 +280,64 @@ async def _claim(
     return outcome, user_message
 
 
+class _TurnRefused(Exception):
+    """The chat refused a new turn, so nothing was sent; ``event`` tells the client why."""
+
+    def __init__(self, detail: str, code: str | None = None) -> None:
+        super().__init__(detail)
+        self.detail = detail
+        self.code = code
+
+    def event(self) -> str:
+        payload = {"step": "init", "detail": self.detail}
+        if self.code is not None:
+            payload["code"] = self.code
+        return sse_event("error", payload)
+
+
+async def _claim_new_turn(
+    request: ChatRequest,
+    username: str,
+    project_id: str | None,
+    request_id: str,
+    turn_running: Callable[[], Awaitable[bool | None]] | None,
+) -> AgentChatMessage | None:
+    """Claim the chat for a new turn before it is sent; the turn's own message to record.
+
+    Raises ``_TurnRefused`` when the turn must not be sent: its start could not be
+    saved, or the chat refused it. Any other claim outcome lets the turn be sent.
+    """
+    try:
+        outcome, user_message = await _claim(
+            request, username, project_id, request_id, turn_running
+        )
+    except Exception as exc:
+        logger.exception("Could not record the start of turn %s", request_id)
+        raise _TurnRefused("Could not save the chat; try again") from exc
+    match outcome:
+        case "conflict":
+            raise _TurnRefused(
+                "This chat changed in another window, so the message was not sent. "
+                "Check the chat and send it again.",
+                TRANSCRIPT_CONFLICT,
+            )
+        case "busy":
+            raise _TurnRefused(
+                "Another answer is still running in this chat. Wait for it to end, "
+                "or stop it, then send the message again.",
+                TURN_RUNNING,
+            )
+        case "unknown":
+            raise _TurnRefused(
+                "Could not check whether an earlier answer still runs in this chat, "
+                "so the message was not sent. Send it again shortly.",
+                TURN_RUNNING,
+            )
+        case "gone":
+            raise _TurnRefused("Chat session not found")
+    return user_message
+
+
 async def _stopped(run: TurnRun, key: RunKey) -> bool:
     """Whether the user stopped the turn, here or through another API process."""
     if run.stop_requested:
@@ -314,67 +372,11 @@ async def _drive(
     try:
         if not request.reattach and request.turn_start is not None:
             try:
-                outcome, user_message = await _claim(
+                user_message = await _claim_new_turn(
                     request, username, run.project_id, request_id, turn_running
                 )
-            except Exception:
-                logger.exception("Could not record the start of turn %s", request_id)
-                run.publish(
-                    sse_event(
-                        "error",
-                        {"step": "init", "detail": "Could not save the chat; try again"},
-                    )
-                )
-                return
-            if outcome == "conflict":
-                run.publish(
-                    sse_event(
-                        "error",
-                        {
-                            "step": "init",
-                            "detail": (
-                                "This chat changed in another window, so the message was not "
-                                "sent. Check the chat and send it again."
-                            ),
-                            "code": TRANSCRIPT_CONFLICT,
-                        },
-                    )
-                )
-                return
-            if outcome == "busy":
-                run.publish(
-                    sse_event(
-                        "error",
-                        {
-                            "step": "init",
-                            "detail": (
-                                "Another answer is still running in this chat. Wait for it to "
-                                "end, or stop it, then send the message again."
-                            ),
-                            "code": TURN_RUNNING,
-                        },
-                    )
-                )
-                return
-            if outcome == "unknown":
-                run.publish(
-                    sse_event(
-                        "error",
-                        {
-                            "step": "init",
-                            "detail": (
-                                "Could not check whether an earlier answer still runs in this "
-                                "chat, so the message was not sent. Send it again shortly."
-                            ),
-                            "code": TURN_RUNNING,
-                        },
-                    )
-                )
-                return
-            if outcome == "gone":
-                run.publish(
-                    sse_event("error", {"step": "init", "detail": "Chat session not found"})
-                )
+            except _TurnRefused as refused:
+                run.publish(refused.event())
                 return
             recorded = await asyncio.to_thread(
                 sessions.recorded_turn, username, session_id, request_id
