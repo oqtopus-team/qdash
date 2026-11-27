@@ -284,14 +284,13 @@ def _mux_qids(mux: int) -> list[str]:
 @pytest.mark.parametrize(
     ("params", "expected_muxes", "excluded"),
     [
-        ({}, [0, 1, 2, 3], set()),
-        ({"mux_ids": list(range(FAKE_DEVICE_MUXES))}, list(range(FAKE_DEVICE_MUXES)), set()),
+        ({}, list(range(FAKE_DEVICE_MUXES)), set()),
         ({"mux_ids": [9, 15]}, [9, 15], set()),
         ({"mux_ids": [9, 15], "exclude_qids": ["37"]}, [9, 15], {"37"}),
         # Qubit IDs passed by older callers do not change the MUX selection.
         ({"mux_ids": [15], "qids": ["0", "1"]}, [15], set()),
     ],
-    ids=["default-mux0-3", "all-16-mux", "mux9-15", "mux9-15-exclude-37", "qids-ignored"],
+    ids=["all-16-mux", "mux9-15", "mux9-15-exclude-37", "qids-ignored"],
 )
 def test_the_template_runs_through_the_hardware_box_scheduler(
     project: None,

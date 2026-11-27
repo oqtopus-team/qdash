@@ -18,8 +18,8 @@ wiring and schedules them with the same box-aware scheduler the hardware templat
 run one after another, the MUX groups of one stage run in parallel, and the qubits of a MUX run
 one after another. Target arguments follow the hardware templates: ``mux_ids`` selects
 MUXes, otherwise ``qids`` selects qubits. With neither, the flow calibrates ``MUX_IDS``, MUX 0
-to 3: 16 of the 64 qubits of the 16-MUX virtual device that the Create Chip dialog configures
-on a fake deployment.
+to 15, every qubit of the 64-qubit, 16-MUX virtual device that the Create Chip dialog
+configures on a fake deployment.
 
 Example:
     fake_calibration(username="alice", chip_id="64Q", backend_name="fake")
@@ -68,11 +68,10 @@ FAKE_CALIBRATION_TASKS: list[TaskCall] = [
     TaskCall(name="CheckRamsey"),
 ]
 
-# MUXes the template calibrates when neither mux_ids nor qids is given. MUX 0 to 3 keeps a
-# first run within the memory of a laptop Docker VM; MUX 0 to 15 is the whole fake device and
-# runs 16 MUX groups at once. Edit this list to choose other MUXes, for example [9, 15]. Keep
-# it a literal list so the execution dialog can show these default targets.
-MUX_IDS: list[int] = [0, 1, 2, 3]
+# MUXes the template calibrates when neither mux_ids nor qids is given: MUX 0 to 15 is the
+# whole fake device. Edit this list to calibrate a subset, for example [9, 15]. Keep it a
+# literal list so the execution dialog can show these default targets.
+MUX_IDS: list[int] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 
 
 @calibration_flow(session_name="Fake Backend Calibration")
@@ -95,7 +94,7 @@ def fake_calibration(
         username: User name (from UI)
         chip_id: Chip ID (default: "64Q")
         mux_ids: MUX IDs to calibrate with MUX-based scheduling. Default: MUX_IDS (MUX 0 to
-            3) when qids is not given either.
+            15) when qids is not given either.
         exclude_qids: Qubit IDs to leave out of the selected MUXes
         qids: Qubit IDs to calibrate when mux_ids is not set
         execution_mode: How the one-qubit targets run (default: "parallel_by_mux"):

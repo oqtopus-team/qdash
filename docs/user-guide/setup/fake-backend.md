@@ -11,10 +11,8 @@ coherence measurements.
 
 ### Targets of the Template
 
-The template's `MUX_IDS` defaults to MUX 0 to 3: qubits 0 to 15. List MUX 0 to 15 to calibrate
-all 64 qubits; 16 MUXes run at once and need far more memory for Docker than four. Edit it to
-choose other MUXes, use `exclude_qids` to omit qubits, or pass `qids` without `mux_ids` for
-individual targets.
+The template's `MUX_IDS` defaults to all 16 MUXes: 64 qubits. Edit it to choose fewer MUXes,
+use `exclude_qids` to omit qubits, or pass `qids` without `mux_ids` for individual targets.
 The execution dialog can override targets for one run. Previously saved flows retain their
 own source and defaults.
 

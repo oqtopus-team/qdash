@@ -34,12 +34,12 @@ def test_the_backend_choice_is_part_of_the_resolved_context() -> None:
     assert result["context"] == FakeContext("alice", "fake-64q", "p", "fake")
 
 
-def test_defaults_to_mux_0_to_3_scheduled_like_hardware() -> None:
+def test_defaults_to_mux_0_to_15_scheduled_like_hardware() -> None:
     result = fake_backend_module.fake_calibration(username="alice", chip_id="fake-64q")
 
     targets = result["targets"]
     assert isinstance(targets, MuxTargets)
-    assert targets.mux_ids == list(range(4)) == fake_backend_module.MUX_IDS
+    assert targets.mux_ids == list(range(16)) == fake_backend_module.MUX_IDS
     assert targets.exclude_qids == []
     [step] = result["steps"]
     assert names(step.tasks) == names(fake_backend_module.FAKE_CALIBRATION_TASKS)
@@ -86,7 +86,7 @@ def test_execution_dialog_reads_the_template_default_targets() -> None:
 
     defaults = resolve_target_defaults(source, "fake_calibration", {})
 
-    assert defaults == FlowTargetOverride(mux_ids=list(range(4)))
+    assert defaults == FlowTargetOverride(mux_ids=list(range(16)))
 
 
 @pytest.mark.parametrize(
