@@ -344,3 +344,34 @@ def test_grid_figure_rejects_mismatched_grid() -> None:
 
     with pytest.raises(ValueError, match="traces_grid"):
         create_mapping_grid_figure(FREQUENCIES, [[_noise(1)]], result, ["Q00", "Q01"])
+
+
+def test_grid_figure_uses_qubex_figure_style() -> None:
+    # Q00 maps to C0; Q01 prefers C1 over C2 by too small a margin.
+    scores = np.array([[30.0, 0.0, 0.0], [0.0, 20.0, 15.0]])
+    result = solve_resonator_qubit_mapping(scores, ["0", "1"], _candidates(3))
+    assert result.outcomes["0"].status == "mapped"
+    assert result.outcomes["1"].status == "ambiguous"
+    traces: list[list[np.ndarray | None]] = [
+        [_noise(row * 3 + column) for column in range(3)] for row in range(2)
+    ]
+
+    figure = create_mapping_grid_figure(FREQUENCIES, traces, result, ["Q00", "Q01"])
+
+    layout = figure.layout
+    assert layout.font.family == "Times New Roman, Times, serif"
+    assert layout.paper_bgcolor == "white"
+    assert layout.plot_bgcolor == "rgba(0,0,0,0)"
+    assert layout.title.font.size == 18
+    assert layout.title.subtitle.font.size == 13
+    axes = [layout[name] for name in layout if name.startswith(("xaxis", "yaxis"))]
+    assert len(axes) == 12
+    for axis in axes:
+        assert axis.showline is True
+        assert axis.mirror is True
+        assert axis.linecolor == "black"
+        assert axis.ticks == "inside"
+        assert axis.showgrid is False
+        assert axis.zeroline is False
+    colors = [trace.line.color for trace in figure.data]
+    assert colors == ["#0C5DA5", "#9e9e9e", "#9e9e9e", "#9e9e9e", "#FF9500", "#9e9e9e"]

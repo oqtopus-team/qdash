@@ -15,7 +15,7 @@ from __future__ import annotations
 import itertools
 import math
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import plotly.graph_objects as go
@@ -45,12 +45,19 @@ _MIN_TRACE_POINTS = 5
 PHASE_NOISE_FLOOR = 1e-3
 """Smallest noise scale in rad, used when the MAD is zero or below it."""
 
-# Status palette: the selected cell keeps a text badge, so color never carries
-# the outcome alone.
-_SELECTED_COLOR = "#0aac23"
-_AMBIGUOUS_COLOR = "#fbb315"
-_IDLE_COLOR = "#8a8a8a"
-_BADGE_TEXT_COLOR = "#0b0b0b"
+# Qubex figure style (qxvisualizer.style), restated here so this module does not
+# import qubex. The selected cell also carries a text badge, so color never
+# carries the outcome alone.
+_FONT_FAMILY = "Times New Roman, Times, serif"
+_TITLE_FONT_SIZE = 18
+_SUBTITLE_FONT_SIZE = 13
+_AXIS_TICKFONT_SIZE = 11
+_AXIS_TITLEFONT_SIZE = 12
+_SUBPLOT_TITLE_FONT_SIZE = 11
+_SELECTED_COLOR = "#0C5DA5"  # Qubex blue
+_AMBIGUOUS_COLOR = "#FF9500"  # Qubex orange
+_IDLE_COLOR = "#9e9e9e"  # Qubex gray
+_BADGE_TEXT_COLORS = {_SELECTED_COLOR: "white", _AMBIGUOUS_COLOR: "black"}
 
 
 @dataclass(frozen=True)
@@ -552,10 +559,10 @@ def create_mapping_grid_figure(
         cols=n_cols,
         shared_xaxes=True,
         subplot_titles=titles,
-        horizontal_spacing=0.03,
+        horizontal_spacing=0.05,
         vertical_spacing=0.08,
     )
-    figure.update_annotations(font_size=10)
+    figure.update_annotations(font_size=_SUBPLOT_TITLE_FONT_SIZE)
 
     for row, qid in enumerate(result.qids):
         outcome = result.outcomes[qid]
@@ -605,7 +612,7 @@ def create_mapping_grid_figure(
                     yanchor="top",
                     text="SELECTED" if outcome.status == "mapped" else "AMBIGUOUS",
                     showarrow=False,
-                    font={"size": 10, "color": _BADGE_TEXT_COLOR},
+                    font={"size": 10, "color": _BADGE_TEXT_COLORS[color]},
                     bgcolor=color,
                     borderpad=2,
                 )
@@ -628,14 +635,30 @@ def create_mapping_grid_figure(
                     f"min_response_score={result.min_response_score:g} "
                     f"min_margin_ratio={result.min_margin_ratio:g}"
                 ),
-                "font": {"size": 12, "family": "monospace"},
+                "font": {"size": _SUBTITLE_FONT_SIZE, "family": "monospace"},
             },
+            "font": {"size": _TITLE_FONT_SIZE},
         },
-        width=max(320 * n_cols, 640),
-        height=max(220 * n_rows, 400) + 80,
-        margin={"t": 110},
-        template="plotly_white",
+        font={"family": _FONT_FAMILY},
+        paper_bgcolor="white",
+        plot_bgcolor="rgba(0,0,0,0)",
+        width=max(260 * n_cols, 600),
+        height=max(180 * n_rows, 300) + 100,
+        margin={"l": 70, "r": 30, "b": 60, "t": 100},
     )
+    axis_style: dict[str, Any] = {
+        "showline": True,
+        "mirror": True,
+        "linecolor": "black",
+        "linewidth": 1,
+        "ticks": "inside",
+        "showgrid": False,
+        "zeroline": False,
+        "tickfont": {"size": _AXIS_TICKFONT_SIZE},
+        "title_font": {"size": _AXIS_TITLEFONT_SIZE},
+    }
+    figure.update_xaxes(**axis_style)
+    figure.update_yaxes(**axis_style)
     return figure
 
 
