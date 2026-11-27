@@ -356,10 +356,10 @@ def _estimate_trace_noise_scale(
 
 
 def _median3(values: np.ndarray) -> np.ndarray:
-    """3-point median filter with edge padding to suppress isolated 1-point spikes."""
+    """3-point median filter with reflected boundaries to suppress isolated 1-point spikes."""
     if values.size < 3:
         return values
-    padded = np.pad(values, 1, mode="edge")
+    padded = np.pad(values, 1, mode="reflect")
     return np.asarray(
         np.median(np.stack((padded[:-2], padded[1:-1], padded[2:]), axis=0), axis=0),
         dtype=float,

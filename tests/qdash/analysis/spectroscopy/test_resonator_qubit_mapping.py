@@ -135,15 +135,23 @@ def test_broad_response_covering_half_sweep_outscores_narrow_crosstalk_spike() -
     )
 
 
-def test_despike_suppresses_isolated_single_point_spike() -> None:
+@pytest.mark.parametrize("index", [0, 60, -1])
+def test_despike_suppresses_isolated_single_point_spike(index: int) -> None:
     spike = _noise(12, sigma=0.02).copy()
-    spike[60] += 3.0
+    spike[index] += 3.0
 
     despiked = score_1d_spectroscopy_trace(FREQUENCIES, spike, despike=True)
     raw = score_1d_spectroscopy_trace(FREQUENCIES, spike, despike=False)
 
     assert despiked < DEFAULT_MIN_RESPONSE_SCORE
     assert raw > 100.0
+
+
+def test_despike_preserves_multi_point_boundary_response() -> None:
+    trace = np.zeros_like(FREQUENCIES)
+    trace[:3] = 1.0
+
+    assert score_1d_spectroscopy_trace(FREQUENCIES, trace, despike=True) > 100.0
 
 
 def test_score_mapping_grid_uses_per_column_noise_floor() -> None:
