@@ -16,12 +16,16 @@ class ReanalyzeResponse(UniversalBaseModel):
     will be added in a follow-up.
     """
 
-    source_task_id: str = pydantic.Field()
+    source_task_id: typing.Optional[str] = pydantic.Field(default=None)
     """
-    Task result whose data was re-analyzed.
+    Task result whose data was re-analyzed; null when an inline figure was re-analyzed.
     """
 
-    source_task_name: str
+    source_task_name: str = pydantic.Field()
+    """
+    Task whose analysis ran: the stored result's task name, or the endpoint's task for an inline figure.
+    """
+
     qid: str
     figure: typing.Dict[str, typing.Any] = pydantic.Field()
     """
@@ -29,6 +33,21 @@ class ReanalyzeResponse(UniversalBaseModel):
     """
 
     output_parameters: typing.List[ReanalyzeOutputParameter]
+    image_base64: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    Base64-encoded PNG of the marked figure. Set only when include_image was true and the server could render the figure.
+    """
+
+    image_media_type: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    Media type of image_base64 (image/png), or null when no image is returned.
+    """
+
+    image_error: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    A fixed message saying the requested image could not be rendered; the cause is logged on the server only. Null when no image was requested or rendering succeeded.
+    """
+
     committed: typing.Optional[bool] = pydantic.Field(default=None)
     """
     Always false in this version; persisting changes will land later.

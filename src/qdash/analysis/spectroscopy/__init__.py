@@ -15,8 +15,10 @@ from qdash.analysis.spectroscopy.estimate_qubit_frequency import (
     Peak,
     QubitFrequencyResult,
     QubitResponse,
+    compute_coarse_control_amplitude,
     estimate_qubit_frequency,
     estimate_qubit_frequency_from_figure,
+    mark_coarse_control_amplitude,
 )
 from qdash.analysis.spectroscopy.estimate_qubit_frequency import (
     create_marked_figure as create_qubit_marked_figure,
@@ -31,6 +33,7 @@ from qdash.analysis.spectroscopy.estimate_resonator_frequency import (
     GroupPeaksConfig,
     GroupResonancesConfig,
     Resonance,
+    annotate_resonator_assignments,
     create_marked_figure,
     estimate_and_mark_figure,
     estimate_local_bare_shift_boundary,
@@ -54,6 +57,7 @@ from qdash.analysis.spectroscopy.remove_false_spike import (
     RemoveFalseSpikeRange,
     remove_false_spike,
     remove_false_spike_from_figure,
+    remove_known_false_spikes_from_figure,
 )
 from qdash.analysis.spectroscopy.representative_y import (
     FirstPointMeetingWidthFromTipStrategy,
@@ -89,6 +93,8 @@ __all__ = [
     "RemoveFalseSpikeRange",
     "Resonance",
     "WidthEstimator",
+    "annotate_resonator_assignments",
+    "compute_coarse_control_amplitude",
     "create_bare_shift_boundary_estimator",
     "create_marked_figure",
     "create_qubit_marked_figure",
@@ -102,10 +108,12 @@ __all__ = [
     "estimate_resonator_frequency",
     "estimate_resonator_frequency_from_figure",
     "guess_sorted_slots_for_partial_mux",
+    "mark_coarse_control_amplitude",
     "peak_positions_from_assignment_order",
     "qid_for_sorted_slot",
     "remove_false_spike",
     "remove_false_spike_from_figure",
+    "remove_known_false_spikes_from_figure",
     "resolve_resonator_assignment_order",
     "resonator_assignment_order_from_pattern",
 ]

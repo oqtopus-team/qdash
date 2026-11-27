@@ -58,6 +58,7 @@ saved-workflow tools do not report such responses as successfully started.
 | `qdash_list_forum_posts`, `qdash_get_forum_post`, `qdash_list_forum_replies` | Forum posts and replies. |
 | `qdash_list_source_roots`, `qdash_search_source`, `qdash_read_source` | Source trees the server serves with their revisions, literal search of contents or paths, and up to 400 numbered lines of one file. A traceback path such as `/app/qdash/workflow/x.py` is mapped onto its root. |
 | `qdash_get_figure`, `qdash_get_task_figures`, `qdash_recent_calibration_figure`, `qdash_analyze_figure_json`, `qdash_build_qcal_evidence` | Figure retrieval, analysis, and evaluation evidence. |
+| `qdash_reanalyze_resonator_spectroscopy`, `qdash_reanalyze_qubit_spectroscopy` | A preview of a stored spectroscopy result analyzed again with the overrides in `parameters`: the re-estimated seed outputs and, unless `includeImage` is false, the marked figure as a PNG. Accepts `qid`, optional `chipId`, and either `sourceTaskId` or an inline raw Plotly `figure`. Deferred, read-only, and available in scripts. |
 
 Lists are paginated: task results and executions accept `skip` and `limit` (1–100).
 Executions require one chip and support `date` (`YYYYMMDD`) and `timezone`, not flow/status filters.
@@ -82,6 +83,22 @@ parts available. Target values are current and may come from a later result. The
 expose the result's cooldown association: without `cooldownId`, cooldown is `not_associated`.
 A supplied cooldown is checked for chip membership and time compatibility, not proven provenance.
 The same reads are available through the [SDK](./clients/typescript.md#read-a-result-with-context).
+
+The reanalysis tools call `POST /chips/{chip_id}/qubits/{qid}/reanalyze/resonator-spectroscopy`
+or `.../qubit-spectroscopy`. QDash reads the stored raw figure, or the request's `figure`, stores
+nothing, and uses no hardware. An inline `figure` must have a raw `heatmap` as its first trace, with
+plain lists of finite numbers on a grid of at least 2 x 2, must not be labeled as marked, and is
+at most 20 MiB as JSON. QDash keeps only that heatmap and plain-text titles, so other traces and
+layout content such as images are dropped before analysis and rendering; stored run parameters do not apply
+to it, and the response's `source_task_id` is null. Passing both `sourceTaskId` and `figure`
+fails. The resonator tool returns `readout_frequency`, `optimal_power` (dB), and
+`readout_amplitude` (a.u.); the qubit tool returns `coarse_qubit_frequency` (also as
+`qubit_frequency`), `coarse_control_amplitude`, `f01_repr_db`, `f01_quality_level`, and
+`qubit_anharmonicity` when f12 is found. The image is recorded under the source task's name, so
+`qcal_evaluate` for that task evaluates it. When the server cannot render a PNG, the result
+says so with a fixed message, still returns the outputs, and tells the model not to evaluate an
+older stored figure in its place; the cause is in the API server log. A script receives the
+outputs, never the image.
 
 Timeseries parameters use exact stored names. Local CSV comparison never uploads files; each file
 is limited to 10 MB. `qdash_current_time` reads the tool host's clock, not hardware time; give an

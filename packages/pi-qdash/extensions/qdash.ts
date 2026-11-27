@@ -16,7 +16,7 @@ import { Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import type { TaskResultComparison } from "@oqtopus-team/qdash-sdk";
 
-import { CONFIG_PATH_DESCRIPTION, PROFILE_DESCRIPTION, configProfiles, connectClient, connectionSource, selectedProfile, shouldUseEnv } from "./lib/connection.js";
+import { CONFIG_PATH_DESCRIPTION, PROFILE_DESCRIPTION, configProfiles, connectClient, connectionSource, selectedProfile, shouldUseEnv, usesContextConnection } from "./lib/connection.js";
 import { analyzePlotlyFigure, figureAnalysisText } from "./lib/figure-analysis.js";
 import { fetchFigureDetails, figureComponent, figureResultText, mediaTypeForPath, type FigureDetails } from "./lib/figures.js";
 import { forumImageReplyContent, forumImageReplyPreview, loadLocalForumImages, type LocalForumImage } from "./lib/forum-images.js";
@@ -43,6 +43,7 @@ import { registerCalibrationSessionTools } from "./tools/calibration-session.js"
 import { registerCurrentTimeTool } from "./tools/current-time.js";
 import { registerFlowAuthoringTools } from "./tools/flow-authoring.js";
 import { isMetricScriptQueryAction, metricScriptQuery, registerMetricScriptTools, type MetricScriptQueryAction } from "./tools/metric-scripts.js";
+import { registerReanalysisTools } from "./tools/reanalysis.js";
 import { registerSourceCodeTools } from "./tools/source-code.js";
 import { notFound, registerTaskKnowledgeTool } from "./tools/task-knowledge.js";
 import { registerTaskResultEvidenceTool } from "./tools/task-result-evidence.js";
@@ -1597,6 +1598,15 @@ export default function qdashExtension(host: ExtensionAPI) {
       : currentContext.chipId,
   });
   registerSourceCodeTools(pi, { makeClient });
+  registerReanalysisTools(pi, {
+    makeClient,
+    // The context's chip belongs to the context's connection; another profile, the
+    // environment, or another config file resolves that connection's default chip.
+    resolveChipId: async (client, params) =>
+      params.chipId
+      ?? (usesContextConnection(params, currentContext.profile) ? currentContext.chipId : undefined)
+      ?? client.getDefaultChipId(),
+  });
   registerAgentLoopTools(pi, { makeClient });
   registerAgentSessionEndTool(pi, { makeClient });
   registerCalibrationPipelineTools(pi, {

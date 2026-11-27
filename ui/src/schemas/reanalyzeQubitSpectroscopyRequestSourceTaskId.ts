@@ -7,6 +7,6 @@
  */
 
 /**
- * Task result to re-analyze. If omitted, the latest matching task result for the (chip_id, qid) is used.
+ * Task result to re-analyze. If omitted (and no figure is given), the latest matching task result for the (chip_id, qid) is used. Cannot be combined with figure.
  */
 export type ReanalyzeQubitSpectroscopyRequestSourceTaskId = string | null;

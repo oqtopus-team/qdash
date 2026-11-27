@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { createToolSearchExtension } from "@earendil-works/pi-durable/tool-search";
 import qdashExtension from "@oqtopus-team/pi-qdash/extensions/qdash.ts";
 
-import { ALLOWED_TOOL_NAMES, isDeferredTool, REVIEWED_WRITE_TOOL_NAMES, SESSION_GRANTED_WRITE_TOOL_NAMES } from "../src/allowed-tools.ts";
+import { ALLOWED_TOOL_NAMES, isDeferredTool, isReviewedWriteTool, isScriptCallableTool, REVIEWED_WRITE_TOOL_NAMES, SESSION_GRANTED_WRITE_TOOL_NAMES } from "../src/allowed-tools.ts";
 import { buildSystemPrompt } from "../src/prompt.ts";
 import { buildIntentGuide } from "../src/tool-guide.ts";
 
@@ -40,6 +40,17 @@ const WRITES = new Set([...REVIEWED_WRITE_TOOL_NAMES, ...SESSION_GRANTED_WRITE_T
 test("the evidence tool is allowlisted and deferred in the runtime", () => {
   assert.ok(ALLOWED_TOOL_NAMES.includes("qdash_get_task_result_evidence"));
   assert.ok(DEFERRED.some((tool) => tool.name === "qdash_get_task_result_evidence"));
+});
+
+test("the spectroscopy reanalysis tools are allowlisted, deferred, script-callable reads in the runtime", async () => {
+  for (const name of ["qdash_reanalyze_resonator_spectroscopy", "qdash_reanalyze_qubit_spectroscopy"]) {
+    assert.ok(ALLOWED_TOOL_NAMES.includes(name), name);
+    assert.ok(DEFERRED.some((tool) => tool.name === name), name);
+    assert.ok(isScriptCallableTool(name), name);
+    assert.ok(!isReviewedWriteTool(name), name);
+  }
+  assert.equal((await search("reanalyze qubit spectroscopy"))[0], "qdash_reanalyze_qubit_spectroscopy");
+  assert.equal((await search("reanalyze resonator spectroscopy"))[0], "qdash_reanalyze_resonator_spectroscopy");
 });
 
 test("the task-result summary is allowlisted and offered directly in the runtime", () => {

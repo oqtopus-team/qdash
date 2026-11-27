@@ -5192,7 +5192,15 @@ class ReanalyzeQubitSpectroscopyRequest(BaseModel):
 
     source_task_id: Annotated[str | None, Field(title="Source Task Id")] = None
     """
-    Task result to re-analyze. If omitted, the latest matching task result for the (chip_id, qid) is used.
+    Task result to re-analyze. If omitted (and no figure is given), the latest matching task result for the (chip_id, qid) is used. Cannot be combined with figure.
+    """
+    figure: Annotated[dict[str, Any] | None, Field(title="Figure")] = None
+    """
+    Plotly figure JSON of a raw spectroscopy measurement to re-analyze instead of a stored task result. The first trace must have type 'heatmap' with plain lists of finite numbers: x (frequency, GHz) and y (power, dB) of at least 2 values each, and z with one row per y and one value per x. A figure labeled as marked is rejected. Only that heatmap, a named colorscale, and plain-text titles and sizes are kept; other traces and layout content (images, templates, shapes, annotations) are dropped. Stored run parameters do not apply, so unset parameters use the analysis defaults. At most 20 MiB as JSON. Cannot be combined with source_task_id.
+    """
+    include_image: Annotated[bool, Field(title="Include Image")] = False
+    """
+    If true, also render the marked figure as a PNG and return it base64-encoded in image_base64. Rendering adds latency, so the chip page leaves it off.
     """
     parameters: ReanalyzeQubitSpectroscopyParams | None = None
 
@@ -5271,7 +5279,15 @@ class ReanalyzeResonatorSpectroscopyRequest(BaseModel):
 
     source_task_id: Annotated[str | None, Field(title="Source Task Id")] = None
     """
-    Task result to re-analyze. If omitted, the latest matching task result for the (chip_id, qid) is used.
+    Task result to re-analyze. If omitted (and no figure is given), the latest matching task result for the (chip_id, qid) is used. Cannot be combined with figure.
+    """
+    figure: Annotated[dict[str, Any] | None, Field(title="Figure")] = None
+    """
+    Plotly figure JSON of a raw spectroscopy measurement to re-analyze instead of a stored task result. The first trace must have type 'heatmap' with plain lists of finite numbers: x (frequency, GHz) and y (power, dB) of at least 2 values each, and z with one row per y and one value per x. A figure labeled as marked is rejected. Only that heatmap, a named colorscale, and plain-text titles and sizes are kept; other traces and layout content (images, templates, shapes, annotations) are dropped. Stored run parameters do not apply, so unset parameters use the analysis defaults. At most 20 MiB as JSON. Cannot be combined with source_task_id.
+    """
+    include_image: Annotated[bool, Field(title="Include Image")] = False
+    """
+    If true, also render the marked figure as a PNG and return it base64-encoded in image_base64. Rendering adds latency, so the chip page leaves it off.
     """
     parameters: ReanalyzeResonatorSpectroscopyParams | None = None
 
@@ -5285,17 +5301,32 @@ class ReanalyzeResponse(BaseModel):
     will be added in a follow-up.
     """
 
-    source_task_id: Annotated[str, Field(title="Source Task Id")]
+    source_task_id: Annotated[str | None, Field(title="Source Task Id")] = None
     """
-    Task result whose data was re-analyzed.
+    Task result whose data was re-analyzed; null when an inline figure was re-analyzed.
     """
     source_task_name: Annotated[str, Field(title="Source Task Name")]
+    """
+    Task whose analysis ran: the stored result's task name, or the endpoint's task for an inline figure.
+    """
     qid: Annotated[str, Field(title="Qid")]
     figure: Annotated[dict[str, Any], Field(title="Figure")]
     """
     Plotly figure JSON of the re-analyzed result with markers.
     """
     output_parameters: Annotated[list[ReanalyzeOutputParameter], Field(title="Output Parameters")]
+    image_base64: Annotated[str | None, Field(title="Image Base64")] = None
+    """
+    Base64-encoded PNG of the marked figure. Set only when include_image was true and the server could render the figure.
+    """
+    image_media_type: Annotated[str | None, Field(title="Image Media Type")] = None
+    """
+    Media type of image_base64 (image/png), or null when no image is returned.
+    """
+    image_error: Annotated[str | None, Field(title="Image Error")] = None
+    """
+    A fixed message saying the requested image could not be rendered; the cause is logged on the server only. Null when no image was requested or rendering succeeded.
+    """
     committed: Annotated[bool, Field(title="Committed")] = False
     """
     Always false in this version; persisting changes will land later.

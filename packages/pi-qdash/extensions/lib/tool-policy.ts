@@ -89,7 +89,10 @@ export const SESSION_GRANTED_WRITE_TOOL_NAMES = [
  * Each was audited to only read the QDash API as the signed-in user
  * (`qdash_current_time` reads only the host clock): no write, no local files,
  * no long polling, and no image output (a script receives JSON, so a figure
- * would be lost). Every other tool, including
+ * would be lost). The spectroscopy reanalysis tools are the exception: their
+ * POST only previews an analysis (QDash stores nothing and uses no hardware),
+ * and a script receives their structured outputs while the optional image
+ * stays model-visible content. Every other tool, including
  * write tools, figure tools, raw API access, and another extension's tool
  * that reuses one of these names, can only be called by the model directly,
  * where approval and the host's own rendering apply.
@@ -141,6 +144,8 @@ export const NESTED_READ_TOOL_NAMES = [
   "qdash_plan_calibration",
   "qdash_plan_pipeline",
   "qdash_query",
+  "qdash_reanalyze_qubit_spectroscopy",
+  "qdash_reanalyze_resonator_spectroscopy",
   "qdash_recent_calibration_summary",
   "qdash_recommend_next_action",
   "qdash_summarize_task_results",
@@ -204,6 +209,9 @@ export const DEFERRED_TOOL_NAMES = [
   // Figure evidence packaging and numeric figure analysis.
   "qdash_analyze_figure_json",
   "qdash_build_qcal_evidence",
+  // Offline spectroscopy reanalysis: a preview with adjusted analysis parameters, no hardware.
+  "qdash_reanalyze_resonator_spectroscopy",
+  "qdash_reanalyze_qubit_spectroscopy",
   // Calibration planning and validation.
   "qdash_compare_calibration",
   "qdash_recommend_next_action",

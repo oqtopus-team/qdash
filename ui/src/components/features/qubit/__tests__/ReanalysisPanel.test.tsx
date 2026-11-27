@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
     isPending: false,
     isError: false,
     error: null as unknown,
-    data: undefined,
+    data: undefined as unknown,
   },
 }));
 
@@ -64,6 +64,30 @@ describe("ReanalysisPanel", () => {
     mocks.reset.mockReset();
     mocks.state.isError = false;
     mocks.state.error = null;
+    mocks.state.data = undefined;
+  });
+
+  describe("result", () => {
+    const result = (sourceTaskId: string | null) => ({
+      data: {
+        figure: { data: [], layout: {} },
+        output_parameters: [{ name: "readout_frequency", value: 6.3, unit: "GHz" }],
+        source_task_id: sourceTaskId,
+      },
+    });
+
+    it("shows the end of the stored source task id", () => {
+      mocks.state.data = result("execution-123456789012");
+      renderPanel("CheckResonatorSpectroscopy");
+      expect(screen.getByText("123456789012")).toBeTruthy();
+    });
+
+    it("labels a result without a source task as an inline figure", () => {
+      mocks.state.data = result(null);
+      renderPanel("CheckResonatorSpectroscopy");
+      expect(screen.getByText("inline figure")).toBeTruthy();
+      expect(screen.getByText("readout_frequency")).toBeTruthy();
+    });
   });
 
   it("renders nothing for unsupported tasks", () => {

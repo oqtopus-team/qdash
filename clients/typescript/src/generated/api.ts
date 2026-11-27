@@ -2840,10 +2840,15 @@ const getChipQubit = (
     }
 
 /**
- * Re-run the resonator-spectroscopy analysis on a previously stored figure.
+ * Re-run the resonator-spectroscopy analysis on a stored or inline figure.
  *
- * Returns the marked figure and the re-estimated `readout_frequency` for
- * the requested qubit. The DB is **not** mutated; this is a preview only.
+ * The figure is the stored raw figure of `source_task_id` (or the qubit's
+ * latest result), or the Plotly JSON given in `figure`.
+ *
+ * Returns the marked figure and the re-estimated `readout_frequency`,
+ * `optimal_power`, and `readout_amplitude` for the requested qubit, plus a PNG
+ * of the marked figure when `include_image` is true. The DB is **not**
+ * mutated; this is a preview only.
  * @summary Re-run resonator spectroscopy analysis on a stored task result (preview)
  */
 const reanalyzeResonatorSpectroscopy = (
@@ -2860,11 +2865,16 @@ const reanalyzeResonatorSpectroscopy = (
     }
 
 /**
- * Re-run the qubit-spectroscopy analysis on a previously stored figure.
+ * Re-run the qubit-spectroscopy analysis on a stored or inline figure.
  *
- * Returns the marked figure and the re-estimated `qubit_frequency`,
- * `f01_repr_db`, `f01_quality_level`, and `qubit_anharmonicity` for the requested
- * qubit. The DB is **not** mutated; this is a preview only.
+ * The figure is the stored raw figure of `source_task_id` (or the qubit's
+ * latest result), or the Plotly JSON given in `figure`.
+ *
+ * Returns the marked figure and the re-estimated `qubit_frequency`
+ * (also as `coarse_qubit_frequency`), `coarse_control_amplitude`,
+ * `f01_repr_db`, `f01_quality_level`, and `qubit_anharmonicity` for the
+ * requested qubit, plus a PNG of the marked figure when `include_image` is
+ * true. The DB is **not** mutated; this is a preview only.
  * @summary Re-run qubit spectroscopy analysis on a stored task result (preview)
  */
 const reanalyzeQubitSpectroscopy = (

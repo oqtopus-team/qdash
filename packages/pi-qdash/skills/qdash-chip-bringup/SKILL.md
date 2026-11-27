@@ -73,6 +73,50 @@ After each run, use `qdash_wait_execution`, then inspect failed tasks with
 
 Report each MUX and qubit as ready, failed at a named task, or not run, with execution links.
 
+## Triage, offline reanalysis, and recovery
+
+Triage spectroscopy results from their outputs before spending evaluations or hardware time.
+
+1. Fast path: a qubit whose tasks completed with `f01_quality_level` of 3 or more, an
+   `optimal_power` below -10 dB, a `coarse_control_amplitude` below 0.8, and no downstream
+   failure is clean. Move it on without calling `qcal_evaluate`.
+2. Inspect the rest: a failed spectroscopy, `f01_quality_level <= 2`, `optimal_power >= -10 dB`,
+   `coarse_control_amplitude >= 0.8`, or a failure in `CheckControlAmplitude` or
+   `CheckAdaptiveChevron`. Fetch the spectroscopy figure (`qdash_get_task_figures` or
+   `qdash_build_qcal_evidence`) and evaluate it with `qcal_evaluate`; for these 2D heatmaps
+   prefer `use_examples: false`.
+3. Reanalyze offline when the evaluation reports `UNSUPPORTED_F01_MARKER` or
+   `FALSE_OR_MISASSIGNED_PEAK` and the figure shows a real feature: call
+   `qdash_reanalyze_qubit_spectroscopy` or `qdash_reanalyze_resonator_spectroscopy` with the
+   result's `sourceTaskId` and adjusted `parameters` (for example `f01_height_min`, `top_power`,
+   or the binarization thresholds for f01; the power region, `bare_shift_estimator_type`, or
+   `resonator_assignment_order` for resonators). Call `qcal_evaluate` again only when the
+   reanalysis returns an image. When PNG rendering fails (the result reports `image_error`),
+   do not call `qcal_evaluate`, because it would evaluate an older stored figure of the task:
+   keep the outputs as unverified candidates and report the rendering failure. Change one or two
+   parameters per attempt. Stop after a few attempts and measure again, or request guidance,
+   when no setting marks the feature.
+4. Confirm a verified candidate on hardware with a targeted Stored Plan before relying on it.
+   Build a short spec, store it with `qdash_create_pipeline_plan`, and run it with a direct
+   `qdash_run_pipeline` call and its `planId`:
+   - A reanalyzed qubit: `CheckControlAmplitude` with
+     `input: {"control_frequency": <coarse_qubit_frequency>, "coarse_control_amplitude": <coarse_control_amplitude>}`,
+     then `CheckAdaptiveChevron`. When both complete, they store the refined outputs:
+     `coarse_qubit_frequency` and `coarse_control_amplitude` from `CheckControlAmplitude`, then
+     `qubit_frequency` and `control_amplitude` from `CheckAdaptiveChevron`.
+   - A reanalyzed resonator: `CheckQubitSpectroscopy` with
+     `input: {"readout_frequency": <readout_frequency>, "readout_amplitude": <readout_amplitude>}`.
+     The task uses the overrides for the acquisition only and stores only its own outputs
+     (`coarse_qubit_frequency`, `f01_repr_db`, `f01_quality_level`, `coarse_control_amplitude`),
+     not the overridden `readout_frequency` and `readout_amplitude`. After this confirmation the
+     readout pair stays
+     unstored in QDash until it is stored separately, for example by a resonator spectroscopy
+     rerun or a manual update; say so in the report.
+
+   Reanalysis writes nothing; only the confirming run's completed tasks store their outputs.
+   Report which values came from reanalysis, which run confirmed them, and which confirmed
+   values QDash still does not store.
+
 ## Running
 
 Saved flows run with `qdash_execute_flow`; a template the user has not saved can be saved with

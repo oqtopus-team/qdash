@@ -396,7 +396,7 @@ interface ReanalyzeMutationLike {
         data?: {
           figure: unknown;
           output_parameters: { name: string; value: number; unit?: string }[];
-          source_task_id: string;
+          source_task_id?: string | null;
         };
       }
     | undefined;
@@ -486,7 +486,10 @@ function ReanalysisResult({ result }: ReanalysisResultProps) {
     <div className="mt-4 space-y-3">
       <div>
         <div className="text-xs text-base-content/60 mb-1">
-          source_task_id: <span className="font-mono">{result.source_task_id.slice(-12)}</span>
+          source_task_id:{" "}
+          <span className="font-mono">
+            {result.source_task_id ? result.source_task_id.slice(-12) : "inline figure"}
+          </span>
         </div>
       </div>
 

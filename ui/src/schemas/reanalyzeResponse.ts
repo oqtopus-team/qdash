@@ -7,6 +7,10 @@
  */
 import type { ReanalyzeOutputParameter } from './reanalyzeOutputParameter';
 import type { ReanalyzeResponseFigure } from './reanalyzeResponseFigure';
+import type { ReanalyzeResponseImageBase64 } from './reanalyzeResponseImageBase64';
+import type { ReanalyzeResponseImageError } from './reanalyzeResponseImageError';
+import type { ReanalyzeResponseImageMediaType } from './reanalyzeResponseImageMediaType';
+import type { ReanalyzeResponseSourceTaskId } from './reanalyzeResponseSourceTaskId';
 
 /**
  * Preview response from a reanalyze endpoint.
@@ -16,13 +20,20 @@ import type { ReanalyzeResponseFigure } from './reanalyzeResponseFigure';
  * will be added in a follow-up.
  */
 export interface ReanalyzeResponse {
-  /** Task result whose data was re-analyzed. */
-  source_task_id: string;
+  /** Task result whose data was re-analyzed; null when an inline figure was re-analyzed. */
+  source_task_id?: ReanalyzeResponseSourceTaskId;
+  /** Task whose analysis ran: the stored result's task name, or the endpoint's task for an inline figure. */
   source_task_name: string;
   qid: string;
   /** Plotly figure JSON of the re-analyzed result with markers. */
   figure: ReanalyzeResponseFigure;
   output_parameters: ReanalyzeOutputParameter[];
+  /** Base64-encoded PNG of the marked figure. Set only when include_image was true and the server could render the figure. */
+  image_base64?: ReanalyzeResponseImageBase64;
+  /** Media type of image_base64 (image/png), or null when no image is returned. */
+  image_media_type?: ReanalyzeResponseImageMediaType;
+  /** A fixed message saying the requested image could not be rendered; the cause is logged on the server only. Null when no image was requested or rendering succeeded. */
+  image_error?: ReanalyzeResponseImageError;
   /** Always false in this version; persisting changes will land later. */
   committed?: boolean;
 }
