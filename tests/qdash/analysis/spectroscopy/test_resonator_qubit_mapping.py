@@ -11,6 +11,7 @@ from qdash.analysis.spectroscopy import (
     ResonatorCandidate,
     create_mapping_grid_figure,
     score_1d_spectroscopy_trace,
+    score_mapping_grid,
     solve_resonator_qubit_mapping,
     withheld_mapped_qids,
 )
@@ -118,6 +119,64 @@ def test_deviation_below_noise_floor_scores_zero() -> None:
 def test_score_rejects_mismatched_lengths() -> None:
     with pytest.raises(ValueError, match="same length"):
         score_1d_spectroscopy_trace([1.0, 2.0, 3.0], [0.0, 1.0])
+
+
+def test_broad_response_covering_half_sweep_outscores_narrow_crosstalk_spike() -> None:
+    # A broad power-broadened response covering ~45% of the sweep used to inflate
+    # per-trace MAD and lose to a 3-point crosstalk spike on a quiet trace.
+    broad = _noise(10, sigma=0.025).copy()
+    broad[20:82] = (broad[20:82] + 3.0 + np.pi) % (2 * np.pi) - np.pi  # wraps near +/-pi
+
+    crosstalk = _noise(11, sigma=0.025).copy()
+    crosstalk[90:93] -= 2.8
+
+    assert score_1d_spectroscopy_trace(FREQUENCIES, broad) > 5.0 * score_1d_spectroscopy_trace(
+        FREQUENCIES, crosstalk
+    )
+
+
+@pytest.mark.parametrize("index", [0, 60, -1])
+def test_despike_suppresses_isolated_single_point_spike(index: int) -> None:
+    spike = _noise(12, sigma=0.02).copy()
+    spike[index] += 3.0
+
+    despiked = score_1d_spectroscopy_trace(FREQUENCIES, spike, despike=True)
+    raw = score_1d_spectroscopy_trace(FREQUENCIES, spike, despike=False)
+
+    assert despiked < DEFAULT_MIN_RESPONSE_SCORE
+    assert raw > 100.0
+
+
+def test_despike_preserves_multi_point_boundary_response() -> None:
+    trace = np.zeros_like(FREQUENCIES)
+    trace[:3] = 1.0
+
+    assert score_1d_spectroscopy_trace(FREQUENCIES, trace, despike=True) > 100.0
+
+
+def test_score_mapping_grid_uses_per_column_noise_floor() -> None:
+    # Candidate 0 is quiet (sigma=0.02), candidate 1 is noisier (sigma=0.08).
+    # Q0 has a broad wrapped response on C0; Q1 has a broad response on C1;
+    # Q0 also sees a narrow 2-point crosstalk dip on C1.
+    q0_c0 = _noise(20, sigma=0.02).copy()
+    q0_c0[25:85] = (q0_c0[25:85] + 2.9 + np.pi) % (2 * np.pi) - np.pi
+    q0_c1 = _noise(21, sigma=0.08).copy()
+    q0_c1[70:72] -= 2.0
+
+    q1_c0 = _noise(22, sigma=0.02).copy()
+    q1_c0[80] -= 2.8  # single-point crosstalk spike
+    q1_c1 = _noise(23, sigma=0.08).copy()
+    q1_c1[40:80] -= 2.4
+
+    scores = score_mapping_grid(FREQUENCIES, [[q0_c0, q0_c1], [q1_c0, q1_c1]])
+    result = solve_resonator_qubit_mapping(scores, ["0", "1"], _candidates(2))
+
+    assert result.mapped_qids == ("0", "1")
+    assert result.outcomes["0"].candidate_position == 0
+    assert result.outcomes["1"].candidate_position == 1
+    assert scores[1, 0] < DEFAULT_MIN_RESPONSE_SCORE
+    assert scores[0, 0] > 10.0 * scores[0, 1]
+    assert scores[1, 1] > 5.0 * scores[0, 1]
 
 
 # ---------------------------------------------------------------------------
@@ -376,6 +435,12 @@ def test_grid_figure_uses_qubex_figure_style() -> None:
         assert axis.zeroline is False
     colors = [trace.line.color for trace in figure.data]
     assert colors == ["#0C5DA5", "#9e9e9e", "#9e9e9e", "#9e9e9e", "#FF9500", "#9e9e9e"]
+    assert all(trace.fill == "tozeroy" for trace in figure.data)
+    y_axes = [layout[name] for name in layout if name.startswith("yaxis")]
+    assert all(axis.range[0] == pytest.approx(-0.1) and axis.range[1] > math.pi for axis in y_axes)
+    for trace in figure.data:
+        y_vals = np.asarray(trace.y, dtype=float)
+        assert np.all((y_vals >= 0.0) & (y_vals <= math.pi + 1e-9))
 
 
 # ---------------------------------------------------------------------------
