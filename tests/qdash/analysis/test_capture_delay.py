@@ -148,3 +148,74 @@ def test_quel3_pipeline_selects_on_the_readout_sampling_grid():
     # The pulse midpoint lands on the window center within one grid step.
     midpoint = arrival_ns - final.final_total_ns + DURATION_NS / 2
     assert midpoint == pytest.approx(center, abs=QUEL3_RESOLUTION_NS)
+
+
+def test_long_pulse_in_narrow_1152ns_quel1_window_calibrates_cleanly():
+    """A 1024 ns pulse in a 144-sample (1152 ns) window leaves only ~11% baseline."""
+    samples = 144
+    center = samples * SAMPLING_NS / 2
+    arrival_ns = 1165.0  # centered near delay=8, word=12 (1120 ns)
+
+    def capture(delay: int, word: int) -> Waveform:
+        return _capture_at(
+            total_delay_ns(delay, word),
+            arrival_ns=arrival_ns,
+            target="Q48",
+            samples=samples,
+        )
+
+    coarse = analyze_waveforms([capture(d, 0) for d in range(19)])
+    coarse_selection = select_delay(coarse, mux=0, center=center)
+    assert coarse_selection.selected_total_ns is not None
+    delay, _ = split_total_delay(coarse_selection.selected_total_ns)
+
+    fine = analyze_waveforms([capture(delay, w) for w in (0, 4, 8, 12)])
+    fine_selection = select_delay(fine, mux=0, center=center)
+    assert fine_selection.selected_total_ns is not None
+
+    verification = analyze_waveforms(
+        [
+            _capture_at(
+                fine_selection.selected_total_ns,
+                arrival_ns=arrival_ns,
+                target="Q48",
+                samples=samples,
+            )
+        ]
+    )
+    final = finalize_delay(verification, fine_selection, center=center)
+
+    assert final.reason == "ready"
+    assert final.final_total_ns is not None
+    assert final.predicted_pre_margin_ns is not None
+    assert final.predicted_pre_margin_ns >= 32
+    assert final.predicted_post_margin_ns is not None
+    assert final.predicted_post_margin_ns >= 32
+
+
+def test_select_delay_uses_observed_duration_when_ringdown_broadens_pulse():
+    """Observed rise-to-fall width avoids picking a delay that clips a broadened fall."""
+    samples = 144
+    center = samples * SAMPLING_NS / 2
+    arrival_ns = 1165.0
+    effective_duration_ns = 1044.0  # nominal 1024 ns + ~20 ns ring-down
+
+    def broadened(delay: int, word: int) -> Waveform:
+        total = total_delay_ns(delay, word)
+        rng = np.random.default_rng(round(total * 10))
+        time = np.arange(samples) * SAMPLING_NS
+        start = arrival_ns - total
+        envelope = 0.5 * (
+            np.tanh((time - start) / 6) - np.tanh((time - start - effective_duration_ns) / 6)
+        )
+        noise = rng.normal(size=samples) + 1j * rng.normal(size=samples)
+        return Waveform(0, "Q48", total, time, envelope * (0.2 + 0j) + 0.002 * noise, DURATION_NS)
+
+    fine = analyze_waveforms([broadened(8, w) for w in (0, 4, 8, 12)])
+    selection = select_delay(fine, mux=0, center=center)
+
+    assert selection.selected_total_ns == total_delay_ns(8, 12)
+    verification = analyze_waveforms([broadened(8, 12)])
+    final = finalize_delay(verification, selection, center=center)
+    assert final.reason == "ready"
+    assert final.final_total_ns == total_delay_ns(8, 12)

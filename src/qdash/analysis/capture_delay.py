@@ -210,7 +210,12 @@ def analyze_waveform(waveform: Waveform, *, snr_threshold: float, smoothing: int
         for part in (differences.real, differences.imag)
     ]
     noise = max(math.hypot(*mad) / math.sqrt(2), 1e-12)
-    low, high = np.percentile(smooth, [10, 90])
+    # A centered 1024 ns readout pulse inside a 1152 ns QuEL-1 capture window
+    # leaves only ~11% baseline samples (even less after rise/fall ramps), so a
+    # 10th-percentile floor lands inside the pulse. Because ``smooth`` is already
+    # averaged, the 2nd percentile stays on the quiet baseline without reacting
+    # to single-sample noise.
+    low, high = np.percentile(smooth, [2, 90])
     contrast = float(high - low)
     if contrast < snr_threshold * noise:
         return EdgeResult(waveform)
@@ -321,6 +326,21 @@ def select_delay(
     """Center the pulse envelope using two consistent observations per target."""
     group = [result for result in results if result.mux == mux]
     targets = list(dict.fromkeys(result.target for result in group))
+    observed_durations: dict[str, float] = {}
+    for target in targets:
+        measured = [
+            float(result.fall_ns) - float(result.rise_ns)
+            for result in group
+            if result.target == target
+            and result.success
+            and result.rise_ns is not None
+            and result.fall_ns is not None
+            and math.isfinite(result.rise_ns)
+            and math.isfinite(result.fall_ns)
+            and result.fall_ns > result.rise_ns
+        ]
+        if measured:
+            observed_durations[target] = float(np.median(measured))
     estimates: list[dict[str, float | str]] = []
     for result in group:
         if not result.success:
@@ -336,7 +356,7 @@ def select_delay(
             for edge in observed
         ):
             continue
-        duration = result.waveform.pulse_duration_ns
+        duration = observed_durations.get(result.target, result.waveform.pulse_duration_ns)
         if not (has_rise and has_fall):
             # One clipped edge is inferred from the recorded readout duration.
             if not math.isfinite(duration) or duration <= 0:
