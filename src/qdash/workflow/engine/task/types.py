@@ -110,6 +110,14 @@ class TaskExecutionError(Exception):
     """Exception raised when task execution fails."""
 
 
+class PostprocessValidationError(ValueError):
+    """A task's postprocess rejected the result for one qid (``validation_error``).
+
+    It is a ``ValueError`` so existing handlers treat it as a validation failure;
+    the executor distinguishes it to still fan out a MUX-level result.
+    """
+
+
 class TaskExecutionResult(BaseModel):
     """Result of task execution.
 

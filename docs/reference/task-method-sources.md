@@ -6,7 +6,7 @@ Sources are documentation only and are not returned by the API or Agent.
 
 | Method | Tasks | Sources |
 | --- | --- | --- |
-| Dispersive resonator and qubit spectroscopy | `CheckResonatorSpectroscopy`, `CheckQubitSpectroscopy`, `CheckControlAmplitude` | [Blais et al. 2021](https://doi.org/10.1103/RevModPhys.93.025005), [Reed et al. 2010](https://doi.org/10.1103/PhysRevLett.105.173601), [Koch et al. 2007](https://doi.org/10.1103/PhysRevA.76.042319) |
+| Dispersive resonator and qubit spectroscopy | `CheckResonatorSpectroscopy`, `CheckResonatorQubitMapping`, `CheckQubitSpectroscopy`, `CheckControlAmplitude` | [Blais et al. 2021](https://doi.org/10.1103/RevModPhys.93.025005), [Reed et al. 2010](https://doi.org/10.1103/PhysRevLett.105.173601), [Koch et al. 2007](https://doi.org/10.1103/PhysRevA.76.042319) |
 | Rabi driving, chevrons, and flat-top pulse amplitudes | `CheckRabi`, `CheckChevron`, `CheckAdaptiveChevron`, `CreateHPIPulse`, `CreatePIPulse` | [Krantz et al. 2019](https://doi.org/10.1063/1.5089550) |
 | T1, Ramsey, and Hahn echo | `CheckT1`, `CheckRamsey`, `CheckT2Echo`, `CheckT1Average`, `CheckT2EchoAverage` | [Krantz et al. 2019](https://doi.org/10.1063/1.5089550); fluctuations: [Klimov et al. 2018](https://doi.org/10.1103/PhysRevLett.121.090502), [Burnett et al. 2019](https://doi.org/10.1038/s41534-019-0168-5) |
 | DRAG pulses | `CreateDRAGHPIPulse`, `CreateDRAGPIPulse` | [Motzoi et al. 2009](https://doi.org/10.1103/PhysRevLett.103.110501), [Gambetta et al. 2011](https://doi.org/10.1103/PhysRevA.83.012308), [Lucero et al. 2010](https://doi.org/10.1103/PhysRevA.82.042339) |

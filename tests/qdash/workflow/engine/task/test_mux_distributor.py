@@ -358,3 +358,109 @@ def test_pinned_mux_batch_runs_once_and_postprocesses_each_qid() -> None:
     ]
     cast("MagicMock", executor.state_manager).update_task_status_to_failed.assert_not_called()
     resolve.assert_not_called()
+
+
+# ------------------------------------------------------------- per-qid validation
+
+
+class _PerQidProbeTask(_ProbeTask):
+    """MUX probe whose postprocess rejects some qids and publishes for the rest."""
+
+    def __init__(self, rejected: set[str]) -> None:
+        super().__init__("CheckResonatorQubitMapping", is_mux_level=True)
+        self.rejected = rejected
+
+    def postprocess(
+        self, _backend: object, _execution_id: str, _run_result: RunResult, qid: str
+    ) -> PostProcessResult:
+        import plotly.graph_objects as go
+
+        from qdash.datamodel.task import OutputParameterModel
+
+        self.calls.append(f"postprocess:{qid}")
+        figure = go.Figure(layout={"title": {"text": f"figure:{qid}"}})
+        if qid in self.rejected:
+            return PostProcessResult(
+                output_parameters={},
+                figures=[figure],
+                validation_error=f"mapping is ambiguous for qid={qid}",
+            )
+        return PostProcessResult(
+            output_parameters={"resonator_frequency": OutputParameterModel(value=10.0 + int(qid))},
+            figures=[figure],
+        )
+
+
+def _per_qid_executor() -> TaskExecutor:
+    executor = _executor(MuxMapping.legacy())
+    cast("MagicMock", executor.data_saver).save_figures.return_value = ([], [])
+    cast("MagicMock", executor.result_processor).process_output_parameters.side_effect = (
+        lambda params, *_args: params
+    )
+    return executor
+
+
+def _status_calls(executor: TaskExecutor, method: str) -> dict[str, str]:
+    """qid -> message for a state-manager status update method."""
+    calls = getattr(cast("MagicMock", executor.state_manager), method).call_args_list
+    return {call.args[3]: call.args[1] for call in calls}
+
+
+def _published_qids(executor: TaskExecutor) -> list[str]:
+    calls = cast("MagicMock", executor.state_manager).put_output_parameters.call_args_list
+    return [call.args[3] for call in calls]
+
+
+def test_rejected_sibling_is_failed_while_other_siblings_publish() -> None:
+    executor = _per_qid_executor()
+    task = _PerQidProbeTask(rejected={"6"})
+
+    _, result = _execute(executor, task, "4")
+
+    assert result.success
+    failed = _status_calls(executor, "update_task_status_to_failed")
+    completed = _status_calls(executor, "update_task_status_to_completed")
+    assert failed == {"6": "mapping is ambiguous for qid=6"}
+    assert set(completed) == {"4", "5", "7"}
+    assert _published_qids(executor) == ["4", "5", "7"]
+    saver = cast("MagicMock", executor._backend_saver)
+    assert [call.args[2] for call in saver.save_mux_qid.call_args_list] == ["5", "7"]
+    # The rejected sibling still keeps its figure for review.
+    figures = cast("MagicMock", executor.data_saver).save_figures.call_args_list
+    saved = {call.args[3]: call.args[0][0].layout.title.text for call in figures}
+    assert saved["6"] == "figure:6"
+
+
+def test_rejected_representative_still_fans_out_and_then_fails() -> None:
+    executor = _per_qid_executor()
+    task = _PerQidProbeTask(rejected={"4"})
+
+    with pytest.raises(ValueError, match="mapping is ambiguous for qid=4"):
+        _execute(executor, task, "4")
+
+    assert [call for call in task.calls if call.startswith("postprocess")] == [
+        "postprocess:4",
+        "postprocess:5",
+        "postprocess:6",
+        "postprocess:7",
+    ]
+    failed = _status_calls(executor, "update_task_status_to_failed")
+    completed = _status_calls(executor, "update_task_status_to_completed")
+    assert set(failed) == {"4"}
+    assert set(completed) == {"5", "6", "7"}
+    assert _published_qids(executor) == ["5", "6", "7"]
+    saver = cast("MagicMock", executor._backend_saver)
+    saver.save.assert_called_once()
+    assert saver.save.call_args.args[2] == "4"
+    assert saver.save.call_args.args[4] is False
+
+
+def test_rejected_non_mux_task_does_not_fan_out() -> None:
+    executor = _per_qid_executor()
+    task = _PerQidProbeTask(rejected={"4"})
+    task.is_mux_level = False
+
+    with pytest.raises(ValueError, match="mapping is ambiguous for qid=4"):
+        _execute(executor, task, "4")
+
+    assert [call for call in task.calls if call.startswith("postprocess")] == ["postprocess:4"]

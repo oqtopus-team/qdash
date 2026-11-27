@@ -32,6 +32,7 @@ from qdash.workflow.engine.task.snapshot_loader import SnapshotParameterLoader
 from qdash.workflow.engine.task.state_manager import TaskStateManager
 from qdash.workflow.engine.task.types import (
     BackendProtocol,
+    PostprocessValidationError,
     TaskExecutionError,
     TaskExecutionResult,
     TaskProtocol,
@@ -430,14 +431,23 @@ class TaskExecutor:
             postprocess_result = self._run_postprocess(task, backend, run_result, qid)
 
             if postprocess_result:
-                # 5. Validate, persist and save the postprocess result
-                result.output_parameters = self._apply_postprocess_result(
-                    task, backend, run_result, postprocess_result, qid, execution_service
-                )
+                is_mux = getattr(task, "is_mux_level", False)
+                # 5. Validate, persist and save the postprocess result. A MUX-level
+                #    result is judged per qid: the representative's own validation
+                #    error must not withhold the other members' results, so it is
+                #    raised only after the fan-out below.
+                representative_error: PostprocessValidationError | None = None
+                try:
+                    result.output_parameters = self._apply_postprocess_result(
+                        task, backend, run_result, postprocess_result, qid, execution_service
+                    )
+                except PostprocessValidationError as e:
+                    if execution_service is None or not is_mux:
+                        raise
+                    representative_error = e
 
                 # 5.5 MUX distribution (production only)
                 if execution_service is not None:
-                    is_mux = getattr(task, "is_mux_level", False)
                     logger.debug(
                         "Checking MUX distribution: task=%s, is_mux_level=%s, qid=%s",
                         task_name,
@@ -454,6 +464,9 @@ class TaskExecutor:
                         logger.debug(
                             "Finished MUX distribution for task=%s, qid=%s", task_name, qid
                         )
+
+                if representative_error is not None:
+                    raise representative_error
 
             # 6. Complete task
             self._complete_task(task_name, task_type, qid, f"{task_name} is completed")
@@ -731,7 +744,7 @@ class TaskExecutor:
                 self.state_manager.clear_output_parameters(task_name, task_type, qid)
             if execution_service is not None:
                 self._backend_saver.save(task, execution_service, qid, backend, False)
-            raise ValueError(postprocess_result.validation_error)
+            raise PostprocessValidationError(postprocess_result.validation_error)
 
         # Validate R² (rollback output params on failure)
         backend_success = True
