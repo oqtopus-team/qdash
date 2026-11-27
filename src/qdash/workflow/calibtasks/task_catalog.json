@@ -6145,7 +6145,7 @@
         "documentation": {
           "description": "MUX-level check of which resonator reads which qubit. It takes the readout settings stored on the MUX's qubits as resonator candidates, runs a coarse 1D high-power qubit spectroscopy for every qubit and candidate pair one at a time, and solves the one-to-one assignment with the strongest responses. Each qubit whose mapping is unambiguous gets its candidate's resonator_frequency (also published as readout_frequency), readout_amplitude and optimal_power. It does not estimate qubit frequencies.",
           "prerequisites": [
-            "readout_frequency (or resonator_frequency) and readout_amplitude are stored on at least two qubits of the MUX, normally by CheckResonatorSpectroscopy."
+            "readout_frequency (or resonator_frequency) and readout_amplitude are stored on at least two qubits of the MUX, normally by CheckResonatorSpectroscopy. The representative qubit may have none."
           ],
           "when_to_use": "Run it after CheckResonatorSpectroscopy and before CheckQubitSpectroscopy when the MUX's resonator frequency order is unknown or suspected to be wrong. A qubit with no response or an ambiguous response fails and keeps its stored values."
         },
@@ -6153,7 +6153,7 @@
         "input_parameters": {
           "readout_amplitude": {
             "default_value": null,
-            "resolution": "database_required",
+            "resolution": "database_optional",
             "user_override": "allowed"
           },
           "readout_frequency": {
@@ -6161,7 +6161,7 @@
             "fallback_parameter_names": [
               "resonator_frequency"
             ],
-            "resolution": "database_required",
+            "resolution": "database_optional",
             "user_override": "allowed"
           }
         },
@@ -6207,6 +6207,12 @@
             "unit": "a.u.",
             "value": 5.0,
             "value_type": "float"
+          },
+          "resonator_candidates": {
+            "description": "Readout settings of the MUX qubits as a JSON array of objects with qid, readout_frequency (GHz), readout_amplitude (a.u.) and optional optimal_power (dB). Leave blank to read them from the stored calibration before the run; the resolved list is recorded, so a re-execution measures the same candidates.",
+            "unit": "",
+            "value": null,
+            "value_type": "str"
           },
           "shots": {
             "description": "Number of shots per drive frequency",

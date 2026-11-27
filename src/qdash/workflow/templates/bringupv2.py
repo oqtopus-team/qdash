@@ -131,6 +131,9 @@ def bringupv2(
               MUXes; the next round starts after every qubit of the round has run
               all of its tasks
             - "sequential": one MUX and one qubit at a time
+            "simultaneous_spectroscopy" is accepted by the type but cannot run this
+            task list: CheckResonatorQubitMapping and CheckControlAmplitude do not
+            support batch execution, so the step is rejected before any hardware work.
         flow_name: Saved flow name QDash injects at launch; keep it in the signature
             and do not pass it on (session.run reads the launch name itself)
         project_id: Project ID (auto-injected)

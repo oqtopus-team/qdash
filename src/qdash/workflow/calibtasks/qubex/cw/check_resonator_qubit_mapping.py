@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import copy
+import json
 import logging
 import math
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar
 
 import numpy as np
@@ -16,6 +18,7 @@ from qdash.analysis.spectroscopy import (
     create_mapping_grid_figure,
     score_1d_spectroscopy_trace,
     solve_resonator_qubit_mapping,
+    withheld_mapped_qids,
 )
 from qdash.common.mux_mapping import MuxMapping, canonical_qid
 from qdash.common.visualization.figure_metadata import set_figure_role
@@ -45,6 +48,75 @@ DEFAULT_MAPPING_MIN_MARGIN_RATIO = 2.0
 MIN_RESONATOR_CANDIDATES = 2
 DUPLICATE_CANDIDATE_TOLERANCE = 0.0005
 """Candidates closer than this (GHz) are the same resonator stored on two qubits."""
+
+
+@dataclass(frozen=True)
+class StoredReadout:
+    """Readout settings a MUX qubit held before the mapping ran."""
+
+    qid: str
+    readout_frequency: float | None
+    readout_amplitude: float | None
+    optimal_power: float | None = None
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "qid": self.qid,
+            "readout_frequency": self.readout_frequency,
+            "readout_amplitude": self.readout_amplitude,
+            "optimal_power": self.optimal_power,
+        }
+
+
+def _optional_number(entry: Mapping[str, Any], key: str, index: int) -> float | None:
+    value = entry.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"resonator_candidates[{index}].{key} must be a number or null")
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError(f"resonator_candidates[{index}].{key} must be finite")
+    return number
+
+
+def parse_stored_readouts(text: str) -> list[StoredReadout]:
+    """Parse the ``resonator_candidates`` run parameter.
+
+    The value is a JSON array of objects with ``qid``, ``readout_frequency``
+    (GHz), ``readout_amplitude`` (a.u.) and optionally ``optimal_power`` (dB);
+    numbers may be null when the qubit has no stored value.
+
+    Raises:
+        ValueError: If the text is not such an array or a qid appears twice.
+    """
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"resonator_candidates is not valid JSON: {exc}") from exc
+    if not isinstance(payload, list):
+        raise ValueError("resonator_candidates must be a JSON array of objects")
+    readouts: list[StoredReadout] = []
+    seen: set[str] = set()
+    for index, entry in enumerate(payload):
+        if not isinstance(entry, Mapping):
+            raise ValueError(f"resonator_candidates[{index}] must be an object")
+        qid = entry.get("qid")
+        if isinstance(qid, bool) or not isinstance(qid, (str, int)) or str(qid) == "":
+            raise ValueError(f"resonator_candidates[{index}].qid must be a qubit ID")
+        member = canonical_qid(qid)
+        if member in seen:
+            raise ValueError(f"resonator_candidates lists qid={member} more than once")
+        seen.add(member)
+        readouts.append(
+            StoredReadout(
+                qid=member,
+                readout_frequency=_optional_number(entry, "readout_frequency", index),
+                readout_amplitude=_optional_number(entry, "readout_amplitude", index),
+                optimal_power=_optional_number(entry, "optimal_power", index),
+            )
+        )
+    return readouts
 
 
 class CheckResonatorQubitMapping(QubexTask):
@@ -80,15 +152,18 @@ class CheckResonatorQubitMapping(QubexTask):
         ),
         prerequisites=(
             "readout_frequency (or resonator_frequency) and readout_amplitude are stored on "
-            "at least two qubits of the MUX, normally by CheckResonatorSpectroscopy.",
+            "at least two qubits of the MUX, normally by CheckResonatorSpectroscopy. The "
+            "representative qubit may have none.",
         ),
     )
     is_mux_level: bool = True
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
-        "readout_frequency": InputParameterSpec.required_database(
+        # Optional: the candidates come from every MUX qubit, so the representative
+        # may have no stored resonator. An explicit override replaces its candidate.
+        "readout_frequency": InputParameterSpec.database_optional(
             fallback_parameter_names=("resonator_frequency",)
         ),
-        "readout_amplitude": InputParameterSpec.required_database(),
+        "readout_amplitude": InputParameterSpec.database_optional(),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "frequency_range": RunParameterSpec(
@@ -98,6 +173,18 @@ class CheckResonatorQubitMapping(QubexTask):
             description=(
                 "Drive frequency range as [start, stop, step] in GHz. Leave blank to use the "
                 "connected control box's qubex default band with frequency_step as the step."
+            ),
+        ),
+        "resonator_candidates": RunParameterSpec(
+            unit="",
+            value_type="str",
+            default=None,
+            description=(
+                "Readout settings of the MUX qubits as a JSON array of objects with qid, "
+                "readout_frequency (GHz), readout_amplitude (a.u.) and optional "
+                "optimal_power (dB). Leave blank to read them from the stored calibration "
+                "before the run; the resolved list is recorded, so a re-execution measures "
+                "the same candidates."
             ),
         ),
         "frequency_step": RunParameterSpec(
@@ -213,8 +300,12 @@ class CheckResonatorQubitMapping(QubexTask):
         return drive_power, min_response_score, min_margin_ratio
 
     def resolve_run_parameters(self, backend: QubexBackend, qid: str) -> None:
-        """Record the effective coarse drive sweep before the task runs."""
+        """Record the effective drive sweep and stored candidates before the run."""
         super().resolve_run_parameters(backend, qid)
+        self._resolve_frequency_range(backend, qid)
+        self._resolve_stored_readouts(backend, qid)
+
+    def _resolve_frequency_range(self, backend: QubexBackend, qid: str) -> None:
         parameter = self.run_parameters["frequency_range"]
         if parameter.value is not None:
             return
@@ -265,53 +356,114 @@ class CheckResonatorQubitMapping(QubexTask):
                 return number
         return None
 
-    def _collect_candidates(
-        self, backend: QubexBackend, qid: str, mux_qids: list[str]
-    ) -> list[ResonatorCandidate]:
-        """Collect the provisional readout settings of the MUX as candidates.
+    def _resolve_stored_readouts(self, backend: QubexBackend, qid: str) -> list[StoredReadout]:
+        """Return the MUX qubits' stored readout settings, recording them once.
 
-        The representative qubit uses its resolved inputs, so explicit input
-        overrides apply; the other members use their stored calibration. Entries
-        without a positive frequency and amplitude are skipped, and entries at the
-        same frequency are kept once. Candidates are sorted by frequency.
+        A recorded value (from a snapshot or an explicit override) is used as is,
+        so a re-execution never reads the current calibration. Otherwise the
+        stored calibration of every MUX qubit is read and recorded as JSON.
         """
-        representative = canonical_qid(qid)
-        entries: list[tuple[str, float, float, float | None]] = []
+        parameter = self.run_parameters.get("resonator_candidates")
+        if parameter is None:
+            # Snapshots recorded before this parameter existed.
+            parameter = self.run_spec["resonator_candidates"].create_model()
+            self.run_parameters["resonator_candidates"] = parameter
+        mux_qids = self._mux_qids(backend, qid)
+        if parameter.value is not None and str(parameter.value).strip():
+            readouts = parse_stored_readouts(str(parameter.value))
+            outside = [readout.qid for readout in readouts if readout.qid not in mux_qids]
+            if outside:
+                raise ValueError(
+                    f"resonator_candidates lists qids {outside} outside MUX qubits {mux_qids}"
+                )
+            return readouts
+
+        readouts = []
         for member in mux_qids:
             data = self._stored_calibration(backend, member)
-            frequency = self._stored_value(data, "readout_frequency", "resonator_frequency")
-            amplitude = self._stored_value(data, "readout_amplitude")
-            if member == representative:
-                frequency = self._input_value("readout_frequency", frequency)
-                amplitude = self._input_value("readout_amplitude", amplitude)
-            optimal_power = self._stored_value(data, "optimal_power")
+            readout = StoredReadout(
+                qid=member,
+                readout_frequency=self._stored_value(
+                    data, "readout_frequency", "resonator_frequency"
+                ),
+                readout_amplitude=self._stored_value(data, "readout_amplitude"),
+                optimal_power=self._stored_value(data, "optimal_power"),
+            )
+            if readout.readout_frequency is None and readout.readout_amplitude is None:
+                continue
+            readouts.append(readout)
+        parameter.value = json.dumps([readout.to_json() for readout in readouts])
+        return readouts
+
+    def _effective_readouts(self, qid: str, stored: list[StoredReadout]) -> list[StoredReadout]:
+        """Apply the representative's explicit input overrides to the stored settings.
+
+        A stored optimal power belongs to the stored frequency and amplitude, so it
+        is dropped when the override moves either of them.
+        """
+        representative = canonical_qid(qid)
+        frequency = self._input_value("readout_frequency", None)
+        amplitude = self._input_value("readout_amplitude", None)
+        if frequency is None and amplitude is None:
+            return list(stored)
+        base = next(
+            (readout for readout in stored if readout.qid == representative),
+            StoredReadout(representative, None, None, None),
+        )
+        new_frequency = base.readout_frequency if frequency is None else frequency
+        new_amplitude = base.readout_amplitude if amplitude is None else amplitude
+        moved_frequency = frequency is not None and (
+            base.readout_frequency is None
+            or abs(frequency - base.readout_frequency) >= DUPLICATE_CANDIDATE_TOLERANCE
+        )
+        moved_amplitude = amplitude is not None and (
+            base.readout_amplitude is None or not math.isclose(amplitude, base.readout_amplitude)
+        )
+        optimal_power = None if moved_frequency or moved_amplitude else base.optimal_power
+        effective = StoredReadout(representative, new_frequency, new_amplitude, optimal_power)
+        others = [readout for readout in stored if readout.qid != representative]
+        return [effective, *others]
+
+    @staticmethod
+    def _candidates_from(readouts: list[StoredReadout]) -> list[ResonatorCandidate]:
+        """Usable readout settings as candidates, sorted by frequency and deduplicated."""
+        usable: list[StoredReadout] = []
+        for readout in readouts:
+            frequency = readout.readout_frequency
+            amplitude = readout.readout_amplitude
             if frequency is None or frequency <= 0.0 or amplitude is None or amplitude <= 0.0:
                 print(
-                    f"[WARNING] qid={member} has no usable readout_frequency/readout_amplitude; "
-                    "it contributes no resonator candidate"
+                    f"[WARNING] qid={readout.qid} has no usable readout_frequency/"
+                    "readout_amplitude; it contributes no resonator candidate"
                 )
                 continue
-            entries.append((member, frequency, amplitude, optimal_power))
+            usable.append(readout)
 
-        entries.sort(key=lambda entry: entry[1])
-        unique: list[tuple[str, float, float, float | None]] = []
-        for entry in entries:
-            if unique and abs(entry[1] - unique[-1][1]) < DUPLICATE_CANDIDATE_TOLERANCE:
+        usable.sort(key=lambda readout: float(readout.readout_frequency or 0.0))
+        unique: list[StoredReadout] = []
+        for readout in usable:
+            frequency = float(readout.readout_frequency or 0.0)
+            previous = unique[-1] if unique else None
+            if (
+                previous is not None
+                and abs(frequency - float(previous.readout_frequency or 0.0))
+                < DUPLICATE_CANDIDATE_TOLERANCE
+            ):
                 print(
-                    f"[WARNING] qid={entry[0]} stores the same resonator as qid={unique[-1][0]} "
-                    f"({entry[1]:.6f} GHz); keeping one candidate"
+                    f"[WARNING] qid={readout.qid} stores the same resonator as "
+                    f"qid={previous.qid} ({frequency:.6f} GHz); keeping one candidate"
                 )
                 continue
-            unique.append(entry)
+            unique.append(readout)
         return [
             ResonatorCandidate(
                 candidate_index=index,
-                source_qid=member,
-                frequency=frequency,
-                readout_amplitude=amplitude,
-                optimal_power=optimal_power,
+                source_qid=readout.qid,
+                frequency=float(readout.readout_frequency or 0.0),
+                readout_amplitude=float(readout.readout_amplitude or 0.0),
+                optimal_power=readout.optimal_power,
             )
-            for index, (member, frequency, amplitude, optimal_power) in enumerate(unique)
+            for index, readout in enumerate(unique)
         ]
 
     def _input_value(self, name: str, fallback: float | None) -> float | None:
@@ -398,7 +550,8 @@ class CheckResonatorQubitMapping(QubexTask):
         drive_power, min_response_score, min_margin_ratio = self._validated_settings()
         exp = self.get_experiment(backend)
         mux_qids = self._mux_qids(backend, qid)
-        candidates = self._collect_candidates(backend, qid, mux_qids)
+        stored = self._resolve_stored_readouts(backend, qid)
+        candidates = self._candidates_from(self._effective_readouts(qid, stored))
         if len(candidates) < MIN_RESONATOR_CANDIDATES:
             raise ValueError(
                 f"{self.name} needs at least {MIN_RESONATOR_CANDIDATES} resonator candidates "
@@ -458,33 +611,40 @@ class CheckResonatorQubitMapping(QubexTask):
             min_response_score=min_response_score,
             min_margin_ratio=min_margin_ratio,
         )
+        # Unpublished qubits keep their stored resonator, so a mapped qubit must not
+        # publish a resonator that one of them still holds.
+        retained: dict[str, float | None] = dict.fromkeys(mux_qids)
+        retained.update({readout.qid: readout.readout_frequency for readout in stored})
+        withheld = withheld_mapped_qids(mapping, retained, tolerance=DUPLICATE_CANDIDATE_TOLERANCE)
         figure = create_mapping_grid_figure(
             frequencies if frequencies is not None else np.array([]),
             traces,
             mapping,
             [labels[member] for member in measured_qids],
             candidates,
+            withheld=withheld,
         )
         set_figure_role(figure, "marked")
         for member in measured_qids:
             outcome = mapping.outcomes[member]
-            print(f"[{self.name}] qid={member} {outcome.status}: {outcome.reason}")
+            reason = withheld.get(member)
+            if reason is not None:
+                print(f"[{self.name}] qid={member} withheld: {reason}")
+            else:
+                print(f"[{self.name}] qid={member} {outcome.status}: {outcome.reason}")
 
         self.save_calibration(backend)
         return RunResult(
             raw_result={
                 "mapping": mapping,
                 "summary": mapping.summary(),
+                "withheld": withheld,
                 "fig": figure,
                 "frequency_range": frequencies,
                 "qubit_labels": labels,
                 "spectroscopy": spectroscopy,
             }
         )
-
-    def batch_run(self, backend: QubexBackend, qids: list[str]) -> RunResult:
-        """Not supported: the task measures its whole MUX from one representative."""
-        raise NotImplementedError(f"{self.name} runs once per MUX; use run instead")
 
     # ------------------------------------------------------------------ results
 
@@ -496,7 +656,9 @@ class CheckResonatorQubitMapping(QubexTask):
         This is called for every qubit of the MUX. Only a ``"mapped"`` qubit gets
         output parameters; a qubit with no response, an ambiguous response or no
         measurement returns the grid figure and a validation error, so stored
-        values that the mapping did not verify are never overwritten.
+        values that the mapping did not verify are never overwritten. A mapped
+        qubit is also withheld when its resonator is still held by a qubit that
+        does not publish, so two qubits never end up on one resonator.
         """
         raw = run_result.raw_result
         mapping: ResonatorQubitMappingResult = raw["mapping"]
@@ -507,8 +669,11 @@ class CheckResonatorQubitMapping(QubexTask):
         outcome = mapping.outcome(member)
         error: str | None = None
         candidate = mapping.mapped_candidate(member)
+        withheld_reason = raw.get("withheld", {}).get(member)
         if outcome is None:
             error = f"Resonator mapping did not measure qid={qid}"
+        elif candidate is not None and withheld_reason is not None:
+            error = f"Resonator mapping for qid={qid} is withheld: {withheld_reason}"
         elif candidate is None:
             error = f"Resonator mapping is {outcome.status} for qid={qid}: {outcome.reason}"
         elif not math.isfinite(candidate.frequency) or candidate.frequency <= 0.0:

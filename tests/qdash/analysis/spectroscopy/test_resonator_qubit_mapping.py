@@ -12,6 +12,7 @@ from qdash.analysis.spectroscopy import (
     create_mapping_grid_figure,
     score_1d_spectroscopy_trace,
     solve_resonator_qubit_mapping,
+    withheld_mapped_qids,
 )
 
 FREQUENCIES = np.arange(3.0, 5.75, 0.02)
@@ -375,3 +376,75 @@ def test_grid_figure_uses_qubex_figure_style() -> None:
         assert axis.zeroline is False
     colors = [trace.line.color for trace in figure.data]
     assert colors == ["#0C5DA5", "#9e9e9e", "#9e9e9e", "#9e9e9e", "#FF9500", "#9e9e9e"]
+
+
+# ---------------------------------------------------------------------------
+# withheld_mapped_qids
+# ---------------------------------------------------------------------------
+
+RETAINED = {qid: candidate.frequency for qid, candidate in zip(QIDS, _candidates(), strict=True)}
+
+
+def test_partial_chain_onto_a_retained_resonator_is_withheld_transitively() -> None:
+    # 0 -> C1 (held by 1), 1 -> C2 (held by 2), 2 is silent and keeps C2.
+    scores = np.array(
+        [
+            [0.0, 40.0, 0.0, 0.0],
+            [0.0, 0.0, 40.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 40.0],
+        ]
+    )
+    result = solve_resonator_qubit_mapping(scores, QIDS, _candidates())
+    assert result.mapped_qids == ("0", "1", "3")
+
+    withheld = withheld_mapped_qids(result, RETAINED, tolerance=0.0005)
+
+    assert set(withheld) == {"0", "1"}
+    assert "retained by unmapped qid=2" in withheld["1"]
+    assert "retained by unmapped qid=1" in withheld["0"]
+
+
+def test_complete_swap_is_not_withheld() -> None:
+    scores = np.array(
+        [
+            [0.0, 40.0, 0.0, 0.0],
+            [40.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 40.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0],  # silent, keeps C3 that nobody takes
+        ]
+    )
+    result = solve_resonator_qubit_mapping(scores, QIDS, _candidates())
+
+    assert withheld_mapped_qids(result, RETAINED, tolerance=0.0005) == {}
+
+
+def test_retained_frequency_of_unmeasured_qubit_blocks_mapping() -> None:
+    result = solve_resonator_qubit_mapping(np.array([[0.0, 40.0]]), ["0"], _candidates(2))
+
+    withheld = withheld_mapped_qids(
+        result, {"0": None, "7": _candidates(2)[1].frequency}, tolerance=0.0005
+    )
+
+    assert set(withheld) == {"0"}
+
+
+def test_grid_figure_rejects_candidates_that_do_not_match_result() -> None:
+    result = solve_resonator_qubit_mapping(np.eye(2) * 30, ["0", "1"], _candidates(2))
+    traces: list[list[np.ndarray | None]] = [[_noise(1)] * 3, [_noise(2)] * 3]
+
+    with pytest.raises(ValueError, match="Expected 2 candidates"):
+        create_mapping_grid_figure(FREQUENCIES, traces, result, ["Q00", "Q01"], _candidates(3))
+
+
+def test_grid_figure_marks_withheld_qubits() -> None:
+    result = solve_resonator_qubit_mapping(np.eye(2) * 30, ["0", "1"], _candidates(2))
+    traces: list[list[np.ndarray | None]] = [[_noise(1), _noise(2)], [_noise(3), _noise(4)]]
+
+    figure = create_mapping_grid_figure(
+        FREQUENCIES, traces, result, ["Q00", "Q01"], withheld={"1": "blocked"}
+    )
+
+    badges = [a.text for a in figure.layout.annotations if a.text in {"SELECTED", "WITHHELD"}]
+    assert badges == ["SELECTED", "WITHHELD"]
+    assert figure.layout.yaxis3.title.text == "Q01<br>withheld"

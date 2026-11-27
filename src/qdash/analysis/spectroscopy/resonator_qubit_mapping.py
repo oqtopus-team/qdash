@@ -22,7 +22,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence
+    from collections.abc import Iterator, Mapping, Sequence
 
     from numpy.typing import ArrayLike
 
@@ -504,6 +504,61 @@ def _format_ratio(value: float) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Publishing
+# ---------------------------------------------------------------------------
+
+
+def withheld_mapped_qids(
+    result: ResonatorQubitMappingResult,
+    retained_frequencies: Mapping[str, float | None],
+    *,
+    tolerance: float,
+) -> dict[str, str]:
+    """Return the mapped qubits that must not publish, with the reason.
+
+    A qubit that is not published keeps its stored resonator frequency. If a
+    mapped qubit published the frequency that another, unpublished qubit keeps,
+    both qubits would read the same resonator. Starting from the mapped qubits,
+    any qubit whose candidate is still retained by an unpublished qubit is
+    withheld, and this repeats until nothing changes, because a withheld qubit
+    keeps its own frequency too. A complete swap among mapped qubits stays
+    publishable; a partial chain that ends at an unpublished qubit is withheld.
+
+    Args:
+        result: Solved mapping.
+        retained_frequencies: Stored resonator frequency of each MUX qubit in GHz,
+            ``None`` when it has none. Qubits that were not measured belong here
+            too.
+        tolerance: Frequencies closer than this (GHz) are the same resonator.
+
+    Returns:
+        Withheld qid -> reason, in no particular order.
+    """
+    publishable = set(result.mapped_qids)
+    withheld: dict[str, str] = {}
+    changed = True
+    while changed:
+        changed = False
+        for qid in sorted(publishable, key=result.qids.index):
+            candidate = result.mapped_candidate(qid)
+            if candidate is None:
+                continue
+            for other, frequency in retained_frequencies.items():
+                if other == qid or other in publishable or frequency is None:
+                    continue
+                if abs(frequency - candidate.frequency) < tolerance:
+                    publishable.discard(qid)
+                    withheld[qid] = (
+                        f"candidate C{candidate.candidate_index} "
+                        f"({candidate.frequency:.6f} GHz) is still retained by unmapped "
+                        f"qid={other}"
+                    )
+                    changed = True
+                    break
+    return withheld
+
+
+# ---------------------------------------------------------------------------
 # Figure
 # ---------------------------------------------------------------------------
 
@@ -514,14 +569,16 @@ def create_mapping_grid_figure(
     result: ResonatorQubitMappingResult,
     qubit_labels: Sequence[str],
     candidates: Sequence[ResonatorCandidate] | None = None,
+    withheld: Mapping[str, str] | None = None,
 ) -> go.Figure:
     """Draw every (qubit, candidate) phase trace in one grid for review.
 
     Rows are qubits and columns are candidates. Each subplot title carries the
     candidate frequency and score. The selected cell of each qubit is drawn in
     the status color with a ``SELECTED`` badge when mapped, or an ``AMBIGUOUS``
-    badge when it is the unverified best guess; other cells stay gray. The row
-    axis title states each qubit's status.
+    badge when it is the unverified best guess; other cells stay gray. A mapped
+    qubit listed in ``withheld`` gets a ``WITHHELD`` badge instead of
+    ``SELECTED``. The row axis title states each qubit's status.
 
     Args:
         frequencies: Drive frequencies in GHz shared by every trace.
@@ -530,16 +587,29 @@ def create_mapping_grid_figure(
         result: Solved mapping whose rows and columns match the grid.
         qubit_labels: Display label of each qubit row.
         candidates: Candidates in column order; defaults to ``result.candidates``.
+            They must match the result's candidates one for one.
+        withheld: Mapped qids whose result is not published, with the reason, as
+            returned by :func:`withheld_mapped_qids`.
 
     Returns:
         The grid figure.
 
     Raises:
-        ValueError: If the grid shape does not match the result.
+        ValueError: If the candidates, labels or grid do not match the result.
     """
     candidate_tuple = tuple(candidates) if candidates is not None else result.candidates
+    withheld = withheld or {}
     n_rows = len(result.qids)
     n_cols = len(candidate_tuple)
+    if n_cols != len(result.candidates):
+        raise ValueError(
+            f"Expected {len(result.candidates)} candidates to match the result, got {n_cols}"
+        )
+    if result.score_matrix.shape != (n_rows, n_cols):
+        raise ValueError(
+            f"result.score_matrix must have shape ({n_rows}, {n_cols}), "
+            f"got {result.score_matrix.shape}"
+        )
     if len(qubit_labels) != n_rows:
         raise ValueError(f"Expected {n_rows} qubit labels, got {len(qubit_labels)}")
     if len(traces_grid) != n_rows or any(len(row) != n_cols for row in traces_grid):
@@ -566,12 +636,19 @@ def create_mapping_grid_figure(
 
     for row, qid in enumerate(result.qids):
         outcome = result.outcomes[qid]
+        published = outcome.status == "mapped" and qid not in withheld
+        status_label = (
+            "withheld" if outcome.status == "mapped" and not published else outcome.status
+        )
+        badge = (
+            "SELECTED" if published else ("WITHHELD" if status_label == "withheld" else "AMBIGUOUS")
+        )
         for column in range(n_cols):
             trace = traces_grid[row][column]
             selected = outcome.candidate_position == column
             color = _IDLE_COLOR
             if selected:
-                color = _SELECTED_COLOR if outcome.status == "mapped" else _AMBIGUOUS_COLOR
+                color = _SELECTED_COLOR if published else _AMBIGUOUS_COLOR
             if trace is not None:
                 y = np.asarray(trace, dtype=float).ravel()
                 figure.add_trace(
@@ -610,14 +687,14 @@ def create_mapping_grid_figure(
                     y=0.95,
                     xanchor="right",
                     yanchor="top",
-                    text="SELECTED" if outcome.status == "mapped" else "AMBIGUOUS",
+                    text=badge,
                     showarrow=False,
                     font={"size": 10, "color": _BADGE_TEXT_COLORS[color]},
                     bgcolor=color,
                     borderpad=2,
                 )
         figure.update_yaxes(
-            title_text=f"{qubit_labels[row]}<br>{outcome.status}",
+            title_text=f"{qubit_labels[row]}<br>{status_label}",
             row=row + 1,
             col=1,
         )

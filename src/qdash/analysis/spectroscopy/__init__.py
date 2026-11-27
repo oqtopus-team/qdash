@@ -75,6 +75,7 @@ from qdash.analysis.spectroscopy.resonator_qubit_mapping import (
     create_mapping_grid_figure,
     score_1d_spectroscopy_trace,
     solve_resonator_qubit_mapping,
+    withheld_mapped_qids,
 )
 
 __all__ = [
@@ -136,4 +137,5 @@ __all__ = [
     "resonator_assignment_order_from_pattern",
     "score_1d_spectroscopy_trace",
     "solve_resonator_qubit_mapping",
+    "withheld_mapped_qids",
 ]

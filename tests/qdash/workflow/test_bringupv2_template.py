@@ -137,3 +137,15 @@ def test_bringupv2_is_listed_as_a_template() -> None:
     assert entry["function_name"] == "bringupv2"
     assert entry["backend"] == "qubex"
     assert entry["category"] == "production"
+
+
+def test_bringupv2_documents_that_batch_mode_cannot_run_its_tasks() -> None:
+    from qdash.workflow.service.one_qubit_stage_runner import batch_capable_tasks
+
+    capable = batch_capable_tasks("qubex")
+    unsupported = [name for name in names(bringupv2_module.BRINGUPV2_TASKS) if not capable[name]]
+
+    assert unsupported == ["CheckResonatorQubitMapping", "CheckControlAmplitude"]
+    docstring = bringupv2_module.bringupv2.__doc__ or ""
+    batch_note = docstring.split('"simultaneous_spectroscopy"', 1)[1]
+    assert all(name in batch_note for name in unsupported)

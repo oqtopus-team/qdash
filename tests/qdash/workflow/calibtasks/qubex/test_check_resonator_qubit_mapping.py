@@ -14,9 +14,11 @@ import qdash.workflow.calibtasks.qubex as qubex_tasks
 from qdash.common.config.backend import get_tasks
 from qdash.common.mux_mapping import MuxMapping
 from qdash.workflow.calibtasks.active_protocols import is_mux_task
+from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.calibtasks.qubex.cw.check_resonator_qubit_mapping import (
     CheckResonatorQubitMapping,
 )
+from qdash.workflow.service.one_qubit_stage_runner import batch_capable_tasks
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.backend.qubex import QubexBackend
@@ -107,6 +109,14 @@ def _make_task(
         lambda _backend, qid: _stored_entry(*entries[qid]) if qid in entries else {},
     )
     return task, backend
+
+
+def _empty_backend() -> QubexBackend:
+    """A backend without project context: no stored calibration is read."""
+    return cast(
+        "QubexBackend",
+        SimpleNamespace(config={}, ensure_mux_mapping_compatible=MuxMapping.legacy),
+    )
 
 
 def test_measures_every_pair_one_at_a_time_at_high_power(monkeypatch) -> None:
@@ -301,7 +311,7 @@ def test_frequency_range_is_resolved_from_control_box_with_coarse_step(monkeypat
     monkeypatch.setattr(task, "get_experiment", lambda _backend: exp)
     monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
 
-    task.resolve_run_parameters(cast("QubexBackend", object()), "0")
+    task.resolve_run_parameters(_empty_backend(), "0")
 
     assert task.run_parameters["frequency_range"].value == (3.0, 5.75, 0.02)
     exp.ctx.experiment_system.get_control_box_for_qubit.assert_called_once_with("Q00")
@@ -312,7 +322,7 @@ def test_explicit_frequency_range_is_kept(monkeypatch) -> None:
     task.run_parameters["frequency_range"].value = (4.0, 5.0, 0.01)
     monkeypatch.setattr(task, "get_experiment", lambda _backend: MagicMock())
 
-    task.resolve_run_parameters(cast("QubexBackend", object()), "0")
+    task.resolve_run_parameters(_empty_backend(), "0")
 
     assert task.run_parameters["frequency_range"].value == (4.0, 5.0, 0.01)
 
@@ -336,3 +346,200 @@ def test_task_is_registered_in_catalog_and_backend() -> None:
     catalog_path = Path(qubex_tasks.__file__).parent.parent / "task_catalog.json"
     catalog = json.loads(catalog_path.read_text())
     assert "CheckResonatorQubitMapping" in json.dumps(catalog)
+
+
+# ------------------------------------------------------------------ review fixes
+
+
+def test_task_is_not_batch_capable() -> None:
+    assert CheckResonatorQubitMapping.batch_run is QubexTask.batch_run
+    assert batch_capable_tasks("qubex")["CheckResonatorQubitMapping"] is False
+
+
+def test_representative_without_stored_readout_uses_other_candidates(monkeypatch) -> None:
+    stored: dict[str, StoredReadout] = {
+        "1": (10.20, 0.11, -19.0),
+        "2": (10.30, 0.12, -18.0),
+    }
+    exp = FakeExperiment({("Q01", 10.20): 0.5, ("Q02", 10.30): 0.5})
+    task, backend = _make_task(monkeypatch, exp, stored)
+    for name in ("readout_frequency", "readout_amplitude"):
+        spec = CheckResonatorQubitMapping.input_spec[name]
+        assert spec.resolution == "database_optional"
+        spec.validate_effective_value(name, None)  # the executor accepts no value
+        assert task.input_parameters[name].value is None
+
+    run_result = task.run(backend, "0")
+
+    mapping = run_result.raw_result["mapping"]
+    assert [c.frequency for c in mapping.candidates] == [10.20, 10.30]
+    assert task.postprocess(backend, "exec-1", run_result, "1").validation_error is None
+    assert task.postprocess(backend, "exec-1", run_result, "0").output_parameters == {}
+
+
+def test_resolved_candidates_are_recorded_for_replay(monkeypatch) -> None:
+    exp = FakeExperiment()
+    task, backend = _make_task(monkeypatch, exp)
+
+    task.resolve_run_parameters(backend, "0")
+
+    recorded = json.loads(str(task.run_parameters["resonator_candidates"].value))
+    assert recorded == [
+        {
+            "qid": qid,
+            "readout_frequency": frequency,
+            "readout_amplitude": amplitude,
+            "optimal_power": power,
+        }
+        for qid, (frequency, amplitude, power) in STORED.items()
+    ]
+
+
+def test_replay_uses_recorded_candidates_instead_of_live_calibration(monkeypatch) -> None:
+    exp = FakeExperiment()
+    task, backend = _make_task(monkeypatch, exp)
+    task.run_parameters["resonator_candidates"].value = json.dumps(
+        [
+            {"qid": qid, "readout_frequency": f, "readout_amplitude": a, "optimal_power": p}
+            for qid, (f, a, p) in STORED.items()
+        ]
+    )
+    # The live calibration has changed since the recorded run.
+    monkeypatch.setattr(
+        task,
+        "_stored_calibration",
+        lambda _backend, qid: _stored_entry(11.0 + int(qid), 0.5, -1.0),
+    )
+
+    task.resolve_run_parameters(backend, "0")
+    task.run(backend, "0")
+
+    measured = {kwargs["readout_frequency"] for _target, kwargs in exp.calls}
+    assert measured == {10.10, 10.20, 10.30, 10.40}
+
+
+@pytest.mark.parametrize(
+    ("value", "match"),
+    [
+        ("not json", "not valid JSON"),
+        ('{"qid": "0"}', "JSON array"),
+        ('[{"qid": "0", "readout_frequency": "10.1"}]', "must be a number"),
+        ('[{"qid": "0"}, {"qid": "0"}]', "more than once"),
+        ('[{"qid": "9", "readout_frequency": 10.1, "readout_amplitude": 0.1}]', "outside MUX"),
+    ],
+)
+def test_malformed_recorded_candidates_are_rejected(monkeypatch, value: str, match: str) -> None:
+    exp = FakeExperiment()
+    task, backend = _make_task(monkeypatch, exp)
+    task.run_parameters["resonator_candidates"].value = value
+
+    with pytest.raises(ValueError, match=match):
+        task.run(backend, "0")
+    assert exp.calls == []
+
+
+def test_recorded_candidates_with_fewer_than_two_entries_fail(monkeypatch) -> None:
+    exp = FakeExperiment()
+    task, backend = _make_task(monkeypatch, exp)
+    task.input_parameters["readout_frequency"].value = None
+    task.input_parameters["readout_amplitude"].value = None
+    task.run_parameters[
+        "resonator_candidates"
+    ].value = '[{"qid": "1", "readout_frequency": 10.2, "readout_amplitude": 0.1}]'
+
+    with pytest.raises(ValueError, match="at least 2 resonator candidates"):
+        task.run(backend, "0")
+
+
+def test_representative_frequency_override_drops_stale_optimal_power(monkeypatch) -> None:
+    exp = FakeExperiment()
+    task, backend = _make_task(monkeypatch, exp)
+    task.input_parameters["readout_frequency"].value = 10.15
+
+    mapping = task.run(backend, "0").raw_result["mapping"]
+
+    overridden = next(c for c in mapping.candidates if c.source_qid == "0")
+    assert overridden.frequency == 10.15
+    assert overridden.optimal_power is None
+    untouched = next(c for c in mapping.candidates if c.source_qid == "1")
+    assert untouched.optimal_power == -19.0
+
+
+def test_unchanged_representative_input_keeps_optimal_power(monkeypatch) -> None:
+    exp = FakeExperiment()
+    task, backend = _make_task(monkeypatch, exp)
+
+    mapping = task.run(backend, "0").raw_result["mapping"]
+
+    assert next(c for c in mapping.candidates if c.source_qid == "0").optimal_power == -20.0
+
+
+def test_mapping_onto_a_resonator_kept_by_a_failed_qubit_is_withheld(monkeypatch) -> None:
+    # Q00 maps to C1, which qid 1 stores; qid 1 has no response and keeps C1.
+    exp = FakeExperiment({("Q00", 10.20): 0.5, ("Q02", 10.30): 0.5, ("Q03", 10.40): 0.5})
+    task, backend = _make_task(monkeypatch, exp)
+    run_result = task.run(backend, "0")
+
+    assert run_result.raw_result["mapping"].outcomes["0"].status == "mapped"
+    withheld = task.postprocess(backend, "exec-1", run_result, "0")
+    failed = task.postprocess(backend, "exec-1", run_result, "1")
+
+    assert withheld.output_parameters == {}
+    assert withheld.validation_error is not None
+    assert "withheld" in withheld.validation_error
+    assert "qid=1" in withheld.validation_error
+    assert failed.output_parameters == {}
+    for qid in ("2", "3"):
+        assert task.postprocess(backend, "exec-1", run_result, qid).validation_error is None
+    badges = [a.text for a in run_result.raw_result["fig"].layout.annotations]
+    assert badges.count("WITHHELD") == 1
+
+
+def test_complete_swap_publishes_both_qubits(monkeypatch) -> None:
+    exp = FakeExperiment()
+    task, backend = _make_task(monkeypatch, exp)
+    run_result = task.run(backend, "0")
+
+    assert run_result.raw_result["withheld"] == {}
+    zero = task.postprocess(backend, "exec-1", run_result, "0")
+    one = task.postprocess(backend, "exec-1", run_result, "1")
+    assert zero.output_parameters["resonator_frequency"].value == 10.20
+    assert one.output_parameters["resonator_frequency"].value == 10.10
+
+
+def test_recorded_candidates_are_accepted_as_task_call_settings() -> None:
+    from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec, step_calls
+    from qdash.workflow.calibtasks.active_protocols import generate_task_instances
+    from qdash.workflow.calibtasks.base import BaseTask
+    from qdash.workflow.engine.task_parameters import (
+        normalize_task_settings,
+        validate_task_settings,
+    )
+
+    value = json.dumps(
+        [{"qid": "1", "readout_frequency": 10.2, "readout_amplitude": 0.1, "optimal_power": None}]
+    )
+    spec = CalibrationPipelineSpec.model_validate(
+        {
+            "spec_version": 2,
+            "targets": {"mux_ids": [0]},
+            "steps": [
+                {
+                    "type": "CustomOneQubit",
+                    "tasks": [
+                        {
+                            "name": "CheckResonatorQubitMapping",
+                            "run": {"resonator_candidates": value},
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+    call = step_calls(spec.steps[0])[0]
+    normalized = normalize_task_settings(call.name, {"run": call.run or {}, "input": {}})
+    registry = BaseTask.registry["qubex"]
+    validate_task_settings(registry[call.name], call.name, normalized, source="test")
+    task = generate_task_instances([call.name], {call.name: normalized}, "qubex")[call.name]
+
+    assert task.run_parameters["resonator_candidates"].value == value
