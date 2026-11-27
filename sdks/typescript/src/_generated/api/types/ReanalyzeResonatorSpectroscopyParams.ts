@@ -9,6 +9,10 @@ import type * as QDashApi from "../index.js";
  * :class:`EstimateResonatorFrequencyConfig`.
  */
 export interface ReanalyzeResonatorSpectroscopyParams {
+    /** Lowest frequency (GHz) to analyze. Columns below it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Use it to exclude a spur or edge noise without measuring again. */
+    frequency_min?: (number | null) | undefined;
+    /** Highest frequency (GHz) to analyze. Columns above it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Must be greater than frequency_min when both are given. */
+    frequency_max?: (number | null) | undefined;
     /** Number of resonators to detect in the MUX (typically 4). */
     num_resonators?: (number | null) | undefined;
     /** Minimum power (dB) for the high-power region. */

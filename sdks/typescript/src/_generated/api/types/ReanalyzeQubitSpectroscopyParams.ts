@@ -4,8 +4,13 @@
  * Optional analysis-parameter overrides for qubit spectroscopy.
  */
 export interface ReanalyzeQubitSpectroscopyParams {
+    /** Lowest frequency (GHz) to analyze. Columns below it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Use it to exclude a spur or edge noise without measuring again. */
+    frequency_min?: (number | null) | undefined;
+    /** Highest frequency (GHz) to analyze. Columns above it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Must be greater than frequency_min when both are given. */
+    frequency_max?: (number | null) | undefined;
     binarize_threshold_sigma_plus?: (number | null) | undefined;
     binarize_threshold_sigma_minus?: (number | null) | undefined;
+    /** Power (dB) just above the strongest analyzed row; peak heights are measured from it. Rows at or above top_power are dropped before the analysis runs, so the returned figure shows only the rows below it. */
     top_power?: (number | null) | undefined;
     f01_height_min?: (number | null) | undefined;
     f12_distance_min?: (number | null) | undefined;

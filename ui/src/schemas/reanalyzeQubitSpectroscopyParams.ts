@@ -11,6 +11,8 @@ import type { ReanalyzeQubitSpectroscopyParamsF01HeightMin } from './reanalyzeQu
 import type { ReanalyzeQubitSpectroscopyParamsF12DistanceMax } from './reanalyzeQubitSpectroscopyParamsF12DistanceMax';
 import type { ReanalyzeQubitSpectroscopyParamsF12DistanceMin } from './reanalyzeQubitSpectroscopyParamsF12DistanceMin';
 import type { ReanalyzeQubitSpectroscopyParamsF12HeightMin } from './reanalyzeQubitSpectroscopyParamsF12HeightMin';
+import type { ReanalyzeQubitSpectroscopyParamsFrequencyMax } from './reanalyzeQubitSpectroscopyParamsFrequencyMax';
+import type { ReanalyzeQubitSpectroscopyParamsFrequencyMin } from './reanalyzeQubitSpectroscopyParamsFrequencyMin';
 import type { ReanalyzeQubitSpectroscopyParamsRetryWithTrim } from './reanalyzeQubitSpectroscopyParamsRetryWithTrim';
 import type { ReanalyzeQubitSpectroscopyParamsTopPower } from './reanalyzeQubitSpectroscopyParamsTopPower';
 
@@ -18,8 +20,13 @@ import type { ReanalyzeQubitSpectroscopyParamsTopPower } from './reanalyzeQubitS
  * Optional analysis-parameter overrides for qubit spectroscopy.
  */
 export interface ReanalyzeQubitSpectroscopyParams {
+  /** Lowest frequency (GHz) to analyze. Columns below it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Use it to exclude a spur or edge noise without measuring again. */
+  frequency_min?: ReanalyzeQubitSpectroscopyParamsFrequencyMin;
+  /** Highest frequency (GHz) to analyze. Columns above it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Must be greater than frequency_min when both are given. */
+  frequency_max?: ReanalyzeQubitSpectroscopyParamsFrequencyMax;
   binarize_threshold_sigma_plus?: ReanalyzeQubitSpectroscopyParamsBinarizeThresholdSigmaPlus;
   binarize_threshold_sigma_minus?: ReanalyzeQubitSpectroscopyParamsBinarizeThresholdSigmaMinus;
+  /** Power (dB) just above the strongest analyzed row; peak heights are measured from it. Rows at or above top_power are dropped before the analysis runs, so the returned figure shows only the rows below it. */
   top_power?: ReanalyzeQubitSpectroscopyParamsTopPower;
   f01_height_min?: ReanalyzeQubitSpectroscopyParamsF01HeightMin;
   f12_distance_min?: ReanalyzeQubitSpectroscopyParamsF12DistanceMin;

@@ -289,3 +289,108 @@ test("the session's chip is used only for the session's connection; another one 
   await writeFile(altConfig, `[lab]\nbase_url = "${lab.baseUrl}"\napi_token = "alt-token"\n`, { mode: 0o600 });
   assert.equal(await reanalyzedChip(lab, { profile: "lab", configPath: altConfig }), "LAB_DEFAULT");
 });
+
+test("frequencyMin and frequencyMax are sent as the frequency window of either tool", async (t) => {
+  const { requests, connection } = await fakeQDash(t);
+  const tools = extensionTools();
+
+  const qubit = await tools.get(REANALYZE_QUBIT_TOOL).execute("call-6", {
+    ...connection,
+    chipId: "64Qv3",
+    qid: "1",
+    sourceTaskId: "task-q1",
+    frequencyMin: 7.3,
+    frequencyMax: 7.9,
+    parameters: { top_power: -5, f01_height_min: 8, retry_with_trim: true },
+    includeImage: false,
+  });
+  await tools.get(REANALYZE_RESONATOR_TOOL).execute("call-7", {
+    ...connection,
+    chipId: "64Qv3",
+    qid: "1",
+    frequencyMax: 10.4,
+    includeImage: false,
+  });
+
+  assert.deepEqual(requests[0].body, {
+    source_task_id: "task-q1",
+    parameters: { top_power: -5, f01_height_min: 8, retry_with_trim: true, frequency_min: 7.3, frequency_max: 7.9 },
+    include_image: false,
+  });
+  assert.deepEqual(requests[1].body, { parameters: { frequency_max: 10.4 }, include_image: false });
+  assert.match(qubit.content[0].text, /overrides: .*frequency_min=7\.3, frequency_max=7\.9/);
+  assert.deepEqual(qubit.details.data.parameters.frequency_min, 7.3);
+});
+
+test("frequencyMin and frequencyMax override the same fields in parameters", async (t) => {
+  const { requests, connection } = await fakeQDash(t);
+  const tool = extensionTools().get(REANALYZE_QUBIT_TOOL);
+
+  await tool.execute("call-8", {
+    ...connection,
+    chipId: "64Qv3",
+    qid: "1",
+    frequencyMin: 7.4,
+    parameters: { frequency_min: 7.0, frequency_max: 8.0 },
+    includeImage: false,
+  });
+
+  assert.deepEqual(requests[0].body.parameters, { frequency_min: 7.4, frequency_max: 8.0 });
+});
+
+test("an unusable frequency window is refused before any request", async (t) => {
+  const { requests, connection } = await fakeQDash(t);
+  const tools = extensionTools();
+  const base = { ...connection, chipId: "64Qv3", qid: "1" };
+
+  for (const name of [REANALYZE_QUBIT_TOOL, REANALYZE_RESONATOR_TOOL]) {
+    const tool = tools.get(name);
+    await assert.rejects(tool.execute("call-9", { ...base, frequencyMin: 7.9, frequencyMax: 7.3 }), /minimum \(7\.9 GHz\) must be less than its maximum \(7\.3 GHz\)/);
+    await assert.rejects(tool.execute("call-10", { ...base, frequencyMin: 7.3, frequencyMax: 7.3 }), /must be less than its maximum/);
+    await assert.rejects(tool.execute("call-11", { ...base, frequencyMax: Number.NaN }), /frequencyMax must be a finite frequency in GHz/);
+    await assert.rejects(tool.execute("call-12", { ...base, frequencyMin: Number.POSITIVE_INFINITY }), /frequencyMin must be a finite frequency in GHz/);
+  }
+  assert.equal(requests.length, 0);
+});
+
+test("both tools describe the frequency window", () => {
+  const tools = extensionTools();
+  for (const name of [REANALYZE_QUBIT_TOOL, REANALYZE_RESONATOR_TOOL]) {
+    const { properties } = tools.get(name).parameters;
+    assert.equal(properties.frequencyMin.type, "number", name);
+    assert.equal(properties.frequencyMax.type, "number", name);
+    assert.match(properties.frequencyMin.description, /GHz/);
+    assert.ok(tools.get(name).promptGuidelines.some((line) => line.includes("frequencyMin")), name);
+  }
+});
+
+test("the merged frequency window is checked, whichever field each edge came from", async (t) => {
+  const { requests, connection } = await fakeQDash(t);
+  const tools = extensionTools();
+  const base = { ...connection, chipId: "64Qv3", qid: "1", includeImage: false };
+
+  for (const name of [REANALYZE_QUBIT_TOOL, REANALYZE_RESONATOR_TOOL]) {
+    const tool = tools.get(name);
+    await assert.rejects(
+      tool.execute("call-13", { ...base, frequencyMin: 7.4, parameters: { frequency_max: 7.0 } }),
+      /minimum \(7\.4 GHz\) must be less than its maximum \(7 GHz\)/,
+    );
+    await assert.rejects(
+      tool.execute("call-14", { ...base, frequencyMax: 7.0, parameters: { frequency_min: 7.4 } }),
+      /minimum \(7\.4 GHz\) must be less than its maximum/,
+    );
+    await assert.rejects(
+      tool.execute("call-15", { ...base, parameters: { frequency_min: 7.9, frequency_max: 7.3 } }),
+      /must be less than its maximum/,
+    );
+    await assert.rejects(
+      tool.execute("call-16", { ...base, parameters: { frequency_min: "7.3" } }),
+      /parameters\.frequency_min must be a finite frequency in GHz/,
+    );
+  }
+  assert.equal(requests.length, 0);
+
+  // An override that repairs the window is accepted.
+  await tools.get(REANALYZE_QUBIT_TOOL).execute("call-17", { ...base, frequencyMin: 6.9, parameters: { frequency_min: 7.4, frequency_max: 7.0 } });
+  assert.deepEqual(requests[0].body.parameters, { frequency_min: 6.9, frequency_max: 7.0 });
+});

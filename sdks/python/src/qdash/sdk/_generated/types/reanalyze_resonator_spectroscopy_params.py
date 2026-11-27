@@ -17,6 +17,16 @@ class ReanalyzeResonatorSpectroscopyParams(UniversalBaseModel):
     :class:`EstimateResonatorFrequencyConfig`.
     """
 
+    frequency_min: typing.Optional[float] = pydantic.Field(default=None)
+    """
+    Lowest frequency (GHz) to analyze. Columns below it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Use it to exclude a spur or edge noise without measuring again.
+    """
+
+    frequency_max: typing.Optional[float] = pydantic.Field(default=None)
+    """
+    Highest frequency (GHz) to analyze. Columns above it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Must be greater than frequency_min when both are given.
+    """
+
     num_resonators: typing.Optional[int] = pydantic.Field(default=None)
     """
     Number of resonators to detect in the MUX (typically 4).

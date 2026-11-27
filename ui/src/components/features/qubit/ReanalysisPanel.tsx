@@ -54,6 +54,7 @@ export function ReanalysisPanel({ chipId, qubitId, taskName, sourceTaskId }: Rea
 
 const NUMBER_ERROR = "Must be a number";
 const POSITIVE_INTEGER_ERROR = "Must be a positive integer";
+const FREQUENCY_WINDOW_ERROR = "Must be greater than frequency_min";
 
 /** Converts a numeric text field to a number, or null when empty. */
 function toNumberOrNull(value: string): number | null {
@@ -69,10 +70,41 @@ function checkNumber(ctx: z.RefinementCtx, field: string, value: string) {
   }
 }
 
+/** Form fields of the optional frequency window (GHz) shared by both reanalyses. */
+const frequencyWindowShape = {
+  frequency_min: z.string(),
+  frequency_max: z.string(),
+};
+
+/** Adds field issues for non-finite window edges and for an empty or inverted window. */
+function checkFrequencyWindow(
+  ctx: z.RefinementCtx,
+  values: { frequency_min: string; frequency_max: string },
+) {
+  checkNumber(ctx, "frequency_min", values.frequency_min);
+  checkNumber(ctx, "frequency_max", values.frequency_max);
+  const min = toNumberOrNull(values.frequency_min);
+  const max = toNumberOrNull(values.frequency_max);
+  if (min !== null && max !== null && Number.isFinite(min) && Number.isFinite(max) && min >= max) {
+    ctx.addIssue({ code: "custom", path: ["frequency_max"], message: FREQUENCY_WINDOW_ERROR });
+  }
+}
+
+/** The frequency window as request parameters; empty edges are null. */
+function frequencyWindowParams(values: { frequency_min: string; frequency_max: string }) {
+  return {
+    frequency_min: toNumberOrNull(values.frequency_min),
+    frequency_max: toNumberOrNull(values.frequency_max),
+  };
+}
+
+const DEFAULT_FREQUENCY_WINDOW = { frequency_min: "", frequency_max: "" };
+
 // ── Resonator-spectroscopy panel ──────────────────────────────────────────
 
 const resonatorFormSchema = z
   .object({
+    ...frequencyWindowShape,
     num_resonators: z.string(),
     high_power_min: z.string(),
     high_power_max: z.string(),
@@ -81,6 +113,7 @@ const resonatorFormSchema = z
     bare_shift_strength_limit: z.string(),
   })
   .superRefine((values, ctx) => {
+    checkFrequencyWindow(ctx, values);
     const numResonators = toNumberOrNull(values.num_resonators);
     if (numResonators !== null && !(Number.isInteger(numResonators) && numResonators >= 1)) {
       ctx.addIssue({
@@ -100,6 +133,7 @@ const resonatorFormSchema = z
   .transform((values): ReanalyzeResonatorSpectroscopyParams => {
     const usingAutoBoundary = values.bare_shift_estimator_type === "high_frequency_strength";
     return {
+      ...frequencyWindowParams(values),
       num_resonators: toNumberOrNull(values.num_resonators),
       high_power_min: usingAutoBoundary ? null : toNumberOrNull(values.high_power_min),
       high_power_max: usingAutoBoundary ? null : toNumberOrNull(values.high_power_max),
@@ -115,6 +149,7 @@ type ResonatorFormInput = z.input<typeof resonatorFormSchema>;
 type ResonatorFormOutput = z.output<typeof resonatorFormSchema>;
 
 const DEFAULT_RESONATOR_FORM: ResonatorFormInput = {
+  ...DEFAULT_FREQUENCY_WINDOW,
   num_resonators: "",
   high_power_min: "",
   high_power_max: "",
@@ -170,6 +205,13 @@ function ResonatorReanalysis({
       onSubmit={handleSubmit(onValid)}
       mutation={mutation}
     >
+      <FrequencyWindowFields
+        id={id}
+        minError={errors.frequency_min?.message}
+        maxError={errors.frequency_max?.message}
+        minRegistration={register("frequency_min")}
+        maxRegistration={register("frequency_max")}
+      />
       <NumberField
         id={`${id}-num_resonators`}
         label="num_resonators"
@@ -241,6 +283,7 @@ function ResonatorReanalysis({
 
 const qubitFormSchema = z
   .object({
+    ...frequencyWindowShape,
     binarize_threshold_sigma_plus: z.string(),
     binarize_threshold_sigma_minus: z.string(),
     top_power: z.string(),
@@ -251,6 +294,7 @@ const qubitFormSchema = z
     retry_with_trim: z.boolean(),
   })
   .superRefine((values, ctx) => {
+    checkFrequencyWindow(ctx, values);
     checkNumber(ctx, "binarize_threshold_sigma_plus", values.binarize_threshold_sigma_plus);
     checkNumber(ctx, "binarize_threshold_sigma_minus", values.binarize_threshold_sigma_minus);
     checkNumber(ctx, "top_power", values.top_power);
@@ -260,6 +304,7 @@ const qubitFormSchema = z
     checkNumber(ctx, "f12_height_min", values.f12_height_min);
   })
   .transform((values): ReanalyzeQubitSpectroscopyParams => ({
+    ...frequencyWindowParams(values),
     binarize_threshold_sigma_plus: toNumberOrNull(values.binarize_threshold_sigma_plus),
     binarize_threshold_sigma_minus: toNumberOrNull(values.binarize_threshold_sigma_minus),
     top_power: toNumberOrNull(values.top_power),
@@ -274,6 +319,7 @@ type QubitFormInput = z.input<typeof qubitFormSchema>;
 type QubitFormOutput = z.output<typeof qubitFormSchema>;
 
 const DEFAULT_QUBIT_FORM: QubitFormInput = {
+  ...DEFAULT_FREQUENCY_WINDOW,
   binarize_threshold_sigma_plus: "",
   binarize_threshold_sigma_minus: "",
   top_power: "",
@@ -327,6 +373,13 @@ function QubitReanalysis({
       onSubmit={handleSubmit(onValid)}
       mutation={mutation}
     >
+      <FrequencyWindowFields
+        id={id}
+        minError={errors.frequency_min?.message}
+        maxError={errors.frequency_max?.message}
+        minRegistration={register("frequency_min")}
+        maxRegistration={register("frequency_max")}
+      />
       <NumberField
         id={`${id}-binarize_threshold_sigma_plus`}
         label="binarize_threshold_sigma_plus"
@@ -424,7 +477,8 @@ function PanelShell({ title, children, mutation, onSubmit, onReset }: PanelShell
         </div>
         <p className="text-xs text-base-content/60 mb-3">
           Re-runs the analysis on the stored spectroscopy figure with the given overrides. Empty
-          fields fall back to the original task&apos;s parameters. The DB is not modified.
+          fields fall back to the original task&apos;s parameters. A frequency window analyzes and
+          shows only that part of the sweep, for example to exclude a spur. The DB is not modified.
         </p>
 
         <form onSubmit={onSubmit} className="space-y-3">
@@ -587,6 +641,42 @@ function NumberField({ id, label, placeholder, disabled, error, registration }: 
       />
       <FieldError id={id} error={error} />
     </div>
+  );
+}
+
+interface FrequencyWindowFieldsProps {
+  id: string;
+  minError?: string;
+  maxError?: string;
+  minRegistration: UseFormRegisterReturn;
+  maxRegistration: UseFormRegisterReturn;
+}
+
+/** The frequency_min and frequency_max inputs (GHz); empty edges keep the full sweep. */
+function FrequencyWindowFields({
+  id,
+  minError,
+  maxError,
+  minRegistration,
+  maxRegistration,
+}: FrequencyWindowFieldsProps) {
+  return (
+    <>
+      <NumberField
+        id={`${id}-frequency_min`}
+        label="frequency_min (GHz)"
+        placeholder="full sweep"
+        error={minError}
+        registration={minRegistration}
+      />
+      <NumberField
+        id={`${id}-frequency_max`}
+        label="frequency_max (GHz)"
+        placeholder="full sweep"
+        error={maxError}
+        registration={maxRegistration}
+      />
+    </>
   );
 }
 

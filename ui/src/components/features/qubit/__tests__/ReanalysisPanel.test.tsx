@@ -95,6 +95,80 @@ describe("ReanalysisPanel", () => {
     expect(container.firstChild).toBeNull();
   });
 
+  describe.each([
+    ["CheckResonatorSpectroscopy", "num_resonators"],
+    ["CheckQubitSpectroscopy", "top_power (dB)"],
+  ])("%s frequency window", (task, otherField) => {
+    it("submits frequency_min and frequency_max in GHz", async () => {
+      renderPanel(task);
+      setField("frequency_min (GHz)", "7.3");
+      setField("frequency_max (GHz)", "7.9");
+      submit();
+
+      await waitFor(() => expect(mocks.mutate).toHaveBeenCalledTimes(1));
+      expect(mocks.mutate.mock.calls[0][0].data.parameters).toMatchObject({
+        frequency_min: 7.3,
+        frequency_max: 7.9,
+      });
+    });
+
+    it("submits a one-sided window", async () => {
+      renderPanel(task);
+      setField("frequency_max (GHz)", "10.4");
+      submit();
+
+      await waitFor(() => expect(mocks.mutate).toHaveBeenCalledTimes(1));
+      expect(mocks.mutate.mock.calls[0][0].data.parameters).toMatchObject({
+        frequency_min: null,
+        frequency_max: 10.4,
+      });
+    });
+
+    it.each([
+      ["7.9", "7.3"],
+      ["7.3", "7.3"],
+    ])("rejects frequency_min=%s with frequency_max=%s", async (min, max) => {
+      renderPanel(task);
+      setField("frequency_min (GHz)", min);
+      setField("frequency_max (GHz)", max);
+      submit();
+
+      const error = await screen.findByText("Must be greater than frequency_min");
+      const input = screen.getByLabelText("frequency_max (GHz)");
+      expect(input.getAttribute("aria-invalid")).toBe("true");
+      expect(input.getAttribute("aria-describedby")).toBe(error.id);
+      expect(screen.getByLabelText("frequency_min (GHz)").getAttribute("aria-invalid")).toBe(
+        "false",
+      );
+      expect(mocks.mutate).not.toHaveBeenCalled();
+    });
+
+    it("rejects a non-finite edge with a field error", async () => {
+      renderPanel(task);
+      setNonFiniteField("frequency_min (GHz)", "1e999");
+      setField("frequency_max (GHz)", "7.9");
+      submit();
+
+      expect(await screen.findByText("Must be a number")).toBeTruthy();
+      expect(screen.getByLabelText("frequency_min (GHz)").getAttribute("aria-invalid")).toBe(
+        "true",
+      );
+      expect(screen.queryByText("Must be greater than frequency_min")).toBeNull();
+      expect(mocks.mutate).not.toHaveBeenCalled();
+    });
+
+    it("clears the window on reset", async () => {
+      renderPanel(task);
+      setField("frequency_min (GHz)", "7.3");
+      setField(otherField, "4");
+      fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+
+      await waitFor(() =>
+        expect((screen.getByLabelText("frequency_min (GHz)") as HTMLInputElement).value).toBe(""),
+      );
+    });
+  });
+
   describe("resonator form", () => {
     const TASK = "CheckResonatorSpectroscopy";
 
@@ -109,6 +183,8 @@ describe("ReanalysisPanel", () => {
         data: {
           source_task_id: "task-1",
           parameters: {
+            frequency_min: null,
+            frequency_max: null,
             num_resonators: null,
             high_power_min: null,
             high_power_max: null,
@@ -133,6 +209,8 @@ describe("ReanalysisPanel", () => {
       expect(mocks.mutate.mock.calls[0][0].data).toEqual({
         source_task_id: null,
         parameters: {
+          frequency_min: null,
+          frequency_max: null,
           num_resonators: 4,
           high_power_min: -20,
           high_power_max: 0.5,
@@ -170,6 +248,8 @@ describe("ReanalysisPanel", () => {
 
       await waitFor(() => expect(mocks.mutate).toHaveBeenCalledTimes(1));
       expect(mocks.mutate.mock.calls[0][0].data.parameters).toEqual({
+        frequency_min: null,
+        frequency_max: null,
         num_resonators: null,
         high_power_min: null,
         high_power_max: null,
@@ -254,6 +334,8 @@ describe("ReanalysisPanel", () => {
 
       await waitFor(() => expect(mocks.mutate).toHaveBeenCalledTimes(1));
       expect(mocks.mutate.mock.calls[0][0].data.parameters).toEqual({
+        frequency_min: null,
+        frequency_max: null,
         binarize_threshold_sigma_plus: null,
         binarize_threshold_sigma_minus: null,
         top_power: null,
@@ -275,6 +357,8 @@ describe("ReanalysisPanel", () => {
 
       await waitFor(() => expect(mocks.mutate).toHaveBeenCalledTimes(1));
       expect(mocks.mutate.mock.calls[0][0].data.parameters).toEqual({
+        frequency_min: null,
+        frequency_max: null,
         binarize_threshold_sigma_plus: 3.5,
         binarize_threshold_sigma_minus: -2,
         top_power: null,

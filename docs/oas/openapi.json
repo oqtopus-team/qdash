@@ -42133,6 +42133,30 @@
       },
       "ReanalyzeQubitSpectroscopyParams": {
         "properties": {
+          "frequency_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frequency Min",
+            "description": "Lowest frequency (GHz) to analyze. Columns below it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Use it to exclude a spur or edge noise without measuring again."
+          },
+          "frequency_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frequency Max",
+            "description": "Highest frequency (GHz) to analyze. Columns above it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Must be greater than frequency_min when both are given."
+          },
           "binarize_threshold_sigma_plus": {
             "anyOf": [
               {
@@ -42164,7 +42188,8 @@
                 "type": "null"
               }
             ],
-            "title": "Top Power"
+            "title": "Top Power",
+            "description": "Power (dB) just above the strongest analyzed row; peak heights are measured from it. Rows at or above top_power are dropped before the analysis runs, so the returned figure shows only the rows below it."
           },
           "f01_height_min": {
             "anyOf": [
@@ -42270,6 +42295,30 @@
       },
       "ReanalyzeResonatorSpectroscopyParams": {
         "properties": {
+          "frequency_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frequency Min",
+            "description": "Lowest frequency (GHz) to analyze. Columns below it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Use it to exclude a spur or edge noise without measuring again."
+          },
+          "frequency_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frequency Max",
+            "description": "Highest frequency (GHz) to analyze. Columns above it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Must be greater than frequency_min when both are given."
+          },
           "num_resonators": {
             "anyOf": [
               {

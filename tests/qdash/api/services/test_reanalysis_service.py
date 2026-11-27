@@ -9,12 +9,16 @@ import threading
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
 import plotly.graph_objs as go
 import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 
-from qdash.analysis.spectroscopy import compute_coarse_control_amplitude
+from qdash.analysis.spectroscopy import (
+    compute_coarse_control_amplitude,
+    guess_sorted_slots_for_partial_mux,
+)
 from qdash.analysis.spectroscopy.estimate_resonator_frequency import Peak, Resonance
 from qdash.api.schemas import reanalysis as reanalysis_schema
 from qdash.api.schemas.reanalysis import (
@@ -83,6 +87,12 @@ def _is_raw(fig: go.Figure) -> bool:
 
 def _outputs(response: ReanalyzeResponse) -> dict[str, tuple[float, str]]:
     return {p.name: (p.value, p.unit) for p in response.output_parameters}
+
+
+def _assert_output(response: ReanalyzeResponse, name: str, value: float, unit: str) -> None:
+    actual_value, actual_unit = _outputs(response)[name]
+    assert actual_value == pytest.approx(value)
+    assert actual_unit == unit
 
 
 # ── Raw figure selection ────────────────────────────────────────────────────
@@ -844,3 +854,530 @@ def test_descending_inline_sweep_assigns_resonators_as_the_ascending_sweep(
     assert ascending["optimal_power"] == (-35.0, "dB")
     assert descending["readout_frequency"] == ascending["readout_frequency"]
     assert descending["optimal_power"] == ascending["optimal_power"]
+
+
+# ── top_power inside the sweep ──────────────────────────────────────────────
+
+_QUBIT_XS = [round(7.0 + 0.01 * i, 2) for i in range(101)]
+_SPUR_X = 7.1
+_F01_X = 7.6
+
+
+def _qubit_sweep(
+    *, ys: list[float] | None = None, spur: bool = False, descending: bool = False
+) -> dict[str, Any]:
+    """A qubit sweep with an f01 line at 7.6 GHz in the six highest-power rows.
+
+    With ``spur``, a taller line at 7.1 GHz spans every row, so the estimator picks
+    it as f01 unless a frequency window excludes it.
+    """
+    ys = ys or [-40.0, -35.0, -30.0, -25.0, -20.0, -15.0, -10.0, -5.0]
+    xs = list(_QUBIT_XS)
+    rng = np.random.default_rng(7)
+    zs = rng.normal(0.0, 0.02, (len(ys), len(xs)))
+    zs[len(ys) - 6 :, xs.index(_F01_X)] = 1.0
+    if spur:
+        zs[:, xs.index(_SPUR_X)] = 1.5
+    rows = zs.tolist()
+    if descending:
+        xs = xs[::-1]
+        rows = [row[::-1] for row in rows]
+    return {"data": [{"type": "heatmap", "x": xs, "y": ys, "z": rows}], "layout": {}}
+
+
+def _stored_qubit_service(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, figure: dict[str, Any]
+) -> ReanalysisService:
+    raw = set_figure_role(go.Figure(figure), "raw")
+    paths = [_write(tmp_path / "CheckQubitSpectroscopy_80_raw_1.json", raw)]
+    doc = _doc(paths, name="CheckQubitSpectroscopy")
+    service = ReanalysisService()
+    monkeypatch.setattr(service, "_load_source_doc", lambda **_: doc)
+    return service
+
+
+def _reanalyze_qubit(
+    service: ReanalysisService,
+    *,
+    figure: dict[str, Any] | None = None,
+    **parameters: Any,
+) -> ReanalyzeResponse:
+    return service.reanalyze_qubit_spectroscopy(
+        project_id="p",
+        chip_id="chip",
+        qid="80",
+        params=ReanalyzeQubitSpectroscopyParams(**parameters),
+        figure=figure,
+    )
+
+
+@pytest.mark.parametrize(
+    "ys",
+    [
+        [-40.0, -35.0, -30.0, -25.0, -20.0, -15.0, -10.0, -5.0],
+        [-60.0, -55.0, -50.0, -45.0, -40.0, -35.0, -30.0, -25.0, -20.0, -15.0, -10.0, -5.0],
+    ],
+)
+def test_stored_qubit_reanalysis_with_top_power_at_the_highest_row(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ys: list[float]
+) -> None:
+    # Regression: top_power equal to the sweep's highest row (-5 dB) made the estimator
+    # raise ValueError("`top_power` must be greater than ..."), which a stored result
+    # propagated as HTTP 500 before retry_with_trim could run.
+    service = _stored_qubit_service(monkeypatch, tmp_path, _qubit_sweep(ys=ys))
+
+    response = _reanalyze_qubit(service, top_power=-5.0, f01_height_min=8.0, retry_with_trim=True)
+
+    _assert_output(response, "coarse_qubit_frequency", _F01_X, "GHz")
+    # The -5 dB row is the ceiling now, so the analyzed figure stops below it.
+    assert max(response.figure["data"][0]["y"]) == -10.0
+
+
+def test_top_power_inside_the_sweep_drops_the_rows_at_or_above_it(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    service = _stored_qubit_service(monkeypatch, tmp_path, _qubit_sweep())
+
+    response = _reanalyze_qubit(service, top_power=-12.0, f01_height_min=8.0)
+
+    assert response.figure["data"][0]["y"] == [-40.0, -35.0, -30.0, -25.0, -20.0, -15.0]
+    _assert_output(response, "coarse_qubit_frequency", _F01_X, "GHz")
+
+
+@pytest.mark.parametrize("inline", [False, True])
+@pytest.mark.parametrize("top_power", [-35.0, -40.0, -80.0])
+def test_top_power_leaving_fewer_than_two_rows_is_a_422(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, top_power: float, inline: bool
+) -> None:
+    figure = _qubit_sweep()
+    service = _stored_qubit_service(monkeypatch, tmp_path, figure)
+
+    with pytest.raises(HTTPException) as excinfo:
+        _reanalyze_qubit(
+            service, figure=figure if inline else None, top_power=top_power, retry_with_trim=True
+        )
+
+    assert excinfo.value.status_code == 422
+    assert "fewer than 2 power rows" in str(excinfo.value.detail)
+
+
+def test_invalid_qubit_analysis_parameter_on_a_stored_result_is_a_422(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    service = _stored_qubit_service(monkeypatch, tmp_path, _qubit_sweep())
+
+    with pytest.raises(HTTPException) as excinfo:
+        _reanalyze_qubit(service, binarize_threshold_sigma_plus=-1.0)
+
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.detail == "Invalid analysis configuration parameters."
+
+
+@pytest.mark.parametrize("top_power", [float("inf"), float("nan")])
+def test_top_power_must_be_finite(top_power: float) -> None:
+    with pytest.raises(ValidationError, match="finite number"):
+        ReanalyzeQubitSpectroscopyParams(top_power=top_power)
+
+
+# ── Frequency window ────────────────────────────────────────────────────────
+
+
+def test_qubit_frequency_window_excludes_a_spur_on_a_stored_result(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    service = _stored_qubit_service(monkeypatch, tmp_path, _qubit_sweep(spur=True))
+
+    unwindowed = _reanalyze_qubit(service)
+    windowed = _reanalyze_qubit(service, frequency_min=7.3, frequency_max=7.9)
+
+    _assert_output(unwindowed, "coarse_qubit_frequency", _SPUR_X, "GHz")
+    _assert_output(windowed, "coarse_qubit_frequency", _F01_X, "GHz")
+    # The marked figure shows only the analyzed window, with its markers.
+    heatmap = windowed.figure["data"][0]
+    assert heatmap["x"][0] == pytest.approx(7.3)
+    assert heatmap["x"][-1] == pytest.approx(7.9)
+    assert all(len(row) == len(heatmap["x"]) for row in heatmap["z"])
+    markers = [trace for trace in windowed.figure["data"][1:] if trace.get("mode") == "markers"]
+    assert markers[0]["x"] == [pytest.approx(_F01_X)]
+
+
+@pytest.mark.parametrize("descending", [False, True])
+def test_qubit_frequency_window_on_an_inline_figure(descending: bool) -> None:
+    service = ReanalysisService()
+
+    response = _reanalyze_qubit(
+        service, figure=_qubit_sweep(spur=True, descending=descending), frequency_min=7.3
+    )
+
+    _assert_output(response, "coarse_qubit_frequency", _F01_X, "GHz")
+    xs = response.figure["data"][0]["x"]
+    assert xs == sorted(xs)
+    assert xs[0] == pytest.approx(7.3)
+    assert xs[-1] == pytest.approx(8.0)
+
+
+def test_frequency_window_keeps_edges_despite_float_rounding() -> None:
+    fig = go.Figure(go.Heatmap(x=[7.0, 7.1, 7.2, 7.3], y=[-20.0, -10.0], z=[[0.0] * 4] * 2))
+
+    windowed = module._apply_frequency_window(fig, 0.1 + 7.0, 7.2)
+
+    assert list(windowed.data[0].x) == [7.1, 7.2]
+
+
+def test_frequency_window_resets_a_fixed_x_range() -> None:
+    fig = go.Figure(go.Heatmap(x=[7.0, 7.1, 7.2, 7.3], y=[-20.0, -10.0], z=[[0.0] * 4] * 2))
+    fig.update_xaxes(range=[7.0, 7.3])
+
+    windowed = module._apply_frequency_window(fig, 7.1, None)
+
+    assert list(windowed.layout.xaxis.range) == [7.1, 7.3]
+    # The source figure is left as it was.
+    assert list(fig.data[0].x) == [7.0, 7.1, 7.2, 7.3]
+
+
+def _resonator_sweep_with_spur() -> dict[str, Any]:
+    """Four resonances at 6.0-6.3 GHz and a stronger spur at 5.8 GHz."""
+    sweep = _resonator_sweep(descending=False)
+    trace = sweep["data"][0]
+    trace["x"] = [5.8, *trace["x"]]
+    trace["z"] = [[3.0 if index == 7 else 0.0, *row] for index, row in enumerate(trace["z"])]
+    return sweep
+
+
+def _strongest_columns(fig: go.Figure, config: Any) -> Any:
+    """Fake estimator: one resonance per strongest column, num_resonators of them."""
+    trace = fig.data[0]
+    xs = list(trace.x)
+    zs = [list(row) for row in trace.z]
+    strengths = [max(row[column] for row in zs) for column in range(len(xs))]
+    columns = sorted(
+        sorted(range(len(xs)), key=lambda column: -strengths[column])[: config.num_resonators]
+    )
+    resonances = []
+    for column in columns:
+        values = [row[column] for row in zs]
+        peak = Peak(x=column, y=values.index(max(values)), prominence=1.0)
+        resonances.append(Resonance(high_power_peaks=None, low_power_peak=peak))
+    return resonances, [], [xs[column] for column in columns]
+
+
+@pytest.mark.parametrize("inline", [False, True])
+def test_resonator_frequency_window_excludes_a_spur(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, inline: bool
+) -> None:
+    sweep = _resonator_sweep_with_spur()
+    raw = set_figure_role(go.Figure(sweep), "raw")
+    doc = _doc(
+        [_write(tmp_path / "CheckResonatorSpectroscopy_1_raw_1.json", raw)],
+        name="CheckResonatorSpectroscopy",
+    )
+    service = ReanalysisService()
+    monkeypatch.setattr(service, "_load_source_doc", lambda **_: doc)
+    monkeypatch.setattr(module, "estimate_resonator_frequency_from_figure", _strongest_columns)
+    monkeypatch.setattr(module, "estimate_minimum_usable_power", lambda *_a, **_k: -60.0)
+
+    def reanalyze(
+        *, frequency_min: float | None = None, frequency_max: float | None = None
+    ) -> ReanalyzeResponse:
+        return service.reanalyze_resonator_spectroscopy(
+            project_id="p",
+            chip_id="chip",
+            qid="1",
+            params=ReanalyzeResonatorSpectroscopyParams(
+                bare_shift_estimator_type="config",
+                frequency_min=frequency_min,
+                frequency_max=frequency_max,
+            ),
+            figure=sweep if inline else None,
+        )
+
+    unwindowed = reanalyze()
+    windowed = reanalyze(frequency_min=5.9, frequency_max=6.35)
+
+    assert _outputs(unwindowed)["readout_frequency"] != (6.3, "GHz")
+    outputs = _outputs(windowed)
+    assert outputs["readout_frequency"] == (6.3, "GHz")
+    assert outputs["optimal_power"] == (-35.0, "dB")
+    assert windowed.figure["data"][0]["x"] == [6.0, 6.1, 6.2, 6.3]
+
+
+@pytest.mark.parametrize(
+    ("frequency_min", "frequency_max"),
+    [(6.3, 6.3), (6.4, 6.0)],
+)
+def test_frequency_min_must_be_below_frequency_max(
+    frequency_min: float, frequency_max: float
+) -> None:
+    for params in (ReanalyzeQubitSpectroscopyParams, ReanalyzeResonatorSpectroscopyParams):
+        with pytest.raises(ValidationError, match="frequency_min must be less than"):
+            params(frequency_min=frequency_min, frequency_max=frequency_max)
+
+
+@pytest.mark.parametrize("value", [float("inf"), float("-inf"), float("nan"), 10**309])
+def test_frequency_window_must_be_finite(value: Any) -> None:
+    for params in (ReanalyzeQubitSpectroscopyParams, ReanalyzeResonatorSpectroscopyParams):
+        with pytest.raises(ValidationError):
+            params(frequency_min=value)
+        with pytest.raises(ValidationError):
+            params(frequency_max=value)
+
+
+def test_frequency_window_is_validated_in_the_request_body() -> None:
+    with pytest.raises(ValidationError, match="frequency_min must be less than"):
+        ReanalyzeResonatorSpectroscopyRequest.model_validate(
+            {"parameters": {"frequency_min": 6.2, "frequency_max": 6.1}}
+        )
+
+
+@pytest.mark.parametrize("inline", [False, True])
+@pytest.mark.parametrize(
+    "window",
+    [
+        {"frequency_min": 9.0},
+        {"frequency_max": 6.5},
+        {"frequency_min": 7.505, "frequency_max": 7.515},
+    ],
+)
+def test_frequency_window_with_fewer_than_two_points_is_a_422(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, window: dict[str, float], inline: bool
+) -> None:
+    figure = _qubit_sweep()
+    service = _stored_qubit_service(monkeypatch, tmp_path, figure)
+
+    with pytest.raises(HTTPException) as excinfo:
+        _reanalyze_qubit(service, figure=figure if inline else None, **window)
+
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.detail == (
+        "Frequency window leaves fewer than 2 frequency points to analyze."
+    )
+
+
+def test_resonator_frequency_window_with_fewer_than_two_points_is_a_422() -> None:
+    with pytest.raises(HTTPException) as excinfo:
+        ReanalysisService().reanalyze_resonator_spectroscopy(
+            project_id="p",
+            chip_id="chip",
+            qid="1",
+            params=ReanalyzeResonatorSpectroscopyParams(frequency_min=6.25),
+            figure=_resonator_sweep(descending=True),
+        )
+
+    assert excinfo.value.status_code == 422
+    assert "fewer than 2 frequency points" in str(excinfo.value.detail)
+
+
+SENSITIVE_PATH = "/private/server/calibration.json"
+
+
+def test_invalid_stored_qubit_parameter_is_a_422_without_its_value(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    raw = set_figure_role(go.Figure(_qubit_sweep()), "raw")
+    doc = _doc(
+        [_write(tmp_path / "CheckQubitSpectroscopy_80_raw_1.json", raw)],
+        name="CheckQubitSpectroscopy",
+        run_parameters={"top_power": {"value": SENSITIVE_PATH, "value_type": "str"}},
+    )
+    service = ReanalysisService()
+    monkeypatch.setattr(service, "_load_source_doc", lambda **_: doc)
+
+    with pytest.raises(HTTPException) as excinfo:
+        _reanalyze_qubit(service)
+
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.detail == "Invalid analysis configuration parameters."
+    assert SENSITIVE_PATH not in str(excinfo.value.detail)
+    # The cause stays in the server log.
+    assert any(
+        record.exc_info and SENSITIVE_PATH in str(record.exc_info[1]) for record in caplog.records
+    )
+
+
+def test_invalid_stored_resonator_parameter_is_a_422_without_its_value(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    raw = set_figure_role(go.Figure(_resonator_sweep(descending=False)), "raw")
+    doc = _doc(
+        [_write(tmp_path / "CheckResonatorSpectroscopy_1_raw_1.json", raw)],
+        name="CheckResonatorSpectroscopy",
+        run_parameters={"num_resonators": {"value": SENSITIVE_PATH, "value_type": "str"}},
+    )
+    service = ReanalysisService()
+    monkeypatch.setattr(service, "_load_source_doc", lambda **_: doc)
+
+    with pytest.raises(HTTPException) as excinfo:
+        service.reanalyze_resonator_spectroscopy(
+            project_id="p",
+            chip_id="chip",
+            qid="1",
+            params=ReanalyzeResonatorSpectroscopyParams(bare_shift_estimator_type="config"),
+        )
+
+    assert excinfo.value.status_code == 422
+    assert SENSITIVE_PATH not in str(excinfo.value.detail)
+
+
+def _mux_sweep(xs: list[float], resonances: list[float]) -> dict[str, Any]:
+    """A sweep over ``xs`` with one resonance per frequency in ``resonances``.
+
+    Each resonance peaks on its own power row, so each has its own optimal power.
+    """
+    ys = [-60.0, -55.0, -50.0, -45.0, -40.0, -35.0, -30.0, -25.0]
+    peak_rows = {xs.index(frequency): 2 + index for index, frequency in enumerate(resonances)}
+    zs = [
+        [1.0 if peak_rows.get(column) == row else 0.0 for column in range(len(xs))]
+        for row in range(len(ys))
+    ]
+    return {"data": [{"type": "heatmap", "x": xs, "y": ys, "z": zs}], "layout": {}}
+
+
+def _nonzero_columns(fig: go.Figure, _config: Any) -> Any:
+    """Fake estimator: one resonance per column that has any signal."""
+    trace = fig.data[0]
+    xs = list(trace.x)
+    zs = [list(row) for row in trace.z]
+    resonances = []
+    frequencies = []
+    for column in range(len(xs)):
+        values = [row[column] for row in zs]
+        if max(values) > 0:
+            peak = Peak(x=column, y=values.index(max(values)), prominence=1.0)
+            resonances.append(Resonance(high_power_peaks=None, low_power_peak=peak))
+            frequencies.append(xs[column])
+    return resonances, [], frequencies
+
+
+_QIDS = ("0", "1", "2", "3")
+
+
+def _mux_service(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, sweep: dict[str, Any], *, inline: bool
+) -> tuple[Any, list[str]]:
+    """A reanalysis function of (qid, window) on ``sweep``, and the assignment modes seen."""
+    raw = set_figure_role(go.Figure(sweep), "raw")
+    doc = _doc(
+        [_write(tmp_path / "CheckResonatorSpectroscopy_1_raw_1.json", raw)],
+        name="CheckResonatorSpectroscopy",
+    )
+    service = ReanalysisService()
+    monkeypatch.setattr(service, "_load_source_doc", lambda **_: doc)
+    monkeypatch.setattr(module, "estimate_resonator_frequency_from_figure", _nonzero_columns)
+    monkeypatch.setattr(module, "estimate_minimum_usable_power", lambda *_a, **_k: -60.0)
+    modes: list[str] = []
+    original_guess = guess_sorted_slots_for_partial_mux
+
+    def record_guess(xs: list[float], frequencies: list[float]) -> Any:
+        slots, mode = original_guess(xs, frequencies)
+        modes.append(mode)
+        return slots, mode
+
+    monkeypatch.setattr(module, "guess_sorted_slots_for_partial_mux", record_guess)
+
+    def reanalyze(
+        qid: str, *, frequency_min: float | None = None, frequency_max: float | None = None
+    ) -> ReanalyzeResponse:
+        return service.reanalyze_resonator_spectroscopy(
+            project_id="p",
+            chip_id="chip",
+            qid=qid,
+            params=ReanalyzeResonatorSpectroscopyParams(
+                bare_shift_estimator_type="config",
+                frequency_min=frequency_min,
+                frequency_max=frequency_max,
+            ),
+            figure=sweep if inline else None,
+        )
+
+    return reanalyze, modes
+
+
+def _labels(response: ReanalyzeResponse) -> set[str]:
+    return {a["text"] for a in response.figure["layout"].get("annotations", [])}
+
+
+def _stars(response: ReanalyzeResponse) -> int:
+    return sum(
+        1 for trace in response.figure["data"] if trace.get("marker", {}).get("symbol") == "star"
+    )
+
+
+@pytest.mark.parametrize("inline", [False, True])
+def test_frequency_window_that_drops_a_resonance_leaves_the_mux_unassigned(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, inline: bool
+) -> None:
+    # Regression: cropping 6.0 GHz out of a full MUX left 6.1-6.2-6.3 GHz, which the
+    # partial-MUX guess put in slots 0-2, so qubit 0 got its neighbor's 6.1 GHz.
+    sweep = _mux_sweep([5.9, 6.0, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6], [6.0, 6.1, 6.2, 6.3])
+    reanalyze, modes = _mux_service(monkeypatch, tmp_path, sweep, inline=inline)
+
+    whole = {qid: _outputs(reanalyze(qid))["readout_frequency"][0] for qid in _QIDS}
+    assert sorted(whole.values()) == [6.0, 6.1, 6.2, 6.3]
+    assert set(modes) == {"full"}
+
+    modes.clear()
+    for qid in _QIDS:
+        cropped = reanalyze(qid, frequency_min=6.05)
+
+        assert cropped.figure["data"][0]["x"] == [6.1, 6.2, 6.3, 6.4, 6.5, 6.6]
+        # No qubit takes a resonance: the window may have dropped any slot's.
+        assert _outputs(cropped) == {"readout_frequency": (0.0, "GHz")}, qid
+        assert not any(label.startswith("Q") for label in _labels(cropped)), qid
+        assert module.WINDOWED_PARTIAL_MUX_MODE in _labels(cropped)
+        # The detected resonances are still marked for inspection.
+        assert _stars(cropped) == 3
+    assert modes == []
+
+
+@pytest.mark.parametrize("inline", [False, True])
+def test_frequency_window_that_keeps_every_resonance_assigns_them_all(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, inline: bool
+) -> None:
+    sweep = _mux_sweep([5.9, 6.0, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6], [6.0, 6.1, 6.2, 6.3])
+    reanalyze, modes = _mux_service(monkeypatch, tmp_path, sweep, inline=inline)
+
+    for qid in _QIDS:
+        whole = reanalyze(qid)
+        cropped = reanalyze(qid, frequency_min=5.95, frequency_max=6.35)
+
+        assert cropped.figure["data"][0]["x"] == [6.0, 6.1, 6.2, 6.3]
+        assert _outputs(cropped) == _outputs(whole), qid
+        assert _labels(cropped) == _labels(whole), qid
+    assert set(modes) == {"full"}
+
+
+@pytest.mark.parametrize("inline", [False, True])
+def test_frequency_window_on_a_partial_mux_leaves_it_unassigned(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, inline: bool
+) -> None:
+    # Three resonances at 6.0-6.2 GHz in a 5.9-6.4 GHz sweep take slots 0-2. Cropped to
+    # 6.0-6.2 GHz, the cropped center put them in slots 1-3; now they stay unassigned.
+    sweep = _mux_sweep([5.9, 6.0, 6.1, 6.2, 6.3, 6.4], [6.0, 6.1, 6.2])
+    reanalyze, modes = _mux_service(monkeypatch, tmp_path, sweep, inline=inline)
+
+    whole = [_outputs(reanalyze(qid))["readout_frequency"][0] for qid in _QIDS]
+    assert sorted(value for value in whole if value) == [6.0, 6.1, 6.2]
+    assert set(modes) == {"right-edge-missing-cluster-left"}
+
+    for qid in _QIDS:
+        cropped = reanalyze(qid, frequency_min=6.0, frequency_max=6.2)
+
+        assert cropped.figure["data"][0]["x"] == [6.0, 6.1, 6.2]
+        assert _outputs(cropped) == {"readout_frequency": (0.0, "GHz")}, qid
+        assert module.WINDOWED_PARTIAL_MUX_MODE in _labels(cropped)
+
+
+@pytest.mark.parametrize("inline", [False, True])
+def test_frequency_window_that_trims_nothing_keeps_the_partial_mux_guess(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, inline: bool
+) -> None:
+    sweep = _mux_sweep([5.9, 6.0, 6.1, 6.2, 6.3, 6.4], [6.0, 6.1, 6.2])
+    reanalyze, modes = _mux_service(monkeypatch, tmp_path, sweep, inline=inline)
+
+    for qid in _QIDS:
+        whole = reanalyze(qid)
+        windowed = reanalyze(qid, frequency_min=5.0, frequency_max=7.0)
+
+        assert _outputs(windowed) == _outputs(whole), qid
+        assert _labels(windowed) == _labels(whole), qid
+    assert set(modes) == {"right-edge-missing-cluster-left"}

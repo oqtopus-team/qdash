@@ -58,7 +58,7 @@ saved-workflow tools do not report such responses as successfully started.
 | `qdash_list_forum_posts`, `qdash_get_forum_post`, `qdash_list_forum_replies` | Forum posts and replies. |
 | `qdash_list_source_roots`, `qdash_search_source`, `qdash_read_source` | Source trees the server serves with their revisions, literal search of contents or paths, and up to 400 numbered lines of one file. A traceback path such as `/app/qdash/workflow/x.py` is mapped onto its root. |
 | `qdash_get_figure`, `qdash_get_task_figures`, `qdash_recent_calibration_figure`, `qdash_analyze_figure_json`, `qdash_build_qcal_evidence` | Figure retrieval, analysis, and evaluation evidence. |
-| `qdash_reanalyze_resonator_spectroscopy`, `qdash_reanalyze_qubit_spectroscopy` | A preview of a stored spectroscopy result analyzed again with the overrides in `parameters`: the re-estimated seed outputs and, unless `includeImage` is false, the marked figure as a PNG. Accepts `qid`, optional `chipId`, and either `sourceTaskId` or an inline raw Plotly `figure`. Deferred, read-only, and available in scripts. |
+| `qdash_reanalyze_resonator_spectroscopy`, `qdash_reanalyze_qubit_spectroscopy` | A preview of a stored spectroscopy result analyzed again with the overrides in `parameters`: the re-estimated seed outputs and, unless `includeImage` is false, the marked figure as a PNG. Accepts `qid`, optional `chipId`, either `sourceTaskId` or an inline raw Plotly `figure`, and an optional frequency window, `frequencyMin` and `frequencyMax` in GHz. Deferred, read-only, and available in scripts. |
 
 Lists are paginated: task results and executions accept `skip` and `limit` (1–100).
 Executions require one chip and support `date` (`YYYYMMDD`) and `timezone`, not flow/status filters.
@@ -91,7 +91,18 @@ plain lists of finite numbers on a grid of at least 2 x 2, must not be labeled a
 at most 20 MiB as JSON. QDash keeps only that heatmap and plain-text titles, so other traces and
 layout content such as images are dropped before analysis and rendering; stored run parameters do not apply
 to it, and the response's `source_task_id` is null. Passing both `sourceTaskId` and `figure`
-fails. The resonator tool returns `readout_frequency`, `optimal_power` (dB), and
+fails. `frequencyMin` and `frequencyMax` are sent as the `frequency_min` and `frequency_max`
+parameters and take precedence over them: QDash drops the heatmap columns outside the window
+before the analysis, so a spur or edge noise can be excluded without measuring again, and the
+returned figure shows only the window. A merged window whose minimum is not below its maximum,
+or a bound that is not a finite number, fails before any request; a window that leaves fewer
+than 2 frequency points fails with HTTP 422. When the resonator tool's window cuts the sweep and
+fewer than 4 resonances remain, no qubit is assigned a resonance (`readout_frequency` is 0 and
+the figure is labeled `unassigned-partial-mux-in-frequency-window`), because the window may
+have dropped any of the missing ones; a window that keeps all 4 assigns them as usual. For the
+qubit tool, power rows at or above
+`top_power` are dropped before the analysis, and a `top_power` that leaves fewer than 2 rows
+fails with HTTP 422. The resonator tool returns `readout_frequency`, `optimal_power` (dB), and
 `readout_amplitude` (a.u.); the qubit tool returns `coarse_qubit_frequency` (also as
 `qubit_frequency`), `coarse_control_amplitude`, `f01_repr_db`, `f01_quality_level`, and
 `qubit_anharmonicity` when f12 is found. The image is recorded under the source task's name, so
