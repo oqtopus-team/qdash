@@ -219,3 +219,23 @@ def test_select_delay_uses_observed_duration_when_ringdown_broadens_pulse():
     final = finalize_delay(verification, selection, center=center)
     assert final.reason == "ready"
     assert final.final_total_ns == total_delay_ns(8, 12)
+
+
+def test_analyze_waveform_handles_phase_rotation_during_pulse():
+    """Dispersive phase rotation across the pulse must not reject valid amplitude edges."""
+    rng = np.random.default_rng(7)
+    time = np.arange(SAMPLES) * SAMPLING_NS
+    start = 1400.0 - total_delay_ns(9, 0)
+    envelope = 0.5 * (np.tanh((time - start) / 6) - np.tanh((time - start - DURATION_NS) / 6))
+    # Rotate complex phase by 2*pi across the pulse (e.g. off-resonant filter dispersion).
+    phase = 2 * np.pi * (time - start) / DURATION_NS
+    noise = rng.normal(size=SAMPLES) + 1j * rng.normal(size=SAMPLES)
+    iq = envelope * 0.3 * np.exp(1j * phase) + 0.005 * noise
+    wf = Waveform(0, "Q48", total_delay_ns(9, 0), time, iq, DURATION_NS)
+
+    result = analyze_waveform(wf, snr_threshold=5.0, smoothing=5)
+
+    assert result.success
+    assert result.edge_kind == "both"
+    assert result.rise_ns == pytest.approx(start, abs=2)
+    assert result.fall_ns == pytest.approx(start + DURATION_NS, abs=2)
