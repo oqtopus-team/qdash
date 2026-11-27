@@ -1124,8 +1124,8 @@ export function ForumPageContent() {
         )}
       </PageFiltersBar>
 
-      {showCategoryManager && isOwner && (
-        <div className="card bg-base-200 shadow-sm mb-4">
+      {isOwner && (
+        <div className="card bg-base-200 shadow-sm mb-4" hidden={!showCategoryManager}>
           <div className="card-body">
             <div className="flex items-center justify-between gap-3">
               <h2 className="card-title">Forum Categories</h2>
