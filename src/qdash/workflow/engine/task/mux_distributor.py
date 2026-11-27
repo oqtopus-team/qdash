@@ -188,8 +188,10 @@ class MuxDistributor:
                 backend, self._execution_id, run_result, target_qid
             )
 
+            validation_error = postprocess_result.validation_error if postprocess_result else None
             if postprocess_result:
-                if postprocess_result.output_parameters:
+                # A rejected result keeps its figures for review but publishes nothing.
+                if postprocess_result.output_parameters and not validation_error:
                     task_model = self._state_manager.get_task(task_name, task_type, target_qid)
                     task.attach_task_id(task_model.task_id)
                     processed_params = self._result_processor.process_output_parameters(
@@ -214,11 +216,23 @@ class MuxDistributor:
                         task_name, task_type, target_qid, png_paths, json_paths
                     )
 
-                self._backend_saver.save_mux_qid(task, execution_service, target_qid, backend)
+                if not validation_error:
+                    self._backend_saver.save_mux_qid(task, execution_service, target_qid, backend)
 
-            self._state_manager.update_task_status_to_completed(
-                task_name, f"{task_name} completed (MUX distribution)", task_type, target_qid
-            )
+            if validation_error:
+                logger.warning(
+                    "MUX result rejected for qid=%s (task=%s): %s",
+                    target_qid,
+                    task_name,
+                    validation_error,
+                )
+                self._state_manager.update_task_status_to_failed(
+                    task_name, validation_error, task_type, target_qid
+                )
+            else:
+                self._state_manager.update_task_status_to_completed(
+                    task_name, f"{task_name} completed (MUX distribution)", task_type, target_qid
+                )
 
         except Exception as e:
             logger.warning(

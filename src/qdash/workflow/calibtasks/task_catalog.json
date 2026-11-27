@@ -6140,6 +6140,90 @@
         "task_type": "qubit"
       },
       {
+        "class_name": "CheckResonatorQubitMapping",
+        "description": "MUX-level check of which resonator reads which qubit. It takes the readout settings stored on the MUX's qubits as resonator candidates, runs a coarse 1D high-power qubit spectroscopy for every qubit and candidate pair one at a time, and solves the one-to-one assignment with the strongest responses. Each qubit whose mapping is unambiguous gets its candidate's resonator_frequency (also published as readout_frequency), readout_amplitude and optimal_power. It does not estimate qubit frequencies.",
+        "documentation": {
+          "description": "MUX-level check of which resonator reads which qubit. It takes the readout settings stored on the MUX's qubits as resonator candidates, runs a coarse 1D high-power qubit spectroscopy for every qubit and candidate pair one at a time, and solves the one-to-one assignment with the strongest responses. Each qubit whose mapping is unambiguous gets its candidate's resonator_frequency (also published as readout_frequency), readout_amplitude and optimal_power. It does not estimate qubit frequencies.",
+          "prerequisites": [
+            "readout_frequency (or resonator_frequency) and readout_amplitude are stored on at least two qubits of the MUX, normally by CheckResonatorSpectroscopy."
+          ],
+          "when_to_use": "Run it after CheckResonatorSpectroscopy and before CheckQubitSpectroscopy when the MUX's resonator frequency order is unknown or suspected to be wrong. A qubit with no response or an ambiguous response fails and keeps its stored values."
+        },
+        "file_path": "cw/check_resonator_qubit_mapping.py",
+        "input_parameters": {
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
+            "resolution": "database_required",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckResonatorQubitMapping",
+        "output_parameters": [
+          "resonator_frequency",
+          "readout_amplitude",
+          "optimal_power"
+        ],
+        "run_parameters": {
+          "drive_power": {
+            "description": "Drive power in dB, at most 0 dB. The default 0 dB is control amplitude 1.0.",
+            "unit": "dB",
+            "value": 0.0,
+            "value_type": "float"
+          },
+          "frequency_range": {
+            "description": "Drive frequency range as [start, stop, step] in GHz. Leave blank to use the connected control box's qubex default band with frequency_step as the step.",
+            "unit": "GHz",
+            "value": null,
+            "value_type": "np.arange"
+          },
+          "frequency_step": {
+            "description": "Drive frequency step in GHz used when frequency_range is blank. The default 0.020 GHz is coarse because the high-power response is broad.",
+            "unit": "GHz",
+            "value": 0.02,
+            "value_type": "float"
+          },
+          "interval": {
+            "description": "Time interval between shots",
+            "unit": "ns",
+            "value": 1024.0,
+            "value_type": "float"
+          },
+          "min_margin_ratio": {
+            "description": "Minimum ratio by which a qubit's selected assignment must beat every alternative that moves the qubit. Lower margins are reported as ambiguous.",
+            "unit": "a.u.",
+            "value": 2.0,
+            "value_type": "float"
+          },
+          "min_response_score": {
+            "description": "Minimum trace score of a significant response. The score is the area of the robust phase z-score above 3 sigma, so pure noise scores near 0.",
+            "unit": "a.u.",
+            "value": 5.0,
+            "value_type": "float"
+          },
+          "shots": {
+            "description": "Number of shots per drive frequency",
+            "unit": "a.u.",
+            "value": 512,
+            "value_type": "int"
+          },
+          "simultaneous_drive": {
+            "description": "Whether control and readout pulses start together. False starts readout after the control pulse ends.",
+            "unit": "a.u.",
+            "value": true,
+            "value_type": "bool"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
         "class_name": "CheckResonatorSpectroscopy",
         "description": "MUX-level 2D readout frequency and power sweep that locates each resonator of the MUX and the power at which it shifts to its bare (punched-out) frequency. It writes resonator_frequency (also published as readout_frequency) and a readout_amplitude derived from an optimal power set a margin below that power boundary.",
         "documentation": {
