@@ -28,7 +28,9 @@ Enter a **Chip ID** and select **Create Chip**. QDash opens **New Flow** with th
 3. Select **Save Flow**.
 4. Select **Execute**, check the chip in the confirmation, then select **Execute** again.
 
-![Reviewing the flow and its targets](/images/guides/first-calibration-review-flow.gif)
+![Reviewing the flow and its targets, MUX 0-3 of the chip](/images/guides/first-calibration-review-flow.gif)
+
+![Executing the saved flow on the chip and MUX 0-3](/images/guides/first-calibration-execute.gif)
 
 ### Follow Progress
 
@@ -36,15 +38,31 @@ The guide opens **Execution** and shows progress. If the run fails or is cancell
 **Open the run** to inspect the message before **Run again**. See [Operations](./operations.md)
 if the services are unavailable.
 
+![Following the run on Execution while tasks complete](/images/guides/first-calibration-follow-progress.gif)
+
 ### Inspect a Result
 
-When the run finishes, open the highlighted completed task. Review its figure and **Output
-Parameters**, then close the preview.
+When the run finishes, open the highlighted completed task.
+
+![Opening the CheckT1 result from the execution flow](/images/guides/first-calibration-open-result.gif)
+
+Review its figure and **Output Parameters**.
+
+![Reading the CheckT1 figure and its output parameters](/images/guides/first-calibration-read-result.gif)
+
+Close the preview to continue.
+
+![Closing the result preview](/images/guides/first-calibration-close-preview.gif)
 
 ### Open the Chip Overview
 
-Open the chip on **Chip**. Each tile shows the latest result of the selected task. This completes
-the guide; Home keeps links to the result and overview.
+Open the chip on **Chip**. Each tile shows the latest result of the selected task.
+
+![Opening the chip overview on Chip](/images/guides/first-calibration-chip-overview.gif)
+
+This completes the guide; Home keeps links to the result and overview.
+
+![Home after the guide, with links to the result and the chip overview](/images/guides/first-calibration-complete.gif)
 
 ## On a Qubex Deployment
 
