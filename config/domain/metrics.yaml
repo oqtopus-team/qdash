@@ -88,6 +88,30 @@ qubit_metrics:
         max: -200
         step: 1
 
+  charging_energy:
+    title: EC
+    unit: GHz
+    scale: 1
+    description: Charging energy estimated from the GE, EF, and FH transition frequencies
+    evaluation:
+      mode: none
+
+  josephson_energy_first_harmonic:
+    title: EJ1
+    unit: GHz
+    scale: 1
+    description: First Josephson harmonic estimated from the GE, EF, and FH transition frequencies
+    evaluation:
+      mode: none
+
+  josephson_energy_second_harmonic:
+    title: EJ2
+    unit: GHz
+    scale: 1
+    description: Second Josephson harmonic estimated from the GE, EF, and FH transition frequencies
+    evaluation:
+      mode: none
+
   t1:
     title: T1
     unit: μs

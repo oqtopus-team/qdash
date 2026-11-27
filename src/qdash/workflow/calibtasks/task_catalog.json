@@ -1766,9 +1766,9 @@
       },
       {
         "class_name": "CheckAdaptiveFHChevron",
-        "description": "Prepares the second excited state with the session's GE and EF pulses and runs an adaptive chevron on the f-to-h transition. It writes fh_frequency (also published as control_frequency_fh).",
+        "description": "Prepares the second excited state with the session's GE and EF pulses and runs an adaptive chevron on the f-to-h transition. It writes fh_frequency (also published as control_frequency_fh) and estimates EC, EJ1, and EJ2 from the GE, EF, and FH frequencies when the fit meets the residual limit. It skips the energy outputs when different energies reproduce the same transition spectrum.",
         "documentation": {
-          "description": "Prepares the second excited state with the session's GE and EF pulses and runs an adaptive chevron on the f-to-h transition. It writes fh_frequency (also published as control_frequency_fh).",
+          "description": "Prepares the second excited state with the session's GE and EF pulses and runs an adaptive chevron on the f-to-h transition. It writes fh_frequency (also published as control_frequency_fh) and estimates EC, EJ1, and EJ2 from the GE, EF, and FH frequencies when the fit meets the residual limit. It skips the energy outputs when different energies reproduce the same transition spectrum.",
           "prerequisites": [
             "GE, EF, and FH drive targets in the current session: configuration_mode ge-ef-fh.",
             "control_frequency, control_amplitude, readout_frequency, and readout_amplitude are stored; hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
@@ -1804,6 +1804,13 @@
             "unit": "GHz",
             "user_override": "allowed"
           },
+          "ef_frequency": {
+            "default_value": null,
+            "description": "Measured EF resonance preferred for the harmonic fit",
+            "resolution": "database_optional",
+            "unit": "GHz",
+            "user_override": "forbidden"
+          },
           "ef_pi_amplitude": {
             "default_value": null,
             "resolution": "database_required",
@@ -1828,6 +1835,13 @@
             "unit": "ns",
             "user_override": "allowed"
           },
+          "qubit_frequency": {
+            "default_value": null,
+            "description": "Measured GE resonance preferred for the harmonic fit",
+            "resolution": "database_optional",
+            "unit": "GHz",
+            "user_override": "forbidden"
+          },
           "readout_amplitude": {
             "default_value": null,
             "resolution": "database_required",
@@ -1846,7 +1860,10 @@
         },
         "name": "CheckAdaptiveFHChevron",
         "output_parameters": [
-          "fh_frequency"
+          "fh_frequency",
+          "charging_energy",
+          "josephson_energy_first_harmonic",
+          "josephson_energy_second_harmonic"
         ],
         "run_parameters": {
           "detuning_range": {
@@ -1863,6 +1880,12 @@
             "description": "Time interval between shots",
             "unit": "ns",
             "value": 153600.0,
+            "value_type": "float"
+          },
+          "maximum_harmonic_fit_residual": {
+            "description": "Maximum absolute GE, EF, or FH residual for publishing EC, EJ1, and EJ2",
+            "unit": "GHz",
+            "value": 0.005,
             "value_type": "float"
           },
           "minimum_peak_background_rms_ratio": {

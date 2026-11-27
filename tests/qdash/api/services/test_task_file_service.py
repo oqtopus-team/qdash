@@ -219,7 +219,11 @@ def test_fh_chevron_is_enabled_with_transition_and_pulse_dependencies() -> None:
     )
     assert task.input_parameters["ef_pi_amplitude"]["resolution"] == "database_required"
     assert task.input_parameters["ef_pi_duration"]["resolution"] == "database_required"
+    for name in ("qubit_frequency", "ef_frequency"):
+        assert task.input_parameters[name]["resolution"] == "database_optional"
+        assert task.input_parameters[name]["user_override"] == "forbidden"
     assert task.run_parameters["detuning_range"]["value"] == [-0.05, 0.05, 41]
+    assert task.run_parameters["maximum_harmonic_fit_residual"]["value"] == 0.005
     assert task.run_parameters["shots"]["value"] == 256
 
 

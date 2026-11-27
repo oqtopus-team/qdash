@@ -192,3 +192,31 @@ def test_metric_aggregations_share_the_completed_result_match_stage() -> None:
         "start_at": {"$gte": cutoff, "$lte": end},
     }
     assert [pipeline[0] for pipeline in pipelines] == [{"$match": expected}] * 3
+
+
+def test_latest_fh_and_harmonic_metrics_keep_their_own_measurement_and_uncertainty(init_db) -> None:
+    _insert_task_result_row(
+        _seq=1,
+        start_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        output_parameters={
+            "fh_frequency": {"value": 4.5},
+            "josephson_energy_second_harmonic": {"value": -0.15, "error": 0},
+        },
+    )
+    _insert_task_result_row(
+        _seq=2,
+        start_at=datetime(2026, 1, 2, tzinfo=timezone.utc),
+        output_parameters={"fh_frequency": {"value": 4.51, "error": 0.001}},
+    )
+
+    metrics = MongoTaskResultHistoryRepository().aggregate_latest_metrics(
+        chip_id="chip-1",
+        project_id="proj-1",
+        entity_type="qubit",
+        metric_keys={"fh_frequency", "josephson_energy_second_harmonic"},
+    )
+
+    fh = metrics["fh_frequency"]["0"]
+    assert (fh["value"], fh["task_id"], fh["stddev"]) == (4.51, "task-2", 0.001)
+    ej2 = metrics["josephson_energy_second_harmonic"]["0"]
+    assert (ej2["value"], ej2["task_id"], ej2["stddev"]) == (-0.15, "task-1", 0.0)

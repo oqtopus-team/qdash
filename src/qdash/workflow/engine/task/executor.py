@@ -821,8 +821,10 @@ class TaskExecutor:
             snap_run, task.run_overrides, task.run_parameters
         )
         declarations = getattr(task.__class__, "input_spec", {})
-        snap_input = snapshot_parameters.normalize_snapshot_inputs(snap_input, declarations)
-        if self._snapshot_loader.requires_snapshot(task_name):
+        requires_snapshot = self._snapshot_loader.requires_snapshot(task_name)
+        if snap_input or requires_snapshot:
+            snap_input = snapshot_parameters.normalize_snapshot_inputs(snap_input, declarations)
+        if requires_snapshot:
             snapshot_parameters.ensure_snapshot_inputs_compatible(
                 task_name, qid, snap_input, declarations
             )
@@ -843,7 +845,7 @@ class TaskExecutor:
             # Re-record in state_manager
             self.state_manager.put_input_parameters(task_name, reconstructed_input, task_type, qid)
 
-        if self._snapshot_loader.requires_snapshot(task_name):
+        if requires_snapshot:
             task.input_parameters_from_snapshot = True
 
         # Override run_parameters on the task instance

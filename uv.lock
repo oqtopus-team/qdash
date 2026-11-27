@@ -3682,6 +3682,8 @@ dependencies = [
     { name = "qubex", extra = ["backend"] },
     { name = "reportlab" },
     { name = "ruamel-yaml" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "scipy", version = "1.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "slack-sdk" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -3705,6 +3707,7 @@ requires-dist = [
     { name = "qubex", extras = ["backend"], git = "https://github.com/amachino/qubex.git?branch=develop" },
     { name = "reportlab", specifier = ">=4.4.1" },
     { name = "ruamel-yaml", specifier = ">=0.18.0" },
+    { name = "scipy" },
     { name = "slack-sdk", specifier = "==3.41.0" },
     { name = "uvicorn", extras = ["standard"] },
 ]

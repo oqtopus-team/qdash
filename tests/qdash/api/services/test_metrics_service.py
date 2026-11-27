@@ -80,6 +80,33 @@ def test_readout_amplitude_is_skipped_by_best_selection():
     assert metrics["readout_amplitude"] == {}
 
 
+def test_transmon_energy_latest_omits_default_uncertainty_only():
+    repository = MagicMock()
+    energies = {
+        "charging_energy": 0.24,
+        "josephson_energy_first_harmonic": 15.0,
+        "josephson_energy_second_harmonic": -0.15,
+    }
+    aggregated = {
+        name: {"0": {"value": value, "task_id": "task-1", "execution_id": "exec-1", "stddev": 0.0}}
+        for name, value in {**energies, "t1": 42.0}.items()
+    }
+    repository.aggregate_latest_metrics.return_value = aggregated
+    repository.aggregate_average_metrics.return_value = aggregated
+    service = MetricsService(repository, MagicMock())
+
+    latest = service.extract_entity_metrics("chip-1", "project-1", "qubit")
+    average = service.extract_entity_metrics(
+        "chip-1", "project-1", "qubit", selection_mode="average"
+    )
+
+    for name, value in energies.items():
+        assert latest[name]["0"].value == value
+        assert latest[name]["0"].model_dump()["stddev"] is None
+        assert average[name]["0"].stddev == 0.0
+    assert latest["t1"]["0"].stddev == 0.0
+
+
 class TestParseDateRange:
     """Tests for _parse_date_range absolute date-range parsing."""
 

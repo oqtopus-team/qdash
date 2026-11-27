@@ -1232,6 +1232,31 @@ class TestSnapshotOverrides:
         assert set(task.input_parameters) == {"existing"}
         assert task.input_parameters_from_snapshot is False
 
+    def test_run_only_optional_snapshot_keeps_fresh_input_declarations(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        class TaskWithOptionalInput(MockTask):
+            input_spec = {
+                "required": InputParameterSpec.required_database(),
+                "optional": InputParameterSpec.database_optional(),
+            }
+
+        task = TaskWithOptionalInput()
+        initial_inputs = {
+            name: declaration.create_model() for name, declaration in task.input_spec.items()
+        }
+        task.input_parameters = initial_inputs
+        mock_snapshot_loader.get_snapshot.return_value = ({}, {"shots": {"value": 512}})
+
+        executor_with_snapshot._apply_snapshot_overrides(task, task.name, "qubit", "0")
+
+        assert task.input_parameters is initial_inputs
+        assert task.run_parameters["shots"].value == 512
+        mock_state_manager.put_input_parameters.assert_not_called()
+
     def test_incompatible_snapshot_lists_missing_inputs_before_state_changes(
         self,
         executor_with_snapshot: TaskExecutor,
