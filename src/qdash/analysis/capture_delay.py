@@ -152,27 +152,30 @@ def _logistic(x: np.ndarray) -> np.ndarray:
 
 
 def _fit_step(time: np.ndarray, iq: np.ndarray) -> tuple[bool, float, float]:
-    """Fit one complex logistic step and return ``(ok, location_ns, snr)``.
+    """Fit one logistic step to the amplitude envelope and return ``(ok, location_ns, snr)``.
 
-    The two complex levels are solved linearly for each trial location and
-    width, so only those two values are optimized nonlinearly.
+    Fitting ``|iq|`` rather than complex ``iq`` makes edge detection immune to
+    phase rotation or dispersive phase transients during filter/resonator
+    ring-up while preserving the step location. The two real levels are solved
+    linearly for each trial location and width, so only those two values are
+    optimized nonlinearly.
     """
+    amp = np.abs(iq)
     dt = float(time[1] - time[0])
     head = max(2, time.size // 8)
-    distance = np.abs(iq - iq[:head].mean())
+    distance = np.abs(amp - amp[:head].mean())
     crossing = np.flatnonzero(distance >= (distance.min() + distance.max()) / 2)
     t0_init = float(time[crossing[0]]) if crossing.size else float(time.mean())
 
     def levels(params: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         step = _logistic((time - params[0]) / np.exp(params[1]))
         basis = np.column_stack([1.0 - step, step])
-        coefficients, *_ = np.linalg.lstsq(basis, iq, rcond=None)
+        coefficients, *_ = np.linalg.lstsq(basis, amp, rcond=None)
         return coefficients, basis @ coefficients
 
     def residuals(params: np.ndarray) -> np.ndarray:
         _, model = levels(params)
-        delta = iq - model
-        return np.concatenate([delta.real, delta.imag])
+        return np.asarray(amp - model, dtype=float)
 
     try:
         fitted = least_squares(
@@ -186,7 +189,7 @@ def _fit_step(time: np.ndarray, iq: np.ndarray) -> tuple[bool, float, float]:
     except (ValueError, np.linalg.LinAlgError):
         return False, math.nan, math.nan
     coefficients, model = levels(fitted.x)
-    noise = math.sqrt(float(np.mean(np.abs(iq - model) ** 2)) / 2)
+    noise = math.sqrt(float(np.mean((amp - model) ** 2)))
     contrast = float(abs(coefficients[1] - coefficients[0]))
     snr = contrast / max(noise, 1e-12)
     location = float(fitted.x[0])
