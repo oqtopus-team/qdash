@@ -5730,24 +5730,6 @@
             "value": 1024.0,
             "value_type": "float"
           },
-          "margin_ghz": {
-            "description": "Padding in GHz added to each side of the detected response cluster",
-            "unit": "GHz",
-            "value": 0.25,
-            "value_type": "float"
-          },
-          "min_response_score": {
-            "description": "Minimum trace score required to accept a power row's response",
-            "unit": "a.u.",
-            "value": 5.0,
-            "value_type": "float"
-          },
-          "min_window_ghz": {
-            "description": "Minimum search window width in GHz so downstream 2D CheckQubitSpectroscopy retains enough off-resonant background",
-            "unit": "GHz",
-            "value": 0.6,
-            "value_type": "float"
-          },
           "power_range": {
             "description": "Few-power sweep as [start, stop, step] in dB (stop is exclusive). Default [-25, 0, 10] measures -25, -15, and -5 dB.",
             "unit": "dB",
@@ -5769,6 +5751,12 @@
             "unit": "a.u.",
             "value": true,
             "value_type": "bool"
+          },
+          "window_width": {
+            "description": "Width of the narrowed frequency window in GHz centered on the detected qubit response (default 0.6 GHz, covering both f01 and f02/2).",
+            "unit": "GHz",
+            "value": 0.6,
+            "value_type": "float"
           }
         },
         "task_type": "qubit"

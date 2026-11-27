@@ -122,7 +122,7 @@ def test_window_task_resolves_coarse_range_and_publishes_narrowed_bounds(monkeyp
     center = float(center_val)
     assert center == pytest.approx(8.15, abs=0.02)
     assert win_min < 8.15 < win_max
-    assert 0.6 <= win_max - win_min < 1.0
+    assert win_max - win_min == pytest.approx(0.6, abs=1e-6)
 
 
 def test_window_task_returns_validation_error_when_no_signal(monkeypatch) -> None:
@@ -177,3 +177,12 @@ def test_check_qubit_spectroscopy_keeps_explicit_frequency_range_override() -> N
 def test_window_task_is_registered_and_not_batch_capable() -> None:
     assert "CheckQubitFrequencyWindow" in get_tasks("qubex")
     assert batch_capable_tasks("qubex")["CheckQubitFrequencyWindow"] is False
+    assert set(CheckQubitFrequencyWindow.run_spec) == {
+        "frequency_range",
+        "frequency_step",
+        "power_range",
+        "shots",
+        "interval",
+        "simultaneous_drive",
+        "window_width",
+    }

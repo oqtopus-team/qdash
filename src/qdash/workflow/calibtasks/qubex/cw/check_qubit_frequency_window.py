@@ -10,9 +10,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 import numpy as np
 
 from qdash.analysis.spectroscopy import (
-    DEFAULT_MIN_RESPONSE_SCORE,
     DEFAULT_MIN_WINDOW_GHZ,
-    DEFAULT_WINDOW_MARGIN_GHZ,
     create_qubit_frequency_window_figure,
     estimate_qubit_frequency_window,
 )
@@ -33,6 +31,7 @@ DEFAULT_WINDOW_FREQUENCY_STEP = 0.010
 DEFAULT_WINDOW_POWER_RANGE = (-25, 0, 10)
 DEFAULT_WINDOW_SHOTS = 512
 DEFAULT_WINDOW_INTERVAL = 1024.0
+_INTERNAL_EDGE_MARGIN_GHZ = 0.10
 
 
 class CheckQubitFrequencyWindow(QubexTask):
@@ -114,26 +113,14 @@ class CheckQubitFrequencyWindow(QubexTask):
                 "False starts readout after the control pulse ends."
             ),
         ),
-        "margin_ghz": RunParameterSpec(
-            unit="GHz",
-            value_type="float",
-            default=DEFAULT_WINDOW_MARGIN_GHZ,
-            description="Padding in GHz added to each side of the detected response cluster",
-        ),
-        "min_window_ghz": RunParameterSpec(
+        "window_width": RunParameterSpec(
             unit="GHz",
             value_type="float",
             default=DEFAULT_MIN_WINDOW_GHZ,
             description=(
-                "Minimum search window width in GHz so downstream 2D CheckQubitSpectroscopy "
-                "retains enough off-resonant background"
+                "Width of the narrowed frequency window in GHz centered on the detected "
+                "qubit response (default 0.6 GHz, covering both f01 and f02/2)."
             ),
-        ),
-        "min_response_score": RunParameterSpec(
-            unit="a.u.",
-            value_type="float",
-            default=DEFAULT_MIN_RESPONSE_SCORE,
-            description="Minimum trace score required to accept a power row's response",
         ),
     }
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
@@ -275,9 +262,8 @@ class CheckQubitFrequencyWindow(QubexTask):
             frequencies,
             powers,
             phase_rows,
-            margin_ghz=float(self.run_parameters["margin_ghz"].get_value()),
-            min_window_ghz=float(self.run_parameters["min_window_ghz"].get_value()),
-            min_response_score=float(self.run_parameters["min_response_score"].get_value()),
+            margin_ghz=_INTERNAL_EDGE_MARGIN_GHZ,
+            min_window_ghz=float(self.run_parameters["window_width"].get_value()),
         )
         figure = create_qubit_frequency_window_figure(
             frequencies, powers, phase_rows, window, label
