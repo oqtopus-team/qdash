@@ -9,7 +9,7 @@
  */
 
 /** The scenarios, in the order the harness runs them. */
-export const SCENARIO_IDS = ["stored-t1", "t1-rerun", "dependent-commit", "unknown-failure", "purpose-pipeline"] as const;
+export const SCENARIO_IDS = ["stored-t1", "t1-rerun", "dependent-commit", "unknown-failure", "purpose-pipeline", "stored-plan-pipeline"] as const;
 export type ScenarioId = (typeof SCENARIO_IDS)[number];
 
 /** The prerequisite chain the harness runs once on the disposable chip (`--setup`). */
@@ -54,7 +54,9 @@ export interface UpdateGrantPlan {
 /**
  * A pipeline run the user approves (`qdash_run_pipeline`). Only a spec whose targets are
  * exactly the selected qubit, whose every step names its tasks explicitly within `tasks`, on
- * the default (fake) backend, recorded in a calibration session this scenario created.
+ * the default (fake) backend, recorded in a calibration session this scenario created. A call
+ * that names a stored plan (`planId`) is judged by the plan the harness reads from QDash and
+ * the dialog shows, under the same bounds.
  */
 export interface PipelineRunPlan {
   tasks: readonly string[];
@@ -62,6 +64,8 @@ export interface PipelineRunPlan {
   maxTaskCalls: number;
   /** Most runs approved in the scenario. */
   maxRuns: number;
+  /** Approve only a run of a stored plan (`planId`); a raw `spec` is declined. */
+  requirePlanReference?: boolean;
 }
 
 /** What the harness, acting as the user, approves when pi asks. Everything else is declined. */
@@ -114,6 +118,14 @@ export interface CalibrationExpectation {
   reportedOrigin: { source: string; tool: string; client: string };
   /** The model must read the calibration session back after starting the run. */
   readBack: boolean;
+  /**
+   * Every run must carry out a stored plan: QDash records its `plan_id` and `review_digest` on
+   * the run, the stored plan stays inside the scenario's target and tasks, and the approved
+   * `qdash_run_pipeline` call named that plan by `planId`, never a raw spec.
+   */
+  storedPlan?: boolean;
+  /** Tasks that must each complete on the qubit in a step execution of the runs. */
+  requiredPipelineTasks?: readonly string[];
 }
 
 /**
@@ -158,6 +170,9 @@ export interface Scenario {
 
 /** The one-step pipeline the baseline and the purpose scenario both stay within. */
 export const PURPOSE_PIPELINE_TASKS = ["CheckT1"] as const;
+
+/** The two coherence checks the stored-plan scenario runs, once each. */
+export const STORED_PLAN_TASKS = ["CheckT1", "CheckT2Echo"] as const;
 
 /** The origin `qdash_run_pipeline` reports (PIPELINE_TOOL_ORIGIN in pi-qdash). */
 export const PIPELINE_TOOL_ORIGIN = { source: "agent_tool", tool: "qdash_run_pipeline", client: "pi-qdash" } as const;
@@ -275,6 +290,34 @@ export const SCENARIOS: Record<ScenarioId, Scenario> = {
       },
     },
     baseline: { spec: baselinePipelineSpec },
+  },
+  "stored-plan-pipeline": {
+    id: "stored-plan-pipeline",
+    title: "A coherence check is prepared as a validated stored pipeline plan and run by reference in a calibration session; the run records the plan and review digest it carried out",
+    // The user asks for a reviewed, stored plan and for what they want to learn. Whether to
+    // build the spec in code mode with qdash.calibration or call the tools directly is the
+    // model's choice.
+    prompt: ({ chipId, qid }) =>
+      `My objective on chip ${chipId}: a coherence check of qubit ${qid}. Keep this work together under one calibration objective in QDash. Prepare a calibration pipeline that measures CheckT1 and then CheckT2Echo on qubit ${qid} only, once each, and store it in QDash as a validated plan first, so what I approve is the stored plan QDash keeps rather than a spec written into the run request. Then run that stored plan by reference in the objective. Wait until it has finished and tell me the plan's ID, its review digest, and the T1 and T2 echo results.`,
+    approvals: {
+      createCalibrationSession: { max: 1 },
+      runPipeline: { tasks: STORED_PLAN_TASKS, maxTaskCalls: STORED_PLAN_TASKS.length, maxRuns: 1, requirePlanReference: true },
+    },
+    expect: {
+      sessions: { min: 0, max: 0 },
+      allowedTasks: [],
+      measurements: { min: 0, max: 0 },
+      noCommits: true,
+      calibration: {
+        sessions: { min: 1, max: 1 },
+        pipelineRuns: { min: 1, max: 1 },
+        pipelineTasks: STORED_PLAN_TASKS,
+        reportedOrigin: PIPELINE_TOOL_ORIGIN,
+        readBack: false,
+        storedPlan: true,
+        requiredPipelineTasks: STORED_PLAN_TASKS,
+      },
+    },
   },
 };
 

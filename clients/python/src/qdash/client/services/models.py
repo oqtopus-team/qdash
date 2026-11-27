@@ -11567,6 +11567,14 @@ class CalibrationPipelineRunResponse(BaseModel):
     The first step's execution, as returned at dispatch
     """
     error: Annotated[str, Field(title="Error")] = ""
+    plan_id: Annotated[str | None, Field(title="Plan Id")] = None
+    """
+    For a run of a stored calibration pipeline plan: the plan it carries out; null for a run requested with a spec
+    """
+    review_digest: Annotated[str | None, Field(title="Review Digest")] = None
+    """
+    For a run of a stored plan: the review digest the request approved and the run carries out; null for a run requested with a spec
+    """
     requested_at: Annotated[AwareDatetime, Field(title="Requested At")]
     updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
     pipeline: PipelineProgress | None = None
@@ -11633,6 +11641,14 @@ class CalibrationRunStateResponse(BaseModel):
     The first step's execution, as returned at dispatch
     """
     error: Annotated[str, Field(title="Error")] = ""
+    plan_id: Annotated[str | None, Field(title="Plan Id")] = None
+    """
+    For a run of a stored calibration pipeline plan: the plan it carries out; null for a run requested with a spec
+    """
+    review_digest: Annotated[str | None, Field(title="Review Digest")] = None
+    """
+    For a run of a stored plan: the review digest the request approved and the run carries out; null for a run requested with a spec
+    """
     requested_at: Annotated[AwareDatetime, Field(title="Requested At")]
     updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
     pipeline: PipelineProgress | None = None

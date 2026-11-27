@@ -17,6 +17,9 @@ import { after, before, test } from "node:test";
 import { fauxAssistantMessage, fauxProvider, fauxText, fauxToolCall } from "@earendil-works/pi-ai";
 import { createAgentSession, DefaultResourceLoader, ModelRuntime, SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
 
+import { resolvePipelinePlanPreview } from "../../packages/pi-qdash/extensions/lib/pipeline-plan-preview.ts";
+import { canonicalArgs } from "../../packages/pi-qdash/extensions/lib/write-approval.ts";
+import { gateDialogMessage } from "../../packages/pi-qdash/extensions/lib/write-gate.ts";
 import { startFakeAgentQDash } from "../../packages/pi-qdash/tests/helpers/fake-agent-qdash.mjs";
 import { inZone } from "../../packages/pi-qdash/tests/helpers/time-zone.mjs";
 import { bundledExtensions } from "../src/bundled-extensions.ts";
@@ -28,7 +31,7 @@ import { prepareLocalCli } from "../src/local-cli.ts";
 import { effectiveSecrets, redact, renderMarkdown, secretValues } from "../validation/fake-loop/report.ts";
 import { classifyOutcome, compactArgs, lineSplitter, runPrompt } from "../validation/fake-loop/rpc-driver.ts";
 import { armFault, disarmFault, FaultFileError, faultPath, launchFor, main, parseOptions, writeSessionArtifacts } from "../validation/fake-loop/run.ts";
-import { SCENARIOS, selectScenarios } from "../validation/fake-loop/scenarios.ts";
+import { SCENARIO_IDS, SCENARIOS, selectScenarios } from "../validation/fake-loop/scenarios.ts";
 
 const target = { chipId: "agentval-loop", qid: "4" };
 const packagesDir = fileURLToPath(new URL("../../packages/", import.meta.url));
@@ -244,6 +247,47 @@ test("a declined dialog is recorded and a run that never settles is aborted at i
   const hung = await runPrompt({ command: process.execPath, args: [fakePi], env: { ...process.env, FAKE_PI_MODE: "hang" }, prompt: "x", timeoutMs: 300, onDialog: async () => ({ confirmed: true, reason: "" }) });
   assert.equal(hung.timedOut, true);
   assert.equal(hung.aborted, true);
+});
+
+test("the driver hands the whole stored-plan review to the approval policy, which approves only the plan it read", async () => {
+  const digest = `sha256:v1:${"c".repeat(64)}`;
+  const plan = {
+    plan_id: "cpp-1",
+    chip_id: target.chipId,
+    backend_name: "fake",
+    expires_at: "2026-11-28T00:00:00",
+    expired: false,
+    review_digest: digest,
+    spec: { targets: { qids: ["4"] }, steps: [{ type: "CustomOneQubit", tasks: [{ name: "CheckT1" }, { name: "CheckT2Echo" }] }] },
+    target_qids: ["4"],
+    steps: [{ index: 1, type: "CustomOneQubit", kind: "calibration", calls: [{ name: "CheckT1" }, { name: "CheckT2Echo" }] }],
+    task_run_count: 2,
+  };
+  // The text pi-qdash's write gate sends the RPC client for this call (fake-pi-rpc.mjs's args).
+  const callArgs = { chipId: "agentval-loop", planId: "cpp-1", calibrationSessionId: "cs-1" };
+  const preview = await resolvePipelinePlanPreview({ getPlan: async () => plan }, callArgs, () => Date.parse("2026-11-27T00:00:00Z"));
+  const message = gateDialogMessage("qdash_run_pipeline", canonicalArgs(callArgs), preview);
+  const approvalContext = { target, plan: SCENARIOS["stored-plan-pipeline"].approvals, scenarioSessionIds: new Set(), scenarioCalibrationSessionIds: new Set(["cs-1"]), now: () => Date.parse("2026-11-27T00:00:00Z") };
+  for (const [storedPlan, expected] of [[plan, true], [{ ...plan, review_digest: `sha256:v1:${"d".repeat(64)}` }, false], [undefined, false]]) {
+    const seen = [];
+    const transcript = await runPrompt({
+      command: process.execPath,
+      args: [fakePi],
+      env: { ...process.env, FAKE_PI_MODE: "plan", FAKE_PI_DIALOG_MESSAGE: message },
+      prompt: "run the plan",
+      timeoutMs: 10_000,
+      onDialog: async (request, call) => {
+        seen.push(request.message);
+        const decision = decideApproval({ ...call, dialogMessage: request.message, ...(storedPlan ? { storedPlan } : {}) }, approvalContext);
+        return { confirmed: decision.approve, reason: decision.reason };
+      },
+    });
+    // The driver passes the complete multi-line review, unshortened, and the call's planId.
+    assert.deepEqual(seen, [message]);
+    assert.equal(transcript.toolCalls[0].args.planId, "cpp-1");
+    assert.equal(transcript.approvals[0].confirmed, expected, transcript.approvals[0].reason);
+    assert.equal(transcript.toolCalls[0].outcome, expected ? "ok" : "declined");
+  }
 });
 
 // ---------------------------------------------------------------- evaluator
@@ -792,4 +836,19 @@ test("open sessions found at the start are reported but never gate, and measurin
     assert.match(SCENARIOS[id].prompt(target), /Start a new agent session for this request\.$/, id);
   }
   assert.doesNotMatch(SCENARIOS["stored-t1"].prompt(target), /agent session/);
+});
+
+test("every scenario runs in a fixed order and is listed in the validation guide", () => {
+  assert.deepEqual([...SCENARIO_IDS], ["stored-t1", "t1-rerun", "dependent-commit", "unknown-failure", "purpose-pipeline", "stored-plan-pipeline"]);
+  assert.deepEqual(selectScenarios("all").map((item) => item.id), [...SCENARIO_IDS]);
+  assert.deepEqual(selectScenarios("stored-plan-pipeline,stored-t1").map((item) => item.id), ["stored-t1", "stored-plan-pipeline"]);
+  const guide = readFileSync(fileURLToPath(new URL("../../docs/developer-guide/agent/agent-validation.md", import.meta.url)), "utf8");
+  for (const id of SCENARIO_IDS) assert.match(guide, new RegExp(`^\\| \`${id}\` \\|`, "m"), id);
+  // Only the calibration scenarios approve a pipeline run, and only the stored-plan one needs a plan.
+  for (const id of SCENARIO_IDS) {
+    const run = SCENARIOS[id].approvals.runPipeline;
+    assert.equal(run !== undefined, ["purpose-pipeline", "stored-plan-pipeline"].includes(id), id);
+    assert.equal(run?.requirePlanReference === true, id === "stored-plan-pipeline", id);
+    assert.equal(SCENARIOS[id].expect.calibration?.storedPlan === true, id === "stored-plan-pipeline", id);
+  }
 });

@@ -74,6 +74,16 @@ class CalibrationPipelineRunResponse(UniversalBaseModel):
     """
 
     error: typing.Optional[str] = None
+    plan_id: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    For a run of a stored calibration pipeline plan: the plan it carries out; null for a run requested with a spec
+    """
+
+    review_digest: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    For a run of a stored plan: the review digest the request approved and the run carries out; null for a run requested with a spec
+    """
+
     requested_at: dt.datetime
     updated_at: dt.datetime
     pipeline: typing.Optional[PipelineProgress] = pydantic.Field(default=None)

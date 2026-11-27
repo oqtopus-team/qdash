@@ -338,17 +338,24 @@ export async function respondToIntervention(
  * Whether the deployment records calibration sessions and the origin a pipeline caller
  * reports. A scenario that needs them is blocked on an older revision rather than failed.
  */
-export async function calibrationCapabilities(api: QDashApi): Promise<{ ok: boolean; detail: string }> {
+export async function calibrationCapabilities(api: QDashApi, options: { storedPlan?: boolean } = {}): Promise<{ ok: boolean; detail: string }> {
   const openapi = await api.get<Json>("/openapi.json");
   const paths = (openapi.paths ?? {}) as Json;
   const needed = ["/calibration-sessions", "/calibration-sessions/{calibration_session_id}", "/calibration-pipelines/execute"];
+  // Stored plans: created, read for the approval, run by reference, and named on the run.
+  if (options.storedPlan) needed.push("/calibration-pipelines/plans", "/calibration-pipelines/plans/{plan_id}", "/calibration-pipelines/plans/{plan_id}/execute");
   const missing = needed.filter((path) => !(path in paths));
   const schemas = (((openapi.components ?? {}) as Json).schemas ?? {}) as Json;
   const request = ((schemas.ExecutePipelineRequest ?? {}) as Json).properties as Json | undefined;
   const summary = ((schemas.ExecutionResponseSummary ?? {}) as Json).properties as Json | undefined;
   if (!request || !("reported_origin" in request)) missing.push("ExecutePipelineRequest.reported_origin");
   if (!summary || !("calibration_session" in summary) || !("reported_origin" in summary)) missing.push("ExecutionResponseSummary.calibration_session/reported_origin");
-  return missing.length === 0 ? { ok: true, detail: "calibration sessions and reported origins present" } : { ok: false, detail: `missing ${missing.join(", ")}` };
+  if (options.storedPlan) {
+    const run = ((schemas.CalibrationPipelineRunResponse ?? {}) as Json).properties as Json | undefined;
+    if (!run || !("plan_id" in run) || !("review_digest" in run)) missing.push("CalibrationPipelineRunResponse.plan_id/review_digest");
+  }
+  const present = options.storedPlan ? "calibration sessions, reported origins, and stored plans present" : "calibration sessions and reported origins present";
+  return missing.length === 0 ? { ok: true, detail: present } : { ok: false, detail: `missing ${missing.join(", ")}` };
 }
 
 /** The caller's calibration sessions on the chip created at or after `since`. */
@@ -358,6 +365,11 @@ export async function listScenarioCalibrationSessions(api: QDashApi, chipId: str
 
 export async function getCalibrationSession(api: QDashApi, calibrationSessionId: string): Promise<Json> {
   return api.get(`/calibration-sessions/${encodeURIComponent(calibrationSessionId)}`);
+}
+
+/** A stored calibration pipeline plan as QDash returns it (`PipelinePlanResponse`). */
+export async function getPipelinePlan(api: QDashApi, planId: string): Promise<Json> {
+  return api.get(`/calibration-pipelines/plans/${encodeURIComponent(planId)}`);
 }
 
 export async function getExecution(api: QDashApi, executionId: string): Promise<Json> {

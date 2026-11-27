@@ -186,6 +186,20 @@ class CalibrationPipelineRunResponse(BaseModel):
         default=None, description="The first step's execution, as returned at dispatch"
     )
     error: str = ""
+    plan_id: str | None = Field(
+        default=None,
+        description=(
+            "For a run of a stored calibration pipeline plan: the plan it carries out; null "
+            "for a run requested with a spec"
+        ),
+    )
+    review_digest: str | None = Field(
+        default=None,
+        description=(
+            "For a run of a stored plan: the review digest the request approved and the run "
+            "carries out; null for a run requested with a spec"
+        ),
+    )
     requested_at: datetime
     updated_at: datetime
     pipeline: PipelineProgress | None = Field(

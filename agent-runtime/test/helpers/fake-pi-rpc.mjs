@@ -4,6 +4,8 @@
  * without a model. FAKE_PI_MODE selects the behaviour:
  *
  * - `approve`: one reviewed-write call with a confirm dialog, then an answer.
+ * - `plan`: one `qdash_run_pipeline` call naming a stored plan, whose confirm dialog carries the
+ *   multi-line plan review text in FAKE_PI_DIALOG_MESSAGE, then an answer.
  * - `hang`: accept the prompt and settle only after an `abort` command.
  */
 
@@ -15,6 +17,7 @@ function onRecord(record) {
   if (record.type === "prompt") {
     out({ id: record.id, type: "response", command: "prompt", success: true, data: { disposition: "started" } });
     if (mode === "approve") void approveFlow();
+    if (mode === "plan") void planFlow();
   } else if (record.type === "extension_ui_response") {
     waiting.get(record.id)?.(record);
   } else if (record.type === "abort") {
@@ -22,11 +25,27 @@ function onRecord(record) {
   }
 }
 
-function dialog(id, title) {
+function dialog(id, title, message = "qdash_create_agent_session will create or modify data in QDash. Continue?") {
   return new Promise((resolve) => {
     waiting.set(id, resolve);
-    out({ type: "extension_ui_request", id, method: "confirm", title, message: "qdash_create_agent_session will create or modify data in QDash. Continue?" });
+    out({ type: "extension_ui_request", id, method: "confirm", title, message });
   });
+}
+
+async function planFlow() {
+  out({ type: "agent_start" });
+  const args = { chipId: "agentval-loop", planId: "cpp-1", calibrationSessionId: "cs-1" };
+  out({ type: "tool_execution_start", toolCallId: "run-1", toolName: "qdash_run_pipeline", args });
+  const answer = await dialog("ui-plan", "Approve QDash write operation?", process.env.FAKE_PI_DIALOG_MESSAGE ?? "");
+  out({
+    type: "tool_execution_end",
+    toolCallId: "run-1",
+    toolName: "qdash_run_pipeline",
+    result: { content: [{ type: "text", text: answer.confirmed ? "Plan cpp-1 started" : "QDash write operation rejected by user" }] },
+    isError: !answer.confirmed,
+  });
+  out({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "Done." }], usage: { totalTokens: 7 } } });
+  out({ type: "agent_settled", aborted: false });
 }
 
 async function approveFlow() {

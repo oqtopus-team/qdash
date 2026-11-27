@@ -37,6 +37,10 @@ export interface CalibrationRunStateResponse {
     /** The first step's execution, as returned at dispatch */
     execution_id?: (string | null) | undefined;
     error?: string | undefined;
+    /** For a run of a stored calibration pipeline plan: the plan it carries out; null for a run requested with a spec */
+    plan_id?: (string | null) | undefined;
+    /** For a run of a stored plan: the review digest the request approved and the run carries out; null for a run requested with a spec */
+    review_digest?: (string | null) | undefined;
     requested_at: string;
     updated_at: string;
     /** The run as a whole, from its step executions; null until its first execution exists */

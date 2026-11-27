@@ -10,6 +10,7 @@
 
 import { parseServerTimestamp } from "../../../packages/pi-qdash/extensions/lib/server-time.ts";
 import { isReviewedWriteTool } from "../../../packages/pi-qdash/extensions/lib/tool-policy.ts";
+import { REVIEW_DIGEST_PATTERN } from "./approval.ts";
 import type { Json, SessionEvidence } from "./qdash-api.ts";
 import type { RunTranscript } from "./rpc-driver.ts";
 import type { Scenario, ScenarioTarget } from "./scenarios.ts";
@@ -64,6 +65,8 @@ export interface CalibrationEvidence {
   sessions: Json[];
   /** `GET /executions/{id}` of every step execution of their runs and every chip execution. */
   executionDetails: Record<string, Json>;
+  /** `GET /calibration-pipelines/plans/{id}` of every stored plan a run names; a deleted plan is absent. */
+  plans?: Record<string, Json>;
   baseline?: BaselineEvidence;
 }
 
@@ -614,6 +617,16 @@ function evaluateCalibration(evidence: ScenarioEvidence, runs: RunTranscript[], 
     );
     const ids = runExecutionIds(run);
     add(`pipeline_run_steps:${runId}`, "server", "at least one step execution listed in the session", `${ids.length}`, ids.length > 0);
+    if (expected.storedPlan) {
+      const problems = storedPlanProblems(run, records.plans?.[str(run.plan_id)], evidence, expected.pipelineTasks);
+      add(
+        `pipeline_run_stored_plan:${runId}`,
+        "server",
+        `the run records the stored plan and review digest it carried out, and that plan, as QDash keeps it, has the same digest, was stored by ${username} for chip ${target.chipId}, starts on qubit ${target.qid} only, and resolves only to ${expected.pipelineTasks.join(", ")}`,
+        problems.length === 0 ? `plan ${str(run.plan_id)}, digest ${str(run.review_digest)}` : problems.join("; "),
+        problems.length === 0,
+      );
+    }
     for (const id of ids) {
       memberIds.add(id);
       const detail = records.executionDetails[id];
@@ -651,6 +664,14 @@ function evaluateCalibration(evidence: ScenarioEvidence, runs: RunTranscript[], 
     }
   }
 
+  // Each required task completed on the qubit in a step execution of the recorded runs.
+  for (const task of expected.requiredPipelineTasks ?? []) {
+    const ran = [...memberIds].flatMap((id) => ((Array.isArray(records.executionDetails[id]?.task) ? records.executionDetails[id].task : []) as Json[]));
+    const done = ran.some((item) => str(item.name) === task && str(item.qid) === target.qid && lower(item.status) === "completed");
+    const tried = ran.some((item) => str(item.name) === task);
+    add(`pipeline_task_completed:${task}`, "server", `${task} completed on qubit ${target.qid} in a step of the run`, done ? "completed" : tried ? "ran, never completed on the qubit" : "not run", done);
+  }
+
   // Every execution on the chip during the scenario is a step of a recorded run.
   const stray = evidence.chipExecutions.filter((execution) => !memberIds.has(str(execution.execution_id)));
   add(
@@ -670,13 +691,36 @@ function evaluateCalibration(evidence: ScenarioEvidence, runs: RunTranscript[], 
   if (expected.readBack) {
     add("calibration_session_read_back", "harness", "the session was read with qdash_get_calibration_session after the pipeline started", readBack ? "read back" : "not read back", readBack);
   }
+  if (expected.storedPlan) {
+    // The run calls that went through: each named a stored plan, never a raw spec, and every
+    // recorded run carries out a plan one of them named.
+    const approvedRuns = calls.filter((call) => call.toolName === "qdash_run_pipeline" && call.outcome === "ok");
+    const named = new Set(approvedRuns.map((call) => (call.args as Json | undefined)?.planId).filter((id): id is string => typeof id === "string" && id !== ""));
+    const bySpec = approvedRuns.filter((call) => (call.args as Json | undefined)?.spec !== undefined || typeof (call.args as Json | undefined)?.planId !== "string");
+    const unnamed = pipelineRuns.filter(({ run }) => !named.has(str(run.plan_id)));
+    add(
+      "pipeline_run_by_plan_reference",
+      "harness",
+      "every qdash_run_pipeline call that ran named a stored plan by planId and no spec, and every recorded run carries out a plan one of them named",
+      approvedRuns.length === 0
+        ? "no qdash_run_pipeline call ran"
+        : bySpec.length > 0
+          ? `${bySpec.length} call(s) ran without a planId or with a spec`
+          : unnamed.length > 0
+            ? `run(s) ${unnamed.map(({ run }) => str(run.run_id)).join(", ")} carry out a plan no call named`
+            : `plan(s) ${[...named].join(", ")}`,
+      approvedRuns.length > 0 && bySpec.length === 0 && unnamed.length === 0,
+    );
+    const stored = calls.filter((call) => (call.toolName === "qdash_create_pipeline_plan" || call.toolName === "codemode") && call.outcome === "ok");
+    add("plan_preparation", "harness", "informational", `${stored.filter((call) => call.toolName === "qdash_create_pipeline_plan").length} direct qdash_create_pipeline_plan call(s), ${stored.filter((call) => call.toolName === "codemode").length} code mode script(s)`, true, false);
+  }
   const executionReads = calls.filter((call, index) => index > started && started >= 0 && call.toolName === "qdash_get_execution" && call.outcome === "ok").length;
   add("execution_reads", "harness", "informational", `${executionReads} qdash_get_execution call(s) after the run started`, true, false);
 
   // The manual baseline, started by the harness through the API without a session or origin.
   const baseline = records.baseline;
-  add("baseline_completed", "harness", "the manual baseline pipeline ran to completion before the prompt", baseline ? baseline.status : "not run", baseline?.status === "completed");
-  if (baseline) {
+  if (evidence.scenario.baseline) add("baseline_completed", "harness", "the manual baseline pipeline ran to completion before the prompt", baseline ? baseline.status : "not run", baseline?.status === "completed");
+  if (baseline && evidence.scenario.baseline) {
     const views = [...baseline.listRows.map((row) => ["list", row] as const), ...baseline.details.map((detail) => ["detail", detail] as const)];
     const attached = views.filter(([, view]) => view.calibration_session != null || view.reported_origin != null || ((view.agent_session ?? null) as Json | null)?.linked === true);
     add(
@@ -707,4 +751,36 @@ function evaluateCalibration(evidence: ScenarioEvidence, runs: RunTranscript[], 
     saysPipeline && !claimsAgentSession ? "pipeline launched by the tool" : claimsAgentSession ? "claims an agent session ran it" : "provenance not stated",
     saysPipeline && !claimsAgentSession,
   );
+}
+
+/**
+ * Why a recorded run does not show that it carried out an in-scope stored plan, or an empty list
+ * when it does. The run's own `plan_id` and `review_digest` are QDash's record of what was
+ * approved and run; the plan itself, read back from QDash, must have that digest and stay on the
+ * scenario's chip, user, qubit, and tasks.
+ */
+export function storedPlanProblems(run: Json, plan: Json | undefined, evidence: Pick<ScenarioEvidence, "target" | "username">, tasks: readonly string[]): string[] {
+  const { target, username } = evidence;
+  const planId = str(run.plan_id);
+  const digest = str(run.review_digest);
+  const problems: string[] = [];
+  if (!planId) problems.push("the run records no plan_id (started from a spec)");
+  if (!REVIEW_DIGEST_PATTERN.test(digest)) problems.push(`the run records no review digest${digest ? ` (${digest})` : ""}`);
+  if (!planId) return problems;
+  if (!plan) {
+    problems.push(`plan ${planId} could not be read from QDash`);
+    return problems;
+  }
+  if (str(plan.plan_id) !== planId) problems.push(`QDash answered with plan ${str(plan.plan_id) || "none"}`);
+  if (str(plan.review_digest) !== digest) problems.push(`the stored plan's digest is ${str(plan.review_digest) || "none"}`);
+  if (str(plan.chip_id) !== target.chipId) problems.push(`plan chip ${str(plan.chip_id) || "none"}`);
+  if (str(plan.created_by) !== username) problems.push(`plan stored by ${str(plan.created_by) || "nobody"}`);
+  const qids = Array.isArray(plan.target_qids) ? (plan.target_qids as unknown[]).map(String) : [];
+  if (!sameSet(qids, [target.qid])) problems.push(`plan starts on ${qids.join(",") || "no qubit"}`);
+  const steps = (Array.isArray(plan.steps) ? plan.steps : []) as Json[];
+  const calls = steps.flatMap((step) => ((Array.isArray(step.calls) ? step.calls : []) as Json[]).map((call) => str(call.name)));
+  if (calls.length === 0) problems.push("the plan resolves to no task call");
+  const off = calls.filter((name) => !tasks.includes(name));
+  if (off.length > 0) problems.push(`plan calls ${off.join(", ")}`);
+  return problems;
 }

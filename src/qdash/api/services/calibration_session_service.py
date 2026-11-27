@@ -732,6 +732,8 @@ class CalibrationSessionService:
             flow_end_state=run.flow_end_state,
             execution_id=run.execution_id,
             error=run.error,
+            plan_id=run.plan_id,
+            review_digest=run.review_digest,
             requested_at=run.requested_at,
             updated_at=run.updated_at,
             pipeline=pipeline,
