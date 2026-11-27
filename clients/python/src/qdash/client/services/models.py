@@ -5168,6 +5168,14 @@ class ReanalyzeQubitSpectroscopyParams(BaseModel):
     Optional analysis-parameter overrides for qubit spectroscopy.
     """
 
+    frequency_min: Annotated[float | None, Field(title="Frequency Min")] = None
+    """
+    Lowest frequency (GHz) to analyze. Columns below it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Use it to exclude a spur or edge noise without measuring again.
+    """
+    frequency_max: Annotated[float | None, Field(title="Frequency Max")] = None
+    """
+    Highest frequency (GHz) to analyze. Columns above it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Must be greater than frequency_min when both are given.
+    """
     binarize_threshold_sigma_plus: Annotated[
         float | None, Field(title="Binarize Threshold Sigma Plus")
     ] = None
@@ -5175,6 +5183,9 @@ class ReanalyzeQubitSpectroscopyParams(BaseModel):
         float | None, Field(title="Binarize Threshold Sigma Minus")
     ] = None
     top_power: Annotated[float | None, Field(title="Top Power")] = None
+    """
+    Power (dB) just above the strongest analyzed row; peak heights are measured from it. Rows at or above top_power are dropped before the analysis runs, so the returned figure shows only the rows below it.
+    """
     f01_height_min: Annotated[float | None, Field(title="F01 Height Min")] = None
     f12_distance_min: Annotated[float | None, Field(title="F12 Distance Min")] = None
     f12_distance_max: Annotated[float | None, Field(title="F12 Distance Max")] = None
@@ -5236,6 +5247,14 @@ class ReanalyzeResonatorSpectroscopyParams(BaseModel):
     :class:`EstimateResonatorFrequencyConfig`.
     """
 
+    frequency_min: Annotated[float | None, Field(title="Frequency Min")] = None
+    """
+    Lowest frequency (GHz) to analyze. Columns below it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Use it to exclude a spur or edge noise without measuring again.
+    """
+    frequency_max: Annotated[float | None, Field(title="Frequency Max")] = None
+    """
+    Highest frequency (GHz) to analyze. Columns above it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Must be greater than frequency_min when both are given.
+    """
     num_resonators: Annotated[int | None, Field(title="Num Resonators")] = None
     """
     Number of resonators to detect in the MUX (typically 4).

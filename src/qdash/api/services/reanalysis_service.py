@@ -21,6 +21,7 @@ from itertools import pairwise
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
 from bunnet import SortDirection
 from fastapi import HTTPException
 
@@ -58,6 +59,7 @@ from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    import numpy.typing as npt
     import plotly.graph_objs as go
 
 logger = logging.getLogger(__name__)
@@ -70,6 +72,11 @@ MARKED_FIGURE_ROLE = "marked"
 PNG_MEDIA_TYPE = "image/png"
 PREVIEW_IMAGE_ERROR = "Preview image rendering failed."
 
+
+MIN_ANALYSIS_POINTS = 2
+FREQUENCY_WINDOW_ERROR = "Frequency window leaves fewer than 2 frequency points to analyze."
+# Window edges given in GHz match grid points within 1 Hz, despite float rounding.
+FREQUENCY_WINDOW_TOLERANCE_GHZ = 1e-9
 
 MAX_INLINE_LABEL_CHARS = 200
 _INLINE_SIZE_RANGE = (100, 4000)
@@ -199,6 +206,96 @@ def _build_inline_figure(figure: dict[str, Any]) -> go.Figure:
     return pgo.Figure(data=[pgo.Heatmap(**heatmap)], layout=pgo.Layout(**safe_layout))
 
 
+def _heatmap_grid(
+    fig: go.Figure,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    """The first trace's x, y, and z as float arrays, with z shaped (len(y), len(x))."""
+    trace = fig.data[0]
+    xs = np.asarray(trace.x, dtype=np.float64)
+    ys = np.asarray(trace.y, dtype=np.float64)
+    zs = np.asarray(trace.z, dtype=np.float64)
+    if xs.ndim != 1 or ys.ndim != 1 or zs.shape != (len(ys), len(xs)):
+        raise ValueError(
+            f"heatmap z has shape {zs.shape}; expected (len(y), len(x)) = {(len(ys), len(xs))}"
+        )
+    return xs, ys, zs
+
+
+def _with_grid(
+    fig: go.Figure,
+    xs: npt.NDArray[np.float64],
+    ys: npt.NDArray[np.float64],
+    zs: npt.NDArray[np.float64],
+) -> go.Figure:
+    """A copy of ``fig`` whose first trace holds the given grid."""
+    import plotly.graph_objects as pgo
+
+    result = pgo.Figure(fig)
+    result.data[0].update(x=xs.tolist(), y=ys.tolist(), z=zs.tolist())
+    # A fixed axis range would show the dropped part of the sweep as empty space.
+    if result.layout.xaxis.range is not None:
+        result.layout.xaxis.range = [float(xs.min()), float(xs.max())]
+    if result.layout.yaxis.range is not None:
+        result.layout.yaxis.range = [float(ys.min()), float(ys.max())]
+    return result
+
+
+def _apply_frequency_window(
+    fig: go.Figure, frequency_min: float | None, frequency_max: float | None
+) -> go.Figure:
+    """Keep only the heatmap columns whose frequency lies in the window (inclusive).
+
+    Returns ``fig`` itself when no window is given. Raises HTTP 422 when fewer than
+    two columns remain.
+    """
+    if frequency_min is None and frequency_max is None:
+        return fig
+    xs, ys, zs = _heatmap_grid(fig)
+    keep = np.ones(len(xs), dtype=bool)
+    if frequency_min is not None:
+        keep &= xs >= frequency_min - FREQUENCY_WINDOW_TOLERANCE_GHZ
+    if frequency_max is not None:
+        keep &= xs <= frequency_max + FREQUENCY_WINDOW_TOLERANCE_GHZ
+    if int(keep.sum()) < MIN_ANALYSIS_POINTS:
+        raise HTTPException(status_code=422, detail=FREQUENCY_WINDOW_ERROR)
+    return _with_grid(fig, xs[keep], ys, zs[:, keep])
+
+
+def _drop_rows_from_top_power(fig: go.Figure, top_power: float) -> go.Figure:
+    """Drop the power rows at or above ``top_power``, as a retry trim does.
+
+    The qubit estimator measures peak heights from ``top_power`` and requires it to
+    exceed every analyzed row. A ``top_power`` inside the sweep therefore drops the
+    rows at or above it, leaving ``top_power`` as their ceiling. Returns ``fig``
+    itself when no row is dropped. Raises HTTP 422 when fewer than two rows remain.
+    """
+    xs, ys, zs = _heatmap_grid(fig)
+    keep = ys < top_power
+    if bool(keep.all()):
+        return fig
+    if int(keep.sum()) < MIN_ANALYSIS_POINTS:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"top_power {top_power:g} dB leaves fewer than 2 power rows to analyze; "
+                f"the sweep's rows span {float(ys.min()):g} to {float(ys.max()):g} dB."
+            ),
+        )
+    return _with_grid(fig, xs, ys[keep], zs[keep])
+
+
+INVALID_PARAMETERS_ERROR = "Invalid analysis configuration parameters."
+
+
+def _invalid_parameters(task_name: str) -> HTTPException:
+    """HTTP 422 for an analysis configuration that cannot be built.
+
+    The cause can quote stored run-parameter values, so it is logged, not returned.
+    """
+    logger.warning("Invalid %s analysis configuration", task_name, exc_info=True)
+    return HTTPException(status_code=422, detail=INVALID_PARAMETERS_ERROR)
+
+
 @contextmanager
 def _analysis_errors(source: _ReanalysisSource) -> Iterator[None]:
     """Report an analysis that cannot run on an inline figure as HTTP 422.
@@ -274,9 +371,19 @@ class ReanalysisService:
         include_image: bool,
     ) -> ReanalyzeResponse:
         run_parameters = source.run_parameters
-        analysis_fig = remove_known_false_spikes_from_figure(source.raw_figure)
+        try:
+            config = self._build_resonator_config(params, run_parameters)
+        except ValueError as exc:
+            raise _invalid_parameters(source.task_name) from exc
 
-        config = self._build_resonator_config(params, run_parameters)
+        denoised_fig = remove_known_false_spikes_from_figure(source.raw_figure)
+        # Partial-MUX slot guessing compares the resonances with the measured sweep's
+        # bounds, so it keeps the whole sweep's frequencies when a window is cut.
+        scan_xs = list(denoised_fig.data[0].x)
+        # The spike ranges depend on the whole sweep's band, so the window is cut afterwards.
+        analysis_fig = _apply_frequency_window(
+            denoised_fig, params.frequency_min, params.frequency_max
+        )
 
         # Older results stored analysis settings as run parameters. Newer results use
         # the task's internal analysis default when no explicit reanalysis override exists.
@@ -307,7 +414,6 @@ class ReanalysisService:
         )
 
         trace = analysis_fig.data[0]
-        xs = list(trace.x)
         local_boundaries, optimal_powers = self._estimate_resonator_powers(
             qid,
             list(trace.y),
@@ -329,7 +435,7 @@ class ReanalysisService:
         assignment_order = self._pick_resonator_assignment_order(params, run_parameters)
         resonance_index = self._resonance_index_for_qid(
             qid,
-            xs,
+            scan_xs,
             frequencies,
             assignment_order=assignment_order,
             marked_fig=marked_fig,
@@ -400,13 +506,19 @@ class ReanalysisService:
         *,
         include_image: bool,
     ) -> ReanalyzeResponse:
-        raw_fig = source.raw_figure
-
-        config = self._build_qubit_config(params, source.run_parameters)
+        try:
+            config = self._build_qubit_config(params, source.run_parameters)
+        except ValueError as exc:
+            raise _invalid_parameters(source.task_name) from exc
         retry_with_trim = bool(params.retry_with_trim)
 
+        analysis_fig = _apply_frequency_window(
+            source.raw_figure, params.frequency_min, params.frequency_max
+        )
+        analysis_fig = _drop_rows_from_top_power(analysis_fig, config.top_power)
+
         marked_fig, freq_result = estimate_and_mark_qubit_figure(
-            raw_fig, config, retry_with_trim=retry_with_trim
+            analysis_fig, config, retry_with_trim=retry_with_trim
         )
 
         outputs: list[ReanalyzeOutputParameter] = []

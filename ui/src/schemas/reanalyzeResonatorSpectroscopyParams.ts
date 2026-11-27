@@ -7,6 +7,8 @@
  */
 import type { ReanalyzeResonatorSpectroscopyParamsBareShiftEstimatorType } from './reanalyzeResonatorSpectroscopyParamsBareShiftEstimatorType';
 import type { ReanalyzeResonatorSpectroscopyParamsBareShiftStrengthLimit } from './reanalyzeResonatorSpectroscopyParamsBareShiftStrengthLimit';
+import type { ReanalyzeResonatorSpectroscopyParamsFrequencyMax } from './reanalyzeResonatorSpectroscopyParamsFrequencyMax';
+import type { ReanalyzeResonatorSpectroscopyParamsFrequencyMin } from './reanalyzeResonatorSpectroscopyParamsFrequencyMin';
 import type { ReanalyzeResonatorSpectroscopyParamsHighPowerMax } from './reanalyzeResonatorSpectroscopyParamsHighPowerMax';
 import type { ReanalyzeResonatorSpectroscopyParamsHighPowerMin } from './reanalyzeResonatorSpectroscopyParamsHighPowerMin';
 import type { ReanalyzeResonatorSpectroscopyParamsLowPower } from './reanalyzeResonatorSpectroscopyParamsLowPower';
@@ -20,6 +22,10 @@ import type { ReanalyzeResonatorSpectroscopyParamsResonatorAssignmentOrder } fro
  * :class:`EstimateResonatorFrequencyConfig`.
  */
 export interface ReanalyzeResonatorSpectroscopyParams {
+  /** Lowest frequency (GHz) to analyze. Columns below it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Use it to exclude a spur or edge noise without measuring again. */
+  frequency_min?: ReanalyzeResonatorSpectroscopyParamsFrequencyMin;
+  /** Highest frequency (GHz) to analyze. Columns above it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Must be greater than frequency_min when both are given. */
+  frequency_max?: ReanalyzeResonatorSpectroscopyParamsFrequencyMax;
   /** Number of resonators to detect in the MUX (typically 4). */
   num_resonators?: ReanalyzeResonatorSpectroscopyParamsNumResonators;
   /** Minimum power (dB) for the high-power region. */

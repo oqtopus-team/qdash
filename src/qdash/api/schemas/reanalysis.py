@@ -15,8 +15,40 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 # Largest inline figure accepted, as serialized JSON. Stored spectroscopy figures are a few MB.
 MAX_INLINE_FIGURE_BYTES = 20 * 1024 * 1024
 
+FREQUENCY_MIN_DESCRIPTION = (
+    "Lowest frequency (GHz) to analyze. Columns below it are dropped from the heatmap "
+    "before the analysis runs, and the returned figure shows only the analyzed window. "
+    "Use it to exclude a spur or edge noise without measuring again."
+)
+FREQUENCY_MAX_DESCRIPTION = (
+    "Highest frequency (GHz) to analyze. Columns above it are dropped from the heatmap "
+    "before the analysis runs, and the returned figure shows only the analyzed window. "
+    "Must be greater than frequency_min when both are given."
+)
 
-class ReanalyzeResonatorSpectroscopyParams(BaseModel):
+
+class _FrequencyWindowParams(BaseModel):
+    """An optional frequency window that restricts the analyzed heatmap columns."""
+
+    frequency_min: float | None = Field(
+        default=None, allow_inf_nan=False, description=FREQUENCY_MIN_DESCRIPTION
+    )
+    frequency_max: float | None = Field(
+        default=None, allow_inf_nan=False, description=FREQUENCY_MAX_DESCRIPTION
+    )
+
+    @model_validator(mode="after")
+    def validate_frequency_window(self) -> _FrequencyWindowParams:
+        if (
+            self.frequency_min is not None
+            and self.frequency_max is not None
+            and self.frequency_min >= self.frequency_max
+        ):
+            raise ValueError("frequency_min must be less than frequency_max")
+        return self
+
+
+class ReanalyzeResonatorSpectroscopyParams(_FrequencyWindowParams):
     """Optional analysis-parameter overrides for resonator spectroscopy.
 
     Any field left ``None`` falls back to the default in
@@ -71,12 +103,20 @@ class ReanalyzeResonatorSpectroscopyParams(BaseModel):
         return value
 
 
-class ReanalyzeQubitSpectroscopyParams(BaseModel):
+class ReanalyzeQubitSpectroscopyParams(_FrequencyWindowParams):
     """Optional analysis-parameter overrides for qubit spectroscopy."""
 
     binarize_threshold_sigma_plus: float | None = Field(default=None)
     binarize_threshold_sigma_minus: float | None = Field(default=None)
-    top_power: float | None = Field(default=None)
+    top_power: float | None = Field(
+        default=None,
+        allow_inf_nan=False,
+        description=(
+            "Power (dB) just above the strongest analyzed row; peak heights are measured "
+            "from it. Rows at or above top_power are dropped before the analysis runs, "
+            "so the returned figure shows only the rows below it."
+        ),
+    )
     f01_height_min: float | None = Field(default=None)
     f12_distance_min: float | None = Field(default=None)
     f12_distance_max: float | None = Field(default=None)

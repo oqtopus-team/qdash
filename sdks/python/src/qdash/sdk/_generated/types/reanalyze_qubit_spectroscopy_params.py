@@ -13,9 +13,23 @@ class ReanalyzeQubitSpectroscopyParams(UniversalBaseModel):
     Optional analysis-parameter overrides for qubit spectroscopy.
     """
 
+    frequency_min: typing.Optional[float] = pydantic.Field(default=None)
+    """
+    Lowest frequency (GHz) to analyze. Columns below it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Use it to exclude a spur or edge noise without measuring again.
+    """
+
+    frequency_max: typing.Optional[float] = pydantic.Field(default=None)
+    """
+    Highest frequency (GHz) to analyze. Columns above it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Must be greater than frequency_min when both are given.
+    """
+
     binarize_threshold_sigma_plus: typing.Optional[float] = None
     binarize_threshold_sigma_minus: typing.Optional[float] = None
-    top_power: typing.Optional[float] = None
+    top_power: typing.Optional[float] = pydantic.Field(default=None)
+    """
+    Power (dB) just above the strongest analyzed row; peak heights are measured from it. Rows at or above top_power are dropped before the analysis runs, so the returned figure shows only the rows below it.
+    """
+
     f01height_min: typing_extensions.Annotated[
         typing.Optional[float],
         FieldMetadata(alias="f01_height_min"),

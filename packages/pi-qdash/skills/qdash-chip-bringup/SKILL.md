@@ -90,7 +90,9 @@ Triage spectroscopy results from their outputs before spending evaluations or ha
    `qdash_reanalyze_qubit_spectroscopy` or `qdash_reanalyze_resonator_spectroscopy` with the
    result's `sourceTaskId` and adjusted `parameters` (for example `f01_height_min`, `top_power`,
    or the binarization thresholds for f01; the power region, `bare_shift_estimator_type`, or
-   `resonator_assignment_order` for resonators). Call `qcal_evaluate` again only when the
+   `resonator_assignment_order` for resonators). When a spur or edge noise is picked instead of
+   the real feature, pass `frequencyMin` and `frequencyMax` (GHz) around the feature to exclude
+   it without measuring again; the returned figure shows only that window. Call `qcal_evaluate` again only when the
    reanalysis returns an image. When PNG rendering fails (the result reports `image_error`),
    do not call `qcal_evaluate`, because it would evaluate an older stored figure of the task:
    keep the outputs as unverified candidates and report the rendering failure. Change one or two

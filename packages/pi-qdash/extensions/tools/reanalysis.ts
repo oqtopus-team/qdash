@@ -32,6 +32,8 @@ type ReanalyzeParams<P> = ConnectionParams & {
   qid: string;
   sourceTaskId?: string;
   figure?: Record<string, unknown>;
+  frequencyMin?: number;
+  frequencyMax?: number;
   parameters?: P;
   includeImage?: boolean;
 };
@@ -93,6 +95,12 @@ function targetParams(taskName: string) {
         description: `A raw ${taskName} Plotly figure JSON object to analyze instead of a stored result, such as one a script read with qdash_analyze_figure_json includeData. The first trace must be the 2D heatmap (x in GHz, y in dB); a marked figure is rejected. Stored run parameters do not apply. At most 20 MiB. Not with sourceTaskId.`,
       }),
     ),
+    frequencyMin: Type.Optional(
+      Type.Number({ description: "Lowest frequency (GHz) to analyze. Heatmap columns below it are dropped before the analysis, and the returned figure shows only the window. Use it to exclude a spur or edge noise without measuring again." }),
+    ),
+    frequencyMax: Type.Optional(
+      Type.Number({ description: "Highest frequency (GHz) to analyze. Heatmap columns above it are dropped before the analysis. Must be greater than frequencyMin when both are given." }),
+    ),
     includeImage: Type.Optional(
       Type.Boolean({ description: "Return a PNG of the re-analyzed marked figure as image content, for qcal_evaluate. Defaults to true; pass false from a code mode script, which receives no images." }),
     ),
@@ -126,7 +134,9 @@ const qubitParameters = Type.Object(
   {
     binarize_threshold_sigma_plus: Type.Optional(Type.Number({ description: "Upper binarization threshold in sigma (default 3.0)." })),
     binarize_threshold_sigma_minus: Type.Optional(Type.Number({ description: "Lower binarization threshold in sigma (default -2.0)." })),
-    top_power: Type.Optional(Type.Number({ description: "Highest power row (dB) used by the analysis (default 0.0)." })),
+    top_power: Type.Optional(
+      Type.Number({ description: "Power (dB) just above the strongest analyzed row; peak heights are measured from it (default 0.0). Rows at or above it are dropped, so -5 with a sweep ending at -5 dB leaves out that row." }),
+    ),
     f01_height_min: Type.Optional(Type.Number({ description: "Smallest f01 feature height, in power rows times step (default 14.9)." })),
     f12_distance_min: Type.Optional(Type.Number({ description: "Smallest f01-f12 distance (GHz) searched for f12." })),
     f12_distance_max: Type.Optional(Type.Number({ description: "Largest f01-f12 distance (GHz) searched for f12." })),
@@ -146,6 +156,33 @@ function formatNumber(value: number): string {
 
 function definedEntries(object: object | undefined): Json {
   return Object.fromEntries(Object.entries(object ?? {}).filter(([, value]) => value !== undefined && value !== null));
+}
+
+/**
+ * The overrides with the frequency window merged in: `frequencyMin` and `frequencyMax` take
+ * precedence over `frequency_min` and `frequency_max` in `parameters`. Throws before any request
+ * when the merged window is unusable.
+ */
+export function withFrequencyWindow(tool: string, parameters: Json, frequencyMin: number | undefined, frequencyMax: number | undefined): Json {
+  const window = definedEntries({ frequency_min: frequencyMin, frequency_max: frequencyMax });
+  const merged = { ...parameters, ...window };
+  const edges = [
+    ["frequencyMin", "frequency_min"],
+    ["frequencyMax", "frequency_max"],
+  ] as const;
+  for (const [name, field] of edges) {
+    const value = merged[field];
+    if (value !== undefined && (typeof value !== "number" || !Number.isFinite(value))) {
+      const source = field in window ? name : `parameters.${field}`;
+      throw new Error(`${tool}: ${source} must be a finite frequency in GHz.`);
+    }
+  }
+  const min = merged.frequency_min as number | undefined;
+  const max = merged.frequency_max as number | undefined;
+  if (min !== undefined && max !== undefined && min >= max) {
+    throw new Error(`${tool}: the frequency window's minimum (${min} GHz) must be less than its maximum (${max} GHz); check frequencyMin, frequencyMax, and parameters.frequency_min and frequency_max.`);
+  }
+  return merged;
 }
 
 /** The response as tool data: outputs by name, no Plotly figure, the image reduced to its status. */
@@ -236,10 +273,10 @@ function registerReanalysisTool<P extends object>(
       if (params.sourceTaskId && params.figure) {
         throw new Error(`${spec.name} takes either sourceTaskId or figure, not both. Pass sourceTaskId to re-analyze a stored result, or figure for a Plotly figure you already have.`);
       }
+      const parameters = withFrequencyWindow(spec.name, definedEntries(params.parameters), params.frequencyMin, params.frequencyMax);
       const client = await deps.makeClient(params);
       const chipId = await deps.resolveChipId(client, params);
       const includeImage = params.includeImage !== false;
-      const parameters = definedEntries(params.parameters);
       const response = await spec.call(
         client,
         chipId,
@@ -276,10 +313,11 @@ export function registerReanalysisTools(pi: Pick<ExtensionAPI, "registerTool">, 
     label: "QDash Reanalyze Resonator Spectroscopy",
     taskName: "CheckResonatorSpectroscopy",
     description:
-      "Re-run the analysis of a stored CheckResonatorSpectroscopy result for one qubit with adjusted analysis parameters (power region, bare-shift estimator, resonator assignment order) and return the re-estimated readout_frequency, optimal_power (dB), and readout_amplitude (a.u.), with the marked figure as an image. Pass figure instead to analyze a raw Plotly figure JSON you already have. Read-only preview: QDash stores nothing and uses no hardware.",
+      "Re-run the analysis of a stored CheckResonatorSpectroscopy result for one qubit with adjusted analysis parameters (power region, bare-shift estimator, resonator assignment order) and return the re-estimated readout_frequency, optimal_power (dB), and readout_amplitude (a.u.), with the marked figure as an image. frequencyMin and frequencyMax restrict the analysis to a frequency window. Pass figure instead to analyze a raw Plotly figure JSON you already have. Read-only preview: QDash stores nothing and uses no hardware.",
     promptSnippet: "Re-analyze a stored resonator spectroscopy result with adjusted analysis parameters (preview, no hardware)",
     promptGuidelines: [
       `Use ${REANALYZE_RESONATOR_TOOL} when a resonator spectroscopy result shows a real resonance that the analysis missed or assigned to the wrong qubit; adjust the analysis parameters instead of measuring again.`,
+      `When a spur or edge noise outside the resonators pulls the ${REANALYZE_RESONATOR_TOOL} analysis, pass frequencyMin and frequencyMax (GHz) to exclude it instead of measuring again.`,
       `${REANALYZE_RESONATOR_TOOL} changes nothing in QDash: treat its outputs as candidates, check the returned figure with qcal_evaluate, and confirm them with a targeted measurement before committing.`,
     ],
     parameters: resonatorParameters,
@@ -290,10 +328,11 @@ export function registerReanalysisTools(pi: Pick<ExtensionAPI, "registerTool">, 
     label: "QDash Reanalyze Qubit Spectroscopy",
     taskName: "CheckQubitSpectroscopy",
     description:
-      "Re-run the analysis of a stored CheckQubitSpectroscopy result for one qubit with adjusted analysis parameters (binarization thresholds, top power, f01 and f12 limits, trim retry) and return the re-estimated coarse_qubit_frequency, coarse_control_amplitude, f01_repr_db, and f01_quality_level, with the marked figure as an image. Pass figure instead to analyze a raw Plotly figure JSON you already have. Read-only preview: QDash stores nothing and uses no hardware.",
+      "Re-run the analysis of a stored CheckQubitSpectroscopy result for one qubit with adjusted analysis parameters (binarization thresholds, top power, f01 and f12 limits, trim retry) and return the re-estimated coarse_qubit_frequency, coarse_control_amplitude, f01_repr_db, and f01_quality_level, with the marked figure as an image. frequencyMin and frequencyMax restrict the analysis to a frequency window. Pass figure instead to analyze a raw Plotly figure JSON you already have. Read-only preview: QDash stores nothing and uses no hardware.",
     promptSnippet: "Re-analyze a stored qubit spectroscopy result with adjusted analysis parameters (preview, no hardware)",
     promptGuidelines: [
       `Use ${REANALYZE_QUBIT_TOOL} when a qubit spectroscopy figure shows a real f01 line that the analysis missed, marked in the wrong place, or rated low; adjust the analysis parameters instead of measuring again.`,
+      `When a spur or edge noise is picked as f01 by ${REANALYZE_QUBIT_TOOL}, pass frequencyMin and frequencyMax (GHz) around the real line to exclude it instead of measuring again.`,
       `${REANALYZE_QUBIT_TOOL} changes nothing in QDash: treat coarse_qubit_frequency and coarse_control_amplitude as seeds, check the returned figure with qcal_evaluate, and confirm them on hardware (for example CheckControlAmplitude then CheckAdaptiveChevron) before committing.`,
     ],
     parameters: qubitParameters,
