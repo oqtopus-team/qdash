@@ -186,3 +186,36 @@ def test_window_task_is_registered_and_not_batch_capable() -> None:
         "simultaneous_drive",
         "window_width",
     }
+
+
+def test_check_qubit_spectroscopy_batch_run_uses_per_qid_windows(monkeypatch) -> None:
+    exp = _FakeExperiment(default_range=(6.5, 9.5, 0.005))
+    backend = _FakeBackend(exp)
+    task = CheckQubitSpectroscopy()
+    task.input_parameters["readout_amplitude"] = InputParameterModel(value=0.015)
+    monkeypatch.setattr(task, "save_calibration", lambda _b: None)
+
+    # First qid has a narrow window [7.20, 7.80].
+    task.input_parameters["qubit_frequency_window_min"] = InputParameterModel(value=7.20)
+    task.input_parameters["qubit_frequency_window_max"] = InputParameterModel(value=7.80)
+    task.resolve_run_parameters(backend, "32")  # type: ignore[arg-type]
+
+    # Second qid has a distinct window [8.30, 8.90].
+    task.input_parameters["qubit_frequency_window_min"] = InputParameterModel(value=8.30)
+    task.input_parameters["qubit_frequency_window_max"] = InputParameterModel(value=8.90)
+    task.resolve_run_parameters(backend, "33")  # type: ignore[arg-type]
+
+    # Third qid has no stored window -> falls back to full control-box band.
+    task.input_parameters["qubit_frequency_window_min"] = InputParameterModel(value=None)
+    task.input_parameters["qubit_frequency_window_max"] = InputParameterModel(value=None)
+    task.resolve_run_parameters(backend, "34")  # type: ignore[arg-type]
+
+    task.batch_run(backend, ["32", "33", "34"])  # type: ignore[arg-type]
+
+    assert len(exp.calls) == 3
+    q32_freqs = np.asarray(exp.calls[0]["frequency_range"], dtype=float)
+    q33_freqs = np.asarray(exp.calls[1]["frequency_range"], dtype=float)
+    q34_freqs = np.asarray(exp.calls[2]["frequency_range"], dtype=float)
+    assert (q32_freqs[0], q32_freqs[-1]) == pytest.approx((7.20, 7.795), abs=1e-6)
+    assert (q33_freqs[0], q33_freqs[-1]) == pytest.approx((8.30, 8.895), abs=1e-6)
+    assert (q34_freqs[0], q34_freqs[-1]) == pytest.approx((6.50, 9.495), abs=1e-6)

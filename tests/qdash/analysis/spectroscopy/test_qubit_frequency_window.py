@@ -111,3 +111,18 @@ def test_window_figure_draws_all_power_rows_and_shades_selected_window() -> None
     assert all(trace.fill == "tozeroy" for trace in figure.data)
     # 3 vrects + 3 vlines across the 3 power subplots
     assert len(figure.layout.shapes) == 6
+
+
+def test_unordered_frequencies_are_sorted_before_despike_and_clustering() -> None:
+    freqs = np.array([7.03, 7.00, 7.01, 7.04, 7.06, 7.07, 7.05, 7.08, 7.02])
+    phases = np.array([[1.0, 0.0, 0.0, 2.0, 0.0, 0.0, 1.0, 0.0, 0.0]])
+
+    result = estimate_qubit_frequency_window(
+        freqs, np.array([-15.0]), phases, margin_ghz=0.01, min_window_ghz=0.04
+    )
+
+    assert result.succeeded
+    assert result.center_frequency is not None
+    assert 7.03 <= result.center_frequency <= 7.05
+    assert result.window_min is not None and result.window_max is not None
+    assert result.window_min <= 7.03 and result.window_max >= 7.05

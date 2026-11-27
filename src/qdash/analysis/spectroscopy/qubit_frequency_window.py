@@ -136,6 +136,9 @@ def estimate_qubit_frequency_window(
     grid = np.atleast_2d(np.asarray(phase_rows, dtype=float))
     if grid.shape != (p.size, x.size):
         raise ValueError(f"phase_rows must have shape ({p.size}, {x.size}), got {grid.shape}")
+    order_f = np.argsort(x, kind="stable")
+    x = x[order_f]
+    grid = grid[:, order_f]
     if x.size < _MIN_TRACE_POINTS or p.size == 0:
         return QubitFrequencyWindowResult(
             window_min=None,
@@ -300,6 +303,9 @@ def create_qubit_frequency_window_figure(
         raise ValueError(f"phase_rows must have shape ({p.size}, {x.size}), got {grid.shape}")
     if p.size == 0:
         raise ValueError("At least one power row is required to draw the figure")
+    order_f = np.argsort(x, kind="stable")
+    x = x[order_f]
+    grid = grid[:, order_f]
 
     order = np.argsort(p)
     n_rows = int(p.size)
