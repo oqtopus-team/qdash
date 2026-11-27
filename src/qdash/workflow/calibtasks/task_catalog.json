@@ -5680,6 +5680,88 @@
         "task_type": "qubit"
       },
       {
+        "class_name": "CheckQubitFrequencyWindow",
+        "description": "Fast coarse few-power qubit spectroscopy that locates the qubit response and publishes a narrowed [qubit_frequency_window_min, qubit_frequency_window_max] search range for downstream 2D CheckQubitSpectroscopy.",
+        "documentation": {
+          "description": "Fast coarse few-power qubit spectroscopy that locates the qubit response and publishes a narrowed [qubit_frequency_window_min, qubit_frequency_window_max] search range for downstream 2D CheckQubitSpectroscopy.",
+          "prerequisites": [
+            "readout_frequency (or resonator_frequency) and readout_amplitude are stored."
+          ],
+          "when_to_use": "Run after CheckResonatorQubitMapping (or CheckResonatorSpectroscopy) and before CheckQubitSpectroscopy to avoid scanning empty frequencies across the full 2D grid."
+        },
+        "file_path": "cw/check_qubit_frequency_window.py",
+        "input_parameters": {
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
+            "resolution": "database_required",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckQubitFrequencyWindow",
+        "output_parameters": [
+          "qubit_frequency_window_min",
+          "qubit_frequency_window_max",
+          "window_center_frequency"
+        ],
+        "run_parameters": {
+          "frequency_range": {
+            "description": "Drive frequency range as [start, stop, step] in GHz. Leave blank to use the connected control box's qubex default band with frequency_step.",
+            "unit": "GHz",
+            "value": null,
+            "value_type": "np.arange"
+          },
+          "frequency_step": {
+            "description": "Coarse drive frequency step in GHz used when frequency_range is blank.",
+            "unit": "GHz",
+            "value": 0.01,
+            "value_type": "float"
+          },
+          "interval": {
+            "description": "Time interval between shots",
+            "unit": "ns",
+            "value": 1024.0,
+            "value_type": "float"
+          },
+          "power_range": {
+            "description": "Few-power sweep as [start, stop, step] in dB (stop is exclusive). Default [-25, 0, 10] measures -25, -15, and -5 dB.",
+            "unit": "dB",
+            "value": [
+              -25,
+              0,
+              10
+            ],
+            "value_type": "np.arange"
+          },
+          "shots": {
+            "description": "Number of shots per drive frequency and power point",
+            "unit": "a.u.",
+            "value": 512,
+            "value_type": "int"
+          },
+          "simultaneous_drive": {
+            "description": "Whether control and readout pulses start together. False starts readout after the control pulse ends.",
+            "unit": "a.u.",
+            "value": true,
+            "value_type": "bool"
+          },
+          "window_width": {
+            "description": "Width of the narrowed frequency window in GHz centered on the detected qubit response (default 0.6 GHz, covering both f01 and f02/2).",
+            "unit": "GHz",
+            "value": 0.6,
+            "value_type": "float"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
         "class_name": "CheckQubitSpectroscopy",
         "description": "2D drive frequency and power spectroscopy read out dispersively. It estimates f01 on a 5 MHz grid, published as coarse_qubit_frequency and control_frequency, and a coarse_control_amplitude seed from the power at which the f01 line appears. An f12 estimate is reported only in logs and figures.",
         "documentation": {
@@ -5691,6 +5773,16 @@
         },
         "file_path": "cw/check_qubit_spectroscopy.py",
         "input_parameters": {
+          "qubit_frequency_window_max": {
+            "default_value": null,
+            "resolution": "database_optional",
+            "user_override": "allowed"
+          },
+          "qubit_frequency_window_min": {
+            "default_value": null,
+            "resolution": "database_optional",
+            "user_override": "allowed"
+          },
           "readout_amplitude": {
             "default_value": null,
             "resolution": "database_required",

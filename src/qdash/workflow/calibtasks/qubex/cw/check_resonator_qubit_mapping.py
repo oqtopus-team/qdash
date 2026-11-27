@@ -315,9 +315,17 @@ class CheckResonatorQubitMapping(QubexTask):
 
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
-        box = exp.ctx.experiment_system.get_control_box_for_qubit(label)
+        system = exp.ctx.experiment_system
+        box = system.get_control_box_for_qubit(label)
         start, stop, _default_step = box.traits.default_control_frequency_range
-        parameter.value = (float(start), float(stop), step)
+        effective_stop = float(stop)
+        get_readout_box = getattr(system, "get_readout_box_for_qubit", None)
+        if callable(get_readout_box):
+            readout_box = get_readout_box(label)
+            readout_start = float(readout_box.traits.default_readout_frequency_range[0])
+            if math.isfinite(readout_start):
+                effective_stop = max(effective_stop, readout_start)
+        parameter.value = (float(start), effective_stop, step)
 
     # ------------------------------------------------------------------ candidates
 
