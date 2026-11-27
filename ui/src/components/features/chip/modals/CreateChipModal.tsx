@@ -434,7 +434,10 @@ export function CreateChipModal({
                 sources={configSources}
                 registeredChipIds={registeredChipIds}
                 selectedSystemId={selectedExistingSource?.system_id ?? NO_EXISTING_CONFIG}
-                onSelect={setExistingSystemId}
+                onSelect={(systemId) => {
+                  setServerError(null);
+                  setExistingSystemId(systemId);
+                }}
                 disabled={createChipMutation.isPending}
               />
               {unregisteredSources.length > 0 && topologyField}

@@ -391,6 +391,22 @@ describe("CreateChipModal", () => {
       );
     });
 
+    it("clears a failed registration's error when another configuration is chosen", async () => {
+      mocks.configSources.sources = [SOURCE_64Q, SOURCE_16Q];
+      render(<CreateChipModal isOpen onClose={vi.fn()} />);
+      useExistingConfig();
+      fireEvent.click(screen.getByRole("button", { name: "Create Chip" }));
+      await waitFor(() => expect(mocks.mutate).toHaveBeenCalledTimes(1));
+
+      act(() => mocks.mutationOptions?.onError(new Error("Chip 64Qv3 already exists")));
+      expect(screen.getByRole("alert")).toHaveTextContent("Chip 64Qv3 already exists");
+
+      fireEvent.change(screen.getByLabelText("Existing configuration"), {
+        target: { value: "16Qv1" },
+      });
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+
     it("blocks submission when every configuration is already registered", async () => {
       render(<CreateChipModal isOpen onClose={vi.fn()} existingChipIds={["64Qv3"]} />);
       useExistingConfig();
