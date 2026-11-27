@@ -94,6 +94,10 @@ Seed import accepts operational frequency/amplitude files, never measured qubit 
 frequency files. Publication must be enabled and validation must pass; see
 [Calibration Data Lifecycle](./calibration-data-lifecycle.md).
 
+Adaptive FH Chevron maps `control_frequency_fh` to the Qubex parameter file
+`control_frequency_fh.yaml`. QDash records EC, EJ1, and EJ2 in task history and exposes them
+through **Metrics**, which can export each selected metric as YAML.
+
 ## Implementation and tests
 
 Declarations and publication targets live in `src/qdash/workflow/calibtasks/qubex/`.

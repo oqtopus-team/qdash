@@ -29,10 +29,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_TRANSMON_ENERGY_METRICS = frozenset(
-    {"charging_energy", "josephson_energy_first_harmonic", "josephson_energy_second_harmonic"}
-)
-
 
 def normalize_qid(qid: str) -> str:
     """Normalize qubit ID to canonical format.
@@ -528,19 +524,11 @@ class MetricsService:
         metrics_data: dict[str, dict[str, MetricValue]] = {key: {} for key in valid_metric_keys}
         for metric_name, entity_values in agg_results.items():
             for entity_id, result in entity_values.items():
-                stddev = result.get("stddev")
-                # The harmonic fit leaves the output error at its default of zero.
-                if (
-                    selection_mode == "latest"
-                    and metric_name in _TRANSMON_ENERGY_METRICS
-                    and stddev == 0
-                ):
-                    stddev = None
                 metrics_data[metric_name][entity_id] = MetricValue(
                     value=result["value"],
                     task_id=result["task_id"],
                     execution_id=result["execution_id"],
-                    stddev=stddev,
+                    stddev=result.get("stddev"),
                 )
 
         return metrics_data

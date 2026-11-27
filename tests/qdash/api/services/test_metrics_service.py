@@ -80,31 +80,26 @@ def test_readout_amplitude_is_skipped_by_best_selection():
     assert metrics["readout_amplitude"] == {}
 
 
-def test_transmon_energy_latest_omits_default_uncertainty_only():
+def test_latest_fh_metrics_preserve_values_and_reported_stddev():
     repository = MagicMock()
-    energies = {
+    values = {
+        "fh_frequency": 4.516,
         "charging_energy": 0.24,
         "josephson_energy_first_harmonic": 15.0,
         "josephson_energy_second_harmonic": -0.15,
     }
-    aggregated = {
+    repository.aggregate_latest_metrics.return_value = {
         name: {"0": {"value": value, "task_id": "task-1", "execution_id": "exec-1", "stddev": 0.0}}
-        for name, value in {**energies, "t1": 42.0}.items()
+        for name, value in values.items()
     }
-    repository.aggregate_latest_metrics.return_value = aggregated
-    repository.aggregate_average_metrics.return_value = aggregated
     service = MetricsService(repository, MagicMock())
 
     latest = service.extract_entity_metrics("chip-1", "project-1", "qubit")
-    average = service.extract_entity_metrics(
-        "chip-1", "project-1", "qubit", selection_mode="average"
-    )
 
-    for name, value in energies.items():
+    assert values.keys() <= repository.aggregate_latest_metrics.call_args.kwargs["metric_keys"]
+    for name, value in values.items():
         assert latest[name]["0"].value == value
-        assert latest[name]["0"].model_dump()["stddev"] is None
-        assert average[name]["0"].stddev == 0.0
-    assert latest["t1"]["0"].stddev == 0.0
+        assert latest[name]["0"].stddev == 0.0
 
 
 class TestParseDateRange:
