@@ -803,6 +803,7 @@ export function ChipPageContent() {
       <CreateChipModal
         isOpen={isCreateChipModalOpen}
         onClose={closeCreateChipModal}
+        existingChipIds={projectChips?.map((chip) => chip.chip_id) ?? []}
         guidedByJourney={journey.adoptsCreatedChip}
         captureSubmission={journey.captureCreateSubmission}
         onSuccess={(chipId, _config, submission) => {

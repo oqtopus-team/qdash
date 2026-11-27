@@ -24,9 +24,15 @@ As a project editor:
 2. Enter a **Chip ID**.
 3. Select **Create Chip**, then **Open template** to continue to a workflow.
 
-Every Fake chip uses the same 64-qubit virtual device and **Square Lattice with MUX** topology.
-QDash creates virtual configuration under `CONFIG_PATH` (the example uses
-`./config/qubex-config`), preserving an existing chip directory. Creation is blocked if this
-configuration tree is not mounted.
+In this default **Create new** mode, every Fake chip uses the same 64-qubit virtual device and
+**Square Lattice with MUX** topology. QDash creates virtual configuration under `CONFIG_PATH`
+(the example uses `./config/qubex-config`), preserving an existing chip directory. Creation is
+blocked if this configuration tree is not mounted.
+
+When `CONFIG_PATH` already contains chip directories, select **Use existing config** instead to
+register one of them as a chip. Choose the directory under **Existing configuration** and a
+**Topology Template**, then select **Create Chip**; QDash uses the directory as is, without
+copying or modifying its files. For the steps, see
+[Register an Existing Configuration](./qubex-backend.md#register-an-existing-configuration).
 
 For the guided path from chip creation to a result, use [Run Your First Calibration](../first-calibration.md).

@@ -55,6 +55,23 @@ To edit the generated files on **Config**:
 untracked files, including saved local work. Before pulling, merge your **Create PR** changes or
 copy them outside the deployment's configuration directory.
 
+### Register an Existing Configuration
+
+When a chip directory already exists under `CONFIG_PATH`, register it in QDash without creating
+new files:
+
+1. Open **Chip → Create Chip** and select **Use existing config**.
+2. Under **Existing configuration**, choose the system. Its system ID becomes the chip ID.
+   Systems already registered in the project are marked **(already registered)** and cannot be
+   chosen.
+3. Check the **Topology Template**. QDash preselects a matching template when available
+   (4 qubits per MUX); verify the qubit count and layout before continuing.
+4. Select **Create Chip**.
+
+QDash creates only the chip record and uses the existing directory as is, without copying or
+modifying its files. **Use existing config** appears only when the mounted configuration tree
+contains at least one system.
+
 ## Check Parallel Execution on QuEL-3
 
 QDash's checks do not establish the parallel capacity of your hardware. With `<box ID>:<port>`
