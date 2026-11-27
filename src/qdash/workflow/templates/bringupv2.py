@@ -22,7 +22,7 @@ from qdash.calibration import (
     MuxTargets,
     OneQubitExecutionMode,
     TaskCall,
-    sweep,  # noqa: F401  # used by commented range overrides below
+    sweep,  # used by commented range overrides below
 )
 from qdash.workflow import CalibrationSession, calibration_flow, resolve_calib_context
 
@@ -67,6 +67,18 @@ BRINGUPV2_TASKS: list[TaskCall] = [
             # Decision thresholds; see the task's run parameter descriptions.
             # "min_response_score": 5.0,
             # "min_margin_ratio": 2.0,
+        },
+    ),
+    # Fast coarse few-power sweep on each mapped (qubit, resonator) pair to
+    # narrow the downstream 2D CheckQubitSpectroscopy frequency window.
+    TaskCall(
+        name="CheckQubitFrequencyWindow",
+        run={
+            "frequency_step": 0.010,
+            # "frequency_range": sweep.arange(3.0, 5.75, 0.010),
+            "power_range": sweep.arange(-25, 0, 10),
+            "shots": 512,
+            "interval": 1024,
         },
     ),
     TaskCall(
@@ -132,8 +144,9 @@ def bringupv2(
               all of its tasks
             - "sequential": one MUX and one qubit at a time
             "simultaneous_spectroscopy" is accepted by the type but cannot run this
-            task list: CheckResonatorQubitMapping and CheckControlAmplitude do not
-            support batch execution, so the step is rejected before any hardware work.
+            task list: CheckResonatorQubitMapping, CheckQubitFrequencyWindow and
+            CheckControlAmplitude do not support batch execution, so the step is
+            rejected before any hardware work.
         flow_name: Saved flow name QDash injects at launch; keep it in the signature
             and do not pass it on (session.run reads the launch name itself)
         project_id: Project ID (auto-injected)

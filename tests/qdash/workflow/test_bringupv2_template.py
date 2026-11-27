@@ -35,6 +35,7 @@ def test_bringupv2_runs_mapping_between_resonator_and_qubit_spectroscopy(monkeyp
     assert names(result["steps"][0].tasks) == [
         "CheckResonatorSpectroscopy",
         "CheckResonatorQubitMapping",
+        "CheckQubitFrequencyWindow",
         "CheckQubitSpectroscopy",
         "CheckControlAmplitude",
         "CheckAdaptiveChevron",
@@ -64,6 +65,17 @@ def test_bringupv2_keeps_bringup_settings_and_adds_mapping_settings(monkeypatch)
                 }
             ),
         ),
+        (
+            "CheckQubitFrequencyWindow",
+            settings(
+                run={
+                    "frequency_step": 0.010,
+                    "power_range": {"value": (-25, 0, 10), "value_type": "np.arange"},
+                    "shots": 512,
+                    "interval": 1024,
+                }
+            ),
+        ),
         ("CheckQubitSpectroscopy", settings(run={"shots": 1024, "interval": 1024})),
         ("CheckControlAmplitude", settings(run={"shots": 8192})),
         ("CheckAdaptiveChevron", settings(run={"shots": 256})),
@@ -74,7 +86,7 @@ def test_bringupv2_shares_every_other_call_with_bringup() -> None:
     v2_calls = [
         call
         for call in bringupv2_module.BRINGUPV2_TASKS
-        if call.name != "CheckResonatorQubitMapping"
+        if call.name not in {"CheckResonatorQubitMapping", "CheckQubitFrequencyWindow"}
     ]
 
     assert [call.model_dump() for call in v2_calls] == [
@@ -145,7 +157,11 @@ def test_bringupv2_documents_that_batch_mode_cannot_run_its_tasks() -> None:
     capable = batch_capable_tasks("qubex")
     unsupported = [name for name in names(bringupv2_module.BRINGUPV2_TASKS) if not capable[name]]
 
-    assert unsupported == ["CheckResonatorQubitMapping", "CheckControlAmplitude"]
+    assert unsupported == [
+        "CheckResonatorQubitMapping",
+        "CheckQubitFrequencyWindow",
+        "CheckControlAmplitude",
+    ]
     docstring = bringupv2_module.bringupv2.__doc__ or ""
     batch_note = docstring.split('"simultaneous_spectroscopy"', 1)[1]
     assert all(name in batch_note for name in unsupported)

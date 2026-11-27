@@ -1,5 +1,6 @@
 import copy
 import logging
+import math
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from qubex.experiment.experiment_constants import DEFAULT_SHOTS
@@ -63,6 +64,8 @@ class CheckQubitSpectroscopy(QubexTask):
             fallback_parameter_names=("resonator_frequency",)
         ),
         "readout_amplitude": InputParameterSpec.required_database(),
+        "qubit_frequency_window_min": InputParameterSpec.database_optional(),
+        "qubit_frequency_window_max": InputParameterSpec.database_optional(),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "simultaneous_drive": RunParameterSpec(
@@ -279,6 +282,16 @@ class CheckQubitSpectroscopy(QubexTask):
         parameter = self.run_parameters["frequency_range"]
         return None if parameter.value is None else parameter.get_value()
 
+    def _optional_input_float(self, name: str) -> float | None:
+        parameter = self.input_parameters.get(name)
+        if parameter is None or parameter.value is None:
+            return None
+        try:
+            value = float(parameter.value)
+        except (TypeError, ValueError):
+            return None
+        return value if math.isfinite(value) else None
+
     def resolve_run_parameters(self, backend: QubexBackend, qid: str) -> None:
         """Populate the effective device-specific sweep before it is recorded."""
         super().resolve_run_parameters(backend, qid)
@@ -289,7 +302,20 @@ class CheckQubitSpectroscopy(QubexTask):
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
         box = exp.ctx.experiment_system.get_control_box_for_qubit(label)
-        parameter.value = tuple(box.traits.default_control_frequency_range)
+        box_start, box_stop, box_step = (
+            float(v) for v in box.traits.default_control_frequency_range
+        )
+
+        win_min = self._optional_input_float("qubit_frequency_window_min")
+        win_max = self._optional_input_float("qubit_frequency_window_max")
+        if win_min is not None and win_max is not None and win_max > win_min and box_step > 0:
+            snapped_start = round(math.floor(win_min / box_step) * box_step, 6)
+            snapped_stop = round(math.ceil(win_max / box_step) * box_step, 6)
+            if snapped_stop > snapped_start + box_step:
+                parameter.value = (snapped_start, snapped_stop, box_step)
+                return
+
+        parameter.value = (box_start, box_stop, box_step)
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         """Run the task."""

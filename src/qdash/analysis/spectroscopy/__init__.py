@@ -53,6 +53,13 @@ from qdash.analysis.spectroscopy.mux import (
     resolve_resonator_assignment_order,
     resonator_assignment_order_from_pattern,
 )
+from qdash.analysis.spectroscopy.qubit_frequency_window import (
+    DEFAULT_MIN_WINDOW_GHZ,
+    DEFAULT_WINDOW_MARGIN_GHZ,
+    QubitFrequencyWindowResult,
+    create_qubit_frequency_window_figure,
+    estimate_qubit_frequency_window,
+)
 from qdash.analysis.spectroscopy.remove_false_spike import (
     RemoveFalseSpikeRange,
     remove_false_spike,
@@ -82,7 +89,9 @@ from qdash.analysis.spectroscopy.resonator_qubit_mapping import (
 __all__ = [
     "DEFAULT_MIN_MARGIN_RATIO",
     "DEFAULT_MIN_RESPONSE_SCORE",
+    "DEFAULT_MIN_WINDOW_GHZ",
     "DEFAULT_RESONATOR_ASSIGNMENT_ORDER",
+    "DEFAULT_WINDOW_MARGIN_GHZ",
     "NUM_RESONATORS",
     "PEAK_POSITIONS",
     "PHASE_NOISE_FLOOR",
@@ -105,6 +114,7 @@ __all__ = [
     "Peak",
     "PeakRepresentativeYStrategy",
     "QubitFrequencyResult",
+    "QubitFrequencyWindowResult",
     "QubitMappingOutcome",
     "QubitResponse",
     "RemoveFalseSpikeRange",
@@ -117,6 +127,7 @@ __all__ = [
     "create_bare_shift_boundary_estimator",
     "create_mapping_grid_figure",
     "create_marked_figure",
+    "create_qubit_frequency_window_figure",
     "create_qubit_marked_figure",
     "estimate_and_mark_figure",
     "estimate_and_mark_qubit_figure",
@@ -125,6 +136,7 @@ __all__ = [
     "estimate_optimal_powers",
     "estimate_qubit_frequency",
     "estimate_qubit_frequency_from_figure",
+    "estimate_qubit_frequency_window",
     "estimate_resonator_frequency",
     "estimate_resonator_frequency_from_figure",
     "guess_sorted_slots_for_partial_mux",
