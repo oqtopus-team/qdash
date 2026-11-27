@@ -1218,15 +1218,13 @@ def test_invalid_stored_resonator_parameter_is_a_422_without_its_value(
     assert SENSITIVE_PATH not in str(excinfo.value.detail)
 
 
-def _partial_mux_sweep() -> dict[str, Any]:
-    """Three evenly spaced resonances at 6.0-6.2 GHz in a 5.9-6.4 GHz sweep.
+def _mux_sweep(xs: list[float], resonances: list[float]) -> dict[str, Any]:
+    """A sweep over ``xs`` with one resonance per frequency in ``resonances``.
 
-    The cluster sits left of the sweep's center, so the missing resonator is the
-    right-edge one and the resonances take slots 0, 1, and 2.
+    Each resonance peaks on its own power row, so each has its own optimal power.
     """
-    xs = [5.9, 6.0, 6.1, 6.2, 6.3, 6.4]
     ys = [-60.0, -55.0, -50.0, -45.0, -40.0, -35.0, -30.0, -25.0]
-    peak_rows = {1: 2, 2: 3, 3: 4}
+    peak_rows = {xs.index(frequency): 2 + index for index, frequency in enumerate(resonances)}
     zs = [
         [1.0 if peak_rows.get(column) == row else 0.0 for column in range(len(xs))]
         for row in range(len(ys))
@@ -1250,13 +1248,13 @@ def _nonzero_columns(fig: go.Figure, _config: Any) -> Any:
     return resonances, [], frequencies
 
 
-@pytest.mark.parametrize("inline", [False, True])
-def test_frequency_window_keeps_partial_mux_slots_of_the_whole_sweep(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, inline: bool
-) -> None:
-    # Regression: slot guessing compared the resonances with the cropped window's
-    # center, so cropping 5.9-6.4 to 6.0-6.2 moved them from slots 0-2 to slots 1-3.
-    sweep = _partial_mux_sweep()
+_QIDS = ("0", "1", "2", "3")
+
+
+def _mux_service(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, sweep: dict[str, Any], *, inline: bool
+) -> tuple[Any, list[str]]:
+    """A reanalysis function of (qid, window) on ``sweep``, and the assignment modes seen."""
     raw = set_figure_role(go.Figure(sweep), "raw")
     doc = _doc(
         [_write(tmp_path / "CheckResonatorSpectroscopy_1_raw_1.json", raw)],
@@ -1291,17 +1289,95 @@ def test_frequency_window_keeps_partial_mux_slots_of_the_whole_sweep(
             figure=sweep if inline else None,
         )
 
-    def labels(response: ReanalyzeResponse) -> set[str]:
-        return {a["text"] for a in response.figure["layout"].get("annotations", [])}
+    return reanalyze, modes
 
-    for qid in ("0", "1", "2", "3"):
+
+def _labels(response: ReanalyzeResponse) -> set[str]:
+    return {a["text"] for a in response.figure["layout"].get("annotations", [])}
+
+
+def _stars(response: ReanalyzeResponse) -> int:
+    return sum(
+        1 for trace in response.figure["data"] if trace.get("marker", {}).get("symbol") == "star"
+    )
+
+
+@pytest.mark.parametrize("inline", [False, True])
+def test_frequency_window_that_drops_a_resonance_leaves_the_mux_unassigned(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, inline: bool
+) -> None:
+    # Regression: cropping 6.0 GHz out of a full MUX left 6.1-6.2-6.3 GHz, which the
+    # partial-MUX guess put in slots 0-2, so qubit 0 got its neighbor's 6.1 GHz.
+    sweep = _mux_sweep([5.9, 6.0, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6], [6.0, 6.1, 6.2, 6.3])
+    reanalyze, modes = _mux_service(monkeypatch, tmp_path, sweep, inline=inline)
+
+    whole = {qid: _outputs(reanalyze(qid))["readout_frequency"][0] for qid in _QIDS}
+    assert sorted(whole.values()) == [6.0, 6.1, 6.2, 6.3]
+    assert set(modes) == {"full"}
+
+    modes.clear()
+    for qid in _QIDS:
+        cropped = reanalyze(qid, frequency_min=6.05)
+
+        assert cropped.figure["data"][0]["x"] == [6.1, 6.2, 6.3, 6.4, 6.5, 6.6]
+        # No qubit takes a resonance: the window may have dropped any slot's.
+        assert _outputs(cropped) == {"readout_frequency": (0.0, "GHz")}, qid
+        assert not any(label.startswith("Q") for label in _labels(cropped)), qid
+        assert module.WINDOWED_PARTIAL_MUX_MODE in _labels(cropped)
+        # The detected resonances are still marked for inspection.
+        assert _stars(cropped) == 3
+    assert modes == []
+
+
+@pytest.mark.parametrize("inline", [False, True])
+def test_frequency_window_that_keeps_every_resonance_assigns_them_all(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, inline: bool
+) -> None:
+    sweep = _mux_sweep([5.9, 6.0, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6], [6.0, 6.1, 6.2, 6.3])
+    reanalyze, modes = _mux_service(monkeypatch, tmp_path, sweep, inline=inline)
+
+    for qid in _QIDS:
         whole = reanalyze(qid)
+        cropped = reanalyze(qid, frequency_min=5.95, frequency_max=6.35)
+
+        assert cropped.figure["data"][0]["x"] == [6.0, 6.1, 6.2, 6.3]
+        assert _outputs(cropped) == _outputs(whole), qid
+        assert _labels(cropped) == _labels(whole), qid
+    assert set(modes) == {"full"}
+
+
+@pytest.mark.parametrize("inline", [False, True])
+def test_frequency_window_on_a_partial_mux_leaves_it_unassigned(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, inline: bool
+) -> None:
+    # Three resonances at 6.0-6.2 GHz in a 5.9-6.4 GHz sweep take slots 0-2. Cropped to
+    # 6.0-6.2 GHz, the cropped center put them in slots 1-3; now they stay unassigned.
+    sweep = _mux_sweep([5.9, 6.0, 6.1, 6.2, 6.3, 6.4], [6.0, 6.1, 6.2])
+    reanalyze, modes = _mux_service(monkeypatch, tmp_path, sweep, inline=inline)
+
+    whole = [_outputs(reanalyze(qid))["readout_frequency"][0] for qid in _QIDS]
+    assert sorted(value for value in whole if value) == [6.0, 6.1, 6.2]
+    assert set(modes) == {"right-edge-missing-cluster-left"}
+
+    for qid in _QIDS:
         cropped = reanalyze(qid, frequency_min=6.0, frequency_max=6.2)
 
         assert cropped.figure["data"][0]["x"] == [6.0, 6.1, 6.2]
-        assert _outputs(cropped) == _outputs(whole), qid
-        assert labels(cropped) == labels(whole), qid
+        assert _outputs(cropped) == {"readout_frequency": (0.0, "GHz")}, qid
+        assert module.WINDOWED_PARTIAL_MUX_MODE in _labels(cropped)
+
+
+@pytest.mark.parametrize("inline", [False, True])
+def test_frequency_window_that_trims_nothing_keeps_the_partial_mux_guess(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, inline: bool
+) -> None:
+    sweep = _mux_sweep([5.9, 6.0, 6.1, 6.2, 6.3, 6.4], [6.0, 6.1, 6.2])
+    reanalyze, modes = _mux_service(monkeypatch, tmp_path, sweep, inline=inline)
+
+    for qid in _QIDS:
+        whole = reanalyze(qid)
+        windowed = reanalyze(qid, frequency_min=5.0, frequency_max=7.0)
+
+        assert _outputs(windowed) == _outputs(whole), qid
+        assert _labels(windowed) == _labels(whole), qid
     assert set(modes) == {"right-edge-missing-cluster-left"}
-    # Some qubit is assigned in this partial MUX, so the comparison checks a real assignment.
-    assigned = [_outputs(reanalyze(qid))["readout_frequency"][0] for qid in ("0", "1", "2", "3")]
-    assert sorted(value for value in assigned if value) == [6.0, 6.1, 6.2]

@@ -70,6 +70,8 @@ QUBIT_TASK_NAME = "CheckQubitSpectroscopy"
 RAW_FIGURE_ROLE = "raw"
 MARKED_FIGURE_ROLE = "marked"
 PNG_MEDIA_TYPE = "image/png"
+# Shown on the marked figure when a frequency window leaves a partial MUX unassigned.
+WINDOWED_PARTIAL_MUX_MODE = "unassigned-partial-mux-in-frequency-window"
 PREVIEW_IMAGE_ERROR = "Preview image rendering failed."
 
 
@@ -384,6 +386,7 @@ class ReanalysisService:
         analysis_fig = _apply_frequency_window(
             denoised_fig, params.frequency_min, params.frequency_max
         )
+        window_trims_sweep = len(analysis_fig.data[0].x) < len(scan_xs)
 
         # Older results stored analysis settings as run parameters. Newer results use
         # the task's internal analysis default when no explicit reanalysis override exists.
@@ -439,6 +442,7 @@ class ReanalysisService:
             frequencies,
             assignment_order=assignment_order,
             marked_fig=marked_fig,
+            guess_partial_mux=not window_trims_sweep,
         )
         readout_frequency = (
             float(frequencies[resonance_index]) if resonance_index is not None else 0.0
@@ -949,11 +953,16 @@ class ReanalysisService:
         *,
         assignment_order: list[int],
         marked_fig: go.Figure | None = None,
+        guess_partial_mux: bool = True,
     ) -> int | None:
         """Return the index in ``frequencies`` of the requested qubit's resonance.
 
         Uses the workflow's assignment, including partial-MUX slot guessing. When
         ``marked_fig`` is given, each assigned resonance is labeled on it.
+
+        With ``guess_partial_mux`` false, as when a frequency window cut the sweep,
+        fewer than a full MUX of resonances is left unassigned: the window may have
+        dropped any of the missing resonances, so which slots remain is unknown.
         """
         try:
             qid_int = int(qid)
@@ -967,7 +976,11 @@ class ReanalysisService:
         id_in_mux = qid_int % NUM_RESONATORS
         peak_positions = peak_positions_from_assignment_order(assignment_order)
         assigned_slot = peak_positions[id_in_mux]
-        sorted_slots, assignment_mode = guess_sorted_slots_for_partial_mux(xs, frequencies)
+        if guess_partial_mux or len(frequencies) >= NUM_RESONATORS:
+            sorted_slots, assignment_mode = guess_sorted_slots_for_partial_mux(xs, frequencies)
+        else:
+            sorted_slots = [None] * len(frequencies)
+            assignment_mode = WINDOWED_PARTIAL_MUX_MODE
         if marked_fig is not None:
             annotate_resonator_assignments(
                 marked_fig,

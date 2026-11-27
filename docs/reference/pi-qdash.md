@@ -96,7 +96,11 @@ parameters and take precedence over them: QDash drops the heatmap columns outsid
 before the analysis, so a spur or edge noise can be excluded without measuring again, and the
 returned figure shows only the window. A merged window whose minimum is not below its maximum,
 or a bound that is not a finite number, fails before any request; a window that leaves fewer
-than 2 frequency points fails with HTTP 422. For the qubit tool, power rows at or above
+than 2 frequency points fails with HTTP 422. When the resonator tool's window cuts the sweep and
+fewer than 4 resonances remain, no qubit is assigned a resonance (`readout_frequency` is 0 and
+the figure is labeled `unassigned-partial-mux-in-frequency-window`), because the window may
+have dropped any of the missing ones; a window that keeps all 4 assigns them as usual. For the
+qubit tool, power rows at or above
 `top_power` are dropped before the analysis, and a `top_power` that leaves fewer than 2 rows
 fails with HTTP 422. The resonator tool returns `readout_frequency`, `optimal_power` (dB), and
 `readout_amplitude` (a.u.); the qubit tool returns `coarse_qubit_frequency` (also as
