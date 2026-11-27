@@ -1,8 +1,11 @@
 "use client";
 
-import { forwardRef, useEffect, useId, useMemo, useState } from "react";
+import { forwardRef, useId, useMemo, useState } from "react";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronDown, ChevronRight, Plus, Trash2, X } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 import {
   useAssignChipToCooldown,
@@ -13,6 +16,7 @@ import {
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDate, toIsoSeconds } from "@/lib/utils/datetime";
 
 import { CooldownWiringSection } from "./CooldownWiringSection";
@@ -47,6 +51,27 @@ function dateInputToIso(value: string, endOfDay = false): string | null {
   return toIsoSeconds(`${value}${time.slice(0, 6)}`);
 }
 
+/** Zod schema for the cooldown date form; the end date is optional but not before the start. */
+const cooldownDatesSchema = z
+  .object({
+    startedAt: z.string().min(1, "Start date is required"),
+    endedAt: z.string(),
+  })
+  .refine((values) => !values.endedAt || !values.startedAt || values.endedAt >= values.startedAt, {
+    message: "End date must be on or after the start date",
+    path: ["endedAt"],
+  });
+
+type CooldownDatesFormValues = z.infer<typeof cooldownDatesSchema>;
+
+/** Returns the date form values for the cooldown's current dates. */
+function cooldownToDateValues(cooldown: Cooldown): CooldownDatesFormValues {
+  return {
+    startedAt: isoToDateInput(cooldown.started_at),
+    endedAt: isoToDateInput(cooldown.ended_at),
+  };
+}
+
 function formatDateRange(startedAt: string, endedAt: string | null | undefined): string {
   const start = formatDate(startedAt);
   if (!endedAt) return `${start} → now`;
@@ -68,28 +93,57 @@ export const CooldownItem = forwardRef<HTMLDivElement, CooldownItemProps>(functi
 
   // Dates: click-to-edit
   const [editingDates, setEditingDates] = useState(false);
-  const [draftStartedAt, setDraftStartedAt] = useState(isoToDateInput(cooldown.started_at));
-  const [draftEndedAt, setDraftEndedAt] = useState(isoToDateInput(cooldown.ended_at));
-  useEffect(() => {
-    setDraftStartedAt(isoToDateInput(cooldown.started_at));
-    setDraftEndedAt(isoToDateInput(cooldown.ended_at));
-  }, [cooldown.started_at, cooldown.ended_at, cooldown.cooldown_id]);
+  const [dateServerError, setDateServerError] = useState<string | null>(null);
+  const startedAtId = useId();
+  const endedAtId = useId();
+  const startedAtErrorId = `${startedAtId}-error`;
+  const endedAtErrorId = `${endedAtId}-error`;
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors },
+  } = useForm<CooldownDatesFormValues>({
+    resolver: zodResolver(cooldownDatesSchema),
+    defaultValues: cooldownToDateValues(cooldown),
+  });
+  const draftStartedAt = watch("startedAt");
 
   const availableChips = useMemo(
     () => allChips.filter((c) => !cooldown.chip_ids.includes(c)),
     [allChips, cooldown.chip_ids],
   );
 
-  const handleSaveDates = async () => {
-    if (!draftStartedAt) return;
-    if (draftEndedAt && draftEndedAt < draftStartedAt) return;
-    await updateMutation.mutateAsync({
-      cooldownId: cooldown.cooldown_id,
-      data: {
-        started_at: dateInputToIso(draftStartedAt),
-        ended_at: draftEndedAt ? dateInputToIso(draftEndedAt, true) : null,
-      },
-    });
+  /** Opens the date editor with values reset from the current cooldown. */
+  const startEditingDates = () => {
+    reset(cooldownToDateValues(cooldown));
+    setDateServerError(null);
+    setEditingDates(true);
+  };
+
+  /** Closes the date editor and discards the draft values. */
+  const cancelEditingDates = () => {
+    reset(cooldownToDateValues(cooldown));
+    setDateServerError(null);
+    setEditingDates(false);
+  };
+
+  /** Saves the dates and surfaces API failures as a server error. */
+  const handleSaveDates = async (values: CooldownDatesFormValues) => {
+    setDateServerError(null);
+    try {
+      await updateMutation.mutateAsync({
+        cooldownId: cooldown.cooldown_id,
+        data: {
+          started_at: dateInputToIso(values.startedAt),
+          ended_at: values.endedAt ? dateInputToIso(values.endedAt, true) : null,
+        },
+      });
+    } catch (err) {
+      setDateServerError(getApiErrorMessage(err, "Failed to update cool-down dates"));
+      return;
+    }
     setEditingDates(false);
     onChange();
   };
@@ -202,7 +256,8 @@ export const CooldownItem = forwardRef<HTMLDivElement, CooldownItemProps>(functi
             <div className="text-base-content/60 font-medium mb-1">Dates</div>
             {!editingDates ? (
               <button
-                onClick={() => setEditingDates(true)}
+                type="button"
+                onClick={startEditingDates}
                 className="text-base-content/80 inline-flex items-center gap-1.5 rounded px-1 -ml-1 hover:bg-base-200 transition-colors tabular-nums"
                 title="Edit dates"
               >
@@ -210,49 +265,75 @@ export const CooldownItem = forwardRef<HTMLDivElement, CooldownItemProps>(functi
                 {isActive && <span className="text-success/80 ml-1">· still active</span>}
               </button>
             ) : (
-              <div className="flex flex-wrap items-end gap-2">
-                <label className="flex flex-col">
-                  <span className="text-xs text-base-content/60">Started</span>
-                  <input
-                    type="date"
-                    className="input input-xs input-bordered tabular-nums"
-                    value={draftStartedAt}
-                    onChange={(e) => setDraftStartedAt(e.target.value)}
-                    autoFocus
-                  />
-                </label>
-                <label className="flex flex-col">
-                  <span className="text-xs text-base-content/60">Ended (empty = active)</span>
-                  <input
-                    type="date"
-                    className="input input-xs input-bordered tabular-nums"
-                    value={draftEndedAt}
-                    onChange={(e) => setDraftEndedAt(e.target.value)}
-                    min={draftStartedAt}
-                  />
-                </label>
-                <button
-                  className="btn btn-xs btn-primary"
-                  onClick={handleSaveDates}
-                  disabled={
-                    !draftStartedAt ||
-                    (!!draftEndedAt && draftEndedAt < draftStartedAt) ||
-                    updateMutation.isPending
-                  }
-                >
-                  Save
-                </button>
-                <button
-                  className="btn btn-xs btn-ghost"
-                  onClick={() => {
-                    setDraftStartedAt(isoToDateInput(cooldown.started_at));
-                    setDraftEndedAt(isoToDateInput(cooldown.ended_at));
-                    setEditingDates(false);
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
+              <form onSubmit={handleSubmit(handleSaveDates)} noValidate>
+                <div className="flex flex-wrap items-start gap-2">
+                  <div className="flex flex-col">
+                    <label htmlFor={startedAtId} className="text-xs text-base-content/60">
+                      Started
+                    </label>
+                    <input
+                      id={startedAtId}
+                      type="date"
+                      className={`input input-xs input-bordered tabular-nums${
+                        errors.startedAt ? " input-error" : ""
+                      }`}
+                      {...register("startedAt")}
+                      aria-invalid={Boolean(errors.startedAt)}
+                      aria-describedby={errors.startedAt ? startedAtErrorId : undefined}
+                      disabled={updateMutation.isPending}
+                      autoFocus
+                    />
+                    {errors.startedAt && (
+                      <p id={startedAtErrorId} className="mt-1 w-0 min-w-full text-xs text-error">
+                        {errors.startedAt.message}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col">
+                    <label htmlFor={endedAtId} className="text-xs text-base-content/60">
+                      Ended (empty = active)
+                    </label>
+                    <input
+                      id={endedAtId}
+                      type="date"
+                      className={`input input-xs input-bordered tabular-nums${
+                        errors.endedAt ? " input-error" : ""
+                      }`}
+                      {...register("endedAt")}
+                      min={draftStartedAt || undefined}
+                      aria-invalid={Boolean(errors.endedAt)}
+                      aria-describedby={errors.endedAt ? endedAtErrorId : undefined}
+                      disabled={updateMutation.isPending}
+                    />
+                    {errors.endedAt && (
+                      <p id={endedAtErrorId} className="mt-1 w-0 min-w-full text-xs text-error">
+                        {errors.endedAt.message}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-2 pt-4">
+                    <button
+                      type="submit"
+                      className="btn btn-xs btn-primary"
+                      disabled={updateMutation.isPending}
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-xs btn-ghost"
+                      onClick={cancelEditingDates}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+                {dateServerError && (
+                  <div className="alert alert-error mt-2 py-2 text-xs" role="alert">
+                    <span>{dateServerError}</span>
+                  </div>
+                )}
+              </form>
             )}
           </div>
 
