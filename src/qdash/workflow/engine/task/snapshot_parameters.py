@@ -72,7 +72,7 @@ def normalize_snapshot_inputs(
     parameter names), keeping the qid-role prefix of the declared name. A
     dict value without a ``parameter_name`` records the compatible name it
     came from. Compatible entries that are not themselves declared inputs are
-    dropped.
+    dropped. Missing optional database inputs are recorded as absent.
     """
     normalized_input = dict(snap_input)
     for param_name, declaration in declarations.items():
@@ -95,6 +95,8 @@ def normalize_snapshot_inputs(
                 normalized_input[param_name] = compatible_value
             if compatible_key not in declarations:
                 normalized_input.pop(compatible_key, None)
+        if param_name not in normalized_input and declaration.resolution == "database_optional":
+            normalized_input[param_name] = declaration.create_model().model_dump()
     return normalized_input
 
 

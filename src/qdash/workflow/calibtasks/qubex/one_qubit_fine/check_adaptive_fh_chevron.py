@@ -1,11 +1,16 @@
-"""Measure the FH transition frequency with Qubex adaptive chevron analysis."""
+"""Measure the FH transition frequency and estimate transmon harmonic energies."""
 
+import logging
 import math
 from typing import ClassVar
 
+from numpy.linalg import LinAlgError
+from prefect import get_run_logger
+from prefect.exceptions import MissingContextError
 from qubex.contrib.experiment import estimate_fh_frequency_from_chevron_adaptive
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
+from qdash.analysis.transmon_harmonics import TransmonHarmonicsFit, fit_transmon_harmonics
 from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
@@ -21,6 +26,8 @@ from qdash.workflow.calibtasks.qubex.validation import (
 )
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
+logger = logging.getLogger(__name__)
+
 
 class CheckAdaptiveFHChevron(QubexTask):
     """Adaptively measure the FH transition using stored Qubex GE and EF pulses.
@@ -35,7 +42,9 @@ class CheckAdaptiveFHChevron(QubexTask):
         description=(
             "Prepares the second excited state with the session's GE and EF pulses and runs an "
             "adaptive chevron on the f-to-h transition. It writes fh_frequency (also published "
-            "as control_frequency_fh)."
+            "as control_frequency_fh) and estimates EC, EJ1, and EJ2 from the GE, EF, and FH "
+            "frequencies when the fit meets the residual limit. It skips the energy outputs "
+            "when different energies reproduce the same transition spectrum."
         ),
         when_to_use=(
             "Run it after EF pulses are calibrated when the third transition is needed. The "
@@ -58,6 +67,16 @@ class CheckAdaptiveFHChevron(QubexTask):
         ),
         "control_frequency_ef": InputParameterSpec.required_database(
             fallback_parameter_names=("ef_frequency",), unit="GHz"
+        ),
+        "qubit_frequency": InputParameterSpec.database_optional(
+            user_override="forbidden",
+            unit="GHz",
+            description="Measured GE resonance preferred for the harmonic fit",
+        ),
+        "ef_frequency": InputParameterSpec.database_optional(
+            user_override="forbidden",
+            unit="GHz",
+            description="Measured EF resonance preferred for the harmonic fit",
         ),
         "control_amplitude": InputParameterSpec.required_database(
             unit="a.u.",
@@ -104,6 +123,12 @@ class CheckAdaptiveFHChevron(QubexTask):
             default=5.0,
             description="Minimum matched-transform peak/background RMS ratio",
         ),
+        "maximum_harmonic_fit_residual": RunParameterSpec(
+            unit="GHz",
+            value_type="float",
+            default=0.005,
+            description="Maximum absolute GE, EF, or FH residual for publishing EC, EJ1, and EJ2",
+        ),
     }
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "fh_frequency": OutputParameterSpec(
@@ -111,7 +136,81 @@ class CheckAdaptiveFHChevron(QubexTask):
             description="Measured f-to-h transition frequency",
             publish_targets=("fh_frequency", "control_frequency_fh"),
         ),
+        "charging_energy": OutputParameterSpec(
+            unit="GHz",
+            default=None,
+            description="Charging energy EC estimated from GE, EF, and FH",
+        ),
+        "josephson_energy_first_harmonic": OutputParameterSpec(
+            unit="GHz",
+            default=None,
+            description="First Josephson harmonic EJ1 estimated from GE, EF, and FH",
+        ),
+        "josephson_energy_second_harmonic": OutputParameterSpec(
+            unit="GHz",
+            default=None,
+            description="Second Josephson harmonic EJ2 estimated from GE, EF, and FH",
+        ),
     }
+
+    def resolve_run_parameters(self, backend: QubexBackend, qid: str) -> None:
+        """Restore the harmonic fit limit when replaying an older parameter snapshot."""
+        super().resolve_run_parameters(backend, qid)
+        name = "maximum_harmonic_fit_residual"
+        if name not in self.run_parameters:
+            self.run_parameters[name] = self.run_spec[name].create_model()
+
+    def _measured_frequency(self, name: str) -> float | None:
+        measured = self.input_parameters.get(name)
+        if measured is None or measured.value is None:
+            return None
+        frequency = float(measured.value)
+        return frequency if math.isfinite(frequency) and frequency > 0 else None
+
+    def _harmonic_fit_frequency(self, measured_name: str, drive_name: str) -> float:
+        measured = self._measured_frequency(measured_name)
+        if measured is not None:
+            return measured
+        if self.input_parameters_from_snapshot:
+            raise ValueError(f"the snapshot lacks a valid {measured_name} resonance")
+        if drive_name in self.input_overrides:
+            raise ValueError(f"{measured_name} is unavailable and {drive_name} was overridden")
+        return self._get_calibration_value(drive_name)
+
+    def _fit_harmonics(self, qid: str, fh_frequency: float) -> TransmonHarmonicsFit | None:
+        try:
+            run_logger = get_run_logger()
+        except MissingContextError:
+            run_logger = logger
+        try:
+            limit_name = "maximum_harmonic_fit_residual"
+            raw_limit = self.run_parameters[limit_name].get_value()
+            limit_error = finite_value_error(raw_limit, limit_name, minimum=0)
+            if limit_error is not None:
+                raise ValueError(limit_error)
+            limit = float(raw_limit)
+            fit = fit_transmon_harmonics(
+                ge_frequency=self._harmonic_fit_frequency("qubit_frequency", "control_frequency"),
+                ef_frequency=self._harmonic_fit_frequency("ef_frequency", "control_frequency_ef"),
+                fh_frequency=fh_frequency,
+            )
+            if fit.active_bounds:
+                run_logger.warning(
+                    "Harmonic fit for qid=%s reached parameter bounds for %s",
+                    qid,
+                    ", ".join(fit.active_bounds),
+                )
+            if not fit.success:
+                raise ValueError(fit.message)
+            if fit.max_abs_residual > limit:
+                raise ValueError(
+                    f"maximum transition residual {fit.max_abs_residual:.6g} GHz "
+                    f"exceeds the {limit:.6g} GHz limit"
+                )
+        except (ValueError, LinAlgError, OverflowError) as exc:
+            run_logger.warning("Skipping transmon harmonic energies for qid=%s: %s", qid, exc)
+            return None
+        return fit
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
@@ -120,27 +219,49 @@ class CheckAdaptiveFHChevron(QubexTask):
         label = exp.ctx.resolve_fh_label(self.get_qubit_label(backend, qid))
         result = run_result.raw_result
         frequency = result.data["resonant_frequencies"].get(label)
-        ef_frequency = self._get_calibration_value("control_frequency_ef")
+        ef_frequency = self._measured_frequency("ef_frequency")
+        if ef_frequency is None:
+            ef_frequency = self._get_calibration_value("control_frequency_ef")
         threshold = self.run_parameters["minimum_peak_background_rms_ratio"].get_value()
         threshold_error = finite_value_error(
             threshold, "minimum_peak_background_rms_ratio", minimum=0
         )
+        frequency_error = finite_value_error(
+            frequency, "fh_frequency", minimum=0, maximum=ef_frequency
+        )
+        if frequency_error is None and float(frequency) == 0:
+            frequency_error = "fh_frequency must be positive"
+        validation_error = first_validation_error(
+            frequency_error,
+            threshold_error,
+            finite_value_error(
+                result.data["peak_background_rms_ratios"].get(label),
+                "FH chevron peak/background RMS ratio",
+                minimum=threshold if threshold_error is None else None,
+            ),
+        )
         self.output_parameters["fh_frequency"].value = frequency
+        declared_outputs = self.attach_execution_id(execution_id)
+        output_parameters = {"fh_frequency": declared_outputs["fh_frequency"]}
+        if validation_error is None:
+            fit = self._fit_harmonics(qid, float(frequency))
+            if fit is not None:
+                for name, energy in (
+                    ("charging_energy", fit.ec),
+                    ("josephson_energy_first_harmonic", fit.ej1),
+                    ("josephson_energy_second_harmonic", fit.ej2),
+                ):
+                    output_parameters[name] = declared_outputs[name].model_copy(
+                        update={"value": energy}
+                    )
+
         final_keys = (f"{label}_measurement", f"{label}_transform")
         figures = [result.figures[key] for key in final_keys if key in result.figures]
         figures.extend(figure for key, figure in result.figures.items() if key not in final_keys)
         return PostProcessResult(
-            output_parameters=self.attach_execution_id(execution_id),
+            output_parameters=output_parameters,
             figures=figures,
-            validation_error=first_validation_error(
-                finite_value_error(frequency, "fh_frequency", minimum=0, maximum=ef_frequency),
-                threshold_error,
-                finite_value_error(
-                    result.data["peak_background_rms_ratios"].get(label),
-                    "FH chevron peak/background RMS ratio",
-                    minimum=threshold if threshold_error is None else None,
-                ),
-            ),
+            validation_error=validation_error,
         )
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:

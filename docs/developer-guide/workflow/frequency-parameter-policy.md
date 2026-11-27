@@ -50,6 +50,16 @@ GE HPI and EF pi pulses. Missing search frequencies use Qubex-derived seeds, not
 anharmonicity. Qubex's `x180()` can prefer existing note pulses over restored HPI/PI inputs;
 a new execution does not clear those notes.
 
+Adaptive FH Chevron checks the FH frequency against the stored EF resonance when available.
+It also estimates EC, EJ1, and EJ2 from the final FH measurement and the GE and EF resonances.
+A fresh run can use a calibrated drive frequency for a missing resonance if that drive
+frequency was resolved without an explicit override. A snapshot re-execution requires both
+recorded resonances to estimate the energies, since history stores effective drive values.
+The task publishes the three energies together when the fit converges within
+`maximum_harmonic_fit_residual` (0.005 GHz by default). It skips publication when the tested
+starting points produce distinct energies with spectra that agree within 1 kHz. In **Latest**
+mode, **Metrics** keeps showing the latest accepted energies in the selected time range.
+
 ## Runtime frequency resolution
 
 Declare operational inputs with explicit `fallback_parameter_names`; reserve aliases for names
@@ -83,6 +93,10 @@ Accepted measured and operational frequencies export to separate named YAML file
 Seed import accepts operational frequency/amplitude files, never measured qubit or resonator
 frequency files. Publication must be enabled and validation must pass; see
 [Calibration Data Lifecycle](./calibration-data-lifecycle.md).
+
+Adaptive FH Chevron maps `control_frequency_fh` to the Qubex parameter file
+`control_frequency_fh.yaml`. QDash records EC, EJ1, and EJ2 in task history and exposes them
+through **Metrics**, which can export each selected metric as YAML.
 
 ## Implementation and tests
 

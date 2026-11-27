@@ -157,6 +157,20 @@ class TestNormalizeSnapshotInputs:
         snap_input = {"control_frequency": {"value": 5.1}, "qubit_frequency": {"value": 5.2}}
         assert normalize_snapshot_inputs(snap_input, declarations) == snap_input
 
+    def test_missing_optional_input_is_restored_as_absent(self) -> None:
+        declarations = {
+            "control_frequency": InputParameterSpec.required_database(),
+            "qubit_frequency": InputParameterSpec.database_optional(unit="GHz"),
+        }
+        recorded = {"control_frequency": {"value": 5.1}}
+
+        inputs = normalize_snapshot_inputs(recorded, declarations)
+        ensure_snapshot_inputs_compatible("FH", "0", inputs, declarations)
+
+        assert inputs["control_frequency"] == recorded["control_frequency"]
+        assert inputs["qubit_frequency"]["value"] is None
+        assert inputs["qubit_frequency"]["unit"] == "GHz"
+
     def test_scalar_compatible_value_is_copied_as_is(self) -> None:
         declarations = {"x": InputParameterSpec.required_database(parameter_aliases=("old",))}
         assert normalize_snapshot_inputs({"old": 3}, declarations) == {"x": 3}
