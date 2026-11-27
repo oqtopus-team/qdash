@@ -16,7 +16,7 @@ from qdash.analysis.spectroscopy import (
     ResonatorCandidate,
     ResonatorQubitMappingResult,
     create_mapping_grid_figure,
-    score_1d_spectroscopy_trace,
+    score_mapping_grid,
     solve_resonator_qubit_mapping,
     withheld_mapped_qids,
 )
@@ -583,11 +583,10 @@ class CheckResonatorQubitMapping(QubexTask):
         frequencies: np.ndarray | None = None
         traces: list[list[np.ndarray | None]] = []
         spectroscopy: dict[str, Any] = {}
-        scores = np.zeros((len(measured_qids), len(candidates)))
-        for row, member in enumerate(measured_qids):
+        for member in measured_qids:
             label = labels[member]
             row_traces: list[np.ndarray | None] = []
-            for column, candidate in enumerate(candidates):
+            for candidate in candidates:
                 result = self._measure_pair(exp, label, candidate, frequency_range, drive_power)
                 spectroscopy[f"{label}@C{candidate.candidate_index}"] = result
                 pair_frequencies, phases = self._extract_1d_trace(result)
@@ -600,9 +599,13 @@ class CheckResonatorQubitMapping(QubexTask):
                         f"{label}@C{candidate.candidate_index} swept different frequencies "
                         "from the first pair"
                     )
-                scores[row, column] = score_1d_spectroscopy_trace(pair_frequencies, phases)
                 row_traces.append(phases)
             traces.append(row_traces)
+
+        scores = score_mapping_grid(
+            frequencies if frequencies is not None else np.array([]),
+            traces,
+        )
 
         mapping = solve_resonator_qubit_mapping(
             scores,

@@ -57,7 +57,13 @@ _SUBPLOT_TITLE_FONT_SIZE = 11
 _SELECTED_COLOR = "#0C5DA5"  # Qubex blue
 _AMBIGUOUS_COLOR = "#FF9500"  # Qubex orange
 _IDLE_COLOR = "#9e9e9e"  # Qubex gray
+_FILL_COLORS = {
+    _SELECTED_COLOR: "rgba(12, 93, 165, 0.22)",
+    _AMBIGUOUS_COLOR: "rgba(255, 149, 0, 0.22)",
+    _IDLE_COLOR: "rgba(158, 158, 158, 0.20)",
+}
 _BADGE_TEXT_COLORS = {_SELECTED_COLOR: "white", _AMBIGUOUS_COLOR: "black"}
+_PHASE_YAXIS_RANGE = (-0.1, math.pi + 0.15)
 
 
 @dataclass(frozen=True)
@@ -196,33 +202,44 @@ def score_1d_spectroscopy_trace(
     phase_values: ArrayLike,
     *,
     noise_floor_sigma: float = DEFAULT_NOISE_FLOOR_SIGMA,
+    noise_scale: float | None = None,
+    despike: bool = True,
 ) -> float:
     """Score how strongly a 1D phase trace departs from its noise floor.
 
     The baseline is the circular median of the phase, so a response of either
-    sign and phases wrapped near +/-pi are handled alike. The noise scale is the
-    median absolute deviation (MAD), floored at ``PHASE_NOISE_FLOOR``: when more
-    than half of the points sit exactly on the baseline the MAD is zero, and the
-    floor keeps a noiseless response scoring higher the wider it is, instead of
-    letting the response set its own noise scale. The score is the
-    area of the robust z-score above ``noise_floor_sigma``: a single point at
-    ``noise_floor_sigma + 5`` sigma scores 5, and a broad power-broadened line
-    scores more than an isolated spike of the same height. Pure noise scores
-    near zero.
+    sign and phases wrapped near +/-pi are handled alike. When ``noise_scale``
+    is not provided, the noise scale is the smaller of the trace MAD and the
+    adjacent-difference MAD (divided by ``sqrt(2)``), floored at
+    ``PHASE_NOISE_FLOOR``: this prevents a broad high-power qubit response
+    covering a large fraction of the sweep from inflating its own noise scale.
+    When ``despike`` is enabled, a 3-point median filter is applied to the
+    absolute circular phase deviation before scoring so isolated single-point
+    crosstalk spikes or glitches do not rival broad power-broadened responses.
+    The score is the area of the robust z-score above ``noise_floor_sigma``;
+    pure noise scores near zero.
 
     Args:
         frequencies: Drive frequencies in GHz, one per phase value.
         phase_values: Measured phases in rad.
         noise_floor_sigma: Robust z-score treated as the noise floor.
+        noise_scale: Optional pre-estimated phase noise standard deviation in
+            rad (e.g. a shared per-resonator noise floor from
+            :func:`score_mapping_grid`). Floored at ``PHASE_NOISE_FLOOR``.
+        despike: Whether to apply a 3-point median filter to ``|Δφ|`` before
+            scoring so isolated single-point spikes are suppressed.
 
     Returns:
         A non-negative score; ``0.0`` for traces too short, flat or non-finite.
 
     Raises:
-        ValueError: If the arrays differ in length or the floor is negative.
+        ValueError: If the arrays differ in length, the floor is negative, or
+            ``noise_scale`` is not finite and positive.
     """
     if not math.isfinite(noise_floor_sigma) or noise_floor_sigma < 0:
         raise ValueError("noise_floor_sigma must be finite and non-negative")
+    if noise_scale is not None and (not math.isfinite(noise_scale) or noise_scale <= 0):
+        raise ValueError("noise_scale must be finite and positive")
     x = np.asarray(frequencies, dtype=float).ravel()
     y = np.asarray(phase_values, dtype=float).ravel()
     if x.shape != y.shape:
@@ -235,15 +252,129 @@ def score_1d_spectroscopy_trace(
         return 0.0
 
     baseline = _circular_median(y)
-    deviation = _wrap_phase(y - baseline)
-    scale = _MAD_TO_SIGMA * float(np.median(np.abs(deviation - np.median(deviation))))
-    if not math.isfinite(scale) or scale < PHASE_NOISE_FLOOR:
-        scale = PHASE_NOISE_FLOOR
+    abs_deviation = np.abs(_wrap_phase(y - baseline))
+    if noise_scale is not None:
+        scale = max(float(noise_scale), PHASE_NOISE_FLOOR)
+    else:
+        scale = _estimate_trace_noise_scale(y, baseline=baseline)
 
-    z_scores = np.abs(deviation) / scale
+    signal = _median3(abs_deviation) if despike else abs_deviation
+    z_scores = signal / scale
     excess = np.clip(z_scores - noise_floor_sigma, 0.0, None)
     score = float(np.sum(excess))
     return score if math.isfinite(score) else 0.0
+
+
+def score_mapping_grid(
+    frequencies: ArrayLike,
+    traces_grid: Sequence[Sequence[ArrayLike | None]],
+    *,
+    noise_floor_sigma: float = DEFAULT_NOISE_FLOOR_SIGMA,
+    despike: bool = True,
+) -> np.ndarray:
+    """Score a full (qubit, candidate) grid using a shared per-candidate noise floor.
+
+    Every trace in a column reads out the same resonator candidate at the same
+    readout amplitude, and at most one qubit in the MUX is resonantly coupled to
+    it. Estimating each column's noise scale as the lower quartile (25th
+    percentile) of its per-trace noise scales adapts to each resonator's readout
+    SNR while preventing a broad high-power response from inflating its own
+    noise scale.
+
+    Args:
+        frequencies: Drive frequencies in GHz shared by every trace.
+        traces_grid: Phase traces indexed ``[qubit_row][candidate_column]``;
+            ``None`` marks an unmeasured pair (scored as ``0.0``).
+        noise_floor_sigma: Robust z-score treated as the noise floor.
+        despike: Whether to suppress isolated 1-point spikes before scoring.
+
+    Returns:
+        Score matrix with shape ``(n_rows, n_cols)``.
+    """
+    n_rows = len(traces_grid)
+    n_cols = len(traces_grid[0]) if n_rows > 0 else 0
+    if any(len(row) != n_cols for row in traces_grid):
+        raise ValueError("traces_grid rows must all have the same length")
+    scores = np.zeros((n_rows, n_cols), dtype=float)
+    if n_rows == 0 or n_cols == 0:
+        return scores
+
+    x = np.asarray(frequencies, dtype=float).ravel()
+    for column in range(n_cols):
+        col_scales: list[float] = []
+        for row in range(n_rows):
+            trace = traces_grid[row][column]
+            if trace is None:
+                continue
+            y = np.asarray(trace, dtype=float).ravel()
+            if y.shape != x.shape:
+                raise ValueError(
+                    f"frequencies and phase_values must have the same length, "
+                    f"got {x.size} and {y.size}"
+                )
+            valid = y[np.isfinite(x) & np.isfinite(y)]
+            if valid.size >= _MIN_TRACE_POINTS:
+                col_scales.append(_estimate_trace_noise_scale(valid))
+
+        shared_scale: float | None = None
+        if col_scales:
+            shared_scale = max(float(np.percentile(col_scales, 25)), PHASE_NOISE_FLOOR)
+
+        for row in range(n_rows):
+            trace = traces_grid[row][column]
+            if trace is None:
+                continue
+            scores[row, column] = score_1d_spectroscopy_trace(
+                x,
+                trace,
+                noise_floor_sigma=noise_floor_sigma,
+                noise_scale=shared_scale,
+                despike=despike,
+            )
+    return scores
+
+
+def _estimate_trace_noise_scale(
+    values: np.ndarray,
+    *,
+    baseline: float | None = None,
+) -> float:
+    """Estimate robust phase noise sigma in rad, resistant to broad responses."""
+    center = _circular_median(values) if baseline is None else baseline
+    deviation = _wrap_phase(values - center)
+    mad_sigma = _MAD_TO_SIGMA * float(np.median(np.abs(deviation - np.median(deviation))))
+    if values.size >= 2:
+        diffs = _wrap_phase(np.diff(values))
+        diff_sigma = _MAD_TO_SIGMA * float(np.median(np.abs(diffs))) / math.sqrt(2.0)
+        candidates = [s for s in (mad_sigma, diff_sigma) if math.isfinite(s)]
+        scale = min(candidates) if candidates else PHASE_NOISE_FLOOR
+    else:
+        scale = mad_sigma
+    if not math.isfinite(scale) or scale < PHASE_NOISE_FLOOR:
+        return PHASE_NOISE_FLOOR
+    return scale
+
+
+def _median3(values: np.ndarray) -> np.ndarray:
+    """3-point median filter with edge padding to suppress isolated 1-point spikes."""
+    if values.size < 3:
+        return values
+    padded = np.pad(values, 1, mode="edge")
+    return np.asarray(
+        np.median(np.stack((padded[:-2], padded[1:-1], padded[2:]), axis=0), axis=0),
+        dtype=float,
+    )
+
+
+def _abs_phase_deviation(values: np.ndarray) -> np.ndarray:
+    """Return ``|Δφ|`` in ``[0, pi]`` relative to the circular median, keeping NaNs."""
+    finite = np.isfinite(values)
+    if not np.any(finite):
+        return np.full_like(values, np.nan, dtype=float)
+    baseline = _circular_median(values[finite])
+    result = np.full(values.shape, np.nan, dtype=float)
+    result[finite] = np.abs(_wrap_phase(values[finite] - baseline))
+    return result
 
 
 def _wrap_phase(values: np.ndarray) -> np.ndarray:
@@ -650,18 +781,20 @@ def create_mapping_grid_figure(
             if selected:
                 color = _SELECTED_COLOR if published else _AMBIGUOUS_COLOR
             if trace is not None:
-                y = np.asarray(trace, dtype=float).ravel()
+                y = _abs_phase_deviation(np.asarray(trace, dtype=float).ravel())
                 figure.add_trace(
                     go.Scatter(
                         x=x[: y.size],
                         y=y,
                         mode="lines",
-                        line={"color": color, "width": 2.5 if selected else 1.5},
+                        fill="tozeroy",
+                        fillcolor=_FILL_COLORS[color],
+                        line={"color": color, "width": 2.2 if selected else 1.3},
                         name=f"{qubit_labels[row]} / C{candidate_tuple[column].candidate_index}",
                         showlegend=False,
                         hovertemplate=(
                             f"{qubit_labels[row]} @ C{candidate_tuple[column].candidate_index}"
-                            "<br>%{x:.4f} GHz<br>%{y:.3f} rad<extra></extra>"
+                            "<br>%{x:.4f} GHz<br>|Δφ| = %{y:.3f} rad<extra></extra>"
                         ),
                     ),
                     row=row + 1,
@@ -735,7 +868,11 @@ def create_mapping_grid_figure(
         "title_font": {"size": _AXIS_TITLEFONT_SIZE},
     }
     figure.update_xaxes(**axis_style)
-    figure.update_yaxes(**axis_style)
+    figure.update_yaxes(
+        **axis_style,
+        range=list(_PHASE_YAXIS_RANGE),
+        tickvals=[0, 1, 2, 3],
+    )
     return figure
 
 
