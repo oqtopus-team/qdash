@@ -237,7 +237,11 @@ def analyze_waveform(waveform: Waveform, *, snr_threshold: float, smoothing: int
         return EdgeResult(waveform, reason=reason)
 
     start, stop = runs[0]
-    rising, falling = start >= guard, stop <= time.size - guard
+    # Allow edge fitting whenever at least 3 samples remain outside the coarse
+    # 50% crossing (24 ns at 8 ns/sample), so slow ring-down tails do not skip
+    # fitting when the true fitted edge still clears MARGIN_NS (32 ns).
+    edge_guard = 3
+    rising, falling = start >= edge_guard, stop <= time.size - edge_guard
     edge_kind = (
         "both"
         if rising and falling

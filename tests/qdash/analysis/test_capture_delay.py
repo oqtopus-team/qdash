@@ -239,3 +239,23 @@ def test_analyze_waveform_handles_phase_rotation_during_pulse():
     assert result.edge_kind == "both"
     assert result.rise_ns == pytest.approx(start, abs=2)
     assert result.fall_ns == pytest.approx(start + DURATION_NS, abs=2)
+
+
+def test_analyze_waveform_fits_falling_edge_with_slow_ringdown_near_window_end():
+    """Slow ring-down pushing the 50% crossing to sample n-4 must still fit fall_ns."""
+    samples = 144
+    time = np.arange(samples) * SAMPLING_NS
+    # Rising edge at 45 ns; falling edge begins at 1060 ns with an exponential
+    # ring-down tail so the smoothed 50% crossing sits around sample 140 (n - 4).
+    amp = np.where(time < 45.0, 0.002, 0.20)
+    tail = time >= 1060.0
+    amp = np.where(tail, 0.20 * np.exp(-(time - 1060.0) / 70.0), amp)
+    wf = Waveform(12, "Q48", total_delay_ns(8, 12), time, amp.astype(complex), DURATION_NS)
+
+    result = analyze_waveform(wf, snr_threshold=5.0, smoothing=5)
+
+    assert result.success
+    assert result.edge_kind == "both"
+    assert result.rise_ns is not None
+    assert result.fall_ns is not None
+    assert result.time_stop_ns - result.fall_ns >= 32.0
