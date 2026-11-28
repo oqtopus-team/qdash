@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render as rtlRender, screen, within } from "@testing-library/react";
+import { withNuqsTestingAdapter, type UrlUpdateEvent } from "nuqs/adapters/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ExecutionPageContent } from "@/components/features/execution/ExecutionPageContent";
@@ -22,62 +22,114 @@ vi.mock("@tanstack/react-query", async () => {
   };
 });
 
+const DEFAULT_CHIPS = [
+  { chip_id: "chip-1", installed_at: "2026-06-01T00:00:00Z" },
+  { chip_id: "chip-2", installed_at: "2026-01-01T00:00:00Z" },
+];
+// The chips of the open project; null while a switched project's chips load.
+let chipList: typeof DEFAULT_CHIPS | null = DEFAULT_CHIPS;
 vi.mock("@/client/chip/chip", () => ({
-  useListChips: () => ({
-    data: {
-      data: {
-        chips: [{ chip_id: "chip-1", installed_at: "2026-06-01T00:00:00Z" }],
-      },
-    },
-  }),
+  useListChips: () => ({ data: chipList ? { data: { chips: chipList } } : undefined }),
+}));
+
+type ListArgs = { skip: number; chip_id: string; date?: string; timezone?: string };
+
+/** The one day with runs; the API returns nothing for any other picked day. */
+const BUSY_DAY = "20261120";
+
+function flatExecutions({ skip, chip_id, date }: ListArgs) {
+  const empty = !!date && date !== BUSY_DAY;
+  return {
+    total: empty ? 0 : 40,
+    executions: empty
+      ? [] // the API returns nothing for a day with no runs
+      : skip > 0 || chip_id === "chip-2"
+        ? [
+            {
+              execution_id: "exec-3",
+              name: "Other Execution",
+              status: "completed",
+              start_at: "2026-06-02T00:00:00Z",
+            },
+          ]
+        : [
+            {
+              execution_id: "exec-1",
+              name: "Running Execution",
+              status: "running",
+              start_at: "2026-06-01T00:00:00Z",
+              elapsed_time: "1m",
+              username: "tester",
+            },
+            {
+              execution_id: "exec-2",
+              name: "Completed Execution",
+              status: "completed",
+              start_at: "2026-06-01T00:00:00Z",
+              username: "tester",
+            },
+          ],
+  };
+}
+
+// Rows the grouped list returns; null means "the flat rows, none grouped".
+let groupedItems: Record<string, unknown>[] | null = null;
+let groupedSummary: Record<string, number> = {
+  total: 0,
+  total_executions: 0,
+  grouped_executions: 0,
+  agent_sessions: 0,
+};
+let groupedError = false;
+let currentProjectId = "project-1";
+const mockListExecutions = vi.fn();
+const mockListGroups = vi.fn();
+
+vi.mock("@/contexts/ProjectContext", () => ({
+  useProject: () => ({ projectId: currentProjectId }),
 }));
 
 vi.mock("@/client/execution/execution", () => ({
-  useListExecutions: ({
-    skip,
-    chip_id,
-    date,
-  }: {
-    skip: number;
-    chip_id: string;
-    date?: string;
-  }) => ({
-    data: {
+  useListExecutions: (args: ListArgs, options: { query: { enabled: boolean } }) => {
+    mockListExecutions(args, options);
+    return {
+      data: { data: flatExecutions(args) },
+      isError: false,
+      isLoading: args.skip > 0 && loadingNextPage,
+    };
+  },
+  useListExecutionGroups: (args: ListArgs, options: { query: { enabled: boolean } }) => {
+    mockListGroups(args, options);
+    const flat = flatExecutions(args);
+    const items =
+      groupedItems ??
+      flat.executions.map((execution) => ({
+        kind: "execution",
+        execution,
+        children: [],
+        children_total: 0,
+        children_in_filter: 0,
+        children_omitted: 0,
+      }));
+    return {
       data: {
-        total: date ? 0 : 40,
-        executions: date
-          ? [] // the API returns nothing for a day with no runs
-          : skip > 0 || chip_id === "chip-2"
-            ? [
-                {
-                  execution_id: "exec-3",
-                  name: "Other Execution",
-                  status: "completed",
-                  start_at: "2026-06-02T00:00:00Z",
-                },
-              ]
-            : [
-                {
-                  execution_id: "exec-1",
-                  name: "Running Execution",
-                  status: "running",
-                  start_at: "2026-06-01T00:00:00Z",
-                  elapsed_time: "1m",
-                  username: "tester",
-                },
-                {
-                  execution_id: "exec-2",
-                  name: "Completed Execution",
-                  status: "completed",
-                  start_at: "2026-06-01T00:00:00Z",
-                  username: "tester",
-                },
-              ],
+        data: groupedItems
+          ? { items, skip: args.skip, limit: 20, children_limit: 20, ...groupedSummary }
+          : {
+              items,
+              total: flat.total,
+              total_executions: flat.total,
+              grouped_executions: 0,
+              agent_sessions: 0,
+              skip: args.skip,
+              limit: 20,
+              children_limit: 20,
+            },
       },
-    },
-    isError: false,
-    isLoading: skip > 0 && loadingNextPage,
-  }),
+      isError: groupedError,
+      isLoading: args.skip > 0 && loadingNextPage,
+    };
+  },
   useGetExecution: () => ({
     data: { data: executionDetail },
     isLoading: false,
@@ -91,6 +143,7 @@ vi.mock("@/client/execution/execution", () => ({
     error: null,
   }),
   getListExecutionsQueryKey: () => ["/executions"],
+  getListExecutionGroupsQueryKey: () => ["/executions/groups"],
   getGetExecutionQueryKey: (executionId: string) => [`/executions/${executionId}`],
 }));
 
@@ -102,12 +155,15 @@ vi.mock("@/hooks/useDateNavigation", () => ({
   useDateNavigation: () => undefined,
 }));
 
-vi.mock("@/hooks/useUrlState", () => ({
-  useExecutionUrlState: () => {
-    const [selectedChip, setSelectedChip] = useState("chip-1");
-    return { selectedChip, setSelectedChip, isInitialized: true };
-  },
-}));
+// The page keeps its chip, day, grouping and page in the URL; tests start on chip-1.
+const onUrlUpdate = vi.fn<(event: UrlUpdateEvent) => void>();
+function render(ui: React.ReactElement, searchParams = "chip=chip-1") {
+  return rtlRender(ui, {
+    wrapper: withNuqsTestingAdapter({ searchParams, onUrlUpdate, hasMemory: true }),
+  });
+}
+const lastUpdate = () => onUrlUpdate.mock.calls[onUrlUpdate.mock.calls.length - 1]?.[0];
+const lastQuery = () => lastUpdate()?.queryString;
 
 vi.mock("@/components/ui/Toast", () => ({
   useToast: () => ({
@@ -119,8 +175,14 @@ vi.mock("@/components/ui/Toast", () => ({
 }));
 
 vi.mock("next/link", () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) => (
-    <a href={href}>{children}</a>
+  default: ({
+    children,
+    href,
+    ...rest
+  }: { children: React.ReactNode; href: string } & Record<string, unknown>) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
   ),
 }));
 
@@ -241,6 +303,32 @@ describe("ExecutionPageContent cancel confirmation", () => {
     expect(panel.getAttribute("aria-hidden")).toBe("true");
   });
 
+  it("links the details panel to the execution's calibration session in this project", () => {
+    executionDetail = {
+      ...DEFAULT_DETAIL,
+      calibration_session: {
+        calibration_session_id: "cs-1",
+        chip_id: "chip-1",
+        objective: "Bring up qubits",
+        status: "open",
+        via: "pipeline_run",
+        pipeline_run_id: "cpr-1",
+      },
+    };
+    render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByText("Running Execution"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    expect(
+      within(panel).getByRole("link", { name: "Open calibration session" }).getAttribute("href"),
+    ).toBe("/calibration-sessions/cs-1?project=project-1&from=executions&chip=chip-1");
+  });
+
+  it("shows no calibration notice for an ordinary execution", () => {
+    render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByText("Running Execution"));
+    expect(screen.queryByTestId("execution-calibration-notice")).toBeNull();
+  });
+
   it("browses adjacent executions without closing the panel and resets its scroll", () => {
     render(<ExecutionPageContent />);
     fireEvent.click(screen.getByText("Running Execution"));
@@ -258,7 +346,7 @@ describe("ExecutionPageContent cancel confirmation", () => {
     expect(panel.scrollTop).toBe(0);
     expect(within(panel).getByRole("heading", { name: "Completed Execution" })).toBeTruthy();
     expect(within(panel).getByRole("link", { name: "View Details" }).getAttribute("href")).toBe(
-      "/execution/chip-1/exec-2",
+      "/execution/chip-1/exec-2?project=project-1",
     );
     expect(within(panel).getByText("2 of 2 on this page")).toBeTruthy();
     expect(next.disabled).toBe(true);
@@ -543,5 +631,664 @@ describe("ExecutionPageContent status presentation", () => {
 
     fireEvent.click(row);
     expect(within(panel).queryByText("TaskFigure")).toBeNull();
+  });
+});
+
+type ListOptions = {
+  query: { enabled?: boolean; queryKey?: unknown[] };
+  request?: { headers: Record<string, string> };
+};
+
+function latestCall(mock: { mock: { calls: unknown[][] } }) {
+  const calls = mock.mock.calls;
+  return calls[calls.length - 1] as [ListArgs, ListOptions] | undefined;
+}
+
+const SESSION_ROW = {
+  kind: "agent_session",
+  sort_at: "2026-06-03T00:00:00Z",
+  agent_session: {
+    session_id: "session-1",
+    project_id: "project-1",
+    chip_id: "chip-1",
+    created_by: "alice",
+    created_at: "2026-06-02T00:00:00Z",
+    updated_at: "2026-06-03T00:00:00Z",
+    expires_at: "2026-06-04T00:00:00Z",
+    status: "waiting_for_human",
+    stored_status: "waiting_for_human",
+    active_intervention_id: "int-1",
+    qids: ["Q00"],
+    allowed_tasks: ["CheckRabi"],
+    autonomy: "auto",
+    skill_name: "qdash-one-qubit-calibration",
+    model_name: "",
+    counts: {
+      actions: 4,
+      max_actions: 20,
+      measurements: 2,
+      pending_dispatch: 0,
+      dispatch_failed: 0,
+      in_flight: 0,
+      rejected_proposals: 1,
+      open_interventions: 1,
+      decisions: 1,
+    },
+    latest_activity_at: "2026-06-03T00:00:00Z",
+    missing: [],
+  },
+  children: [
+    {
+      action_id: "act-1",
+      sequence: 1,
+      attempt: 1,
+      task_name: "CheckRabi",
+      qid: "Q00",
+      in_filter: true,
+      execution: {
+        execution_id: "agent-exec-1",
+        name: "agent:CheckRabi-agent-exec-1",
+        status: "completed",
+        start_at: "2026-06-02T01:00:00Z",
+        tags: [],
+        note: {},
+      },
+    },
+    {
+      action_id: "act-2",
+      sequence: 2,
+      attempt: 2,
+      task_name: "CheckRabi",
+      qid: "Q00",
+      in_filter: true,
+      execution: {
+        execution_id: "agent-exec-2",
+        name: "agent:CheckRabi-agent-exec-2",
+        status: "failed",
+        start_at: "2026-06-03T00:00:00Z",
+        tags: [],
+        note: {},
+      },
+    },
+  ],
+  children_total: 2,
+  children_in_filter: 2,
+  children_omitted: 0,
+};
+
+const MANUAL_ROW = {
+  kind: "execution",
+  execution: {
+    execution_id: "exec-1",
+    name: "Running Execution",
+    status: "running",
+    start_at: "2026-06-01T00:00:00Z",
+    tags: [],
+    note: {},
+  },
+  children: [],
+};
+
+const CALIBRATION_ROW = {
+  kind: "calibration_session",
+  sort_at: "2026-06-05T00:00:00Z",
+  calibration_session: {
+    calibration_session_id: "cs-1",
+    project_id: "project-1",
+    chip_id: "chip-1",
+    objective: "Shorten the 0-1 ZX90",
+    status: "closed",
+    created_by: "alice",
+    created_at: "2026-06-04T00:00:00Z",
+    closed_at: "2026-06-05T02:00:00Z",
+    targets: ["0", "1", "0-1"],
+    counts: {
+      pipeline_runs: 2,
+      agent_sessions: 1,
+      executions: 3,
+      executions_in_filter: 3,
+      running: 0,
+      failed: 1,
+      unknown_dispatch: 0,
+      decisions: 5,
+    },
+    first_activity_at: "2026-06-04T00:00:00Z",
+    latest_activity_at: "2026-06-05T00:00:00Z",
+    recommendation: null,
+  },
+  pipeline_runs: [
+    {
+      run_id: "cpr-1",
+      pipeline_name: "zx90_q0_q1_c03",
+      dispatch_status: "dispatched",
+      requested_by: "alice",
+      requested_at: "2026-06-04T01:00:00Z",
+      decision_id: "cd-12345678",
+      targets: ["0", "1"],
+      executions: [
+        {
+          execution_id: "pipe-exec-1",
+          name: "zx90_q0_q1_c03_step1",
+          status: "failed",
+          start_at: "2026-06-04T01:00:00Z",
+          tags: [],
+          note: {},
+        },
+      ],
+      executions_total: 1,
+      executions_in_filter: 1,
+    },
+    {
+      run_id: "cpr-2",
+      pipeline_name: "zx90_q0_q1_c04",
+      dispatch_status: "rejected",
+      requested_by: "alice",
+      requested_at: "2026-06-04T02:00:00Z",
+      decision_id: null,
+      targets: [],
+      executions: [],
+      executions_total: 0,
+      executions_in_filter: 0,
+    },
+  ],
+  pipeline_runs_omitted: 0,
+  nested_agent_sessions: [
+    {
+      agent_session: SESSION_ROW.agent_session,
+      children: SESSION_ROW.children,
+      children_total: 2,
+      children_in_filter: 2,
+      children_omitted: 0,
+    },
+  ],
+  nested_agent_sessions_omitted: 0,
+  children: [],
+};
+
+describe("ExecutionPageContent calibration session groups", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    loadingNextPage = false;
+    executionDetail = DEFAULT_DETAIL;
+    currentProjectId = "project-1";
+    groupedError = false;
+    groupedItems = [CALIBRATION_ROW, MANUAL_ROW];
+    groupedSummary = {
+      total: 2,
+      total_executions: 4,
+      grouped_executions: 3,
+      agent_sessions: 0,
+      calibration_sessions: 1,
+    };
+  });
+
+  afterEach(() => {
+    cleanup();
+    groupedItems = null;
+  });
+
+  it("shows the objective, its records' counts, and links in the open project", () => {
+    render(<ExecutionPageContent />);
+    expect(screen.getByText("Shorten the 0-1 ZX90")).toBeTruthy();
+    expect(
+      screen.getByText("4 executions, 3 of them in 1 calibration session; 2 rows"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/2 runs · 1 agent session · 3 executions · 1 failed · 5 decisions/),
+    ).toBeTruthy();
+    // Each recorded target is a qubit tile, as everywhere a qubit or coupling is named.
+    const targets = screen.getByTestId("calibration-session-targets");
+    expect(within(targets).getByText("Targets")).toBeTruthy();
+    expect(["0", "1", "0-1"].every((qid) => within(targets).getByText(qid))).toBe(true);
+    // Closed says nothing about the objective; no recommendation was recorded, so none is shown.
+    expect(screen.getByText("Closed")).toBeTruthy();
+    expect(screen.queryByText(/Recommends/)).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Open calibration session" }).getAttribute("href"),
+    ).toBe("/calibration-sessions/cs-1?project=project-1&from=executions&chip=chip-1");
+    expect(screen.queryByText("zx90_q0_q1_c03_step1")).toBeNull();
+  });
+
+  it("expands to every run with its step executions and the nested agent session", () => {
+    render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByRole("button", { expanded: false, name: /Shorten the 0-1 ZX90/ }));
+    expect(screen.getByText("zx90_q0_q1_c03_step1")).toBeTruthy();
+    expect(screen.getByText(/Carries out decision cd-12345/)).toBeTruthy();
+    expect(screen.getByText("Refused before it started; nothing ran.")).toBeTruthy();
+    // The nested agent session keeps its own row and does not repeat the parent link.
+    expect(screen.getByText("qdash-one-qubit-calibration")).toBeTruthy();
+    expect(screen.queryAllByRole("link", { name: /Calibration session:/ })).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { expanded: false, name: /qdash-one-qubit/ }));
+    fireEvent.click(screen.getByText("zx90_q0_q1_c03_step1"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    // Browsing covers the run's step, the agent session's two children, and the manual run.
+    expect(within(panel).getByText("1 of 4 on this page")).toBeTruthy();
+  });
+});
+
+const AUTOMATIC_ROW = {
+  kind: "calibration_session",
+  sort_at: "2026-06-06T00:00:00Z",
+  calibration_session: {
+    ...CALIBRATION_ROW.calibration_session,
+    calibration_session_id: "cs-auto-1",
+    objective: "Workflow nightly_1q",
+    status: "open",
+    origin: "automatic",
+    closed_at: null,
+    targets: [],
+    counts: {
+      pipeline_runs: 1,
+      agent_sessions: 0,
+      executions: 2,
+      executions_in_filter: 2,
+      running: 0,
+      failed: 0,
+      unknown_dispatch: 0,
+      decisions: 0,
+    },
+  },
+  pipeline_runs: [
+    {
+      run_id: "cpr-flow-1",
+      run_kind: "workflow",
+      run_name: "nightly_1q",
+      trigger: "schedule",
+      pipeline_name: "",
+      dispatch_status: "dispatched",
+      requested_by: "alice",
+      requested_at: "2026-06-06T00:00:00Z",
+      decision_id: null,
+      targets: [],
+      executions: [
+        {
+          execution_id: "flow-step-1",
+          name: "nightly_1q_bringup",
+          status: "completed",
+          start_at: "2026-06-06T00:00:00Z",
+          tags: [],
+          note: {},
+        },
+        {
+          execution_id: "flow-step-2",
+          name: "nightly_1q_rabi",
+          status: "completed",
+          start_at: "2026-06-06T00:05:00Z",
+          tags: [],
+          note: {},
+        },
+      ],
+      executions_total: 2,
+      executions_in_filter: 2,
+    },
+  ],
+  pipeline_runs_omitted: 0,
+  nested_agent_sessions: [],
+  nested_agent_sessions_omitted: 0,
+  children: [],
+};
+
+describe("ExecutionPageContent automatic calibration sessions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    loadingNextPage = false;
+    executionDetail = DEFAULT_DETAIL;
+    currentProjectId = "project-1";
+    groupedError = false;
+    groupedItems = [AUTOMATIC_ROW, MANUAL_ROW];
+    groupedSummary = {
+      total: 2,
+      total_executions: 3,
+      grouped_executions: 2,
+      agent_sessions: 0,
+      calibration_sessions: 1,
+    };
+  });
+
+  afterEach(() => {
+    cleanup();
+    groupedItems = null;
+  });
+
+  it("shows a scheduled workflow run as one row with every step execution", () => {
+    render(<ExecutionPageContent />);
+    expect(screen.getByText("Automatic")).toBeTruthy();
+    expect(screen.getByText(/1 run · 2 executions/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { expanded: false, name: /Workflow nightly_1q/ }));
+    const runs = screen.getByRole("list", { name: "Runs" });
+    expect(within(runs).getByText("nightly_1q")).toBeTruthy();
+    expect(within(runs).getByText("Workflow")).toBeTruthy();
+    expect(within(runs).getByText("Scheduled")).toBeTruthy();
+    expect(within(runs).getByText("nightly_1q_bringup")).toBeTruthy();
+    expect(within(runs).getByText("nightly_1q_rabi")).toBeTruthy();
+  });
+});
+
+describe("ExecutionPageContent agent session groups", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    loadingNextPage = false;
+    executionDetail = DEFAULT_DETAIL;
+    currentProjectId = "project-1";
+    groupedError = false;
+    groupedItems = [SESSION_ROW, MANUAL_ROW];
+    groupedSummary = { total: 2, total_executions: 3, grouped_executions: 2, agent_sessions: 1 };
+  });
+
+  afterEach(() => {
+    cleanup();
+    groupedItems = null;
+    executionDetail = DEFAULT_DETAIL;
+  });
+
+  it("shows a session as one row with its own status and explains the counts", () => {
+    render(<ExecutionPageContent />);
+
+    expect(screen.getByText("qdash-one-qubit-calibration")).toBeTruthy();
+    // The group status is the session's, not a failure of its last execution.
+    expect(screen.getByText("Paused for an expert")).toBeTruthy();
+    expect(screen.getByText(/Waiting for an expert/)).toBeTruthy();
+    expect(screen.getByText("3 executions, 2 of them in 1 agent session; 2 rows")).toBeTruthy();
+    expect(screen.getByText(/1 rejected proposal/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open session graph" }).getAttribute("href")).toBe(
+      "/execution/chip-1/sessions/session-1?project=project-1",
+    );
+    // Children stay folded until the row is expanded.
+    expect(screen.queryByText("agent:CheckRabi-agent-exec-1")).toBeNull();
+    const lastCall = latestCall(mockListGroups);
+    expect(lastCall?.[1].query.enabled).toBe(true);
+    expect(latestCall(mockListExecutions)?.[1].query.enabled).toBe(false);
+  });
+
+  it("expands a session and opens a child in the existing details panel", () => {
+    render(<ExecutionPageContent />);
+    const toggle = screen.getByRole("button", { expanded: false, name: /qdash-one-qubit/ });
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("agent:CheckRabi-agent-exec-1")).toBeTruthy();
+    expect(screen.getByText("#2 · try 2")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("agent:CheckRabi-agent-exec-2"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    expect(panel.getAttribute("aria-hidden")).toBe("false");
+    // Browsing covers the visible executions: both children and the manual run.
+    expect(within(panel).getByText("2 of 3 on this page")).toBeTruthy();
+
+    fireEvent.click(toggle);
+    expect(screen.queryByText("agent:CheckRabi-agent-exec-1")).toBeNull();
+  });
+
+  it("links the details panel to the execution's agent session", () => {
+    executionDetail = {
+      ...DEFAULT_DETAIL,
+      chip_id: "chip-1",
+      agent_session: {
+        session_id: "session-1",
+        linked: true,
+        action_id: "act-1",
+        status: "active",
+      },
+    };
+    render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByText("Running Execution"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    expect(within(panel).getByText(/One measurement of agent session/)).toBeTruthy();
+    expect(
+      within(panel).getByRole("link", { name: "Open session graph" }).getAttribute("href"),
+    ).toBe("/execution/chip-1/sessions/session-1");
+  });
+
+  it("switches to the calibration session view on the same chip, in this project", () => {
+    render(<ExecutionPageContent />);
+    const views = screen.getByRole("navigation", { name: "Execution views" });
+    const executions = within(views).getByRole("link", { name: "Executions" });
+    const sessions = within(views).getByRole("link", { name: "Calibration sessions" });
+
+    expect(executions.getAttribute("aria-current")).toBe("page");
+    expect(sessions.getAttribute("aria-current")).toBeNull();
+    expect(sessions.getAttribute("href")).toBe(
+      "/calibration-sessions?chip=chip-1&project=project-1",
+    );
+    // Grouping stays the default view of this list.
+    expect(
+      (screen.getByRole("checkbox", { name: "Group sessions" }) as HTMLInputElement).checked,
+    ).toBe(true);
+  });
+
+  it("switches to the flat list without grouping", () => {
+    render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Group sessions" }));
+
+    expect(latestCall(mockListExecutions)?.[1].query.enabled).toBe(true);
+    expect(latestCall(mockListGroups)?.[1].query.enabled).toBe(false);
+    expect(screen.queryByText("qdash-one-qubit-calibration")).toBeNull();
+    expect(screen.getByText("40 executions")).toBeTruthy();
+    expect(screen.getByText("Completed Execution")).toBeTruthy();
+  });
+
+  it("resets expanded groups and the panel when the project changes", () => {
+    const { rerender } = render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByRole("button", { expanded: false, name: /qdash-one-qubit/ }));
+    fireEvent.click(screen.getByText("agent:CheckRabi-agent-exec-1"));
+    expect(
+      screen.getByRole("complementary", { name: "Execution details" }).getAttribute("aria-hidden"),
+    ).toBe("false");
+
+    currentProjectId = "project-2";
+    rerender(<ExecutionPageContent />);
+
+    expect(document.getElementById("execution-details-panel")?.getAttribute("aria-hidden")).toBe(
+      "true",
+    );
+    expect(screen.queryByText("agent:CheckRabi-agent-exec-1")).toBeNull();
+    // The grouped request is pinned to the new project.
+    const options = latestCall(mockListGroups)?.[1];
+    expect(options?.query.queryKey).toContain("project-2");
+    expect(options?.request?.headers["X-Project-Id"]).toBe("project-2");
+  });
+
+  it("gives a session card the accent of an execution card in the same state", () => {
+    const sessionCard = (status: string) => {
+      groupedItems = [
+        { ...SESSION_ROW, agent_session: { ...SESSION_ROW.agent_session, status } },
+        MANUAL_ROW,
+      ];
+      const view = render(<ExecutionPageContent />);
+      const card = screen.getByTestId("agent-session-card");
+      const className = card.className;
+      view.unmount();
+      return className;
+    };
+
+    // The manual row is a running execution card.
+    render(<ExecutionPageContent />);
+    const runningCard = screen.getByRole("button", {
+      name: "View Running Execution execution details",
+    });
+    expect(runningCard.className).toContain("border-l-info");
+    cleanup();
+
+    const active = sessionCard("active");
+    expect(active).toContain("border-l-4");
+    expect(active).toContain("border-l-info");
+    expect(sessionCard("completed")).toContain("border-l-success");
+    expect(sessionCard("cancelled")).toContain("border-l-neutral");
+    expect(sessionCard("waiting_for_human")).toContain("border-l-warning");
+    const expired = sessionCard("expired");
+    expect(expired).toContain("border-l-base-300");
+    expect(expired).not.toMatch(/border-l-(info|success|warning|error|neutral)/);
+  });
+
+  it("reports a grouped list that cannot be loaded", () => {
+    groupedError = true;
+    render(<ExecutionPageContent />);
+    expect(screen.getByRole("alert").textContent).toContain(
+      "Execution history could not be loaded",
+    );
+  });
+});
+
+describe("ExecutionPageContent view kept in the URL", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    loadingNextPage = false;
+    executionDetail = DEFAULT_DETAIL;
+    groupedItems = null;
+    groupedError = false;
+    currentProjectId = "project-1";
+    chipList = DEFAULT_CHIPS;
+    window.history.replaceState(null, "", "/execution");
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  const viewDetailsHref = () => {
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    return within(panel).getByRole("link", { name: "View Details" }).getAttribute("href") ?? "";
+  };
+
+  it("opens an old bookmark as the grouped latest runs on the first page", () => {
+    render(<ExecutionPageContent />, "chip=chip-1");
+
+    const [args, options] = latestCall(mockListGroups) ?? [];
+    expect(options?.query.enabled).toBe(true);
+    expect(args).toMatchObject({ chip_id: "chip-1", skip: 0 });
+    expect(args?.date).toBeUndefined();
+    expect(latestCall(mockListExecutions)?.[1].query.enabled).toBe(false);
+    expect(
+      (screen.getByRole("checkbox", { name: "Group sessions" }) as HTMLInputElement).checked,
+    ).toBe(true);
+    expect(screen.getByText("selected:latest")).toBeTruthy();
+  });
+
+  it("reads invalid values as the defaults, before the first request", () => {
+    render(<ExecutionPageContent />, "chip=chip-1&date=20261345&flat=maybe&page=-4");
+
+    // No request ever carries the invalid day or page.
+    for (const [args] of [...mockListGroups.mock.calls, ...mockListExecutions.mock.calls]) {
+      expect((args as ListArgs).date).toBeUndefined();
+      expect((args as ListArgs).skip).toBe(0);
+    }
+    expect(latestCall(mockListGroups)?.[1].query.enabled).toBe(true);
+    expect(screen.getByText("selected:latest")).toBeTruthy();
+  });
+
+  it("restores a day, the flat list and page 2, and links the execution page back to them", () => {
+    render(<ExecutionPageContent />, `chip=chip-1&date=${BUSY_DAY}&flat=true&page=2`);
+
+    // The very first flat request already asks for that day and page.
+    const [first] = mockListExecutions.mock.calls[0] as [ListArgs];
+    expect(first).toMatchObject({ chip_id: "chip-1", date: BUSY_DAY, skip: 20 });
+    expect(latestCall(mockListExecutions)?.[1].query.enabled).toBe(true);
+    // The flat list is pinned to the project it shows, like the grouped one.
+    expect(latestCall(mockListExecutions)?.[1].query.queryKey).toContain("project-1");
+    expect(latestCall(mockListExecutions)?.[1].request?.headers["X-Project-Id"]).toBe("project-1");
+    expect(latestCall(mockListGroups)?.[1].query.enabled).toBe(false);
+    expect(screen.getByText("Page 2 of 2")).toBeTruthy();
+    expect(screen.getByText(`selected:${BUSY_DAY}`)).toBeTruthy();
+
+    fireEvent.click(screen.getByText("Other Execution"));
+    const href = viewDetailsHref();
+    expect(href).toBe(
+      `/execution/chip-1/exec-3?project=project-1&date=${BUSY_DAY}&flat=true&page=2`,
+    );
+  });
+
+  it("moves a page past the end to the last page without a history entry", async () => {
+    render(<ExecutionPageContent />, "chip=chip-1&page=9");
+
+    await vi.waitFor(() =>
+      expect(lastUpdate()).toMatchObject({
+        queryString: "?chip=chip-1&page=2",
+        options: { history: "replace" },
+      }),
+    );
+  });
+
+  it("adds a history entry for each change, so Back returns to the previous view", async () => {
+    const { unmount } = render(<ExecutionPageContent />, "chip=chip-1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await vi.waitFor(() => expect(lastQuery()).toBe("?chip=chip-1&page=2"));
+    expect(lastUpdate().options.history).toBe("push");
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Group sessions" }));
+    await vi.waitFor(() => expect(lastQuery()).toBe("?chip=chip-1&flat=true"));
+    expect(lastUpdate().options.history).toBe("push");
+
+    fireEvent.click(screen.getByText("pick-day"));
+    await vi.waitFor(() => expect(lastQuery()).toBe("?chip=chip-1&flat=true&date=20260101"));
+
+    // Back to the earlier entry renders that entry's view again.
+    unmount();
+    vi.clearAllMocks();
+    render(<ExecutionPageContent />, "chip=chip-1&page=2");
+    expect(latestCall(mockListGroups)?.[0]).toMatchObject({ skip: 20 });
+    expect(latestCall(mockListGroups)?.[1].query.enabled).toBe(true);
+  });
+
+  it("resets the day and page when another chip is picked", async () => {
+    render(<ExecutionPageContent />, `chip=chip-1&date=${BUSY_DAY}&flat=true&page=2`);
+
+    fireEvent.click(screen.getByRole("button", { name: "Change chip" }));
+
+    // The flat list stays; the old chip's day and page do not.
+    await vi.waitFor(() => expect(lastQuery()).toBe("?chip=chip-2&flat=true"));
+    expect(lastUpdate().options.history).toBe("push");
+    expect(latestCall(mockListExecutions)?.[0]).toMatchObject({ chip_id: "chip-2", skip: 0 });
+    expect(latestCall(mockListExecutions)?.[0].date).toBeUndefined();
+  });
+
+  it("drops the day and page when the project is switched", async () => {
+    // The switch has removed the chip from the URL, and the new project's chips are loading.
+    chipList = null;
+    const { rerender } = render(<ExecutionPageContent />, `date=${BUSY_DAY}&page=2`);
+    window.history.replaceState(null, "", "/execution?project=project-2");
+    currentProjectId = "project-2";
+    rerender(<ExecutionPageContent />);
+    expect(onUrlUpdate).not.toHaveBeenCalled();
+
+    // Its default chip is picked with the old day and page dropped, in one update.
+    chipList = DEFAULT_CHIPS;
+    rerender(<ExecutionPageContent />);
+    await vi.waitFor(() => expect(lastQuery()).toBe("?chip=chip-1"));
+    expect(onUrlUpdate).toHaveBeenCalledTimes(1);
+    expect(lastUpdate().options.history).toBe("replace");
+    expect(latestCall(mockListGroups)?.[0]).toMatchObject({ skip: 0 });
+  });
+
+  it("asks for no list while the chip is not one of the open project's", () => {
+    // Back to another project's entry: its chip shows before that project's chips load.
+    chipList = null;
+    const { rerender } = render(<ExecutionPageContent />, `chip=chip-9&date=${BUSY_DAY}&page=2`);
+    expect(screen.getByText("Skeleton")).toBeTruthy();
+    for (const [, options] of [...mockListGroups.mock.calls, ...mockListExecutions.mock.calls]) {
+      expect((options as ListOptions).query.enabled).toBe(false);
+    }
+
+    // The project's chips do not include it: still nothing is asked for that chip.
+    chipList = DEFAULT_CHIPS;
+    rerender(<ExecutionPageContent />);
+    expect(latestCall(mockListGroups)?.[1].query.enabled).toBe(false);
+    expect(latestCall(mockListExecutions)?.[1].query.enabled).toBe(false);
+  });
+
+  it("keeps the view when Back returns to an entry of another project", () => {
+    const { rerender } = render(<ExecutionPageContent />, `chip=chip-1&date=${BUSY_DAY}&page=2`);
+
+    // Back restores an entry that names its own chip with its project.
+    window.history.replaceState(
+      null,
+      "",
+      `/execution?chip=chip-1&date=${BUSY_DAY}&page=2&project=project-2`,
+    );
+    currentProjectId = "project-2";
+    rerender(<ExecutionPageContent />);
+
+    expect(onUrlUpdate).not.toHaveBeenCalled();
+    expect(latestCall(mockListGroups)?.[0]).toMatchObject({ date: BUSY_DAY, skip: 20 });
+    expect(latestCall(mockListGroups)?.[1].query.queryKey).toContain("project-2");
   });
 });

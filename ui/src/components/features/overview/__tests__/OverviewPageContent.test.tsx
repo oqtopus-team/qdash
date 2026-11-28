@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OverviewPageContent } from "@/components/features/overview/OverviewPageContent";
@@ -15,6 +15,17 @@ const mockCurrentCooldownId = vi.hoisted(() => vi.fn<() => string | null>(() => 
 const mockCooldowns = vi.hoisted(() => vi.fn<() => unknown[]>(() => []));
 const mockListForumPosts = vi.hoisted(() => vi.fn());
 const mockGetChipNotesSummary = vi.hoisted(() => vi.fn());
+type MockMetricValue = { value: number | null; stddev: number | null };
+const mockQubitMetricValues = vi.hoisted(() =>
+  vi.fn<() => Record<string, Record<string, MockMetricValue>>>(() => ({
+    t1: { Q0: { value: null, stddev: null } },
+  })),
+);
+const mockQubitMetricsConfig = vi.hoisted(() =>
+  vi.fn<() => { key: string; title: string; unit: string; scale: number }[]>(() => [
+    { key: "t1", title: "T1", unit: "us", scale: 1 },
+  ]),
+);
 
 vi.mock("@/client/chip/chip", () => ({
   useListChips: () => ({
@@ -63,11 +74,7 @@ vi.mock("@/client/metrics/metrics", () => ({
   useGetChipMetrics: () => ({
     data: {
       data: {
-        qubit_metrics: {
-          t1: {
-            Q0: { value: null, stddev: null },
-          },
-        },
+        qubit_metrics: mockQubitMetricValues(),
         coupling_metrics: {
           zx90_gate_fidelity: {
             "0-1": { value: null, stddev: null },
@@ -119,7 +126,7 @@ vi.mock("@/contexts/ProjectContext", () => ({
 
 vi.mock("@/hooks/useMetricsConfig", () => ({
   useMetricsConfig: () => ({
-    qubitMetrics: [{ key: "t1", title: "T1", unit: "us", scale: 1 }],
+    qubitMetrics: mockQubitMetricsConfig(),
     couplingMetrics: [
       { key: "zx90_gate_fidelity", title: "ZX90 Gate Fidelity", unit: "", scale: 1 },
     ],
@@ -252,13 +259,18 @@ vi.mock("@/components/features/overview/OverviewMetricModal", () => ({
 vi.mock("@/components/features/overview/QubitMetricGrid", () => ({
   QubitMetricGrid: ({
     forumLinkedQids,
+    metricData,
+    unit,
     onQubitClick,
   }: {
     forumLinkedQids?: Record<string, string | null>;
+    metricData?: Record<string, { value: number | null }> | null;
+    unit?: string;
     onQubitClick?: (qid: string) => void;
   }) => (
     <div>
       <span data-testid="qubit-forum-label">{String(forumLinkedQids?.["0"])}</span>
+      <span data-testid="qubit-grid-value">{`${String(metricData?.["0"]?.value)} ${unit}`}</span>
       <button type="button" onClick={() => onQubitClick?.("0")}>
         Open qubit
       </button>
@@ -290,6 +302,8 @@ describe("OverviewPageContent", () => {
     mockCurrentCooldownId.mockReturnValue(null);
     mockCooldowns.mockReturnValue([]);
     mockHasUrlRange.mockReturnValue(false);
+    mockQubitMetricValues.mockReturnValue({ t1: { Q0: { value: null, stddev: null } } });
+    mockQubitMetricsConfig.mockReturnValue([{ key: "t1", title: "T1", unit: "us", scale: 1 }]);
   });
 
   afterEach(() => {
@@ -529,5 +543,35 @@ describe("OverviewPageContent", () => {
     fireEvent.click(screen.getByRole("button", { name: /1 qubit metric without data/ }));
 
     expect(screen.getByText("No values in the selected range")).toBeTruthy();
+  });
+
+  it("shows a stored zero readout amplitude as data and opens its history from the grid", () => {
+    mockQubitMetricsConfig.mockReturnValue([
+      { key: "t1", title: "T1", unit: "us", scale: 1 },
+      { key: "readout_amplitude", title: "Readout Amplitude", unit: "a.u.", scale: 1 },
+    ]);
+    mockQubitMetricValues.mockReturnValue({
+      t1: { Q0: { value: null, stddev: null } },
+      readout_amplitude: { Q0: { value: 0, stddev: null } },
+    });
+
+    const { container } = render(<OverviewPageContent />);
+
+    // Zero is a stored value, so only T1 and the coupling metric count as empty.
+    expect(screen.getByText("1 with data")).toBeTruthy();
+    expect(screen.getByText("2 empty")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /1 qubit metric without data/ })).toBeTruthy();
+
+    const section = container.querySelector<HTMLElement>(
+      "#overview-qubit-metric-readout_amplitude",
+    );
+    expect(section).not.toBeNull();
+    const metric = within(section!);
+    expect(metric.getByText("Readout Amplitude")).toBeTruthy();
+    expect(metric.getByTestId("qubit-grid-value").textContent).toBe("0 a.u.");
+    expect(container.querySelector("#overview-qubit-metric-t1")).toBeNull();
+
+    fireEvent.click(metric.getByRole("button", { name: "Open qubit" }));
+    expect(screen.getByTestId("metric-note-modal").textContent).toBe("0:readout_amplitude");
   });
 });

@@ -1,5 +1,6 @@
 """Database session management with dependency injection support."""
 
+import asyncio
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -182,11 +183,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     """
     from qdash.api.logging_config import setup_logging
+    from qdash.api.services.agent_intervention_service import run_notification_sweeper
+    from qdash.api.services.calibration_session_lifecycle import run_lifecycle_sweeper
 
     setup_logging()
     init_db()
     create_initial_admin()
+    sweeper = run_notification_sweeper()
+    # Closes automatic calibration sessions whose work ended, including after a crash.
+    lifecycle_sweeper = run_lifecycle_sweeper()
     try:
         yield
     finally:
+        sweeper.cancel()
+        lifecycle_sweeper.cancel()
+        # Lets a sweep in progress stop (bounded) before its database connection closes.
+        await asyncio.wait({lifecycle_sweeper})
         close_db()

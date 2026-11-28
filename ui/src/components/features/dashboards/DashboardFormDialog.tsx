@@ -6,6 +6,7 @@ import { useListChips } from "@/client/chip/chip";
 import { useListDashboardTemplates } from "@/client/dashboard/dashboard";
 import type { DashboardResponseVisibility, DashboardTemplateResponse } from "@/schemas";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import { VisibilitySelector } from "@/components/ui/VisibilitySelector";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { sortChipsByDefaultPriority } from "@/lib/utils/chips";
 
@@ -278,46 +279,19 @@ function DashboardForm({
           </p>
         </fieldset>
 
-        <fieldset className="fieldset">
-          <legend className="fieldset-legend">Sharing</legend>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <label className="choice-field gap-3 rounded-[var(--radius-field)] border border-base-300 p-3">
-              <input
-                type="radio"
-                name={`${id}-visibility`}
-                className="radio radio-sm"
-                checked={visibility === "private"}
-                onChange={() => setVisibility("private")}
-              />
-              <span>
-                <span className="block font-medium">Private</span>
-                <span className="block text-xs text-base-content/60">Only you can open it</span>
-              </span>
-            </label>
-            <label className="choice-field gap-3 rounded-[var(--radius-field)] border border-base-300 p-3">
-              <input
-                type="radio"
-                name={`${id}-visibility`}
-                className="radio radio-sm"
-                checked={visibility === "project"}
-                onChange={() => setVisibility("project")}
-              />
-              <span>
-                <span className="block font-medium">Shared with project</span>
-                <span className="block text-xs text-base-content/60">
-                  Every project member can open it
-                </span>
-              </span>
-            </label>
-          </div>
-          {isCreate && (
-            <p className="label whitespace-normal">
-              {visibility === "project"
+        <VisibilitySelector
+          value={visibility}
+          onChange={setVisibility}
+          privateDescription="Only you can open it"
+          projectDescription="Every project member can open it"
+          hint={
+            isCreate
+              ? visibility === "project"
                 ? "A shared dashboard can only show scripts that are shared with the project"
-                : "You can share it with the project later from the dashboard's actions menu"}
-            </p>
-          )}
-        </fieldset>
+                : "You can share it with the project later from the dashboard's actions menu"
+              : undefined
+          }
+        />
 
         {isCreate ? (
           <details className="collapse collapse-arrow rounded-[var(--radius-field)] border border-base-300">

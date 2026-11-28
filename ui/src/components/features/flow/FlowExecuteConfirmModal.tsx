@@ -246,8 +246,8 @@ export function FlowExecuteConfirmModal({
                 <p className="label whitespace-normal">
                   {changed
                     ? mode === "pairs"
-                      ? "These directed pairs replace the coupling targets of each CalibService in this flow run. The scheduler groups exactly these pairs from hardware constraints; later filtering steps still apply."
-                      : "These targets replace the initial targets of each CalibService in this flow run. Later filtering steps still apply."
+                      ? "These directed pairs replace the coupling targets of each CalibrationSession.run in this flow run. The scheduler groups exactly these pairs from hardware constraints; later filtering steps still apply."
+                      : "These targets replace the initial targets of each CalibrationSession.run in this flow run. Later filtering steps still apply."
                     : defaults
                       ? "Defaults from the saved workflow. Edit to override for this execution only."
                       : "Targets are dynamic, unset, or differ within the saved workflow. Leave unchanged to use the code, or enter targets to override this execution."}

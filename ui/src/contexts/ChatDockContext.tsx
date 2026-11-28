@@ -11,20 +11,20 @@ import React, {
   useSyncExternalStore,
 } from "react";
 import { usePathname } from "next/navigation";
-import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
+import { useAgentChatSessionContext } from "@/contexts/AgentChatSessionContext";
 import type {
   EditProposal,
   InvestigationTarget,
   PageContext,
   TaskChatContext,
-} from "@/types/copilotChat";
-import { matchesEditTarget } from "@/lib/copilotEditTarget";
+} from "@/types/agentChat";
+import { matchesEditTarget } from "@/lib/agentEditTarget";
 import {
   sameInvestigation,
   investigationKey,
   investigationPrompt,
   investigationTitle,
-} from "@/lib/copilotInvestigation";
+} from "@/lib/agentInvestigation";
 
 /**
  * What a page tells the chat about itself. A page registers one while it is
@@ -94,7 +94,7 @@ function sameSummary(a: PageContextSummary | null, b: PageContextSummary | null)
 /**
  * Where the in-app chat is shown outside the /chat page: the docked sidebar or
  * the floating window that sits above modals. Both render the active session
- * of CopilotChatSessionProvider, so a chat moves between them mid-stream.
+ * of AgentChatSessionProvider, so a chat moves between them mid-stream.
  */
 /** Where an investigation opens: the docked sidebar on a page, the floating window above a modal. */
 export type InvestigationSurface = "sidebar" | "mini";
@@ -164,12 +164,14 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   const {
     activeSession,
     sessions,
+    runs,
+    detachedTurns,
     findSessionByContext,
     switchSession,
     createNewSession,
     hasSession,
     sendMessage,
-  } = useCopilotChatSessionContext();
+  } = useAgentChatSessionContext();
   const [isOpen, setIsOpen] = useState(false);
   // Read by applyCode, which keeps one identity across renders.
   const isOpenRef = useRef(isOpen);
@@ -266,16 +268,22 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
     [focusContext],
   );
 
+  // Whether the active chat has a turn going, streamed or not: reopening the chat shows it.
+  const activeBusy = Boolean(
+    activeSession && (activeSession.id in runs || activeSession.id in detachedTurns),
+  );
+
   const openGeneralChat = useCallback(() => {
     // Keep the chat the user was in; start fresh only when there is none or it
-    // is about a specific result.
-    if (!activeSession || activeSession.context || activeSession.investigation) {
+    // is about a specific result and has no answer going. A running answer is
+    // never replaced by an empty chat: the user reopened the chat to see it.
+    if (!activeSession || ((activeSession.context || activeSession.investigation) && !activeBusy)) {
       createNewSession(null);
     }
     // One surface at a time: the sidebar replaces the floating window.
     setMiniOpen(false);
     setIsOpen(true);
-  }, [activeSession, createNewSession]);
+  }, [activeBusy, activeSession, createNewSession]);
 
   const openSidebar = useCallback(() => {
     setMiniOpen(false);

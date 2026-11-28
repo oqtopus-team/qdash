@@ -43,9 +43,12 @@ Do not manually edit generated files:
 - `ui/src/client/`
 - `ui/src/schemas/`
 - `clients/typescript/src/generated/`
+- `sdks/python/src/qdash/sdk/_generated/`
+- `sdks/typescript/src/_generated/`
 - `docs/oas/openapi.json`
 
-When backend API schemas or routes change, run `task generate` from the repository root to regenerate the OpenAPI document and TypeScript clients.
+When backend API schemas or routes change, run `task generate` from the repository root to regenerate the OpenAPI document, clients, and SDKs.
+SDK-only regeneration uses `task generate-python-sdk` or `task generate-typescript-sdk`; both require Node.js (`npx`) and Docker.
 
 ## Common Commands
 
@@ -114,7 +117,7 @@ regardless of change size, including documentation-only changes.
 - Start docs with a direct context sentence.
 - Do not add manual tables of contents, summary sections, empty checklists, future-enhancement sections, or emoji.
 - Link relevant docs inline instead of adding broad related-document lists.
-- Do not restructure `docs/task-knowledge/`; those files have a fixed template consumed by the copilot system.
+- Do not restructure `docs/task-knowledge/`; those files have a fixed template consumed by the agent system.
 
 ## Git And PR Conventions
 

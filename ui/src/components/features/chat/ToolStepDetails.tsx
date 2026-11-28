@@ -12,7 +12,7 @@ import {
   Terminal,
   Wrench,
 } from "lucide-react";
-import type { TraceStep } from "@/types/copilotChat";
+import type { TraceStep } from "@/types/agentChat";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
 
 /**
@@ -262,6 +262,16 @@ export function stepTitle(step: ToolStep): string {
       if (step.status === "done" && outcome === "ambiguous") return "Classification unclear";
       return step.status === "done" ? "Classified" : step.label;
     }
+    // The waiting tools: while running, the turn is parked on QDash, not working.
+    case "qdash_wait_agent_intervention":
+      if (step.status === "running") return "Waiting for the expert's answer";
+      return step.status === "done" ? "Expert answer received" : step.label;
+    case "qdash_wait_agent_action":
+      if (step.status === "running") return "Waiting for the calibration step to finish";
+      return step.status === "done" ? "Calibration step ended" : step.label;
+    case "qdash_wait_execution":
+      if (step.status === "running") return "Waiting for the execution to finish";
+      return step.status === "done" ? "Execution ended" : step.label;
     default:
       return drafting ? `Writing a ${step.label.toLowerCase()} call` : step.label;
   }

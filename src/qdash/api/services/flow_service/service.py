@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -35,6 +36,7 @@ from qdash.api.services.flow_service.execution import (
     FlowDispatchError,
 )
 from qdash.api.services.flow_service.execution_plan import uses_manual_rounds
+from qdash.api.services.flow_service.flow_metadata import declared_session_name
 from qdash.api.services.flow_service.plan_preview import build_execution_plan
 from qdash.api.services.flow_service.prefect_gateway import SystemDeploymentUnavailable
 from qdash.api.services.flow_service.source_store import FlowSourceStore
@@ -53,7 +55,11 @@ from qdash.api.services.manual_round_checks import load_chip_round_model
 from qdash.common.manual_rounds import MANUAL_TARGET_OVERRIDE_REASON
 from qdash.common.mux_mapping import resolve_topology_mux_mapping
 from qdash.config import get_settings
+from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec, step_name
+from qdash.datamodel.calibration_plan import APPROVED_PLAN_CONTRACT, APPROVED_PLAN_CONTRACT_KEY
 from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY, FlowTargetOverride
+from qdash.datamodel.run import RUN_CONTEXT_KEY, RunIdentity
+from qdash.repository.run_ledger import NOTE_RUN_KEY, NOTE_SESSION_KEY, UNGROUPED_MARKER
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -102,7 +108,7 @@ class FlowService:
         """
         validate_flow_name(request.name)
         # None keeps the stored folder, so a client that does not know about
-        # folders (the Copilot's save tool) does not move the flow to the root.
+        # folders (the Agent's save tool) does not move the flow to the root.
         folder = normalize_folder(request.folder) if request.folder is not None else None
 
         if request.flow_function_name is None:
@@ -357,8 +363,24 @@ class FlowService:
         request: ExecuteFlowRequest,
         username: str,
         project_id: str,
+        calibration_run: RunIdentity | None = None,
     ) -> ExecuteFlowResponse:
         """Execute a saved flow through its Prefect deployment."""
+        prepared = self.prepare_flow_run(name, request, username, project_id)
+        return await self.dispatch_flow_run(prepared, calibration_run)
+
+    def prepare_flow_run(
+        self,
+        name: str,
+        request: ExecuteFlowRequest,
+        username: str,
+        project_id: str,
+    ) -> PreparedFlowRun:
+        """Check a saved flow can run and resolve what its launch sends, launching nothing.
+
+        Every refusal of the request (an unknown flow, no deployment, a target override the
+        flow cannot take) is raised here, before a run is recorded or a flow run created.
+        """
         flow = self._flow_repo.find_by_project_and_name(project_id, name)
         if not flow:
             raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
@@ -384,6 +406,7 @@ class FlowService:
 
         chip_id = str(parameters.get("chip_id") or flow.chip_id or "").strip()
         run_context: dict[str, Any] = {}
+        session_name = self._declared_session_name(flow.file_path, flow.flow_function_name)
         if request.target_override is not None:
             code = self._sources.read(Path(flow.file_path))
             if uses_manual_rounds(code):
@@ -400,32 +423,65 @@ class FlowService:
             # Omit unselected modes so workers that predate a mode still parse it.
             run_context[TARGET_CONTEXT_KEY] = request.target_override.model_dump(exclude_none=True)
             accepted = flow_parameter_names(code, flow.flow_function_name)
-            # Templates may validate targets before creating CalibService. Pass
+            # Templates may validate targets before running a calibration. Pass
             # them (and clear the other mode) only when the flow can receive
-            # this mode; otherwise saved parameters stay and CalibService.run
+            # this mode; otherwise saved parameters stay and CalibrationSession.run
             # applies the override from the run context.
             if mode in accepted:
                 parameters.update(
                     {key: value for key, value in override.items() if key in accepted}
                 )
+        return PreparedFlowRun(
+            name=name,
+            project_id=project_id,
+            username=username,
+            chip_id=chip_id,
+            deployment_id=str(flow.deployment_id),
+            parameters=parameters,
+            tags=list(parameters.get("tags") or flow.tags or []),
+            context=run_context,
+            session_name=session_name,
+        )
 
+    def _declared_session_name(self, file_path: str, function_name: str) -> str | None:
+        """The session name the saved source declares; None when it declares none.
+
+        Parsed, never imported. An unreadable source only loses the name: the launch then
+        names its automatic session as a flow without one does.
+        """
+        try:
+            code = self._sources.read(Path(file_path))
+        except Exception:
+            logger.warning("Could not read flow source %s for its session name", file_path)
+            return None
+        return declared_session_name(code, function_name)
+
+    async def dispatch_flow_run(
+        self,
+        prepared: PreparedFlowRun,
+        calibration_run: RunIdentity | None = None,
+    ) -> ExecuteFlowResponse:
+        """Launch a prepared saved-flow run, handing the worker its calibration run."""
+        name = prepared.name
+        context = with_calibration_run(prepared.context, calibration_run)
         logger.info(
             f"Executing flow '{name}' "
-            f"(deployment={flow.deployment_id}) "
-            f"with parameters: {parameters}"
+            f"(deployment={prepared.deployment_id}) "
+            f"with parameters: {prepared.parameters}"
         )
 
         try:
             result = await self._coordinator.dispatch_run(
-                project_id=project_id,
-                username=username,
-                chip_id=chip_id,
+                project_id=prepared.project_id,
+                username=prepared.username,
+                chip_id=prepared.chip_id,
                 name=name,
-                deployment_id=flow.deployment_id,
-                parameters=parameters,
-                tags=parameters.get("tags") or flow.tags,
+                deployment_id=prepared.deployment_id,
+                parameters=prepared.parameters,
+                tags=prepared.tags,
                 workflow=True,
-                **({"context": run_context} if run_context else {}),
+                note=calibration_note_of(calibration_run),
+                context=context or None,
             )
         except FlowDispatchError as exc:
             logger.error(f"Failed to execute flow: {exc}")
@@ -435,7 +491,9 @@ class FlowService:
             ) from exc
 
         logger.info(f"Flow run created: {result.flow_run_id}")
-        return _execute_response(result, f"Flow '{name}' execution started successfully")
+        return _execute_response(
+            result, f"Flow '{name}' execution started successfully", calibration_run
+        )
 
     async def get_execution_plan(
         self, name: str, username: str, project_id: str, chip_id: str | None
@@ -523,6 +581,8 @@ class FlowService:
         backend_name: str | None = None,
         default_run_parameters: dict[str, Any] | None = None,
         task_run_parameters: dict[str, dict[str, Any]] | None = None,
+        calibration_run: RunIdentity | None = None,
+        ungrouped: bool = False,
     ) -> ExecuteFlowResponse:
         """Execute one task for one qubit through the system single-task deployment.
 
@@ -558,6 +618,11 @@ class FlowService:
         )
 
         try:
+            context: dict[str, Any] = (
+                {RUN_CONTEXT_KEY: {UNGROUPED_MARKER: True}}
+                if ungrouped and calibration_run is None
+                else with_calibration_run({}, calibration_run)
+            )
             result = await self._coordinator.dispatch_run(
                 project_id=project_id,
                 username=username,
@@ -566,6 +631,8 @@ class FlowService:
                 deployment_id=deployment_id,
                 parameters=parameters,
                 tags=tags,
+                note=calibration_note_of(calibration_run),
+                context=context or None,
             )
         except FlowDispatchError as exc:
             logger.error(f"Failed to execute single task: {exc}")
@@ -579,6 +646,7 @@ class FlowService:
             result,
             f"Single task '{task_name}' (qid={qid}) "
             f"re-execution started from snapshot {source_execution_id}",
+            calibration_run,
         )
 
     async def execute_calibration_pipeline(
@@ -591,32 +659,43 @@ class FlowService:
         backend_name: str | None = None,
         flow_name: str | None = None,
         tags: list[str] | None = None,
+        calibration_run: RunIdentity | None = None,
+        approved_plan: dict[str, Any] | None = None,
     ) -> ExecuteFlowResponse:
         """Run a validated pipeline spec through the system pipeline deployment.
 
         The caller (``CalibrationPipelineService``) has already validated the
         spec; this only claims the execution lock, creates the Prefect run, and
         pre-creates the execution row, exactly as a saved flow would.
+        ``approved_plan`` (``ApprovedPipelinePlan`` as JSON) is passed for a run of a stored
+        plan, so the worker checks the run against it before measuring; a spec run sends none.
         """
-        deployment_id = await self._system_deployment(
-            "calibration-pipeline/system-calibration-pipeline",
-            unavailable_detail=(
-                "Calibration pipeline deployment not available."
-                " The worker may not have started yet."
-            ),
-        )
+        if approved_plan is not None:
+            # Resolved and checked in the same read, so the run goes to the deployment whose
+            # schema was checked, never to one that would ignore the approval.
+            deployment_id = await self.approved_plan_deployment()
+        else:
+            deployment_id = await self._system_deployment(
+                PIPELINE_DEPLOYMENT,
+                unavailable_detail=_PIPELINE_UNAVAILABLE,
+            )
 
-        name = flow_name or str(spec.get("name") or "pipeline")
-        all_tags = sorted({*(tags or []), *(spec.get("tags") or []), "pipeline"})
+        # An unnamed run stays unnamed for the worker, which then names each step's
+        # execution after the step alone; only the scheduled row needs a label now.
+        run_name = flow_name or (str(spec["name"]) if spec.get("name") else None)
+        name = run_name or _first_step_name(spec)
+        all_tags = sorted({*(tags or []), *(spec.get("tags") or [])})
         parameters: dict[str, Any] = {
             "username": username,
             "chip_id": chip_id,
             "spec": spec,
             "project_id": project_id,
-            "flow_name": name,
+            "flow_name": run_name,
             "tags": all_tags,
             "backend_name": backend_name,
         }
+        if approved_plan is not None:
+            parameters["approved_plan"] = approved_plan
         logger.info(
             f"Executing calibration pipeline '{name}' on chip {chip_id} "
             f"(deployment={deployment_id}, steps={len(spec.get('steps') or [])})"
@@ -632,6 +711,8 @@ class FlowService:
                 parameters=parameters,
                 tags=all_tags,
                 workflow=True,
+                note=calibration_note_of(calibration_run),
+                context=with_calibration_run({}, calibration_run) or None,
             )
         except FlowDispatchError as exc:
             logger.error(f"Failed to execute calibration pipeline: {exc}")
@@ -641,7 +722,41 @@ class FlowService:
             ) from exc
 
         logger.info(f"Pipeline flow run created: {result.flow_run_id}")
-        return _execute_response(result, f"Calibration pipeline '{name}' started")
+        return _execute_response(result, f"Calibration pipeline '{name}' started", calibration_run)
+
+    async def approved_plan_deployment(self) -> UUID:
+        """The pipeline deployment, when it is registered to accept an approved plan.
+
+        A stored plan's run is dispatched only to a deployment whose recorded parameter
+        schema advertises ``APPROVED_PLAN_CONTRACT`` on ``approved_plan``. A deployment
+        registered from older code has no such parameter (Prefect would drop it, and the run
+        would measure unchecked), and one registered before schemas were recorded has no
+        schema; both, and a schema that cannot be read, are refused with 503 and nothing is
+        dispatched. The schema shows the signature the deployment was registered with, not
+        which code a worker runs: the guarantee is that QDash never sends a stored plan to a
+        deployment that did not declare it checks one.
+        """
+        try:
+            deployment = await self._coordinator.read_deployment(PIPELINE_DEPLOYMENT)
+        except SystemDeploymentUnavailable as exc:
+            raise HTTPException(status_code=503, detail=_PIPELINE_UNAVAILABLE) from exc
+        advertised = approved_plan_contract(deployment.parameter_schema)
+        # Exactly the integer: a bool or a float that compares equal is not this contract.
+        if type(advertised) is not int or advertised != APPROVED_PLAN_CONTRACT:
+            found = "none" if advertised is None else repr(advertised)
+            logger.error(
+                f"Pipeline deployment {deployment.id} does not accept approved plans "
+                f"(contract {found}, need {APPROVED_PLAN_CONTRACT})"
+            )
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "The calibration pipeline deployment does not accept approved plans "
+                    f"(contract {found}, need {APPROVED_PLAN_CONTRACT}); the worker must be "
+                    "restarted with the current code to register it. Nothing was started."
+                ),
+            )
+        return deployment.id
 
     async def execute_agent_candidate_apply(
         self,
@@ -730,6 +845,27 @@ class FlowService:
         )
         return ExecutionAvailabilityResponse(available=available, reason=reason)
 
+    def ensure_hardware_available(
+        self,
+        *,
+        project_id: str,
+        chip_id: str,
+        parameters: dict[str, Any],
+        workflow: bool,
+    ) -> None:
+        """Refuse with 409 a launch whose hardware a running execution already holds.
+
+        Checked before the launch records anything; the atomic claim at dispatch still
+        decides. ``parameters`` are the run's flow parameters (only its targets matter), and
+        ``workflow`` claims the whole chip, as saved flows and pipelines do.
+        """
+        self._coordinator.ensure_available(
+            project_id=project_id,
+            chip_id=chip_id,
+            parameters=parameters,
+            workflow=workflow,
+        )
+
     async def _system_deployment(
         self,
         deployment_name: str,
@@ -751,6 +887,29 @@ class FlowService:
             file_path.unlink()
 
 
+PIPELINE_DEPLOYMENT = "calibration-pipeline/system-calibration-pipeline"
+_PIPELINE_UNAVAILABLE = (
+    "Calibration pipeline deployment not available. The worker may not have started yet."
+)
+
+
+def approved_plan_contract(schema: Any) -> Any:
+    """The approved-plan contract a deployment's parameter schema advertises, if any.
+
+    Anything but a schema with an ``approved_plan`` property that names the contract gives
+    ``None``; the value is returned as found, so the caller compares it exactly.
+    """
+    if not isinstance(schema, dict):
+        return None
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return None
+    parameter = properties.get("approved_plan")
+    if not isinstance(parameter, dict):
+        return None
+    return parameter.get(APPROVED_PLAN_CONTRACT_KEY)
+
+
 def _flow_exists(name: str) -> HTTPException:
     """The conflict a create-only save reports for a name that is already taken."""
     return HTTPException(
@@ -759,7 +918,63 @@ def _flow_exists(name: str) -> HTTPException:
     )
 
 
-def _execute_response(result: DispatchResult, message: str) -> ExecuteFlowResponse:
+@dataclass(frozen=True)
+class PreparedFlowRun:
+    """What the launch of a checked saved-flow request sends to Prefect."""
+
+    name: str
+    project_id: str
+    username: str
+    chip_id: str
+    deployment_id: str
+    parameters: dict[str, Any]
+    tags: list[str]
+    context: dict[str, Any] = field(default_factory=dict)
+    session_name: str | None = None
+    """The ``@calibration_flow(session_name=...)`` literal, for an automatic session's name."""
+
+
+def with_calibration_run(
+    context: dict[str, Any], calibration_run: RunIdentity | None
+) -> dict[str, Any]:
+    """The flow-run context with the run identity the worker stamps on every step."""
+    if calibration_run is None:
+        return dict(context)
+    return {**context, RUN_CONTEXT_KEY: calibration_run.model_dump()}
+
+
+def calibration_note_of(calibration_run: RunIdentity | None) -> dict[str, str]:
+    """The note keys of the execution QDash pre-creates for a run."""
+    if calibration_run is None:
+        return {}
+    note = {NOTE_RUN_KEY: calibration_run.run_id}
+    if calibration_run.calibration_session_id is not None:
+        note[NOTE_SESSION_KEY] = calibration_run.calibration_session_id
+    return note
+
+
+_UNNAMED_PIPELINE_LABEL = "calibration-pipeline"
+
+
+def _first_step_name(spec: dict[str, Any]) -> str:
+    """The name the worker gives an unnamed run's first step execution.
+
+    The scheduled row the API pre-creates becomes that execution, so it carries the
+    same name. A spec that does not parse (the route always sends a validated one)
+    falls back to the pipeline flow's name.
+    """
+    try:
+        parsed = CalibrationPipelineSpec.model_validate(spec)
+    except ValueError:
+        return _UNNAMED_PIPELINE_LABEL
+    return step_name(parsed.steps[0])
+
+
+def _execute_response(
+    result: DispatchResult,
+    message: str,
+    calibration_run: RunIdentity | None = None,
+) -> ExecuteFlowResponse:
     """Map a dispatched run onto the API response, falling back to the flow run ID."""
     return ExecuteFlowResponse(
         execution_id=result.execution_id or result.flow_run_id,
@@ -767,4 +982,8 @@ def _execute_response(result: DispatchResult, message: str) -> ExecuteFlowRespon
         flow_run_url=result.flow_run_url,
         qdash_ui_url=result.qdash_ui_url,
         message=message,
+        calibration_session_id=(
+            calibration_run.calibration_session_id if calibration_run is not None else None
+        ),
+        calibration_run_id=calibration_run.run_id if calibration_run is not None else None,
     )

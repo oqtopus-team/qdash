@@ -7,6 +7,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -24,6 +25,25 @@ class CheckOptimalReadoutAmplitude(QubexTask):
 
     name: str = "CheckOptimalReadoutAmplitude"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Sweeps readout amplitude (0.01 to 0.25 by default), measures single-shot IQ data "
+            "for prepared 0 and 1 states, and writes the smallest readout_amplitude whose GMM "
+            "assignment fidelity reaches 99% of the peak."
+        ),
+        when_to_use=(
+            "Run it during fine calibration once pi pulses exist, together with "
+            "CheckOptimalReadoutFrequency, then re-run Configure so later tasks use the new "
+            "value."
+        ),
+        prerequisites=(
+            (
+                "No declared inputs: it uses the frequencies and pi pulse already in the Qubex "
+                "session, so run it after Configure and the pulse calibrations in the same "
+                "flow."
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "readout_duration": readout_duration_run_parameter(),

@@ -25,11 +25,13 @@ tasks:
         ENV=test uv run python -c 'import json, os; from dotenv import load_dotenv; load_dotenv(".env"); os.environ["ENV"] = "test"; from qdash.api.main import app; print(json.dumps(app.openapi(), ensure_ascii=False, indent=2))' > "$OPENAPI_TMP"
         mv "$OPENAPI_TMP" docs/oas/openapi.json
       - task: generate-python-schema
+      - task: generate-python-sdk
+      - task: generate-typescript-sdk
       - cd clients/typescript && bun run generate:ui
       - cd clients/typescript && bun run generate
       - cd ui && bun run fmt
       - cd ui && bun run lint:fix
-    desc: Generate the OpenAPI document and the Python and TypeScript clients
+    desc: Generate the OpenAPI document, the Python client and SDK, the TypeScript SDK, and the TypeScript clients
 
   generate-task-catalog:
     desc: Generate task metadata catalog from workflow classes
@@ -40,6 +42,26 @@ tasks:
     desc: Generate the Python client's Pydantic models from the OpenAPI document
     cmds:
       - uv run python scripts/generate_python_client_models.py
+
+  generate-python-sdk:
+    desc: Generate qdash.sdk._generated from the OpenAPI document (needs npx and Docker)
+    cmds:
+      - uv run python scripts/generate_python_sdk.py
+
+  check-python-sdk-generated:
+    desc: Fail when qdash.sdk._generated differs from a fresh generation (needs npx and Docker)
+    cmds:
+      - uv run python scripts/generate_python_sdk.py --check
+
+  generate-typescript-sdk:
+    desc: Generate sdks/typescript/src/_generated from the OpenAPI document (needs npx and Docker)
+    cmds:
+      - node sdks/typescript/scripts/generate.mjs
+
+  check-typescript-sdk-generated:
+    desc: Fail when sdks/typescript/src/_generated differs from a fresh generation (needs npx and Docker)
+    cmds:
+      - node sdks/typescript/scripts/generate.mjs --check
 
   knowledge-pull:
     desc: Pull task-knowledge.json from the knowledge repository (KNOWLEDGE_REPO_URL)
@@ -212,7 +234,7 @@ tasks:
         fi
         if [ -z "${AGENT_RUNTIME_TOKEN:-}" ]; then
           AGENT_RUNTIME_TOKEN="$(docker compose -f compose.yaml -f compose.dev-local.yaml exec -T agent-runtime cat /run/agent-runtime-auth/token 2>/dev/null)" \
-            || echo "Pi Agent Runtime is not running: Copilot chat fails until task dev-services starts it" >&2
+            || echo "Pi Agent Runtime is not running: Agent chat fails until task dev-services starts it" >&2
           export AGENT_RUNTIME_TOKEN
         fi
         exec uv run uvicorn src.qdash.api.main:app --reload --host "$bind" --port "${API_PORT:-5715}" --forwarded-allow-ips "*"
@@ -267,19 +289,27 @@ tasks:
   test-sdk:
     desc: Run Python SDK tests
     cmds:
-      - uv run pytest sdks/python/tests/ -v
+      - uv run --package qdash-sdk pytest sdks/python/tests/ -v
 
   build-client-ts:
     desc: Build the local TypeScript client and SDK for pi packages and the runtime
+    # Dependents running in parallel share one build instead of rewriting dist/ concurrently.
+    run: once
     cmds:
       - bun run build:client
       - bun run build:sdk
 
   pi-local:
-    desc: Run the pi CLI with pi-qdash and the Copilot chat models from .env (args after --)
+    desc: Run the pi CLI with pi-qdash and the Agent chat models from .env (args after --)
     deps: [build-client-ts]
     cmds:
       - bun agent-runtime/src/local-cli.ts {{range .CLI_ARGS_LIST}}{{shellQuote .}} {{end}}
+
+  validate-agent-fake-loop:
+    desc: Opt-in real-model agent loop validation against a local fake-backend QDash (args after --)
+    deps: [build-client-ts]
+    cmds:
+      - bun agent-runtime/validation/fake-loop/run.ts {{range .CLI_ARGS_LIST}}{{shellQuote .}} {{end}}
 
   test-client-ts:
     desc: Run TypeScript client checks
@@ -288,8 +318,13 @@ tasks:
       - bun run check
 
   test-sdk-ts:
-    desc: Run TypeScript SDK checks against the built client
-    deps: [build-client-ts]
+    desc: Check the TypeScript SDK's generated client is fresh, then typecheck and test the SDK
+    cmds:
+      - task: check-typescript-sdk-generated
+      - task: check-sdk-ts-package
+
+  check-sdk-ts-package:
+    desc: Typecheck and test the TypeScript SDK package without the generation check
     dir: sdks/typescript
     cmds:
       - bun run check
@@ -344,6 +379,9 @@ tasks:
 
   build-docs:
     dir: docs
+    # check-docs-links and check-docs-mermaid run in one invocation share one build
+    # instead of writing .vitepress/dist concurrently.
+    run: once
     cmds:
       - bun run docs:build
 
@@ -459,21 +497,51 @@ tasks:
     cmds:
       # Fail fast on the wrong scanner before the slower checks run.
       - task: check-betterleaks-version
+      # Auto-fixes write files, so they finish before any read-only check starts.
       - task: lint
-      - task: ci-lint
-      - task: ci-typecheck
-      - task: ci-test
-      - task: ci-ui
-      - task: test-client-ts
-      - task: test-sdk-ts
-      - task: ci-pi-packages
-      - task: ci-agent-runtime
+      # Checks run in parallel lanes. Grouped output keeps each task's log
+      # contiguous; the run continues after a failure and exits non-zero if any check fails.
+      - '"{{.TASK_EXE}}" --output group check-lanes'
+      # Scan the tree last so no check is still writing files while it is copied.
       - task: scan-leaks-local
 
   check-all:
     desc: Run the full local check suite
     cmds:
       - task: check
+
+  check-lanes:
+    desc: Run the checks of task check in parallel lanes (no auto-fix or leak scan)
+    deps: [check-lane-python, check-lane-typescript, ci-ui]
+
+  check-lane-python:
+    internal: true
+    cmds:
+      # ci-lint syncs the uv environment with --all-packages and runs the Python Fern check,
+      # so the later uv runs do not race on the sync and the two Fern runs never overlap.
+      - task: ci-lint
+      - task: check-lane-python-after-lint
+
+  check-lane-python-after-lint:
+    internal: true
+    deps: [ci-typecheck, check-test-python, check-typescript-sdk-generated]
+
+  check-test-python:
+    internal: true
+    cmds:
+      # Same tests and flags as ci-test, without coverage instrumentation or reports.
+      - uv run pytest tests/ clients/python/tests/ sdks/python/tests/ -v --tb=short
+
+  check-lane-typescript:
+    internal: true
+    cmds:
+      # Build the local client and SDK once before anything reads their dist/ output.
+      - task: build-client-ts
+      - task: check-lane-typescript-after-build
+
+  check-lane-typescript-after-build:
+    internal: true
+    deps: [test-client-ts, check-sdk-ts-package, ci-pi-packages, ci-agent-runtime]
 
   # =============================================================================
   # CI Checks (check-only, no auto-fix)
@@ -491,13 +559,14 @@ tasks:
     cmds:
       - uv run --all-packages scripts/generate_task_catalog.py --check
       - uv run python scripts/generate_python_client_models.py --check
+      - task: check-python-sdk-generated
       - uv run ruff check .
       - uv run ruff format --check .
 
   ci-typecheck:
     desc: Run mypy type checking
     cmds:
-      - uv run mypy src/qdash/common src/qdash/datamodel src/qdash/dbmodel src/qdash/repository src/qdash/api src/qdash/workflow clients/python/src/qdash/client sdks/python/src/qdash/sdk clients/python/tests sdks/python/tests tests
+      - uv run mypy src/qdash/common src/qdash/datamodel src/qdash/dbmodel src/qdash/repository src/qdash/api src/qdash/workflow clients/python/src/qdash/client sdks/python/src/qdash/sdk sdks/python/src/qdash/calibration clients/python/tests sdks/python/tests tests
 
   ci-test:
     desc: Run all tests with coverage

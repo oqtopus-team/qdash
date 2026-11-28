@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { executionFigureUrl } from "@/lib/utils/executionFiles";
 
 const PlotlyRenderer = dynamic(
   () => import("@/components/charts/PlotlyRenderer").then((mod) => mod.PlotlyRenderer),
@@ -32,9 +33,7 @@ export function InteractiveFigureContent({
   return (
     <>
       <div className="w-fit max-w-full h-fit max-h-[78vh] bg-white rounded-[var(--radius-box)] p-4 shadow overflow-auto">
-        <PlotlyRenderer
-          fullPath={`/api/executions/figure?path=${encodeURIComponent(figureJsonPath)}`}
-        />
+        <PlotlyRenderer fullPath={executionFigureUrl(figureJsonPath)} />
       </div>
       {showNavigation && (
         <div className="mt-4 flex justify-center gap-2">

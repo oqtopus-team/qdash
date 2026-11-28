@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
-import type { CopilotSession } from "@/hooks/useCopilotChat";
+import type { AgentSession } from "@/hooks/useAgentChat";
 
 const DAY_MS = 86_400_000;
 
@@ -33,9 +33,9 @@ function groupLabel(ts: number, now: Date): string {
   return "Older";
 }
 
-function groupSessions(sessions: CopilotSession[]): [string, CopilotSession[]][] {
+function groupSessions(sessions: AgentSession[]): [string, AgentSession[]][] {
   const now = new Date();
-  const groups = new Map<string, CopilotSession[]>();
+  const groups = new Map<string, AgentSession[]>();
   for (const session of [...sessions].sort((a, b) => b.updatedAt - a.updatedAt)) {
     const label = groupLabel(session.updatedAt, now);
     const list = groups.get(label);
@@ -106,7 +106,7 @@ export function SessionMenu({
   className,
   onOpenChange,
 }: {
-  session: CopilotSession;
+  session: AgentSession;
   onRename: () => void;
   onDelete: () => void;
   className?: string;
@@ -138,7 +138,7 @@ export function SessionMenu({
 }
 
 interface ChatSidebarProps {
-  sessions: CopilotSession[];
+  sessions: AgentSession[];
   activeSessionId: string | null;
   /** Sessions with an answer streaming right now. */
   runningSessionIds?: readonly string[];
@@ -162,7 +162,7 @@ export function ChatSidebar({
   onClose,
 }: ChatSidebarProps) {
   const [query, setQuery] = useState("");
-  const [pendingDelete, setPendingDelete] = useState<CopilotSession | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<AgentSession | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
@@ -205,12 +205,13 @@ export function ChatSidebar({
 
       <div className="px-3 pb-2">
         <label className="chat-sidebar-search">
-          <Search className="w-3.5 h-3.5 text-base-content/40" />
+          <Search className="w-3.5 h-3.5 text-base-content/40" aria-hidden="true" />
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search chats"
+            aria-label="Search chats"
             className="flex-1 bg-transparent outline-none text-sm min-w-0"
           />
         </label>
@@ -245,13 +246,14 @@ export function ChatSidebar({
                   );
                 }
                 const menuOpen = menuOpenId === session.id;
+                const running = runningSessionIds.includes(session.id);
                 return (
                   <li key={session.id} className="group relative">
                     <button
                       type="button"
                       onClick={() => onSelect(session.id)}
                       onDoubleClick={() => setRenamingId(session.id)}
-                      className={`chat-sidebar-item ${active ? "chat-sidebar-item-active" : ""}`}
+                      className={`chat-sidebar-item ${active ? "chat-sidebar-item-active" : ""} ${running ? "chat-sidebar-item-running" : ""}`}
                       aria-current={active ? "page" : undefined}
                       title={session.title}
                     >
@@ -268,15 +270,15 @@ export function ChatSidebar({
                         />
                       )}
                       <span className="truncate">{session.title}</span>
-                      {runningSessionIds.includes(session.id) && (
-                        <span
-                          className="chat-pulse-dot ml-2 shrink-0"
-                          role="status"
-                          aria-label="Answering"
-                          title="Answering"
-                        />
-                      )}
                     </button>
+                    {/* Its own slot beside the options menu, so hover never hides it. */}
+                    {running && (
+                      <span
+                        className="loading loading-spinner loading-xs pointer-events-none absolute right-10 top-1/2 -translate-y-1/2 text-primary"
+                        role="status"
+                        aria-label={`${session.title} is answering`}
+                      />
+                    )}
                     <span
                       className={`chat-sidebar-item-actions ${
                         active || menuOpen ? "opacity-100" : ""

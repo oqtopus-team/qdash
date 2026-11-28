@@ -14,7 +14,7 @@
  * quiet list of rows that carry their own inline icon.
  */
 
-import { Children, isValidElement, cloneElement, type ReactElement, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { twMerge } from "tailwind-merge";
 
 import {
@@ -26,7 +26,7 @@ import {
   type ReasoningTriggerProps,
 } from "@/components/ui/Reasoning";
 
-export type ChainOfThoughtVariant = "timeline" | "plain";
+type ChainOfThoughtVariant = "timeline" | "plain";
 
 export type ChainOfThoughtStepProps = Omit<ReasoningProps, "className"> & {
   /** What sits on the timeline: an icon, a dot, a spinner. Unused by the plain variant. */
@@ -77,29 +77,4 @@ export function ChainOfThoughtTrigger({ className, ...props }: ReasoningTriggerP
 
 export function ChainOfThoughtContent({ className, ...props }: ReasoningContentProps) {
   return <ReasoningContent className={twMerge("mt-1", className)} {...props} />;
-}
-
-/** Lays out its ChainOfThoughtStep children and tells the last one it is last. */
-export function ChainOfThought({
-  children,
-  className,
-  variant = "timeline",
-}: {
-  children: ReactNode;
-  className?: string;
-  variant?: ChainOfThoughtVariant;
-}) {
-  const steps = Children.toArray(children).filter(isValidElement);
-  return (
-    <ol className={twMerge("flex flex-col", variant === "plain" ? "gap-2" : "", className)}>
-      {steps.map((step, index) => (
-        <li key={step.key ?? index}>
-          {cloneElement(step as ReactElement<ChainOfThoughtStepProps>, {
-            isLast: index === steps.length - 1,
-            variant,
-          })}
-        </li>
-      ))}
-    </ol>
-  );
 }

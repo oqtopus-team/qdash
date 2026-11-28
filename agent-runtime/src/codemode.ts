@@ -12,7 +12,9 @@
  * tools, which run in this process with the signed-in user's connection.
  * Which tools a script may call is decided three times. Every tool states its
  * `callers` (see `buildQDashExtension` and `modelOnly`); a script is shown
- * and given only the audited read-only tools; and a hook blocks every nested
+ * and given only the audited read-only tools and the audited proposal tool
+ * `qdash_create_pipeline_plan` (which stores an expiring plan and runs or
+ * approves nothing); and a hook blocks every nested
  * call outside that set, so a tool added later without a decision cannot run
  * from a script. Write tools in particular stay model-only: their approval
  * card only exists for a call the model made.
@@ -58,6 +60,7 @@ import {
   deferredToolsGuideline,
   QDASH_SCRIPT_GUIDELINE,
 } from "@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts";
+import { prepareScriptSource } from "@oqtopus-team/pi-qdash/extensions/lib/script-prelude.ts";
 import {
   boundScriptData,
   DEFAULT_SCRIPT_TIMEOUT_MS,
@@ -136,6 +139,14 @@ export function withScriptDeadline(source: string): string {
   return sharedScriptDeadline(source, CODEMODE_OPTIONS_PREFIX);
 }
 
+/**
+ * The source a script runs with: a bounded deadline, and the pure `qdash.calibration` builders
+ * when it names `qdash` (shared with the pi CLI, pi-qdash extensions/lib/script-prelude.ts).
+ */
+export function prepareScript(source: string): string {
+  return prepareScriptSource(source, CODEMODE_OPTIONS_PREFIX);
+}
+
 /** The same tool, callable by the model only, unless it already says who may call it. */
 export function modelOnly<T extends ToolRegistration>(tool: T): T {
   return tool.callers === undefined ? { ...tool, callers: ["model"] } : tool;
@@ -184,7 +195,7 @@ export type InternalCalls = Readonly<Record<string, readonly string[]>>;
 
 /** What decides which nested calls run. */
 export interface ToolPolicy {
-  /** Tools a Code Mode script may call: the audited read-only ones. */
+  /** Tools a Code Mode script may call: the audited read-only ones and the proposal tool. */
   nestedTools: Iterable<string>;
   /** Tools a model call to which, before they are loaded, loads them. */
   deferredTools: Iterable<string>;
@@ -217,7 +228,7 @@ async function parentToolName(call: ToolHookCall, api: HookApi, context: Context
  *
  * A nested call names only its parent's task; the policy reads which tool
  * that task runs from the Harness's live slots (`parentToolName`). That holds
- * for a caller that parks (pi-durable 1.6 `{ sleep }` or `{ wait }`) and for
+ * for a caller that parks (pi-durable 1.7.0 `{ kind: "sleep" }` or `{ kind: "wait" }`) and for
  * a nested call it started with `wait: false`, whose check runs after the
  * caller's `execute()` returned. A call whose parent it cannot find is blocked.
  */
@@ -274,15 +285,17 @@ function forScripts(agent: Agent, scriptTools: ReadonlySet<string>): Agent {
 }
 
 /**
- * The Code Mode tool with every script's deadline bounded, and with only the
- * tools in `scriptTools` in the script's `tools`.
+ * The Code Mode tool with every script's deadline bounded and the calibration
+ * builders available, and with only the tools in `scriptTools` in the
+ * script's `tools`. The prepared source exists only for this run: the model's
+ * call keeps the code it wrote, and a replay prepares it again the same way.
  */
 function boundedCodemode(tool: ToolRegistration, scriptTools: ReadonlySet<string>): ToolRegistration {
   return {
     ...tool,
     execute: (args: unknown, api, context: Context) => {
       const code = (args as { code?: unknown }).code;
-      const bounded = typeof code === "string" ? { ...(args as object), code: withScriptDeadline(code) } : args;
+      const bounded = typeof code === "string" ? { ...(args as object), code: prepareScript(code) } : args;
       const scriptApi = { ...api, agent: async (inner: Context) => forScripts(await api.agent(inner), scriptTools) };
       return tool.execute(bounded as never, scriptApi, context);
     },

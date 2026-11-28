@@ -6,40 +6,56 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowUpRight,
-  Ban,
   ChevronLeft,
   ChevronRight,
-  CircleCheck,
-  CircleHelp,
-  CirclePlay,
-  CircleX,
-  Clock,
   ExternalLink,
   StopCircle,
   UserRound,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 
 import { isExecutionCancellable } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
+import {
+  type ExecutionListContext,
+  type SessionReturnContext,
+  executionDetailHref,
+} from "@/lib/executionArea";
 import { DEFAULT_TIMEZONE, formatDateTime } from "@/lib/utils/datetime";
 
+import { AgentSessionGroupRow } from "./AgentSessionGroupRow";
+import {
+  CalibrationSessionGroupRow,
+  calibrationRowExecutions,
+  calibrationRowKey,
+} from "./CalibrationSessionGroupRow";
+import { pluralize } from "./agentSessionDisplay";
 import {
   type ActivityWindow,
   DEFAULT_ACTIVITY_WINDOW,
   ExecutionActivityChart,
 } from "./ExecutionActivityChart";
+import { ExecutionAgentSessionNotice } from "./ExecutionAgentSessionNotice";
+import { ExecutionViewSwitch } from "./ExecutionAreaNav";
+import { ExecutionCalibrationNotice } from "./ExecutionCalibrationContext";
+import {
+  ExecutionListCard,
+  formatActorLabel,
+  getStatusBorderStyle,
+  getStatusIcon,
+} from "./ExecutionListCard";
 
 import type { ExecutionResponseSummary } from "@/schemas";
 
 import { useListChips } from "@/client/chip/chip";
 import {
   useListExecutions,
+  useListExecutionGroups,
   useGetExecution,
   useCancelExecution,
   getListExecutionsQueryKey,
+  getListExecutionGroupsQueryKey,
   getGetExecutionQueryKey,
 } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
@@ -47,6 +63,8 @@ import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateW
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
 import { ExecutionRunSummary } from "@/components/features/execution/ExecutionRunSummary";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
+import { TransformStepOutcome } from "@/components/features/execution/TransformStepOutcome";
+import { isTransformExecution } from "@/lib/transformStep";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -55,60 +73,9 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { ExecutionPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { useToast } from "@/components/ui/Toast";
+import { useProject } from "@/contexts/ProjectContext";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
 import { useExecutionUrlState } from "@/hooks/useUrlState";
-
-type ActorFields = {
-  user_id?: string | null;
-  username?: string;
-};
-
-function formatActorLabel(actor?: ActorFields | null) {
-  if (actor?.username) return `@${actor.username}`;
-  return actor?.user_id || "Unknown";
-}
-
-function getStatusLabel(status: string) {
-  return status.charAt(0).toUpperCase() + status.slice(1);
-}
-
-function getStatusBadgeClass(status: string) {
-  switch (status) {
-    case "running":
-      return "badge-info";
-    case "completed":
-      return "badge-success";
-    case "scheduled":
-    case "pending":
-      return "badge-warning";
-    case "failed":
-      return "badge-error";
-    default:
-      return "badge-ghost";
-  }
-}
-
-// Static icons pair each status color with a shape, so running and cancelling stay
-// recognizable without a continuous pulse and status never relies on color alone.
-function getStatusIcon(status: string): LucideIcon {
-  switch (status) {
-    case "running":
-      return CirclePlay;
-    case "completed":
-      return CircleCheck;
-    case "scheduled":
-    case "pending":
-      return Clock;
-    case "failed":
-      return CircleX;
-    case "cancelling":
-      return StopCircle;
-    case "cancelled":
-      return Ban;
-    default:
-      return CircleHelp;
-  }
-}
 
 // Task rows keep their established mapping: any status outside the known set reads as failed.
 function getTaskStatusDisplay(status?: string | null) {
@@ -128,12 +95,12 @@ function getTaskStatusDisplay(status?: string | null) {
 
 function PaginationControls({
   currentPage,
-  setCurrentPage,
+  onPageChange,
   hasMore,
   totalPages,
 }: {
   currentPage: number;
-  setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
+  onPageChange: (page: number) => void;
   hasMore: boolean;
   totalPages?: number;
 }) {
@@ -144,7 +111,7 @@ function PaginationControls({
   return (
     <div className="flex justify-center items-center gap-2 sm:gap-4 my-3 sm:my-4 px-4">
       <button
-        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+        onClick={() => onPageChange(Math.max(1, currentPage - 1))}
         disabled={currentPage === 1}
         className="btn btn-xs sm:btn-sm btn-outline"
       >
@@ -152,7 +119,7 @@ function PaginationControls({
       </button>
       <span className="text-sm">{pageLabel}</span>
       <button
-        onClick={() => setCurrentPage((prev) => prev + 1)}
+        onClick={() => onPageChange(currentPage + 1)}
         disabled={isNextDisabled}
         className="btn btn-xs sm:btn-sm btn-outline"
       >
@@ -162,18 +129,39 @@ function PaginationControls({
   );
 }
 
+/** "2 calibration sessions and 1 agent session", naming only the kinds present. */
+function groupedLabel(calibrationSessions: number, agentSessions: number): string {
+  const parts = [
+    calibrationSessions > 0 ? pluralize(calibrationSessions, "calibration session") : "",
+    agentSessions > 0 ? pluralize(agentSessions, "agent session") : "",
+  ].filter(Boolean);
+  return parts.join(" and ") || "sessions";
+}
+
 /**
  * Execution history page listing workflow runs with task results and cancellation controls
  */
 export function ExecutionPageContent() {
   const queryClient = useQueryClient();
 
-  // URL state management
-  const { selectedChip, setSelectedChip, isInitialized } = useExecutionUrlState();
+  // The chip, day, grouping and page live in the URL, so Back and links back restore them.
+  // Calibration and agent sessions are grouped on the server; the flat list stays available.
+  const {
+    selectedChip,
+    setSelectedChip,
+    selectedDate,
+    groupSessions,
+    page: currentPage,
+    changeChip,
+    changeDate,
+    changeGrouping,
+    setPage,
+    resetForProject,
+    isInitialized,
+  } = useExecutionUrlState();
 
-  // Add date state for navigation
-  const [selectedDate, setSelectedDate] = useState<string>("latest");
-
+  const { projectId } = useProject();
+  const [expandedSessions, setExpandedSessions] = useState<ReadonlySet<string>>(new Set());
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [expandedTaskIndex, setExpandedTaskIndex] = useState<number | null>(null);
@@ -185,12 +173,10 @@ export function ExecutionPageContent() {
   const pendingFocusRestore = useRef<string | null>(null);
   const executionListHeading = useRef<HTMLHeadingElement>(null);
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
   // Use custom hook for date navigation (unused but kept for potential future use)
-  useDateNavigation(selectedChip || "", selectedDate, setSelectedDate);
+  useDateNavigation(selectedChip || "", selectedDate, changeDate);
 
   // Get list of chips to set default
   const { data: chipsData } = useListChips();
@@ -205,37 +191,74 @@ export function ExecutionPageContent() {
     });
   }, [chipsData?.data?.chips]);
 
+  // Set when a project switch cleared the chip: the old chip's day and page go with it.
+  const projectSwitched = useRef(false);
+
   // Set the latest chip as default when chips are loaded and no chip is selected from URL
   useEffect(() => {
     if (isInitialized && !selectedChip && sortedChips.length > 0) {
-      setSelectedChip(sortedChips[0].chip_id);
+      const chipId = sortedChips[0].chip_id;
+      // One URL update for the chip and the reset, so neither overwrites the other.
+      if (projectSwitched.current) resetForProject(chipId);
+      else setSelectedChip(chipId);
+      projectSwitched.current = false;
     }
-  }, [isInitialized, selectedChip, sortedChips, setSelectedChip]);
+  }, [isInitialized, selectedChip, sortedChips, setSelectedChip, resetForProject]);
 
-  // Fetch execution summary list by chip_id
-  const {
-    data: executionData,
-    isError,
-    isLoading,
-  } = useListExecutions(
-    {
-      chip_id: selectedChip || "",
-      skip: (currentPage - 1) * itemsPerPage,
-      limit: itemsPerPage,
-      // A picked day is filtered on the server, so every run of that day is reachable,
-      // not only those on the first page. The day follows the UI's display time zone.
-      ...(selectedDate === "latest" ? {} : { date: selectedDate, timezone: DEFAULT_TIMEZONE }),
+  const listParams = {
+    chip_id: selectedChip || "",
+    skip: (currentPage - 1) * itemsPerPage,
+    limit: itemsPerPage,
+    // A picked day is filtered on the server, so every run of that day is reachable,
+    // not only those on the first page. The day follows the UI's display time zone.
+    ...(selectedDate === "latest" ? {} : { date: selectedDate, timezone: DEFAULT_TIMEZONE }),
+  };
+
+  // The list is read only for a chip of the open project. Around a project switch, or on Back
+  // to another project's entry, the chip and the project briefly disagree; asking then would
+  // show one project's chip under another, so the list waits for the project's chips.
+  const chipsLoaded = !!chipsData?.data?.chips;
+  const chipInProject = !!selectedChip && sortedChips.some((chip) => chip.chip_id === selectedChip);
+
+  // Fetch execution summary list by chip_id; like the grouped list, the key and header pin the
+  // project the page shows, so a refetch during a project switch stays in its own project.
+  const flatList = useListExecutions(listParams, {
+    query: {
+      queryKey: [...getListExecutionsQueryKey(listParams), projectId],
+      // Refresh every 5 seconds
+      refetchInterval: 5000,
+      // Keep polling even when the window is in the background
+      refetchIntervalInBackground: true,
+      enabled: chipInProject && !groupSessions && projectId !== null,
     },
-    {
-      query: {
-        // Refresh every 5 seconds
-        refetchInterval: 5000,
-        // Keep polling even when the window is in the background
-        refetchIntervalInBackground: true,
-        enabled: !!selectedChip,
-      },
+    request: projectId ? { headers: { "X-Project-Id": projectId } } : undefined,
+  });
+  // Rows with each agent session grouped; the key and header pin the project the page shows.
+  const groupedList = useListExecutionGroups(listParams, {
+    query: {
+      queryKey: [...getListExecutionGroupsQueryKey(listParams), projectId],
+      refetchInterval: 5000,
+      refetchIntervalInBackground: true,
+      enabled: chipInProject && groupSessions && projectId !== null,
     },
-  );
+    request: projectId ? { headers: { "X-Project-Id": projectId } } : undefined,
+  });
+  const activeList = groupSessions ? groupedList : flatList;
+  const { isError } = activeList;
+  const isLoading = activeList.isLoading || (!!selectedChip && !chipsLoaded);
+  // Rows of another project's chip are never shown, even when an earlier answer is cached.
+  const executionData = chipInProject ? flatList.data : undefined;
+  const groupData = chipInProject ? groupedList.data?.data : undefined;
+  const listTotal = groupSessions ? groupData?.total : executionData?.data?.total;
+
+  // A page past the end, as from an old link or a list that shrank, moves to the last page
+  // without a history entry.
+  // The total is read only from the answer for this page's own request.
+  useEffect(() => {
+    if (listTotal == null) return;
+    const lastPage = Math.max(1, Math.ceil(listTotal / itemsPerPage));
+    if (currentPage > lastPage) setPage(lastPage, { replace: true });
+  }, [currentPage, listTotal, setPage]);
 
   const cancelMutation = useCancelExecution();
   const toast = useToast();
@@ -256,8 +279,23 @@ export function ExecutionPageContent() {
     },
   });
 
-  // Compute card data from execution data (filter by date)
-  const cardData = useMemo(() => executionData?.data?.executions ?? [], [executionData]);
+  // The executions on screen, in list order: the panel browses these.
+  const cardData = useMemo<ExecutionResponseSummary[]>(() => {
+    if (!groupSessions) return executionData?.data?.executions ?? [];
+    return (groupData?.items ?? []).flatMap((item) => {
+      if (item.kind === "execution") return item.execution ? [item.execution] : [];
+      if (item.kind === "calibration_session") {
+        const id = item.calibration_session?.calibration_session_id;
+        return id && expandedSessions.has(calibrationRowKey(id))
+          ? calibrationRowExecutions(item, expandedSessions)
+          : [];
+      }
+      const sessionId = item.agent_session?.session_id;
+      return sessionId && expandedSessions.has(sessionId)
+        ? (item.children ?? []).map((child) => child.execution)
+        : [];
+    });
+  }, [executionData, expandedSessions, groupData, groupSessions]);
 
   const selectedExecutionIndex = cardData.findIndex(
     (execution) => execution.execution_id === selectedExecutionId,
@@ -309,20 +347,57 @@ export function ExecutionPageContent() {
     return () => window.removeEventListener("keydown", handleEscape);
   }, [isSidebarOpen, showCancelConfirm, handleCloseSidebar]);
 
-  // Chip selection change handler
-  const handleChipChange = (chipId: string) => {
-    handleCloseSidebar();
-    setSelectedChip(chipId || null);
-    // A day picked for one chip means nothing for another.
-    setSelectedDate("latest");
-    setCurrentPage(1);
+  // A project switch shows another project's records: drop what this one had open.
+  const shownProject = useRef(projectId);
+  useEffect(() => {
+    if (shownProject.current === projectId) return;
+    const previous = shownProject.current;
+    shownProject.current = projectId;
+    pendingFocusRestore.current = null;
+    setIsSidebarOpen(false);
+    setSelectedExecutionId(null);
+    setExpandedTaskIndex(null);
+    setExpandedSessions(new Set());
+    // Switching project clears the chip from the URL; the old chip's day and page go with it
+    // when the new project's default chip is picked. The first project to load, and Back to an
+    // entry of another project (which names its own chip), keep the view the URL holds.
+    projectSwitched.current =
+      previous !== null && !new URLSearchParams(window.location.search).get("chip");
+  }, [projectId]);
+
+  const toggleSession = (sessionId: string) => {
+    setExpandedSessions((current) => {
+      const next = new Set(current);
+      if (next.has(sessionId)) next.delete(sessionId);
+      else next.add(sessionId);
+      return next;
+    });
   };
 
-  // Wrap date setter to reset page
+  const handleGroupingChange = (grouped: boolean) => {
+    handleCloseSidebar();
+    setExpandedSessions(new Set());
+    changeGrouping(grouped);
+  };
+
+  // Chip selection change handler. A day picked for one chip means nothing for another, so
+  // the day and page reset with it.
+  const handleChipChange = (chipId: string) => {
+    handleCloseSidebar();
+    setExpandedSessions(new Set());
+    changeChip(chipId || null);
+  };
+
+  // A new day starts on its first page.
   const handleDateChange = (date: string) => {
     handleCloseSidebar();
-    setSelectedDate(date);
-    setCurrentPage(1);
+    setExpandedSessions(new Set());
+    changeDate(date);
+  };
+
+  const handlePageChange = (page: number) => {
+    handleCloseSidebar();
+    setPage(page);
   };
 
   if (isLoading) return <ExecutionPageSkeleton />;
@@ -330,6 +405,12 @@ export function ExecutionPageContent() {
     return (
       <PageContainer>
         <PageHeader title="Execution" description="Workflow runs and their task results" />
+        <ExecutionViewSwitch
+          current="executions"
+          chipId={selectedChip}
+          projectId={projectId}
+          className="mb-4"
+        />
         <div role="alert" className="alert alert-error">
           <AlertCircle className="h-5 w-5" />
           <span>Execution history could not be loaded. Please try again.</span>
@@ -340,6 +421,11 @@ export function ExecutionPageContent() {
 
   // Generate unique key for execution
   const getExecutionKey = (execution: ExecutionResponseSummary) => `${execution.execution_id}`;
+
+  const registerCard = (executionId: string, element: HTMLDivElement | null) => {
+    if (element) executionCards.current.set(executionId, element);
+    else executionCards.current.delete(executionId);
+  };
 
   const handleCardClick = (execution: ExecutionResponseSummary) => {
     setSelectedExecutionId(execution.execution_id);
@@ -355,6 +441,7 @@ export function ExecutionPageContent() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListExecutionsQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListExecutionGroupsQueryKey() });
           if (selectedExecutionId) {
             queryClient.invalidateQueries({
               queryKey: getGetExecutionQueryKey(selectedExecutionId),
@@ -376,35 +463,33 @@ export function ExecutionPageContent() {
     setExpandedTaskIndex(expandedTaskIndex === index ? null : index);
   };
 
-  // Get border color based on status
-  const getStatusBorderStyle = (status: string) => {
-    switch (status) {
-      case "running":
-        return "border-l-4 border-l-info";
-      case "completed":
-        return "border-l-4 border-l-success";
-      case "scheduled":
-        return "border-l-4 border-l-warning";
-      case "failed":
-        return "border-l-4 border-l-error";
-      case "cancelled":
-      case "cancelling":
-        return "border-l-4 border-l-neutral";
-      default:
-        return "border-l-4 border-l-base-300";
-    }
+  // A session or execution page opened from this list links back to this same view.
+  const listContext: ExecutionListContext = {
+    chip: selectedChip,
+    date: selectedDate === "latest" ? null : selectedDate,
+    flat: !groupSessions,
+    page: currentPage,
   };
+  const sessionReturn: SessionReturnContext = { from: "executions", list: listContext };
 
-  const hasMorePages =
-    !!executionData?.data?.executions && executionData.data.executions.length >= itemsPerPage;
+  const pageRows = groupSessions
+    ? (groupData?.items.length ?? 0)
+    : (executionData?.data?.executions.length ?? 0);
+  const hasMorePages = pageRows >= itemsPerPage;
 
-  const total = executionData?.data?.total;
+  const total = listTotal;
   const totalPages = total != null ? Math.max(1, Math.ceil(total / itemsPerPage)) : undefined;
   const shouldShowPagination = currentPage > 1 || hasMorePages || (totalPages ?? 1) > 1;
 
   return (
     <PageContainer>
       <PageHeader title="Execution" description="Workflow runs and their task results" />
+      <ExecutionViewSwitch
+        current="executions"
+        chipId={selectedChip}
+        projectId={projectId}
+        className="mb-4"
+      />
       <PageFiltersBar className="mb-4 sm:mb-6">
         <PageFiltersBar.Group>
           <PageFiltersBar.Item className="sm:w-64">
@@ -417,6 +502,19 @@ export function ExecutionPageContent() {
               onDateSelect={handleDateChange}
               disabled={!selectedChip}
             />
+          </PageFiltersBar.Item>
+        </PageFiltersBar.Group>
+        <PageFiltersBar.Group>
+          <PageFiltersBar.Item>
+            <label className="choice-field gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="toggle toggle-sm"
+                checked={groupSessions}
+                onChange={(event) => handleGroupingChange(event.target.checked)}
+              />
+              <span>Group sessions</span>
+            </label>
           </PageFiltersBar.Item>
         </PageFiltersBar.Group>
       </PageFiltersBar>
@@ -438,12 +536,18 @@ export function ExecutionPageContent() {
             Recent executions
           </h2>
           <p className="text-sm text-base-content/60">
-            {total != null
-              ? `${total} execution${total === 1 ? "" : "s"}`
-              : `${cardData.length} shown`}
+            {groupSessions && groupData
+              ? groupData.grouped_executions > 0 ||
+                groupData.agent_sessions > 0 ||
+                (groupData.calibration_sessions ?? 0) > 0
+                ? `${pluralize(groupData.total_executions, "execution")}, ${groupData.grouped_executions} of them in ${groupedLabel(groupData.calibration_sessions ?? 0, groupData.agent_sessions)}; ${pluralize(groupData.total, "row")}`
+                : pluralize(groupData.total_executions, "execution")
+              : total != null
+                ? `${total} execution${total === 1 ? "" : "s"}`
+                : `${cardData.length} shown`}
           </p>
         </div>
-        {cardData.length === 0 && (
+        {pageRows === 0 && (
           <div className="rounded-box border border-dashed border-base-300 bg-base-100 px-6 py-12 text-center">
             <h3 className="font-medium">No executions found</h3>
             <p className="mt-1 text-sm text-base-content/60">
@@ -452,74 +556,62 @@ export function ExecutionPageContent() {
           </div>
         )}
         <div className="grid grid-cols-1 gap-2">
-          {cardData.map((execution) => {
-            const executionKey = getExecutionKey(execution);
-            const isSelected = selectedExecutionId === execution.execution_id;
-            const statusBorderStyle = getStatusBorderStyle(execution.status);
-            const StatusIcon = getStatusIcon(execution.status);
-
-            return (
-              <div
-                key={executionKey}
-                ref={(element) => {
-                  if (element) executionCards.current.set(execution.execution_id, element);
-                  else executionCards.current.delete(execution.execution_id);
-                }}
-                role="button"
-                aria-expanded={isSelected && isSidebarOpen}
-                aria-controls="execution-details-panel"
-                tabIndex={0}
-                aria-label={`View ${execution.name} execution details`}
-                className={`relative flex cursor-pointer overflow-hidden rounded-box border border-base-200 bg-base-100 p-3 shadow-sm transition-colors hover:border-primary/40 hover:bg-base-200/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary sm:p-4 ${statusBorderStyle}`}
-                onClick={() => handleCardClick(execution)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleCardClick(execution);
-                  }
-                }}
-              >
-                {isSelected && (
-                  <div className="absolute inset-0 bg-primary opacity-10 pointer-events-none transition-opacity duration-500" />
-                )}
-                <div className="relative z-10 w-full">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="truncate text-sm font-medium">{execution.name}</h3>
-                    <span
-                      className={`badge badge-sm flex-shrink-0 gap-1 ${getStatusBadgeClass(execution.status)}`}
-                    >
-                      <StatusIcon className="h-4 w-4" aria-hidden="true" />
-                      {getStatusLabel(execution.status)}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-0.5 mt-0.5 sm:mt-1 text-sm text-base-content/60">
-                    <span>{formatDateTime(execution.start_at)}</span>
-                    {execution.elapsed_time && (
-                      <span className="hidden sm:inline">Duration: {execution.elapsed_time}</span>
-                    )}
-                    {execution.elapsed_time && (
-                      <span className="sm:hidden">{execution.elapsed_time}</span>
-                    )}
-                    <span className="inline-flex items-center gap-1 min-w-0">
-                      <UserRound className="h-3 w-3 flex-shrink-0" />
-                      <span className="truncate">{formatActorLabel(execution)}</span>
-                    </span>
-                  </div>
-                  {execution.status === "failed" && execution.message && (
-                    <p className="mt-2 line-clamp-2 text-xs text-error">{execution.message}</p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          {groupSessions
+            ? (groupData?.items ?? []).map((item) =>
+                item.kind === "calibration_session" && item.calibration_session ? (
+                  <CalibrationSessionGroupRow
+                    key={`calibration:${item.calibration_session.calibration_session_id}`}
+                    item={item}
+                    projectId={projectId}
+                    expanded={expandedSessions}
+                    onToggle={toggleSession}
+                    selectedExecutionId={selectedExecutionId}
+                    isPanelOpen={isSidebarOpen}
+                    onOpenExecution={handleCardClick}
+                    registerCard={registerCard}
+                    hasDayFilter={selectedDate !== "latest"}
+                    sessionReturn={sessionReturn}
+                  />
+                ) : item.kind === "agent_session" && item.agent_session ? (
+                  <AgentSessionGroupRow
+                    key={`session:${item.agent_session.session_id}`}
+                    item={item}
+                    projectId={projectId}
+                    isExpanded={expandedSessions.has(item.agent_session.session_id)}
+                    onToggle={toggleSession}
+                    selectedExecutionId={selectedExecutionId}
+                    isPanelOpen={isSidebarOpen}
+                    onOpenExecution={handleCardClick}
+                    registerCard={registerCard}
+                    hasDayFilter={selectedDate !== "latest"}
+                    sessionReturn={sessionReturn}
+                  />
+                ) : item.execution ? (
+                  <ExecutionListCard
+                    key={getExecutionKey(item.execution)}
+                    execution={item.execution}
+                    isSelected={selectedExecutionId === item.execution.execution_id}
+                    isPanelOpen={isSidebarOpen}
+                    onOpen={handleCardClick}
+                    registerCard={registerCard}
+                  />
+                ) : null,
+              )
+            : cardData.map((execution) => (
+                <ExecutionListCard
+                  key={getExecutionKey(execution)}
+                  execution={execution}
+                  isSelected={selectedExecutionId === execution.execution_id}
+                  isPanelOpen={isSidebarOpen}
+                  onOpen={handleCardClick}
+                  registerCard={registerCard}
+                />
+              ))}
         </div>
         {shouldShowPagination && (
           <PaginationControls
             currentPage={currentPage}
-            setCurrentPage={(page) => {
-              handleCloseSidebar();
-              setCurrentPage(page);
-            }}
+            onPageChange={handlePageChange}
             hasMore={hasMorePages}
             totalPages={totalPages}
           />
@@ -574,8 +666,21 @@ export function ExecutionPageContent() {
             </nav>
             <div className="p-2 sm:p-4 bg-base-100 mb-4 sm:mb-6">
               <h2 className="text-sm font-medium pr-8">
-                {cardData.find((exec) => getExecutionKey(exec) === selectedExecutionId)?.name}
+                {cardData.find((exec) => getExecutionKey(exec) === selectedExecutionId)?.name ??
+                  executionDetailData?.data?.name}
               </h2>
+              <ExecutionAgentSessionNotice
+                link={executionDetailData?.data?.agent_session}
+                chipId={executionDetailData?.data?.chip_id || selectedChip || ""}
+                className="mt-3"
+              />
+              <ExecutionCalibrationNotice
+                link={executionDetailData?.data?.calibration_session}
+                origin={executionDetailData?.data?.reported_origin}
+                projectId={projectId}
+                sessionReturn={sessionReturn}
+                className="mt-3"
+              />
               {executionDetailData?.data && (
                 <ExecutionRunSummary
                   status={executionDetailData.data.status}
@@ -585,7 +690,12 @@ export function ExecutionPageContent() {
               )}
               <div className="mt-3 sm:mt-4 flex flex-wrap gap-2">
                 <Link
-                  href={`/execution/${selectedChip || ""}/${selectedExecutionId}`}
+                  href={executionDetailHref(
+                    selectedChip || "",
+                    selectedExecutionId,
+                    projectId,
+                    listContext,
+                  )}
                   className="btn btn-primary btn-sm sm:btn-md"
                 >
                   <ExternalLink data-icon="inline-start" />
@@ -599,7 +709,10 @@ export function ExecutionPageContent() {
                     | string
                     | undefined;
                   const isCancellable =
-                    !!detailFlowRunId && isExecutionCancellable(selectedExec?.status);
+                    !!detailFlowRunId &&
+                    isExecutionCancellable(
+                      selectedExec?.status ?? executionDetailData?.data?.status,
+                    );
                   return (
                     isCancellable && (
                       <button
@@ -643,6 +756,12 @@ export function ExecutionPageContent() {
                       surface="mini"
                     />
                   }
+                />
+              )}
+              {executionDetailData && isTransformExecution(executionDetailData.data.note) && (
+                <TransformStepOutcome
+                  note={executionDetailData.data.note}
+                  status={executionDetailData.data.status}
                 />
               )}
               {executionDetailData &&

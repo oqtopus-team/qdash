@@ -11,11 +11,13 @@ import { AGENT_TAB_WIDTH, ChatSidebar, useAgentTabShown } from "./ChatSidebar";
 import { MiniChatWindow } from "./MiniChatWindow";
 import { MobileTabBar } from "./MobileTabBar";
 
+import { ChatNotifier } from "@/components/features/chat/ChatNotifier";
+
 import { FirstCalibrationBanner } from "@/components/features/first-calibration/FirstCalibrationBanner";
 import { FirstCalibrationCoachmarks } from "@/components/features/first-calibration/FirstCalibrationCoachmarks";
 import { SidebarProvider } from "@/contexts/SidebarContext";
 import { ChatDockProvider } from "@/contexts/ChatDockContext";
-import { CopilotChatSessionProvider } from "@/contexts/CopilotChatSessionContext";
+import { AgentChatSessionProvider } from "@/contexts/AgentChatSessionContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 
@@ -84,7 +86,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, username } = useAuth();
-  const { currentProject, loading: projectLoading, projects } = useProject();
+  const { currentProject, projectId, loading: projectLoading, projects } = useProject();
   const isPublicPage = PUBLIC_PATHS.includes(pathname);
   const isProjectOptionalPage = PROJECT_OPTIONAL_PATH_PREFIXES.some((prefix) =>
     pathname.startsWith(prefix),
@@ -107,8 +109,9 @@ export function AppLayout({ children }: AppLayoutProps) {
   // Authenticated pages - render with sidebar and navbar
   return (
     <SidebarProvider>
-      <CopilotChatSessionProvider owner={username ?? null}>
+      <AgentChatSessionProvider owner={username ?? null} project={projectId ?? null}>
         <ChatDockProvider>
+          <ChatNotifier owner={username ?? null} project={projectId ?? null} />
           {/* `h-dvh` tracks the visible viewport on mobile browsers, so the tab bar at the
               bottom of the column stays on screen; the side and top padding keep the
               chrome clear of display cutouts once the viewport extends under them. */}
@@ -135,7 +138,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             </Suspense>
           )}
         </ChatDockProvider>
-      </CopilotChatSessionProvider>
+      </AgentChatSessionProvider>
     </SidebarProvider>
   );
 }

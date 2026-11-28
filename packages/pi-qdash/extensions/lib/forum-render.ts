@@ -1,11 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 
-import { firstNumber, firstString, payloadTotal } from "./payload.js";
+import { firstNumber, firstString, payloadTotal, shortId } from "./payload.js";
 import { ansi, boxed, boxLinesToWidth } from "./render.js";
-
-function shortId(value: string, length = 10): string {
-  return value.length > length ? `${value.slice(0, length)}…` : value;
-}
 
 export function forumPostsFromPayload(payload: unknown): Record<string, unknown>[] {
   if (Array.isArray(payload)) return payload.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");

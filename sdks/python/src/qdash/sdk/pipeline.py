@@ -1,143 +1,123 @@
 """Calibration pipeline definitions that serialize to pipeline spec version 2.
 
-The classes here are the API's generated pipeline models (``qdash.client`` builds them from the
-OpenAPI document) with a few conveniences: :class:`Pipeline` fixes ``spec_version``,
-:class:`QubitTargets` and :class:`MuxTargets` select qubit IDs or MUXes, and
-:class:`CustomOneQubit` fills in the step ``type``. Building them checks only the structure
+:class:`Pipeline` and the step models re-exported here (``OneQubitCheckStep`` and the others)
+are strict pipeline models generated from the API's OpenAPI document into
+``qdash.sdk._generated._authoring`` (unknown fields, patterns, constants and defaults are
+enforced locally); :class:`Pipeline` fixes ``spec_version``. :class:`TaskCall`,
+:class:`QubitTargets`, :class:`MuxTargets` and :class:`CustomOneQubit` are the shared
+definitions of :mod:`qdash.calibration`. Building them checks only the structure
 the schema describes, such as required fields, ID patterns and literal values. Whether a
 pipeline can run, including task names, call ID uniqueness, step order and calibration data,
 is decided by the server's validate and execute routes.
 
 Defining a pipeline has no effects: no request is sent and nothing runs until
 ``Chip.validate_calibration``, ``Chip.calibrate``, ``QDash.pipelines.validate`` or
-``QDash.pipelines.execute`` is called. :mod:`qdash.sdk.calibration` re-exports the definitions
-a calibration needs; this module adds :class:`Pipeline` for building a whole spec.
+``QDash.pipelines.execute`` is called.
 
-Any other step type can be passed as its generated model from
-``qdash.client.services.models`` (for example ``OneQubitCheckStep(type="OneQubitCheck")``) or
-as a plain dictionary in the spec's JSON form.
+This module is the wire-level layer. Write calibrations with the shared definitions of
+:mod:`qdash.calibration` (re-exported by :mod:`qdash.sdk.calibration`) and run them with
+:class:`qdash.sdk.CalibrationSession`; :class:`Pipeline` accepts those definitions too.
+
+Any other step type can be passed as its generated model, re-exported here (for example
+``OneQubitCheckStep(type="OneQubitCheck")``), or as a plain dictionary in the spec's JSON form.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Literal
 
-from qdash.client.services import models
-from qdash.client.services.models import (
-    CalibrationPipelineSpec,
-    CustomOneQubitStep,
-    PipelineTargets,
+from pydantic import model_validator
+
+from qdash.calibration import (
+    CalibrationTargets,
+    CustomOneQubit,
+    ExecutionStep,
+    MuxTargets,
+    QubitTargets,
+    TaskCall,
 )
+from qdash.calibration.steps import OneQubitStepExecutionMode as OneQubitExecutionMode
 from qdash.sdk import sweep
+from qdash.sdk._generated._authoring import (
+    BringUpStep,
+    CalibrationPipelineSpec,
+    ConfigureAllStep,
+    CustomOneQubitStep,
+    CustomTwoQubitStep,
+    FilterByMetricStep,
+    FilterByStatusStep,
+    GenerateCRScheduleStep,
+    OneQubitCheckStep,
+    OneQubitFineTuneStep,
+    PipelineTargets,
+    TaskSettings,
+    TwoQubitCalibrationStep,
+)
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
 __all__ = [
+    "BringUpStep",
+    "CalibrationPipelineSpec",
+    "ConfigureAllStep",
     "CustomOneQubit",
+    "CustomOneQubitStep",
+    "CustomTwoQubitStep",
+    "FilterByMetricStep",
+    "FilterByStatusStep",
+    "GenerateCRScheduleStep",
     "MuxTargets",
     "OnFailure",
+    "OneQubitCheckStep",
     "OneQubitExecutionMode",
+    "OneQubitFineTuneStep",
     "Pipeline",
     "PipelineSpecInput",
+    "PipelineTargets",
     "QubitTargets",
     "Qubits",
     "TaskCall",
+    "TaskSettings",
+    "TwoQubitCalibrationStep",
     "sweep",
     "to_spec",
 ]
 
-# The generated models type these fields as enums and root models, which type checkers would
-# demand instead of plain strings. The signatures below, seen only by type checkers, accept the
-# strings; validation at run time stays the generated models'.
-OneQubitExecutionMode = Literal[
-    "parallel_by_round", "parallel_by_mux", "simultaneous_spectroscopy", "sequential", "manual"
-]
 OnFailure = Literal["continue", "stop"]
-
-
-class TaskCall(models.TaskCall):
-    """One call of a task in a step. ``call_id`` defaults to the task name."""
-
-    if TYPE_CHECKING:
-
-        def __init__(
-            self,
-            *,
-            name: str,
-            call_id: str | None = None,
-            run: Mapping[str, Any] | None = None,
-            input: Mapping[str, Any] | None = None,
-            update_calibration_parameters: bool | None = None,
-            on_failure: OnFailure | None = None,
-        ) -> None: ...
-
-
-class QubitTargets(PipelineTargets):
-    """Explicit target qubits by the IDs QDash lists, e.g. ``QubitTargets(["0", "1"])``.
-
-    Named after ``qdash.workflow``'s ``QubitTargets``; it serializes to ``{"qids": [...]}``.
-    """
-
-    def __init__(self, qids: Iterable[str]) -> None:
-        if isinstance(qids, str):
-            raise TypeError('QubitTargets takes a list of qubit IDs, e.g. QubitTargets(["0", "1"])')
-        super().__init__(qids=list(qids))
 
 
 Qubits = QubitTargets
 """The earlier name of :class:`QubitTargets`; the same class."""
 
 
-class MuxTargets(PipelineTargets):
-    """Every qubit of the given MUXes, e.g. ``MuxTargets([0, 1], exclude_qids=["5"])``.
-
-    Named after ``qdash.workflow``'s ``MuxTargets``; it serializes to
-    ``{"mux_ids": [...], "exclude_qids": [...]}``. The server resolves the MUXes to qubits
-    from the chip topology.
-    """
-
-    def __init__(self, mux_ids: Iterable[int], *, exclude_qids: Iterable[str] = ()) -> None:
-        for name, value in (("mux_ids", mux_ids), ("exclude_qids", exclude_qids)):
-            if isinstance(value, str):
-                raise TypeError(f"MuxTargets {name} must be a list, got {value!r}")
-        excluded = list(exclude_qids)
-        if excluded:
-            super().__init__(mux_ids=list(mux_ids), exclude_qids=excluded)
-        else:
-            super().__init__(mux_ids=list(mux_ids))
-
-
-class CustomOneQubit(CustomOneQubitStep):
-    """A ``CustomOneQubit`` step: the given task calls, in order, on every candidate qubit."""
-
-    type: Literal["CustomOneQubit"] = "CustomOneQubit"
-
-    if TYPE_CHECKING:
-
-        def __init__(
-            self,
-            *,
-            tasks: Sequence[models.TaskCall | Mapping[str, Any]],
-            step_name: str = ...,
-            execution_mode: OneQubitExecutionMode = ...,
-            rounds: Sequence[Sequence[str]] | None = None,
-            continue_on_failure: bool = ...,
-        ) -> None: ...
-
-
 class Pipeline(CalibrationPipelineSpec):
-    """A calibration pipeline spec, version 2."""
+    """A calibration pipeline spec, version 2.
+
+    Targets and steps may also be the shared definitions of :mod:`qdash.calibration`; they
+    are written in their spec JSON, with only the fields that were set.
+    """
 
     spec_version: Literal[2] = 2
 
+    @model_validator(mode="before")
+    @classmethod
+    def _shared_definitions(cls, data: Any) -> Any:
+        if not isinstance(data, Mapping):
+            return data
+        converted = dict(data)
+        for key in ("targets", "steps"):
+            if key in converted:
+                converted[key] = _plain(converted[key])
+        return converted
+
     if TYPE_CHECKING:
 
         def __init__(
             self,
             *,
-            targets: PipelineTargets | Mapping[str, Any],
+            targets: PipelineTargets | CalibrationTargets | Mapping[str, Any],
             steps: Sequence[BaseModel | Mapping[str, Any]],
             name: str = ...,
             default_run_parameters: Mapping[str, Any] = ...,
@@ -148,6 +128,17 @@ class Pipeline(CalibrationPipelineSpec):
     def to_spec(self) -> dict[str, Any]:
         """The spec as the JSON object the validate and execute routes accept."""
         return to_spec(self)
+
+
+def _plain(value: Any) -> Any:
+    """Shared definitions anywhere in ``value`` as their spec JSON; anything else as it is."""
+    if isinstance(value, CalibrationTargets | ExecutionStep | TaskCall):
+        return value.to_spec()
+    if isinstance(value, Mapping):
+        return {key: _plain(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [_plain(item) for item in value]
+    return value
 
 
 PipelineSpecInput = CalibrationPipelineSpec | Mapping[str, Any]

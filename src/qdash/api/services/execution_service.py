@@ -23,6 +23,7 @@ from qdash.api.schemas.execution import (
     ExecutionActivityDay,
     ExecutionActivityGranularity,
     ExecutionActivityResponse,
+    ExecutionAgentSessionLink,
     ExecutionLockStatusResponse,
     ExecutionResponseDetail,
     ExecutionResponseSummary,
@@ -30,8 +31,23 @@ from qdash.api.schemas.execution import (
     PipelineStepProgress,
     Task,
 )
+from qdash.api.services.agent_execution_links import (
+    link_for_execution,
+    resolve_chip_links,
+    summary_link,
+)
+from qdash.api.services.calibration_session_links import (
+    NO_RELATIONS,
+    ExecutionRelations,
+    resolve_execution_relations,
+)
 from qdash.common.utils.datetime import now, parse_elapsed_time
 from qdash.datamodel.execution import ExecutionStatusModel
+from qdash.datamodel.step_record import (
+    PLAN_RECORDS_TRANSFORMS,
+    read_transform_record,
+    step_keys,
+)
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.repository.execution_finalizer import (
     finalize_executions_by_flow_run_id,
@@ -194,6 +210,36 @@ def by_index_ids(by_index: dict[int, ExecutionHistoryDocument]) -> set[str]:
     return {doc.execution_id for doc in by_index.values()}
 
 
+def execution_summary(
+    execution: ExecutionHistoryDocument,
+    agent_session: ExecutionAgentSessionLink | None = None,
+    relations: ExecutionRelations = NO_RELATIONS,
+) -> ExecutionResponseSummary:
+    """The list row of one execution, with its verified agent session link if any, and its
+    calibration session and reported origin as ``resolve_execution_relations`` found them."""
+    return ExecutionResponseSummary(
+        name=f"{execution.name}-{execution.execution_id}",
+        execution_id=execution.execution_id,
+        status=execution.status,
+        message=execution.message,
+        user_id=execution.user_id,
+        username=execution.username,
+        start_at=execution.start_at,
+        end_at=execution.end_at,
+        elapsed_time=parse_elapsed_time(execution.elapsed_time),
+        tags=execution.tags,
+        note=execution.note,
+        agent_session=agent_session,
+        calibration_session=relations.calibration_session,
+        reported_origin=relations.reported_origin,
+    )
+
+
+def day_window(date: str, timezone: str) -> tuple[datetime, datetime]:
+    """UTC bounds of the calendar day ``date`` (YYYYMMDD) in ``timezone``, or a 400."""
+    return _day_window(date, _resolve_zone(timezone))
+
+
 class ExecutionService:
     """Service for execution-related operations.
 
@@ -311,19 +357,18 @@ class ExecutionService:
             limit=limit,
             started_between=_day_window(date, _resolve_zone(timezone)) if date else None,
         )
+        if not executions:
+            return []
+        # One chip-wide resolution, shared with the grouped list, instead of a lookup per row.
+        links = resolve_chip_links(project_id, chip_id)
+        agent_links = {e.execution_id: summary_link(links, e.execution_id) for e in executions}
+        # Calibration sessions and reported origins of the whole page, in batched reads.
+        relations = resolve_execution_relations(project_id, executions, agent_links)
         return [
-            ExecutionResponseSummary(
-                name=f"{execution.name}-{execution.execution_id}",
-                execution_id=execution.execution_id,
-                status=execution.status,
-                message=execution.message,
-                user_id=execution.user_id,
-                username=execution.username,
-                start_at=execution.start_at,
-                end_at=execution.end_at,
-                elapsed_time=parse_elapsed_time(execution.elapsed_time),
-                tags=execution.tags,
-                note=execution.note,
+            execution_summary(
+                execution,
+                agent_links[execution.execution_id],
+                relations.get(execution.execution_id, NO_RELATIONS),
             )
             for execution in executions
         ]
@@ -376,6 +421,10 @@ class ExecutionService:
         # Fetch tasks directly from task_result_history collection
         tasks = self._fetch_tasks_for_execution(project_id, execution.execution_id)
 
+        agent_session = link_for_execution(project_id, execution)
+        relations = resolve_execution_relations(
+            project_id, [execution], {execution.execution_id: agent_session}
+        ).get(execution.execution_id, NO_RELATIONS)
         return ExecutionResponseDetail(
             name=f"{execution.name}-{execution.execution_id}",
             status=execution.status,
@@ -391,7 +440,24 @@ class ExecutionService:
             tags=execution.tags,
             chip_id=execution.chip_id,
             pipeline=self._pipeline_progress(project_id, execution),
+            agent_session=agent_session,
+            calibration_session=relations.calibration_session,
+            reported_origin=relations.reported_origin,
         )
+
+    def pipeline_progress_of(
+        self, project_id: str, executions: list[ExecutionHistoryDocument]
+    ) -> PipelineProgress | None:
+        """The pipeline run these executions of one flow run are steps of, or None.
+
+        The first execution that carries the plan (``note.pipeline``) is read; the scheduled
+        row QDash pre-creates carries none until the flow adopts it.
+        """
+        for execution in executions:
+            progress = self._pipeline_progress(project_id, execution)
+            if progress is not None:
+                return progress
+        return None
 
     def _pipeline_progress(
         self, project_id: str, execution: ExecutionHistoryDocument
@@ -418,6 +484,19 @@ class ExecutionService:
             if isinstance(index, int) and index not in by_index:
                 by_index[index] = doc
 
+        entries = [entry for entry in planned if isinstance(entry, dict)]
+        keys = step_keys(
+            [
+                (
+                    str(entry.get("name") or ""),
+                    entry.get("step_id") if isinstance(entry.get("step_id"), str) else None,
+                )
+                for entry in entries
+            ]
+        )
+        # Runs recorded before transform steps had executions mark none in their plan.
+        records_transforms = plan.get(PLAN_RECORDS_TRANSFORMS) is True
+
         steps: list[PipelineStepProgress] = []
         open_statuses = {
             ExecutionStatusModel.RUNNING.value,
@@ -426,34 +505,37 @@ class ExecutionService:
         }
         any_open = False
         last_terminal: str | None = None
-        for entry in planned:
-            if not isinstance(entry, dict):
-                continue
+        for entry, key in zip(entries, keys, strict=True):
             index = int(entry.get("index", 0))
             kind = str(entry.get("kind") or "calibration")
             started = by_index.get(index)
-            if kind == "transform":
-                steps.append(
-                    PipelineStepProgress(
-                        index=index,
-                        name=str(entry.get("name") or ""),
-                        type=str(entry.get("type") or ""),
-                        kind=kind,
-                        status="skipped",
-                    )
-                )
-                continue
+            base = PipelineStepProgress(
+                index=index,
+                name=str(entry.get("name") or ""),
+                step_id=entry.get("step_id") if isinstance(entry.get("step_id"), str) else None,
+                key=key,
+                type=str(entry.get("type") or ""),
+                kind=kind,
+                status="pending",
+            )
             if started is None:
+                if kind == "transform" and not records_transforms:
+                    base.status = "not_recorded"
+                steps.append(base)
+                continue
+            if started.status in open_statuses:
+                any_open = True
+            else:
+                last_terminal = started.status
+            if kind == "transform":
+                # No tasks: the execution's status and recorded outcome are the step's result.
                 steps.append(
-                    PipelineStepProgress(
-                        index=index,
-                        name=str(entry.get("name") or ""),
-                        step_id=(
-                            entry.get("step_id") if isinstance(entry.get("step_id"), str) else None
-                        ),
-                        type=str(entry.get("type") or ""),
-                        kind=kind,
-                        status="pending",
+                    base.model_copy(
+                        update={
+                            "execution_id": started.execution_id,
+                            "status": started.status,
+                            "transform": read_transform_record(started.note),
+                        }
                     )
                 )
                 continue
@@ -462,23 +544,16 @@ class ExecutionService:
             figures = [
                 path for t in finished for path in (t.figure_path or []) if isinstance(path, str)
             ]
-            if started.status in open_statuses:
-                any_open = True
-            else:
-                last_terminal = started.status
             steps.append(
-                PipelineStepProgress(
-                    index=index,
-                    name=str(entry.get("name") or ""),
-                    step_id=entry.get("step_id") if isinstance(entry.get("step_id"), str) else None,
-                    type=str(entry.get("type") or ""),
-                    kind=kind,
-                    execution_id=started.execution_id,
-                    status=started.status,
-                    task_total=len(tasks),
-                    task_finished=len(finished),
-                    task_failed=sum(1 for t in finished if t.status == "failed"),
-                    figure_paths=figures,
+                base.model_copy(
+                    update={
+                        "execution_id": started.execution_id,
+                        "status": started.status,
+                        "task_total": len(tasks),
+                        "task_finished": len(finished),
+                        "task_failed": sum(1 for t in finished if t.status == "failed"),
+                        "figure_paths": figures,
+                    }
                 )
             )
 
@@ -506,6 +581,11 @@ class ExecutionService:
             )
         else:
             status = last_terminal or ExecutionStatusModel.COMPLETED.value
+        if status != ExecutionStatusModel.RUNNING.value:
+            # The run ended: a step it never reached was skipped, and has no execution.
+            for step in steps:
+                if step.status == "pending":
+                    step.status = "skipped"
 
         return PipelineProgress(
             name=str(plan.get("name") or execution.name),

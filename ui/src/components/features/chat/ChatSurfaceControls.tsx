@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { FlaskConical, History, MessageSquare } from "lucide-react";
-import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
+import { useAgentChatSessionContext } from "@/contexts/AgentChatSessionContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
+import { ChatStatusLine, useChatStatus } from "@/components/features/chat/ChatTurnStatus";
 
 const RECENT_LIMIT = 8;
 
@@ -42,22 +43,28 @@ export function SurfaceButton({
   );
 }
 
-/** Title of the active chat; its context shows above the composer. */
+/**
+ * Title of the active chat, with what its turn is doing (running, waiting, reconnecting, or
+ * how it ended); its context shows above the composer.
+ */
 export function SurfaceTitle() {
-  const { activeSession } = useCopilotChatSessionContext();
+  const { activeSession } = useAgentChatSessionContext();
+  const status = useChatStatus();
   const hasMessages = Boolean(activeSession?.messages.length);
   return (
     <div className="min-w-0 flex-1">
       <div className="text-sm font-medium truncate">
         {activeSession && hasMessages ? activeSession.title : "Agent"}
       </div>
+      <ChatStatusLine status={status} className="mt-0.5" />
     </div>
   );
 }
 
 /** Jump back to a recent chat without leaving the page. Full history lives on /chat. */
 export function RecentChatsMenu({ onOpenAll }: { onOpenAll: () => void }) {
-  const { sessions, activeSessionId, runs, switchSession } = useCopilotChatSessionContext();
+  const { sessions, activeSessionId, runs, detachedTurns, switchSession } =
+    useAgentChatSessionContext();
   const recent = [...sessions].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, RECENT_LIMIT);
 
   return (
@@ -93,8 +100,12 @@ export function RecentChatsMenu({ onOpenAll }: { onOpenAll: () => void }) {
               <MessageSquare className="w-3.5 h-3.5 shrink-0 text-base-content/45" />
             )}
             <span className="truncate">{session.title}</span>
-            {session.id in runs && (
-              <span className="chat-pulse-dot ml-auto shrink-0" title="Answering" />
+            {(session.id in runs || session.id in (detachedTurns ?? {})) && (
+              <span
+                className="loading loading-spinner loading-xs ml-auto shrink-0 text-primary"
+                role="status"
+                aria-label="Answering"
+              />
             )}
           </DropdownMenuItem>
         ))}

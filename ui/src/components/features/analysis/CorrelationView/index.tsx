@@ -17,23 +17,22 @@ import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useSelectStyles } from "@/hooks/useSelectStyles";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
 import { useCorrelationUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
+import {
+  isPercentageMetric,
+  type MetricType,
+  MetricTypeSwitch,
+  SelectionModeToggle,
+} from "../AnalysisControls";
 
 type MetricOption = {
   value: string;
   label: string;
 };
 
-type MetricType = "qubit" | "coupling";
-
 interface CorrelationDataPoint {
   entityId: string;
   xValue: number;
   yValue: number;
-}
-
-// Helper function to check if a metric uses percentage unit
-function isPercentageMetric(unit: string | undefined): boolean {
-  return unit === "%";
 }
 
 // Calculate Pearson correlation coefficient
@@ -503,20 +502,7 @@ export function CorrelationView() {
           <div className="flex flex-col gap-3 sm:gap-4">
             {/* Row 1a: Type + Chip */}
             <div className="flex flex-col sm:flex-row flex-wrap items-start gap-2 sm:gap-3">
-              <div className="tabs tabs-boxed tabs-sm">
-                <button
-                  className={`tab ${metricType === "qubit" ? "tab-active" : ""}`}
-                  onClick={() => handleMetricTypeChange("qubit")}
-                >
-                  1Q
-                </button>
-                <button
-                  className={`tab ${metricType === "coupling" ? "tab-active" : ""}`}
-                  onClick={() => handleMetricTypeChange("coupling")}
-                >
-                  2Q
-                </button>
-              </div>
+              <MetricTypeSwitch value={metricType} onValueChange={handleMetricTypeChange} />
 
               <div className="w-full sm:w-64">
                 <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
@@ -574,29 +560,11 @@ export function CorrelationView() {
 
             {/* Mode + Export */}
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <div className="join">
-                <button
-                  className={`join-item btn btn-sm ${selectionMode === "latest" ? "btn-primary" : ""}`}
-                  onClick={() => setSelectionMode("latest")}
-                >
-                  Latest
-                </button>
-                <button
-                  className={`join-item btn btn-sm ${selectionMode === "best" ? "btn-primary" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
-                  onClick={() => setSelectionMode("best")}
-                  disabled={!isBestModeSupported}
-                  title={!isBestModeSupported ? "Best mode not available" : "Show best values"}
-                >
-                  Best
-                </button>
-                <button
-                  className={`join-item btn btn-sm ${selectionMode === "average" ? "btn-primary" : ""}`}
-                  onClick={() => setSelectionMode("average")}
-                  title="Show average values"
-                >
-                  Average
-                </button>
-              </div>
+              <SelectionModeToggle
+                value={selectionMode}
+                onChange={setSelectionMode}
+                isBestModeSupported={isBestModeSupported}
+              />
 
               <button
                 className="btn btn-outline btn-sm ml-auto sm:ml-0"

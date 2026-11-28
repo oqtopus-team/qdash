@@ -1,7 +1,7 @@
 # pi-qcaleval
 
 `@oqtopus-team/pi-qcaleval` evaluates calibration figures independently of QDash.
-For the QDash host integration, see [Calibration Evaluation](../developer-guide/copilot/evaluation.md).
+For the QDash host integration, see [Calibration Evaluation](../developer-guide/agent/evaluation.md).
 
 ## Tool
 
@@ -57,6 +57,34 @@ Without task-specific `criteria`, the status choices are `SUCCESS`, `SUBOPTIMAL`
 
 ## Configuration
 
+For standalone pi, install `npm:@oqtopus-team/pi-qcaleval` with `pi install`. Declare an
+image-capable model in `~/.pi/agent/models.json` (or your custom pi agent directory):
+
+```json
+{
+  "providers": {
+    "vllm": {
+      "baseUrl": "https://llm.example/v1",
+      "api": "openai-completions",
+      "apiKey": "$EVALUATION_API_KEY",
+      "models": [{
+        "id": "your-image-model",
+        "contextWindow": 16384,
+        "maxTokens": 2048,
+        "input": ["text", "image"]
+      }]
+    }
+  }
+}
+```
+
+Replace the endpoint, model ID, and limits with your server's values. Set `EVALUATION_API_KEY`
+in pi's environment and `QCALEVAL_MODEL=vllm/your-image-model`, then restart pi. Ask for a
+`dry_run` evaluation to inspect prompts without a model call, then evaluate a figure and check
+`details.missing_keys` for unanswered questions. In QDash web Agent, use
+[AI Setup](../user-guide/setup/ai.md) instead of editing pi's local configuration.
+
+
 | Priority | Model source |
 | --- | --- |
 | 1 | Call's `model` (`provider/modelId`), then `QCALEVAL_MODEL`. |
@@ -67,4 +95,4 @@ Without task-specific `criteria`, the status choices are `SUCCESS`, `SUBOPTIMAL`
 | --- | --- |
 | Output tokens | Model's `maxTokens`, capped at 4096 per answer. |
 | Temperature | Set to 0 for reproducible answers. |
-| Provider | Declare the model, base URL, and credential in pi's `models.json`. See [Pi Extension Design](../developer-guide/copilot/extensions.md#pi-qcaleval). |
+| Provider | Declare the model, base URL, and credential in pi's `models.json`. See the standalone example above. |

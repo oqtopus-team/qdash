@@ -8,7 +8,7 @@ import {
   isOpenSteer,
   steerStatusText,
   type PendingSteer,
-} from "@/lib/copilotSteer";
+} from "@/lib/agentSteer";
 
 /**
  * Messages sent while the answer was streaming that it has not read yet, or

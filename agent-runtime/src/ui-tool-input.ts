@@ -1,7 +1,7 @@
 import { Type, type Static, type TSchema } from "typebox";
 
 // See ui-tool.ts for why this path resolves in the image too.
-import { UI_COMPONENT_TYPES, type UiSpec } from "../../ui/src/lib/copilotUiSpec.ts";
+import { UI_COMPONENT_TYPES, type UiSpec } from "../../ui/src/lib/agentUiSpec.ts";
 
 /**
  * The arguments `render_ui` declares to the model, and their mapping to and
@@ -50,7 +50,11 @@ const element = (properties: Record<string, TSchema>, children: boolean) =>
       id: str("Unique element id: letters, digits, - and _."),
       ...properties,
       ...(children
-        ? { children: Type.Array(Type.String(), { description: "Ids of the child elements, in order." }) }
+        ? {
+            children: Type.Array(Type.String(), {
+              description: "Ids of the direct child elements, in order. Each element belongs to exactly one container.",
+            }),
+          }
         : {}),
     },
     { additionalProperties: false },

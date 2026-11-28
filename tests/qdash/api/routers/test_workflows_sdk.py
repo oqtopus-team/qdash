@@ -1,6 +1,6 @@
 """qdash.sdk's QDash.workflows against the real /flows routes.
 
-The SDK's QDashClient sends its requests through FastAPI's TestClient, so list, get and run
+The SDK session sends its requests through FastAPI's TestClient, so list, get and run
 reach the flow service and its project scoping. Prefect dispatch is patched; nothing runs.
 """
 
@@ -12,9 +12,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from qdash.client import QDashClient, QDashConfig
 from qdash.dbmodel.flow import FlowDocument
-from qdash.sdk import QDash, QDashNotFoundError
+from qdash.sdk import QDash, QDashConfig, QDashNotFoundError
 from tests.qdash.api.routers.test_flow import test_project  # noqa: F401 - pytest fixture
 
 if TYPE_CHECKING:
@@ -54,7 +53,7 @@ def qdash(test_client: Any, flows: None) -> Iterator[QDash]:
     config = QDashConfig(
         base_url=str(test_client.base_url), api_token="test_token", project_id="test_project"
     )
-    with QDash(QDashClient(config, http_client=test_client)) as session:
+    with QDash(config, http_client=test_client) as session:
         yield session
 
 

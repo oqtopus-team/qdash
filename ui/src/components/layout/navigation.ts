@@ -28,6 +28,11 @@ export type NavItem = {
   badge?: "Beta";
   icon: LucideIcon;
   match?: "exact" | "prefix";
+  /**
+   * Routes the destination owns, each with the routes nested under it. Set, it replaces
+   * `match`: the destination is active on any of these routes.
+   */
+  activeBases?: readonly string[];
   visible?: boolean;
 };
 
@@ -35,6 +40,18 @@ export type NavSection = {
   label: string;
   items: NavItem[];
 };
+
+/**
+ * Routes of the Execution area. `/executions/{id}` resolves to an execution page, and the
+ * calibration session list and pages are a view of the same work grouped by objective.
+ */
+const EXECUTION_AREA_BASES = ["/execution", "/executions", "/calibration-sessions"] as const;
+
+/** The two lists of the Execution area, in the order the area shows them. */
+export const EXECUTION_VIEWS = [
+  { href: "/execution", label: "Executions" },
+  { href: "/calibration-sessions", label: "Calibration sessions" },
+] as const;
 
 interface NavigationOptions {
   canEdit: boolean;
@@ -71,7 +88,12 @@ export function getNavigationSections({ canEdit, isAdmin }: NavigationOptions): 
           match: "prefix",
           visible: canEdit,
         },
-        { href: "/execution", label: "Execution", icon: Zap },
+        {
+          href: "/execution",
+          label: "Execution",
+          icon: Zap,
+          activeBases: EXECUTION_AREA_BASES,
+        },
         {
           href: "/task-results",
           label: "Task Results",
@@ -126,13 +148,13 @@ export function getNavigationSections({ canEdit, isAdmin }: NavigationOptions): 
 /**
  * Destinations shown as tabs in the mobile tab bar, in display order. Each tab
  * is active on its own route and on every route nested under one of its bases;
- * `/executions/{id}` resolves to an execution page, so it belongs to Execution.
- * Every other destination stays in the header menu.
+ * Execution owns every route of its area (`EXECUTION_AREA_BASES`).
+ * Every other destination sits in the More sheet that the last tab opens.
  */
 const MOBILE_TAB_BASES: ReadonlyArray<{ href: string; bases: readonly string[] }> = [
   { href: "/overview", bases: ["/overview"] },
   { href: "/workflow", bases: ["/workflow"] },
-  { href: "/execution", bases: ["/execution", "/executions"] },
+  { href: "/execution", bases: EXECUTION_AREA_BASES },
   { href: "/chat", bases: ["/chat"] },
 ];
 
@@ -140,6 +162,12 @@ export type MobileTab = {
   item: NavItem;
   bases: readonly string[];
 };
+
+/** Resolves whether `item` owns the current route, honouring its `match` mode. */
+export function isNavItemActive(item: NavItem, pathname: string): boolean {
+  if (item.activeBases) return item.activeBases.some((base) => isPathWithin(pathname, base));
+  return item.match === "prefix" ? pathname.startsWith(item.href) : pathname === item.href;
+}
 
 /** True when `pathname` is `base` itself or a route nested under it. */
 export function isPathWithin(pathname: string, base: string): boolean {
@@ -169,4 +197,14 @@ export function withoutMobileTabs(sections: NavSection[]): NavSection[] {
     ...section,
     items: section.items.filter((item) => !tabHrefs.has(item.href)),
   }));
+}
+
+/**
+ * True when a visible destination outside the mobile tabs owns `pathname`, so the
+ * More tab can show that the current page lives in its sheet.
+ */
+export function isMobileOverflowActive(sections: NavSection[], pathname: string): boolean {
+  return withoutMobileTabs(sections).some((section) =>
+    section.items.some((item) => item.visible !== false && isNavItemActive(item, pathname)),
+  );
 }

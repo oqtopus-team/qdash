@@ -1,0 +1,525 @@
+"use client";
+
+import React, { useState, useMemo, useCallback } from "react";
+import Link from "next/link";
+import { ChevronRight, History, FileText, GitBranch } from "lucide-react";
+
+import type { TaskHistoryResponse, TaskResult as Task } from "@/schemas";
+
+import { firstPublishedParameter, inExecution } from "@/lib/provenanceTarget";
+import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
+
+import { useGetExecution } from "@/client/execution/execution";
+import { TaskFigure } from "@/components/charts/TaskFigure";
+import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
+import {
+  ExecutionHistoryModalContent,
+  type ExecutionHistoryMobileTab,
+} from "@/components/features/task-history/ExecutionHistoryModalContent";
+import { useManualOverrides } from "@/hooks/useManualOverrides";
+import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
+import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
+import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
+import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
+import type { TaskChatContext } from "@/types/agentChat";
+import { useChatDock } from "@/contexts/ChatDockContext";
+import { DockedChatPanel } from "@/components/features/chat/DockedChatPanel";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import {
+  ExecutionTasksColumn,
+  TaskDetailsHeader,
+  TaskParametersTables,
+} from "@/components/features/task-history/TaskResultDetailParts";
+
+type TaskHistoryTargetKind = "qubit" | "coupling";
+
+interface TaskHistoryTargetConfig {
+  label: string;
+  /** Opens the task result page with client-side routing instead of a full page load. */
+  clientSideTaskLink: boolean;
+}
+
+const TARGET_CONFIG: Record<TaskHistoryTargetKind, TaskHistoryTargetConfig> = {
+  qubit: { label: "QID", clientSideTaskLink: true },
+  coupling: { label: "Coupling", clientSideTaskLink: false },
+};
+
+interface TaskHistoryQueryState {
+  data: TaskHistoryResponse | undefined;
+  isLoading: boolean;
+  isError: boolean;
+}
+
+interface TargetTaskHistoryModalProps {
+  chipId: string;
+  /** Qubit ID or coupling ID the history belongs to. */
+  targetId: string;
+  targetKind: TaskHistoryTargetKind;
+  taskName: string;
+  isOpen: boolean;
+  onClose: () => void;
+  selectedDate?: string;
+  history: TaskHistoryQueryState;
+}
+
+/**
+ * Task execution history of a qubit or coupling, with the selected result's details.
+ *
+ * Qubit history shows the result chat inline as a split view; coupling history opens
+ * the mini chat instead.
+ */
+export function TargetTaskHistoryModal({
+  chipId,
+  targetId: qid,
+  targetKind,
+  taskName,
+  isOpen,
+  onClose,
+  selectedDate,
+  history: { data: historyData, isLoading, isError },
+}: TargetTaskHistoryModalProps) {
+  const config = TARGET_CONFIG[targetKind];
+  const docksChat = targetKind === "qubit";
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedExecutionTaskIndex, setSelectedExecutionTaskIndex] = useState(0);
+  const [mobileTab, setMobileTab] = useState<ExecutionHistoryMobileTab>("history");
+  const { focusTaskChat, openMiniChat } = useChatDock();
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
+  const handleAskAi = useCallback(
+    (ctx: TaskChatContext) => {
+      if (!docksChat) {
+        openMiniChat(ctx);
+        return;
+      }
+      // Resume or start the chat for this result. We deliberately do NOT open
+      // the global sidebar — the chat is shown inline as a split view here.
+      focusTaskChat(ctx);
+      setIsChatOpen(true);
+    },
+    [docksChat, focusTaskChat, openMiniChat],
+  );
+
+  // Reset chat pane when modal closes so re-opening starts clean.
+  React.useEffect(() => {
+    if (!isOpen) setIsChatOpen(false);
+  }, [isOpen]);
+  const manualOverrides = useManualOverrides(qid);
+
+  const historyArray = useMemo(
+    () =>
+      Object.entries(historyData?.data || {})
+        .map(([key, task]) => ({ key, task: task as Task }))
+        .sort((a, b) => {
+          const dateA = a.task.end_at ? new Date(a.task.end_at).getTime() : 0;
+          const dateB = b.task.end_at ? new Date(b.task.end_at).getTime() : 0;
+          return dateB - dateA;
+        }),
+    [historyData],
+  );
+
+  React.useEffect(() => {
+    if (!isOpen || historyArray.length === 0) return;
+    if (!selectedDate || selectedDate === "latest") {
+      setSelectedIndex(0);
+      return;
+    }
+    const idx = historyArray.findIndex((item) => {
+      if (!item.task.end_at) return false;
+      const dateStr = formatDateTime(item.task.end_at, "yyyyMMdd");
+      return dateStr === selectedDate;
+    });
+    setSelectedIndex(idx >= 0 ? idx : 0);
+  }, [isOpen, historyArray, selectedDate]);
+
+  const selectedItem = historyArray[selectedIndex];
+  const selectedHistoryTask = selectedItem?.task;
+  const selectedExecutionId = selectedHistoryTask?.execution_id ?? null;
+  const { data: executionDetailData, isLoading: isExecutionLoading } = useGetExecution(
+    selectedExecutionId || "",
+    {
+      query: {
+        enabled: !!selectedExecutionId,
+        staleTime: 30000,
+        gcTime: 60000,
+      },
+    },
+  );
+  const executionTasks = useMemo(
+    () => (executionDetailData?.data?.task ?? []).filter((task) => task.qid === qid),
+    [executionDetailData?.data?.task, qid],
+  );
+  React.useEffect(() => {
+    if (executionTasks.length === 0) {
+      setSelectedExecutionTaskIndex(0);
+      return;
+    }
+    const historyTaskId = selectedHistoryTask?.task_id;
+    const matchingIndex = historyTaskId
+      ? executionTasks.findIndex((task) => task.task_id === historyTaskId)
+      : -1;
+    setSelectedExecutionTaskIndex(matchingIndex >= 0 ? matchingIndex : 0);
+  }, [executionTasks, selectedHistoryTask?.task_id]);
+  React.useEffect(() => {
+    if (executionTasks.length > 0 && selectedExecutionTaskIndex >= executionTasks.length) {
+      setSelectedExecutionTaskIndex(0);
+    }
+  }, [executionTasks.length, selectedExecutionTaskIndex]);
+  const selectedTask = executionTasks[selectedExecutionTaskIndex] ?? selectedHistoryTask;
+  const figures = selectedTask
+    ? Array.isArray(selectedTask.figure_path)
+      ? selectedTask.figure_path
+      : selectedTask.figure_path
+        ? [selectedTask.figure_path]
+        : []
+    : [];
+
+  const jsonFigures = selectedTask
+    ? Array.isArray(selectedTask.json_figure_path)
+      ? selectedTask.json_figure_path
+      : selectedTask.json_figure_path
+        ? [selectedTask.json_figure_path]
+        : []
+    : [];
+  const rawDataPaths = selectedTask?.raw_data_path ?? [];
+
+  const chatContext: TaskChatContext | null = useMemo(() => {
+    if (!selectedTask?.task_id) return null;
+    return {
+      taskName: selectedTask.name || taskName,
+      chipId,
+      qid,
+      executionId: selectedExecutionId || "",
+      taskId: selectedTask.task_id,
+    };
+  }, [selectedTask, selectedExecutionId, chipId, qid, taskName]);
+
+  const handleSelectIndex = (idx: number) => {
+    setSelectedIndex(idx);
+    setMobileTab("tasks");
+  };
+
+  const handleSelectExecutionTask = (idx: number) => {
+    setSelectedExecutionTaskIndex(idx);
+    setMobileTab("details");
+  };
+
+  // Column 1: Execution History
+  const renderHistoryList = () => (
+    <div className="flex flex-col min-h-0 h-full">
+      <div className="mb-3 shrink-0">
+        <div className="flex items-center gap-2 mb-1">
+          <History className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-medium text-base-content">Execution History</h3>
+        </div>
+        <p className="text-xs text-base-content/50">
+          {historyArray.length} executions with {taskName}
+        </p>
+      </div>
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex flex-col gap-2">
+          {historyArray.map((item, idx) => {
+            const isSelected = idx === selectedIndex;
+            return (
+              <button
+                key={item.key}
+                onClick={() => handleSelectIndex(idx)}
+                className={`w-full text-left p-3 rounded-lg transition-all border-2 ${
+                  isSelected
+                    ? "bg-primary text-primary-content border-primary"
+                    : "bg-base-200 hover:bg-base-300 border-transparent hover:border-primary/30"
+                }`}
+              >
+                <div className="flex justify-between items-start">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-sm">
+                      {item.task.status === "completed" ? (
+                        <span className={isSelected ? "" : "text-success"}>Completed</span>
+                      ) : item.task.status === "failed" ? (
+                        <span className={isSelected ? "" : "text-error"}>Failed</span>
+                      ) : (
+                        <span className={isSelected ? "" : "text-warning"}>{item.task.status}</span>
+                      )}
+                    </div>
+                    <div className="text-xs opacity-70 mt-1">
+                      {item.task.end_at ? formatDateTimeCompact(item.task.end_at) : "N/A"}
+                    </div>
+                    {item.task.name && (
+                      <div className="text-xs opacity-60 mt-1 truncate">{item.task.name}</div>
+                    )}
+                    {idx === 0 && (
+                      <span
+                        className={`badge badge-xs mt-1 ${
+                          isSelected ? "badge-primary-content" : "badge-success"
+                        }`}
+                      >
+                        Latest
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs opacity-60">#{idx + 1}</span>
+                    <ChevronRight
+                      className={`h-4 w-4 opacity-40 ${isSelected ? "opacity-80" : ""}`}
+                    />
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Column 2: Tasks in Execution
+  const renderTasksList = () => (
+    <ExecutionTasksColumn
+      executionId={selectedExecutionId}
+      tasks={executionTasks}
+      isLoading={isExecutionLoading}
+      isSelected={(task) => task.task_id === selectedTask?.task_id}
+      onSelect={handleSelectExecutionTask}
+      matchName={taskName}
+      targetId={qid}
+      targetNoun={targetKind}
+    />
+  );
+
+  // Column 3: Task Details
+  const renderTaskDetails = () => (
+    <div className="flex flex-col">
+      <TaskDetailsHeader
+        position={
+          executionTasks.length > 0
+            ? `${selectedExecutionTaskIndex + 1} / ${executionTasks.length}`
+            : historyArray.length > 0
+              ? `${selectedIndex + 1} / ${historyArray.length}`
+              : null
+        }
+        index={selectedExecutionTaskIndex}
+        total={executionTasks.length}
+        onSelect={handleSelectExecutionTask}
+      />
+
+      {/* Figure Display - Fixed height with horizontal scroll */}
+      <div className="h-[280px] bg-base-200 rounded-lg p-3 overflow-x-auto overflow-y-hidden flex items-center justify-start">
+        {isExecutionLoading ? (
+          <span className="loading loading-spinner loading-lg"></span>
+        ) : !selectedTask ? (
+          <div className="flex flex-col items-center justify-center text-base-content/40">
+            <FileText className="h-12 w-12 mb-3 opacity-30" />
+            <p className="text-sm">
+              {selectedExecutionId ? "Select a task to view details" : "Select an execution first"}
+            </p>
+          </div>
+        ) : figures.length > 0 ? (
+          figures.map((fig, i) => (
+            <TaskFigure
+              key={i}
+              path={fig}
+              jsonFigurePath={jsonFigures[i]}
+              qid={qid}
+              className="h-full w-auto object-contain"
+            />
+          ))
+        ) : selectedTask.task_id ? (
+          <TaskFigure
+            taskId={selectedTask.task_id}
+            qid={qid}
+            className="h-full w-auto object-contain"
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center text-base-content/40">
+            <FileText className="h-12 w-12 mb-3 opacity-30" />
+            <p className="text-sm">No figure available for this task</p>
+          </div>
+        )}
+      </div>
+
+      {/* Task Metadata */}
+      {selectedTask && (
+        <div className="mt-2 text-xs text-base-content/60 space-y-1 bg-base-200 p-3 rounded-lg">
+          {selectedTask.name && (
+            <div className="flex items-center gap-2">
+              <span className="font-medium">Task Name:</span>
+              <span className="font-mono">{selectedTask.name}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <span className="font-medium">Execution ID:</span>
+            <span className="font-mono truncate">{selectedExecutionId}</span>
+          </div>
+          {selectedTask.task_id && (
+            <div className="flex items-center gap-2">
+              <span className="font-medium">Task ID:</span>
+              {config.clientSideTaskLink ? (
+                <Link
+                  href={`/task-results/${selectedTask.task_id}`}
+                  className="font-mono truncate link link-primary"
+                >
+                  {selectedTask.task_id}
+                </Link>
+              ) : (
+                <a
+                  href={`/task-results/${selectedTask.task_id}`}
+                  className="font-mono truncate link link-primary"
+                >
+                  {selectedTask.task_id}
+                </a>
+              )}
+            </div>
+          )}
+          {selectedTask.start_at != null && (
+            <div className="flex items-center gap-2">
+              <span className="font-medium">Start:</span>
+              <span>{formatDateTime(String(selectedTask.start_at))}</span>
+            </div>
+          )}
+          {selectedTask.end_at && (
+            <div className="flex items-center gap-2">
+              <span className="font-medium">End:</span>
+              <span>{formatDateTime(String(selectedTask.end_at))}</span>
+            </div>
+          )}
+          <TaskArtifactDownloads
+            jsonFigurePaths={jsonFigures}
+            rawDataPaths={rawDataPaths}
+            imagePaths={figures}
+          />
+          {/* Lineage */}
+          <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2 flex-wrap">
+            <LineageButton
+              target={inExecution(
+                firstPublishedParameter(
+                  qid,
+                  selectedTask.output_parameters,
+                  selectedTask.input_parameters,
+                ),
+                selectedExecutionId,
+              )}
+              className="btn btn-xs btn-outline"
+            >
+              <GitBranch data-icon="inline-start" />
+              Lineage
+            </LineageButton>
+          </div>
+        </div>
+      )}
+
+      {selectedTask?.task_id && (
+        <TaskResultMemo taskId={selectedTask.task_id} chipId={chipId} hideWhenEmpty />
+      )}
+
+      {/* Parameters */}
+      {selectedTask && (
+        <TaskParametersTables
+          task={selectedTask}
+          outputOverrides={manualOverrides}
+          className="flex flex-col gap-2 mt-2 mb-6"
+        />
+      )}
+
+      {/* Forum threads about this result */}
+      {/* AI evaluations of this result, requested the same way as from the chip page */}
+      {selectedTask?.task_id && (
+        <TaskResultEvaluations
+          taskId={selectedTask.task_id}
+          chipId={chipId}
+          taskName={selectedTask.name || taskName}
+          qid={qid}
+          executionId={selectedExecutionId || undefined}
+          onChat={chatContext ? () => handleAskAi(chatContext) : undefined}
+        />
+      )}
+
+      {selectedTask?.task_id && <TaskResultThreads taskId={selectedTask.task_id} />}
+    </div>
+  );
+
+  if (!isOpen) return null;
+
+  const content = isLoading ? (
+    <div className="flex items-center justify-center h-48 sm:h-96">
+      <span className="loading loading-spinner loading-lg"></span>
+    </div>
+  ) : isError || historyArray.length === 0 ? (
+    <div className="alert alert-info text-sm">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        className="stroke-current shrink-0 w-5 h-5 sm:w-6 sm:h-6"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+      <span>No history available</span>
+    </div>
+  ) : (
+    <ExecutionHistoryModalContent
+      mobileTab={mobileTab}
+      onMobileTabChange={setMobileTab}
+      history={renderHistoryList()}
+      tasks={renderTasksList()}
+      details={renderTaskDetails()}
+    />
+  );
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        className={
+          docksChat
+            ? `max-sm:top-auto max-sm:bottom-0 max-sm:translate-y-0 max-sm:rounded-b-none w-full p-0 h-[90vh] sm:h-[95vh] !overflow-hidden flex flex-col transition-[max-width] duration-300 ease-in-out ${
+                isChatOpen ? "sm:w-[96vw] max-w-[112rem]" : "sm:w-11/12 max-w-[112rem]"
+              }`
+            : "max-sm:top-auto max-sm:bottom-0 max-sm:translate-y-0 max-sm:rounded-b-none w-full max-w-[112rem] h-[90vh] sm:h-[95vh] p-0 !overflow-hidden flex flex-col"
+        }
+      >
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <DialogTitle className="text-sm font-medium truncate">{taskName}</DialogTitle>
+            <DialogDescription className="text-sm text-base-content/70 mt-0.5 sm:mt-1">
+              {config.label} {qid}
+            </DialogDescription>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn btn-sm btn-circle btn-ghost flex-shrink-0"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+
+        {docksChat ? (
+          <div className="flex flex-1 min-h-0 overflow-hidden">
+            <div
+              className={`flex flex-col min-w-0 p-3 sm:p-6 overflow-hidden ${
+                isChatOpen ? "flex-1 lg:flex-[1.1]" : "flex-1"
+              }`}
+            >
+              {content}
+            </div>
+
+            {isChatOpen && (
+              <div className="hidden md:flex w-[26rem] xl:w-[30rem] flex-shrink-0 border-l border-base-300 bg-base-100 min-h-0">
+                <div className="w-full h-full min-h-0">
+                  <DockedChatPanel onClose={() => setIsChatOpen(false)} />
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex-1 min-h-0 overflow-hidden p-3 sm:p-6">{content}</div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}

@@ -34,8 +34,9 @@ when this call fails: ``"stop"`` skips them, ``"continue"`` runs them. ``None``
 inherits the step's ``continue_on_failure``. The scope is one target: a failure on
 qubit 0 never stops qubit 1.
 
-The module only depends on ``qdash.datamodel`` so the API validates a declarative
-pipeline spec with the same model the worker runs.
+The fields are those of :class:`qdash.calibration.TaskCall`, which the SDK and flow
+authors write; this module only depends on it and ``qdash.datamodel`` so the API
+validates a declarative pipeline spec with the same model the worker runs.
 """
 
 from __future__ import annotations
@@ -48,6 +49,15 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from qdash.calibration._task_call import (
+    CALL_ID_PATTERN,
+    INPUT_DESCRIPTION,
+    RUN_DESCRIPTION,
+    TASK_NAME_PATTERN,
+    UPDATE_DESCRIPTION,
+    OnFailure,
+)
+from qdash.calibration._task_call import TaskCall as TaskCallDefinition
 from qdash.datamodel.task_invocation import TaskInvocation
 from qdash.datamodel.task_settings import (
     INPUT,
@@ -60,6 +70,7 @@ from qdash.datamodel.task_settings import (
 
 __all__ = [
     "CALL_ID_PATTERN",
+    "TASK_NAME_PATTERN",
     "OnFailure",
     "StepCalls",
     "TaskCall",
@@ -71,34 +82,12 @@ __all__ = [
     "plan_digest",
 ]
 
-TASK_NAME_PATTERN = r"^[A-Za-z][A-Za-z0-9_]{0,127}$"
-"""Task names are class-style identifiers such as ``CheckRamsey``."""
-
-CALL_ID_PATTERN = r"^[A-Za-z][A-Za-z0-9_.-]{0,63}$"
-"""Call ids accept task names (``CheckRamsey``) as well as ``ramsey_fine``."""
-
-OnFailure = Literal["continue", "stop"]
-
 MIGRATION_HINT = (
     "Task lists take TaskCall entries since spec version 2, e.g. "
     'TaskCall(name="CheckRabi"). Update the saved flow by hand: import TaskCall from '
     "qdash.workflow and wrap each task name in TaskCall(name=...), giving a repeated task "
     "a call_id per occurrence; see "
     "docs/developer-guide/workflow/task-calls.md#migrate-saved-flows."
-)
-
-
-_RUN_DESCRIPTION = (
-    "Run parameters. A plain value, "
-    '{"value": ..., "value_type": ...}, or a sweep declaration '
-    '{"value": [start, stop, step_or_num], "value_type": "np.arange" | '
-    '"np.linspace" | "np.logspace" | "range"} or '
-    '{"value": [points...], "value_type": "list"}.'
-)
-_INPUT_DESCRIPTION = "Calibration input overrides, as plain values."
-_UPDATE_DESCRIPTION = (
-    "False records outputs as measurement history only. None inherits the next "
-    "layer and finally the workflow's policy."
 )
 
 
@@ -131,11 +120,9 @@ class TaskSettings(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    run: dict[str, Any] | None = Field(default=None, description=_RUN_DESCRIPTION)
-    input: dict[str, Any] | None = Field(default=None, description=_INPUT_DESCRIPTION)
-    update_calibration_parameters: bool | None = Field(
-        default=None, description=_UPDATE_DESCRIPTION
-    )
+    run: dict[str, Any] | None = Field(default=None, description=RUN_DESCRIPTION)
+    input: dict[str, Any] | None = Field(default=None, description=INPUT_DESCRIPTION)
+    update_calibration_parameters: bool | None = Field(default=None, description=UPDATE_DESCRIPTION)
 
     _normalize_run = field_validator("run", mode="before")(_run_or_none)
     _normalize_input = field_validator("input", mode="before")(_input_or_none)
@@ -149,35 +136,14 @@ class TaskSettings(BaseModel):
         return _settings_entry(self.run, self.input, self.update_calibration_parameters)
 
 
-class TaskCall(BaseModel):
+# A subclass of qdash.calibration.TaskCall, the definition the SDK and flow authors write: it
+# adds no field, so both serialize and default alike; the worker's normalization of run and
+# input replaces the definition's, and unlike the definition it is frozen. Its docstring is the
+# API schema description, so it stays the public one.
+class TaskCall(TaskCallDefinition):
     """One call of a task in a step, with its own settings and identity."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
-
-    name: str = Field(
-        pattern=TASK_NAME_PATTERN,
-        description='Registered task name, e.g. "CheckRamsey".',
-    )
-    call_id: str | None = Field(
-        default=None,
-        pattern=CALL_ID_PATTERN,
-        description=(
-            "Identifier of this call, unique within its step. Defaults to the task "
-            "name; required on every occurrence of a task that appears more than once."
-        ),
-    )
-    run: dict[str, Any] | None = Field(default=None, description=_RUN_DESCRIPTION)
-    input: dict[str, Any] | None = Field(default=None, description=_INPUT_DESCRIPTION)
-    update_calibration_parameters: bool | None = Field(
-        default=None, description=_UPDATE_DESCRIPTION
-    )
-    on_failure: OnFailure | None = Field(
-        default=None,
-        description=(
-            '"stop" skips this target\'s later calls in the step when this call fails; '
-            '"continue" runs them. None inherits the step\'s continue_on_failure.'
-        ),
-    )
 
     _normalize_run = field_validator("run", mode="before")(_run_or_none)
     _normalize_input = field_validator("input", mode="before")(_input_or_none)
@@ -205,9 +171,22 @@ class TaskNameNotCallError(ValueError, TypeError):
     """
 
 
+def worker_call(call: TaskCallDefinition) -> TaskCall:
+    """The worker's validated call for a ``qdash.calibration.TaskCall``.
+
+    The fields that were set are passed as they are, so a sweep in ``run`` reaches the
+    worker's normalization as the same declaration a runtime call receives.
+    """
+    if isinstance(call, TaskCall):
+        return call
+    return TaskCall.model_validate({name: getattr(call, name) for name in call.model_fields_set})
+
+
 def _coerce_call(entry: Any, where: str) -> TaskCall:
     if isinstance(entry, TaskCall):
         return entry
+    if isinstance(entry, TaskCallDefinition):
+        return worker_call(entry)
     if isinstance(entry, str):
         raise TaskNameNotCallError(f"{where} is the task name {entry!r}; {MIGRATION_HINT}")
     if isinstance(entry, Mapping):

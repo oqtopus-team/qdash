@@ -135,7 +135,7 @@ test("a tool call that started and ended between revisions still starts and ends
     { type: "tool_draft", name: "render_chart", index: 0, id: "c1" },
     { type: "tool_start", name: "render_chart", id: "c1", args: { data: [] } },
     { type: "chart", chart },
-    { type: "tool_end", name: "render_chart", isError: false, id: "c1" },
+    { type: "tool_end", name: "render_chart", isError: false, id: "c1", entry_id: "3" },
   ]);
 });
 
@@ -202,7 +202,7 @@ test("a window that moved past the stream names the gap, and its entries stream 
       { type: "tool_draft", name: "bash", index: 0, id: "g1" },
       { type: "tool_args_delta", index: 0, path: ["command"], delta: "ls" },
       { type: "tool_start", name: "bash", id: "g1", args: { command: "ls" } },
-      { type: "tool_end", name: "bash", isError: false, id: "g1" },
+      { type: "tool_end", name: "bash", isError: false, id: "g1", entry_id: "3" },
       { type: "text_delta", delta: "Done." },
     ],
   );
@@ -396,7 +396,7 @@ test("finish streams a turn the watch had not delivered when it settled", async 
         { type: "tool_draft", name: "render_chart", index: 0, id: "c1" },
         { type: "tool_start", name: "render_chart", id: "c1", args: { data: [1] } },
         { type: "chart", chart: { data: [1], layout: {} } },
-        { type: "tool_end", name: "render_chart", isError: false, id: "c1" },
+        { type: "tool_end", name: "render_chart", isError: false, id: "c1", entry_id: "17" },
       ],
     );
     assert.equal(answerOf(out), "Here is the chart.");
@@ -467,7 +467,7 @@ test("an aborted turn drains its tool call's end", async () => {
 
     assert.deepEqual(assertOnce(out, "tool_start"), ["q1"]);
     const ends = out.filter((line) => line.type === "tool_end");
-    assert.deepEqual(ends, [{ type: "tool_end", name: "qdash_query", isError: true, id: "q1" }]);
+    assert.deepEqual(ends, [{ type: "tool_end", name: "qdash_query", isError: true, id: "q1", entry_id: "13" }]);
     assert.equal(answerOf(out), "");
   } finally {
     await harness.close(context);
@@ -498,7 +498,7 @@ test("a turn that ends in a model error drains its tool round and no failed text
     assert.deepEqual(assertOnce(out, "tool_start"), ["c1"]);
     assert.deepEqual(
       out.filter((line) => line.type === "tool_end"),
-      [{ type: "tool_end", name: "render_chart", isError: false, id: "c1" }],
+      [{ type: "tool_end", name: "render_chart", isError: false, id: "c1", entry_id: "13" }],
     );
     assert.equal(out.filter((line) => line.type === "chart").length, 1);
     assert.equal(answerOf(out), "");
@@ -678,4 +678,145 @@ test("the turn's own message reports only an answer given since the watch starte
     const events = translator.advance(view([...initial, note, userAt(4, "Q2")]));
     assert.equal(placedUser(events).answer, "");
   }
+});
+
+// --- Which turn a tool result belongs to, and a stream bounded to one turn. ---
+
+const asksFor = (id, callId, name = "qcal_evaluate") => ({
+  id,
+  kind: "pi.assistant",
+  byTaskId: 7,
+  model: [
+    {
+      role: "assistant",
+      stopReason: "toolUse",
+      content: [{ type: "toolCall", id: callId, name, arguments: {} }],
+    },
+  ],
+});
+const resultOf = (id, callId, name = "qcal_evaluate") => ({
+  id,
+  kind: "pi.tool-result",
+  model: [{ role: "toolResult", toolCallId: callId, toolName: name, isError: false, content: [] }],
+});
+const message = (id, text) => ({ id, kind: "pi.user", model: [{ role: "user", content: text }] });
+const said = (id, text) => ({
+  id,
+  kind: "pi.assistant",
+  byTaskId: 7,
+  model: [{ role: "assistant", stopReason: "stop", content: [{ type: "text", text }] }],
+});
+const fixedSource = (entries) => ({
+  watch: async () => ({ value: view(entries, {}), stop: async () => ({ kind: "ended" }) }),
+  entries: async () => ({ items: [] }),
+});
+
+test("a tool result names its durable entry, whatever ID the model gave the call", () => {
+  const translator = new ViewEventTranslator(view([user]));
+  // A local model reuses one call ID in every round: the entries still tell the calls apart.
+  const out = lines(translator, view([user, asksFor(2, "call_0"), resultOf(3, "call_0")], { run: RUN }));
+  assert.deepEqual(
+    out.filter((line) => line.type === "tool_end"),
+    [{ type: "tool_end", name: "qcal_evaluate", isError: false, id: "call_0", entry_id: "3" }],
+  );
+  const again = lines(
+    translator,
+    view([user, asksFor(2, "call_0"), resultOf(3, "call_0"), asksFor(4, "call_0"), resultOf(5, "call_0")], {
+      run: RUN,
+    }),
+  );
+  // The second round reuses the ID: it is a new call, started and ended under its own entry.
+  assert.deepEqual(
+    again.filter((line) => line.type === "tool_start" || line.type === "tool_end").map((line) => [line.type, line.id, line.entry_id]),
+    [
+      ["tool_start", "call_0", undefined],
+      ["tool_end", "call_0", "5"],
+    ],
+  );
+});
+
+test("a tool result committed before the turn's own message is marked as an earlier turn's", async () => {
+  // A run recovered from an earlier request finished a tool round (entries 2, 3) before
+  // this request's message landed as entry 5; the call after it (6, 7) is this turn's.
+  const entries = [
+    user,
+    asksFor(2, "a"),
+    resultOf(3, "a"),
+    said(4, "earlier answer"),
+    message(5, "this turn"),
+    asksFor(6, "b"),
+    resultOf(7, "b"),
+  ];
+  const out = [];
+  const stream = new ViewEventStream(
+    fixedSource(entries),
+    view([user]),
+    (event) => out.push(...toNdjsonEvents(event)),
+    BACKGROUND_CONTEXT,
+    async (entryId) => entryId < 5,
+    async (entryId) => entryId === 5,
+  );
+  await stream.push(view(entries, {}));
+  assert.deepEqual(
+    out.filter((line) => line.type === "tool_end" || line.type === "turn_start").map((line) => [line.type, line.id, line.before_turn]),
+    [
+      ["tool_end", "a", true],
+      ["turn_start", undefined, undefined],
+      ["tool_end", "b", undefined],
+    ],
+  );
+});
+
+test("a stream bounded to one turn translates nothing of the turn after it", async () => {
+  // Turn A: message 1 through answer 4. Turn B: message 5 on, with its own call, and still running.
+  const entries = [
+    message(1, "A"),
+    asksFor(2, "call_0"),
+    resultOf(3, "call_0"),
+    said(4, "answer A"),
+    message(5, "B"),
+    asksFor(6, "call_1"),
+    resultOf(7, "call_1"),
+  ];
+  const running = { run: RUN, tools: [{ callId: "call_2", name: "qcal_evaluate", status: "running" }] };
+  const out = [];
+  const stream = new ViewEventStream(
+    { ...fixedSource(entries), watch: async () => ({ value: view(entries, running), stop: async () => ({ kind: "ended" }) }) },
+    { entries: [], docs: {}, before: 1 },
+    (event) => out.push(...toNdjsonEvents(event)),
+    BACKGROUND_CONTEXT,
+    async (entryId) => entryId < 1,
+    async (entryId) => entryId === 1,
+    4,
+  );
+  await stream.push(view(entries, running));
+  await stream.finish({ stop: async () => ({ kind: "ended" }) });
+  assert.deepEqual(
+    out.filter((line) => line.type === "tool_start" || line.type === "tool_end").map((line) => [line.type, line.entry_id ?? line.id]),
+    [
+      ["tool_start", "call_0"],
+      ["tool_end", "3"],
+    ],
+  );
+  assert.equal(answerOf(out), "answer A");
+});
+
+test("a bounded stream reads the turn's entries a moved window dropped, and no later ones", async () => {
+  const entries = [message(1, "A"), asksFor(2, "x"), resultOf(3, "x"), said(4, "answer A"), message(5, "B"), said(6, "answer B")];
+  const asked = [];
+  const source = {
+    watch: async () => ({ value: view(entries.slice(4), {}, 4), stop: async () => ({ kind: "ended" }) }),
+    entries: async (query) => {
+      asked.push([query.minEntryId, query.maxEntryId]);
+      return { items: entries.filter((e) => e.id >= query.minEntryId && e.id <= query.maxEntryId) };
+    },
+  };
+  const out = [];
+  const stream = new ViewEventStream(source, { entries: [], docs: {}, before: 1 }, (event) => out.push(...toNdjsonEvents(event)), BACKGROUND_CONTEXT, undefined, undefined, 4);
+  // The window starts at B: everything of A is behind it.
+  await stream.push(view(entries.slice(4), {}, 4));
+  await stream.finish({ stop: async () => ({ kind: "ended" }) });
+  assert.deepEqual(asked, [[2, 4]]);
+  assert.equal(answerOf(out), "answer A");
+  assert.deepEqual(out.filter((line) => line.type === "tool_end").map((line) => line.entry_id), ["3"]);
 });

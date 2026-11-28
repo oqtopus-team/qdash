@@ -35,7 +35,7 @@ from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.tasks import BRINGUP_TASKS
 
 if TYPE_CHECKING:
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
     from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
 
@@ -122,7 +122,7 @@ class BringUp(CalibrationStep):
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -186,7 +186,7 @@ class BringUp(CalibrationStep):
 
     def _execute_direct(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         qids: list[str],
         plan: StepCalls | None = None,
     ) -> dict[str, Any]:

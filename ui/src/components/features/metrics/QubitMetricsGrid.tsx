@@ -1,22 +1,23 @@
 "use client";
 
-import { useMemo, useState, useRef, useCallback, useEffect, memo } from "react";
-import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import { useMemo, useState, useRef, useCallback, memo } from "react";
 
-import { GitBranch, Lock, ZoomIn } from "lucide-react";
+import { GitBranch } from "lucide-react";
 
-import {
-  GridFullscreenButton,
-  gridFullscreenPanelClass,
-} from "@/components/ui/GridFullscreenButton";
-import { LockedGridScroller } from "@/components/ui/LockedGridScroller";
+import { gridFullscreenPanelClass } from "@/components/ui/GridFullscreenButton";
 import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
-import { GridZoomControls } from "@/components/ui/GridZoomControls";
+import {
+  GridRegionBackBar,
+  GridTemplateRegionOverlay,
+  GridViewModeSwitch,
+  GridViewport,
+} from "@/components/ui/GridViewControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
+import { useGridViewState } from "@/hooks/useGridViewState";
 import { usePanClickGuard } from "@/hooks/usePanClickGuard";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import {
@@ -268,18 +269,20 @@ export function QubitMetricsGrid({
     [hasMux, muxSize, effectiveGridSize, layoutType],
   );
 
+  const isSquareGrid = gridRows === gridCols;
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
-  const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
-  const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
-  const [selectedRegion, setSelectedRegion] = useState<{
-    row: number;
-    col: number;
-  } | null>(null);
-  const [hoveredRegion, setHoveredRegion] = useState<{
-    row: number;
-    col: number;
-  } | null>(null);
+  const {
+    viewMode,
+    changeViewMode,
+    zoomMode,
+    selectedRegion,
+    zoomToRegion,
+    showFullGrid,
+    hoveredRegion,
+    setHoveredRegion,
+    regionSelectionEnabled,
+    setRegionSelectionEnabled,
+  } = useGridViewState(isSquareGrid);
 
   // LOD state with ref to avoid excessive re-renders
   const [lodLevel, setLodLevel] = useState<"high" | "medium" | "low">("high");
@@ -302,17 +305,6 @@ export function QubitMetricsGrid({
   const isModalOpen = selectedQubitInfo !== null;
 
   const numRegions = Math.floor(effectiveGridSize / regionSize);
-  const isSquareGrid = gridRows === gridCols;
-
-  // Lock works for every topology, but region zoom assumes a square grid; leave it when the
-  // grid is not square.
-  useEffect(() => {
-    if (!isSquareGrid) {
-      setZoomMode("full");
-      setSelectedRegion(null);
-      setRegionSelectionEnabled(false);
-    }
-  }, [isSquareGrid]);
 
   // Debounced LOD update to avoid excessive re-renders during zoom
   const handleTransform = useCallback((_: unknown, state: { scale: number }) => {
@@ -534,52 +526,18 @@ export function QubitMetricsGrid({
 
         {/* Region selection overlay */}
         {zoomMode === "full" && regionSelectionEnabled && isSquareGrid && viewMode === "region" && (
-          <div
-            className="absolute inset-0 pointer-events-none z-20"
-            style={{ padding: `${padding / 2}px` }}
-          >
-            <div
-              className="grid w-full h-full"
-              style={{
-                gap: `${gap}px`,
-                gridTemplateColumns: `repeat(${displayCols}, minmax(${displayCellSize}px, 1fr))`,
-                gridTemplateRows: `repeat(${displayRows}, minmax(${displayCellSize}px, 1fr))`,
-              }}
-            >
-              {Array.from({ length: numRegions * numRegions }).map((_, index) => {
-                const regionRow = Math.floor(index / numRegions);
-                const regionCol = index % numRegions;
-                const isHovered =
-                  hoveredRegion?.row === regionRow && hoveredRegion?.col === regionCol;
-
-                return (
-                  <button
-                    key={index}
-                    className={`pointer-events-auto transition-colors duration-200 rounded-lg flex items-center justify-center ${
-                      isHovered
-                        ? "bg-primary/30 border-2 border-primary z-10"
-                        : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
-                    }`}
-                    style={{
-                      gridColumn: `${regionCol * regionSize + 1} / span ${regionSize}`,
-                      gridRow: `${regionRow * regionSize + 1} / span ${regionSize}`,
-                    }}
-                    onMouseEnter={() => setHoveredRegion({ row: regionRow, col: regionCol })}
-                    onMouseLeave={() => setHoveredRegion(null)}
-                    onClick={() => {
-                      setSelectedRegion({ row: regionRow, col: regionCol });
-                      setZoomMode("region");
-                    }}
-                    title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
-                  >
-                    <span className="text-xs font-medium text-white bg-black/50 px-2 py-1 rounded">
-                      {regionRow},{regionCol}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <GridTemplateRegionOverlay
+            numRegions={numRegions}
+            regionSize={regionSize}
+            hoveredRegion={hoveredRegion}
+            onHoverChange={setHoveredRegion}
+            onSelect={zoomToRegion}
+            padding={padding}
+            gap={gap}
+            cols={displayCols}
+            rows={displayRows}
+            cellSize={displayCellSize}
+          />
         )}
       </div>
     ),
@@ -608,6 +566,8 @@ export function QubitMetricsGrid({
       numRegions,
       regionSize,
       hoveredRegion,
+      setHoveredRegion,
+      zoomToRegion,
     ],
   );
 
@@ -621,33 +581,7 @@ export function QubitMetricsGrid({
     >
       {/* View Mode Toggle */}
       <div className="flex items-center gap-4">
-        <div className="tabs tabs-boxed bg-base-200 w-fit">
-          <button
-            type="button"
-            className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
-            onClick={() => setViewMode("region")}
-            title="Lock"
-            aria-label="Lock"
-          >
-            <Lock className="h-4 w-4" />
-            <span className="hidden sm:inline">Lock</span>
-          </button>
-          <button
-            type="button"
-            className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
-            onClick={() => {
-              setViewMode("pan-zoom");
-              setZoomMode("full");
-              setSelectedRegion(null);
-              setRegionSelectionEnabled(false);
-            }}
-            title="Zoom"
-            aria-label="Zoom"
-          >
-            <ZoomIn className="h-4 w-4" />
-            <span className="hidden sm:inline">Zoom</span>
-          </button>
-        </div>
+        <GridViewModeSwitch value={viewMode} onValueChange={changeViewMode} />
 
         <div
           className={
@@ -662,70 +596,35 @@ export function QubitMetricsGrid({
 
       {/* Back button */}
       {zoomMode === "region" && selectedRegion && (
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => {
-              setZoomMode("full");
-              setSelectedRegion(null);
-            }}
-            className="btn btn-sm btn-ghost"
-          >
-            ← Back to Full View
-          </button>
-          <span className="text-sm text-base-content/70">
-            Region {selectedRegion.row + 1},{selectedRegion.col + 1} (Qubits{" "}
-            {displayGridStart.row * gridSize + displayGridStart.col} -{" "}
-            {(displayGridStart.row + regionSize - 1) * gridSize +
-              displayGridStart.col +
-              regionSize -
-              1}
-            )
-          </span>
-        </div>
+        <GridRegionBackBar
+          region={selectedRegion}
+          onBack={showFullGrid}
+          detail={
+            <>
+              {" "}
+              (Qubits {displayGridStart.row * gridSize + displayGridStart.col} -{" "}
+              {(displayGridStart.row + regionSize - 1) * gridSize +
+                displayGridStart.col +
+                regionSize -
+                1}
+              )
+            </>
+          }
+        />
       )}
 
       {/* Grid display */}
-      <div
-        className={`flex-1 relative flex justify-center ${
-          viewMode === "pan-zoom"
-            ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
-            : "items-start overflow-hidden bg-base-200/60 rounded-lg"
-        }`}
-        style={{ padding: `${Math.max(4, padding / 4)}px` }}
-        ref={containerRef}
+      <GridViewport
+        viewMode={viewMode}
+        padding={padding}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+        onTransform={handleTransform}
+        panClickGuard={panClickGuard}
+        viewportRef={containerRef}
       >
-        <GridFullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
-        {viewMode === "pan-zoom" ? (
-          <TransformWrapper
-            initialScale={1}
-            minScale={0.3}
-            maxScale={4}
-            wheel={{ step: 0.08 }}
-            pinch={{ step: 5 }}
-            doubleClick={{ mode: "zoomIn", step: 0.7 }}
-            panning={{ velocityDisabled: true }}
-            smooth={false}
-            limitToBounds={false}
-            centerOnInit={true}
-            onTransform={handleTransform}
-          >
-            <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
-            <TransformComponent
-              contentProps={panClickGuard}
-              wrapperStyle={{ width: "100%", height: "100%" }}
-              contentStyle={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              {gridContent}
-            </TransformComponent>
-          </TransformWrapper>
-        ) : (
-          <LockedGridScroller>{gridContent}</LockedGridScroller>
-        )}
-      </div>
+        {gridContent}
+      </GridViewport>
 
       {/* Qubit Detail Modal */}
       <Dialog open={isModalOpen} onOpenChange={(open) => !open && setSelectedQubitInfo(null)}>

@@ -8,86 +8,39 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![slack](https://img.shields.io/badge/slack-OQTOPUS-pink.svg?logo=slack&style=plastic)](https://join.slack.com/t/oqtopus/shared_invite/zt-3bpjb7yc3-Vg8IYSMY1m5wV3DR~TMSnw)
 
-`@oqtopus-team/pi-qdash` is a [pi](https://github.com/badlogic/pi-mono) extension for querying [QDash](https://github.com/oqtopus-team/qdash), the large-scale QPU calibration platform in the OQTOPUS ecosystem.
-
-It uses [`@oqtopus-team/qdash-client`](https://www.npmjs.com/package/@oqtopus-team/qdash-client), and [`@oqtopus-team/qdash-sdk`](https://www.npmjs.com/package/@oqtopus-team/qdash-sdk) for the pipeline and flow-run tools, and reuses existing `QDASH_*` environment variables or profiles from `~/.config/qdash/config.ini` / `$XDG_CONFIG_HOME/qdash/config.ini`.
-
-## Features
-
-- **Read-only investigation**: dedicated tools to inspect chips, qubits, couplings, calibration task results, task knowledge (`qdash_get_task_knowledge`), executions, and Forum posts. Secrets are redacted from tool output.
-- **Dashboards and insights**: compact dashboards, triage overviews, target-level incident reports, degradation reports, and wiring insights.
-- **Agent calibration workflow**: create agent sessions, submit and track agent actions, and commit/apply calibration candidates. Write operations are approval-gated.
-- **Calibration pipelines**: compose a declarative pipeline spec from QDash's step catalog (`qdash_get_pipeline_catalog`), validate it (`qdash_plan_pipeline`), and run it as one execution (`qdash_run_pipeline`, approval-gated).
-- **Figures**: fetch calibration PNG/JSON figures and render them in the interactive TUI.
-- **Metric scripts and dashboards**: write `qdash_metrics` scripts that compute per-qubit or per-coupling values, validate and preview them on a chip (`qdash_validate_metric_script`, `qdash_preview_metric_script`), and save scripts and dashboards after approval, guided by the `qdash-metric-scripts` skill.
-- **Scripts and tool loading**: with pi's `codemode` and `tool_search`, scripts batch read-only QDash calls and receive JSON data, and narrower tools load on demand. Scripts cannot reach write, figure, or shell tools. pi-qdash activates both for a new user and keeps a selection you make across reloads, new sessions, and forks. Set `PI_QDASH_CODEMODE=off`, or add `-codemode` to pi's `defaultTools` setting, to leave `codemode` inactive.
-- **Calibration evaluation**: with [pi-qcaleval](https://www.npmjs.com/package/@oqtopus-team/pi-qcaleval) installed, `qcal_evaluate` calls get the requested task's figure, QDash task knowledge, and (on request) labeled examples.
-- **Generic timeseries comparison**: inspect and align arbitrary QDash parameters/targets with explicitly mapped local CSV sensor columns, reuse schema-validated investigation presets, and report correlations plus optional shared-period/phase evidence without hard-coded metrics or schemas.
-- **Forum integration**: read Forum posts, publish task-result evidence, and upload locally generated analysis images to replies.
+`@oqtopus-team/pi-qdash`: Query calibration data and run approved operations from pi CLI or QDash Agent.
 
 ## Installation
 
-Install pi first if needed:
-
 ```bash
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent
-```
-
-Install the extension:
-
-```bash
 pi install npm:@oqtopus-team/pi-qdash
 ```
 
-Or try it without installing:
+Requires Node.js 20 or later. Append `@beta` to the extension package for a prerelease.
 
-```bash
-pi -e npm:@oqtopus-team/pi-qdash
-```
+## Quick Start
 
-The package declares Node.js 20 or later and is tested with Node.js 24 and pi 1.6.0.
-Published releases pin the matching `@oqtopus-team/qdash-client` and `@oqtopus-team/qdash-sdk` versions.
-Use the `beta` dist-tag to try changes merged into QDash's `develop` branch:
-
-```bash
-pi install npm:@oqtopus-team/pi-qdash@beta
-```
-
-## Quick start
-
-In interactive pi, set up the session context first:
+Reuse your Python or TypeScript SDK’s `config.toml`, or [create a profile with the SDK](https://oqtopus-team.github.io/qdash/reference/clients/typescript#connect-to-a-deployment).
+In pi, select your profile and chip:
 
 ```text
 /qdash-setup <profile> <chip_id>
 /qdash-dashboard
 ```
 
-See the [pi-qdash reference](https://oqtopus-team.github.io/qdash/reference/pi-qdash)
-for the full tool and command list.
+Writes require approval. An approved `auto` session permits only the operations in its grant.
+Read-only tools can inspect results, figures, history, and Forum discussions.
 
-## Documentation and development
+See the [tool reference](https://oqtopus-team.github.io/qdash/reference/pi-qdash) for inputs,
+outputs, commands, and configuration.
 
-The [tool, command, and skill reference](https://oqtopus-team.github.io/qdash/reference/pi-qdash)
-describes the extension's capabilities. The
-[pi extension design guide](https://oqtopus-team.github.io/qdash/developer-guide/copilot/extensions)
-explains where to add tools, safety gates, and domain reasoning.
+## Development
 
-Development takes place in the [QDash monorepo](https://github.com/oqtopus-team/qdash/tree/develop/packages/pi-qdash).
-Follow the [package development and release guide](https://oqtopus-team.github.io/qdash/developer-guide/copilot/packages)
-for workspace setup, checks, local pi CLI testing, and npm releases, which share QDash's version.
-Open pull requests against QDash's `develop` branch and report bugs in
-[QDash issues](https://github.com/oqtopus-team/qdash/issues).
+Develop in the QDash monorepo. Follow the
+[package guide](https://oqtopus-team.github.io/qdash/developer-guide/agent/packages) for setup,
+checks, and releases, and the
+[extension guide](https://oqtopus-team.github.io/qdash/developer-guide/agent/extensions) for code boundaries.
 
-## Citation
-
-Citation information is available in the [CITATION](https://github.com/oqtopus-team/qdash/blob/develop/packages/pi-qdash/CITATION.cff) file.
-
-## Contact
-
-Open a [QDash issue](https://github.com/oqtopus-team/qdash/issues) or email us:
-
-- [oqtopus-team[at]googlegroups.com](mailto:oqtopus-team@googlegroups.com)
-
-## License
-
-pi-qdash is released under the [Apache License 2.0](./LICENSE).
+Report bugs in [QDash issues](https://github.com/oqtopus-team/qdash/issues).
+Licensed under [Apache 2.0](./LICENSE).

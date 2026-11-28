@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { useChatDock } from "@/contexts/ChatDockContext";
 import { useProject } from "@/contexts/ProjectContext";
-import type { TaskChatContext } from "@/types/copilotChat";
+import type { TaskChatContext } from "@/types/agentChat";
 
 import { EvaluationRequestModal } from "./EvaluationRequestModal";
 
@@ -28,7 +28,7 @@ interface AskAiButtonProps {
 /**
  * The one "Ask Agent" entry for a single task result, everywhere a result is
  * shown: the same request modal as the chip page's Evaluate, with the choice
- * of a recorded evaluation (model only or via Copilot) or a chat about the
+ * of a recorded evaluation (model only or via Agent) or a chat about the
  * result. A viewer who cannot request evaluations goes straight to the chat.
  */
 export function AskAiButton({

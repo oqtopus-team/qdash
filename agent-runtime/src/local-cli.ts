@@ -7,14 +7,20 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "@earendil-works/pi-coding-agent";
 import { parse } from "yaml";
 
-import { readCopilotModelYaml, resolveCopilotModelFiles } from "./copilot-profile.ts";
+import {
+  AGENT_PROFILE_ENV,
+  LEGACY_AGENT_PROFILE_ENV,
+  readAgentModelYaml,
+  resolveAgentConfigPaths,
+  resolveAgentModelFiles,
+} from "./agent-profile.ts";
 import { buildModelsConfig, CF_ACCESS_ENV, PROVIDER_ALIASES, type ModelsConfig } from "./models-config.ts";
 
 /**
- * Run the pi CLI from a QDash checkout with the Copilot chat models.
+ * Run the pi CLI from a QDash checkout with the Agent chat models.
  *
- * The models come from config/copilot/chat.yaml and evaluation.yaml (or the
- * profile `QDASH_COPILOT_PROFILE` selects), translated by the same
+ * The models come from config/agent/chat.yaml and evaluation.yaml (or the
+ * profile `QDASH_AGENT_PROFILE` selects), translated by the same
  * buildModelsConfig the agent runtime uses. Endpoint and key variables are read
  * from the checkout's `.env` without evaluating it as shell code. models.json
  * stores `$NAME` references only, so no secret is written to disk, and it goes
@@ -26,7 +32,7 @@ import { buildModelsConfig, CF_ACCESS_ENV, PROVIDER_ALIASES, type ModelsConfig }
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
-/** QDash reasoning_effort onto Pi thinking levels, as the API maps it for Copilot chats. */
+/** QDash reasoning_effort onto Pi thinking levels, as the API maps it for Agent chats. */
 export const THINKING_LEVELS: Record<string, string> = {
   none: "off",
   minimal: "minimal",
@@ -36,7 +42,7 @@ export const THINKING_LEVELS: Record<string, string> = {
 };
 
 /** Variables taken from `.env` besides the ones a model names. */
-const SELECTION_ENV = ["QDASH_COPILOT_PROFILE", "CHAT_CONFIG_PATH", "EVALUATION_CONFIG_PATH"];
+const SELECTION_ENV = [AGENT_PROFILE_ENV, LEGACY_AGENT_PROFILE_ENV, "CHAT_CONFIG_PATH", "EVALUATION_CONFIG_PATH"];
 
 const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -294,6 +300,13 @@ export interface LocalCliPlan {
   waitForStdin: boolean;
 }
 
+/** Expand a leading `~` or `~/...` against the user's home directory, matching pi's `--agent-dir`. */
+export function expandTilde(path: string): string {
+  if (path === "~") return homedir();
+  if (path.startsWith("~/") || path.startsWith("~\\")) return join(homedir(), path.slice(2));
+  return path;
+}
+
 /**
  * Prepare a pi run: write models.json into `agentDir` and build the arguments.
  *
@@ -321,8 +334,8 @@ export function prepareLocalCli(
         parseArgs([...piArgs, argv[i]]).unknownFlags.has(argv[i].slice(2))) {
       const value = argv[i + 1];
       if (!value) throw new Error(`${argv[i]} needs a path`);
-      if (argv[i] === "--env-file") envFile = resolve(value);
-      else agentDir = resolve(value);
+      if (argv[i] === "--env-file") envFile = resolve(expandTilde(value));
+      else agentDir = resolve(expandTilde(value));
       i += 1;
     } else {
       piArgs.push(argv[i]);
@@ -345,9 +358,12 @@ export function prepareLocalCli(
   }
 
   const selection = overlayEnv(baseEnv, fileValues, SELECTION_ENV);
-  const copilotConfigPath = baseEnv.COPILOT_CONFIG_PATH ?? join(repoRoot, "config/copilot/config.yaml");
-  const files = resolveCopilotModelFiles(selection.env, copilotConfigPath);
-  const yaml = readCopilotModelYaml(files);
+  // AGENT_CONFIG_PATH (or the legacy COPILOT_CONFIG_PATH) comes from the shell only.
+  const { configPath: agentConfigPath } = resolveAgentConfigPaths(baseEnv, join(repoRoot, "config"), (message) =>
+    console.warn(`[pi-local] ${message}`),
+  );
+  const files = resolveAgentModelFiles(selection.env, agentConfigPath);
+  const yaml = readAgentModelYaml(files);
   const { env, loaded } = overlayEnv(
     selection.env,
     fileValues,

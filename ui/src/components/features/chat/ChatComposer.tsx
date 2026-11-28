@@ -6,7 +6,9 @@ import React, {
   forwardRef,
   useCallback,
   useEffect,
+  useId,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -42,10 +44,12 @@ import {
   type ChatThinkingChoice,
   type ChatThinkingLevel,
 } from "@/lib/chatThinking";
-import type { ModelOption } from "@/lib/copilotModels";
+import { matchSkills, skillInvocation, skillQuery, type ChatSkill } from "@/lib/chatSkills";
+import type { ModelOption } from "@/lib/agentModels";
 import type { ChatModelListStatus } from "@/hooks/useChatModelSelection";
 
 const MAX_HEIGHT_PX = 240;
+const NO_SKILLS: readonly ChatSkill[] = [];
 
 /** The thinking menu's button text: the choice, with what Auto resolves to. */
 export function thinkingLabel(
@@ -95,6 +99,11 @@ interface ChatComposerProps {
    * current step (`onSubmit` is called as usual). Figures cannot go with it.
    */
   steerable?: boolean;
+  /**
+   * Skills the runtime has loaded. Typing `/` at the start of a message offers
+   * them; picking one inserts `/skill:<name> ` for the user to add arguments.
+   */
+  skills?: readonly ChatSkill[];
 }
 
 export interface ChatComposerHandle {
@@ -125,6 +134,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     onRemoveAttachment,
     compact = false,
     steerable = false,
+    skills = NO_SKILLS,
   },
   ref,
 ) {
@@ -166,15 +176,65 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   const canSteer = isStreaming && steerable && hasText && !disabled && !(attachments?.length ?? 0);
   const canSend = (hasText && !isStreaming && !disabled && !isStaging) || canSteer;
 
+  // The skill menu: open while a leading `/command` is typed into a focused, idle composer.
+  // A steer is read as plain text, so the menu stays closed while an answer streams.
+  const skillListId = useId();
+  const [focused, setFocused] = useState(false);
+  // Escape closes the menu for the text it was pressed on; typing reopens it.
+  const [dismissedValue, setDismissedValue] = useState<string | null>(null);
+  const [active, setActive] = useState({ query: "", index: 0 });
+  const query = skills.length && !isStreaming && !disabled ? skillQuery(value) : null;
+  const skillMatches = useMemo(
+    () => (query === null ? [] : matchSkills(skills, query)),
+    [query, skills],
+  );
+  const skillMenuOpen = focused && skillMatches.length > 0 && dismissedValue !== value;
+  // A new query starts at the top match.
+  const activeIndex = active.query === query ? Math.min(active.index, skillMatches.length - 1) : 0;
+  const activeOptionId = `${skillListId}-option-${activeIndex}`;
+
+  useEffect(() => {
+    if (!skillMenuOpen) return;
+    document.getElementById(activeOptionId)?.scrollIntoView?.({ block: "nearest" });
+  }, [activeOptionId, skillMenuOpen]);
+
+  const selectSkill = useCallback(
+    (skill: ChatSkill) => {
+      // Inserted, not sent: the user adds arguments and sends as usual.
+      onChange(skillInvocation(skill.name));
+      textareaRef.current?.focus();
+    },
+    [onChange],
+  );
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.nativeEvent.isComposing) return;
+      if (skillMenuOpen) {
+        const count = skillMatches.length;
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          const step = e.key === "ArrowDown" ? 1 : -1;
+          setActive({ query: query ?? "", index: (activeIndex + step + count) % count });
+          return;
+        }
+        if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
+          e.preventDefault();
+          selectSkill(skillMatches[activeIndex]);
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setDismissedValue(value);
+          return;
+        }
+      }
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         if (canSend) onSubmit();
       }
     },
-    [canSend, onSubmit],
+    [activeIndex, canSend, onSubmit, query, selectSkill, skillMatches, skillMenuOpen, value],
   );
 
   // Screenshots pasted from the clipboard arrive as files; text pastes as usual.
@@ -222,6 +282,12 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   );
 
   const selected = modelOptions.find((o) => o.key === selectedModelKey) ?? modelOptions[0];
+  const selectedIdentity = selected?.resolvedModel ?? selected?.model;
+  const alwaysThinking = selectedIdentity?.name === "claude-opus-5-5";
+  const displayedThinking = alwaysThinking && thinkingChoice === "off" ? "low" : thinkingChoice;
+  const thinkingChoices = alwaysThinking
+    ? THINKING_CHOICES.filter((choice) => choice.value !== "off")
+    : THINKING_CHOICES;
 
   return (
     <form
@@ -272,20 +338,69 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
           ))}
         </div>
       )}
-      <textarea
-        ref={textareaRef}
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onPaste={handlePaste}
-        placeholder={
-          isStreaming && steerable ? "Add a note; it is read after the current step" : placeholder
-        }
-        rows={1}
-        aria-label="Message"
-        className="w-full max-h-[40dvh] resize-none bg-transparent border-none outline-none focus:ring-0 leading-6 px-1 pt-1 text-base sm:text-sm placeholder:text-base-content/35"
-      />
+      <div className="relative">
+        {skillMenuOpen && (
+          <ul
+            id={skillListId}
+            role="listbox"
+            aria-label="Skills"
+            className="menu menu-sm absolute bottom-full left-0 right-0 z-50 mb-2 max-h-64 flex-nowrap overflow-y-auto rounded-box border border-base-300 bg-base-100 shadow-lg"
+          >
+            {skillMatches.map((skill, i) => (
+              <li
+                key={skill.name}
+                id={`${skillListId}-option-${i}`}
+                role="option"
+                aria-selected={i === activeIndex}
+              >
+                <div
+                  className={`flex flex-col items-start gap-0.5 ${i === activeIndex ? "menu-focus" : ""}`}
+                  onMouseDown={(e) => {
+                    // Keep focus in the message field.
+                    e.preventDefault();
+                    selectSkill(skill);
+                  }}
+                  onMouseMove={() => {
+                    if (i !== activeIndex) setActive({ query: query ?? "", index: i });
+                  }}
+                >
+                  <span className="font-mono text-xs">/skill:{skill.name}</span>
+                  {skill.description && (
+                    <span className="line-clamp-2 text-xs text-base-content/60">
+                      {skill.description}
+                    </span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        <textarea
+          ref={textareaRef}
+          value={value}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          placeholder={
+            isStreaming && steerable ? "Add a note; it is read after the current step" : placeholder
+          }
+          rows={1}
+          aria-label="Message"
+          {...(skills.length
+            ? {
+                role: "combobox",
+                "aria-autocomplete": "list" as const,
+                "aria-expanded": skillMenuOpen,
+                "aria-controls": skillMenuOpen ? skillListId : undefined,
+                "aria-activedescendant": skillMenuOpen ? activeOptionId : undefined,
+              }
+            : {})}
+          className="w-full max-h-[40dvh] resize-none bg-transparent border-none outline-none focus:ring-0 leading-6 px-1 pt-1 text-base sm:text-sm placeholder:text-base-content/35"
+        />
+      </div>
       <div className="flex items-center gap-2 pt-1">
         {/* The selectors share the room left of the send controls and truncate there,
             so a narrow composer never pushes them past its edge. */}
@@ -347,16 +462,27 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                   <Brain data-icon="inline-start" className="shrink-0" />
                   {compact ? (
                     <span className="truncate">
-                      {thinkingLabel(thinkingChoice, thinkingModelDefault ?? null, true)}
+                      {thinkingLabel(
+                        displayedThinking ?? thinkingChoice,
+                        thinkingModelDefault ?? null,
+                        true,
+                      )}
                     </span>
                   ) : (
                     <>
                       {/* The full label needs a wide composer; a phone gets the short one. */}
                       <span className="truncate @md:hidden">
-                        {thinkingLabel(thinkingChoice, thinkingModelDefault ?? null, true)}
+                        {thinkingLabel(
+                          displayedThinking ?? thinkingChoice,
+                          thinkingModelDefault ?? null,
+                          true,
+                        )}
                       </span>
                       <span className="hidden truncate @md:inline">
-                        {thinkingLabel(thinkingChoice, thinkingModelDefault ?? null)}
+                        {thinkingLabel(
+                          displayedThinking ?? thinkingChoice,
+                          thinkingModelDefault ?? null,
+                        )}
                       </span>
                     </>
                   )}
@@ -364,7 +490,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" side="top">
-                {THINKING_CHOICES.map((choice) => (
+                {thinkingChoices.map((choice) => (
                   <DropdownMenuItem
                     key={choice.value}
                     onSelect={() => onThinkingChange(choice.value)}
@@ -376,10 +502,12 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                           : choice.label}
                       </span>
                       <span className="block text-xs text-base-content/50">
-                        {choice.description}
+                        {alwaysThinking && choice.value === "low"
+                          ? "Brief reasoning; this model always thinks"
+                          : choice.description}
                       </span>
                     </span>
-                    {choice.value === thinkingChoice && (
+                    {choice.value === displayedThinking && (
                       <Check className="w-3.5 h-3.5 text-primary" />
                     )}
                   </DropdownMenuItem>
@@ -391,7 +519,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
             <Tooltip>
               <TooltipTrigger asChild>
                 <Link
-                  href="/settings?tab=copilot"
+                  href="/settings?tab=agent"
                   className="btn btn-ghost btn-sm shrink-0 gap-1 font-normal text-base-content/60"
                   aria-label="Your instructions apply"
                 >
@@ -453,6 +581,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
 function fixedModelReason(status: ChatModelListStatus, optionCount: number): string | null {
   if (status === "loading") return "Loading the configured chat models";
   if (status === "error") return "Could not load the chat models; the configured default answers";
+  if (status === "none") return "No chat model has its API key set";
   if (optionCount < 2) return "Only one chat model is configured";
   return null;
 }

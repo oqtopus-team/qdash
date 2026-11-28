@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -15,6 +15,8 @@ from pydantic import ValidationError
 
 from qdash.api.schemas.agent_session import (
     AgentCandidateReference,
+    AgentCandidateResponse,
+    AgentCandidateSetCommitResponse,
     ApplyAgentCandidateRequest,
     CommitAgentCandidateRequest,
     CommitAgentCandidateSetRequest,
@@ -28,15 +30,30 @@ from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.datamodel.agent_session import (
     AgentActionDecision,
     AgentActionType,
+    AgentModelIdentity,
     AgentSessionPolicy,
     NumericBounds,
 )
+from qdash.datamodel.calibration_session import (
+    CalibrationPipelineRunStatus,
+    CalibrationRunIdentity,
+    CalibrationRunKind,
+)
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.dbmodel.agent_session import AgentActionDocument
+from qdash.dbmodel.agent_session import (
+    AgentActionDocument,
+    AgentCandidateSetCommitDocument,
+    AgentSessionDocument,
+)
+from qdash.dbmodel.calibration_session import (
+    CalibrationPipelineRunDocument,
+    CalibrationSessionDocument,
+)
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+from tests.qdash.api._legacy_records import make_standalone_agent_session
 
 
 @pytest.fixture
@@ -65,30 +82,47 @@ def _create_session(
     *,
     max_actions: int = 10,
     quality_gates: dict[str, NumericBounds] | None = None,
+    task_quality_gates: dict[str, dict[str, NumericBounds]] | None = None,
+    allowed_tasks: list[str] | None = None,
     allowed_overrides: dict[str, NumericBounds] | None = None,
 ):
-    return service.create_session(
+    """Create a session; ``quality_gates`` stores legacy session-wide gates on the record.
+
+    New sessions cannot request session-wide gates, so a test of their legacy meaning writes
+    them to the stored policy the way a session approved before task gates holds them.
+    """
+    session = service.create_session(
         project_id="project-1",
         username="tester",
         body=CreateAgentSessionRequest(
             chip_id="chip-001",
             policy=AgentSessionPolicy(
                 qids=["Q00", "Q01"],
-                allowed_tasks=["CheckQubitSpectroscopy"],
+                allowed_tasks=allowed_tasks or ["CheckQubitSpectroscopy"],
                 allowed_overrides=allowed_overrides
                 or {
                     "drive_amplitude": NumericBounds(minimum=0.01, maximum=0.2),
                     "qubit_frequency": NumericBounds(minimum=3.0, maximum=6.0),
                 },
-                quality_gates=quality_gates or {},
+                task_quality_gates=task_quality_gates or {},
                 max_actions=max_actions,
             ),
             skill_name="single-qubit-bringup",
             skill_version="1",
             skill_hash="sha256:test",
-            model_name="local-model",
+            model=AgentModelIdentity(provider="local", model_id="local-model"),
         ),
     )
+    if quality_gates:
+        _store_legacy_quality_gates(session.session_id, quality_gates)
+    return service.get_session(project_id="project-1", session_id=session.session_id)
+
+
+def _store_legacy_quality_gates(session_id: str, gates: dict[str, NumericBounds]) -> None:
+    doc = AgentSessionDocument.find_one({"session_id": session_id}).run()
+    assert doc is not None
+    doc.policy = doc.policy.model_copy(update={"quality_gates": gates})
+    doc.save()
 
 
 def _run_task_action(
@@ -319,6 +353,7 @@ def _attach_completed_task_result(
     output_parameters: dict[str, object],
     quality_metrics: dict[str, float] | None = None,
     sequence: int = 1,
+    task_name: str = "CheckQubitSpectroscopy",
 ) -> None:
     action = AgentActionDocument.find_one({"session_id": session_id, "action_id": action_id}).run()
     assert action is not None
@@ -331,7 +366,7 @@ def _attach_completed_task_result(
         project_id="project-1",
         username="tester",
         task_id=f"task-result-{sequence}",
-        name="CheckQubitSpectroscopy",
+        name=task_name,
         upstream_id="",
         status="completed",
         message="completed",
@@ -445,6 +480,201 @@ def test_list_action_candidates_applies_session_quality_gates(
     assert candidate.accepted is accepted
     assert reason in candidate.reason
     assert candidate.quality_metrics == quality_metrics
+
+
+def _run_without_overrides(task_name: str, key: str, version: int) -> SubmitAgentActionRequest:
+    return SubmitAgentActionRequest(
+        idempotency_key=key,
+        expected_state_version=version,
+        action_type=AgentActionType.RUN_TASK,
+        task_name=task_name,
+        qids=["Q00"],
+    )
+
+
+RABI_AND_RB = ["CheckRabi", "RandomizedBenchmarking"]
+RABI_AND_RB_BOUNDS = {
+    "maximum_rabi_frequency": NumericBounds(minimum=2000.0, maximum=3000.0),
+    "average_gate_fidelity": NumericBounds(minimum=0.9, maximum=1.0),
+}
+
+
+def _measure_rabi_and_rb(
+    service: AgentSessionService,
+    session_id: str,
+    *,
+    rabi_metrics: dict[str, float],
+    rb_metrics: dict[str, float],
+) -> tuple[AgentCandidateResponse, AgentCandidateResponse]:
+    rabi = service.submit_action(
+        project_id="project-1",
+        session_id=session_id,
+        body=_run_without_overrides("CheckRabi", "rabi", 0),
+    )
+    _attach_completed_task_result(
+        session_id=session_id,
+        action_id=rabi.action_id,
+        output_parameters={"maximum_rabi_frequency": {"value": 2681.29}},
+        quality_metrics=rabi_metrics,
+        task_name="CheckRabi",
+    )
+    rb = service.submit_action(
+        project_id="project-1",
+        session_id=session_id,
+        body=_run_without_overrides("RandomizedBenchmarking", "rb", 1),
+    )
+    _attach_completed_task_result(
+        session_id=session_id,
+        action_id=rb.action_id,
+        output_parameters={"average_gate_fidelity": {"value": 0.995}},
+        quality_metrics=rb_metrics,
+        sequence=2,
+        task_name="RandomizedBenchmarking",
+    )
+
+    def only(action_id: str) -> AgentCandidateResponse:
+        items = service.list_action_candidates(
+            project_id="project-1", session_id=session_id, action_id=action_id
+        ).items
+        assert len(items) == 1
+        return items[0]
+
+    return only(rabi.action_id), only(rb.action_id)
+
+
+def test_task_quality_gate_checks_only_its_own_task(service: AgentSessionService) -> None:
+    """A gate of RandomizedBenchmarking neither rejects nor annotates a CheckRabi result."""
+    session = _create_session(
+        service,
+        allowed_tasks=RABI_AND_RB,
+        allowed_overrides=RABI_AND_RB_BOUNDS,
+        task_quality_gates={"RandomizedBenchmarking": {"r2": NumericBounds(minimum=0.9)}},
+    )
+    rabi, rb = _measure_rabi_and_rb(
+        service, session.session_id, rabi_metrics={"r2": 0.99723}, rb_metrics={"r2": 0.95}
+    )
+
+    assert rabi.accepted, rabi.reason
+    assert rabi.applied_quality_gates == []
+    assert rabi.reason == "candidate passed deterministic bounds gate"
+    assert rb.accepted, rb.reason
+    assert [
+        (g.metric_name, g.scope.value, g.task_name, g.minimum) for g in rb.applied_quality_gates
+    ] == [("r2", "task", "RandomizedBenchmarking", 0.9)]
+    assert rb.reason == "candidate passed deterministic bounds and quality gates"
+
+
+def test_missing_metric_of_an_applicable_task_gate_still_rejects(
+    service: AgentSessionService,
+) -> None:
+    """A task gate fails closed when its own task's result lacks the metric."""
+    session = _create_session(
+        service,
+        allowed_tasks=RABI_AND_RB,
+        allowed_overrides=RABI_AND_RB_BOUNDS,
+        task_quality_gates={
+            "CheckRabi": {"r2": NumericBounds(minimum=0.98)},
+            "RandomizedBenchmarking": {"r2": NumericBounds(minimum=0.9)},
+        },
+    )
+    rabi, rb = _measure_rabi_and_rb(
+        service, session.session_id, rabi_metrics={"r2": 0.97}, rb_metrics={}
+    )
+
+    assert not rabi.accepted
+    assert rabi.reason == (
+        "Quality metric 'r2' for task 'CheckRabi' candidate is below the minimum bound"
+    )
+    assert not rb.accepted
+    assert rb.reason == (
+        "Required quality metric 'r2' for task 'RandomizedBenchmarking' is missing"
+    )
+
+
+def test_legacy_session_wide_gate_keeps_its_approved_meaning(
+    service: AgentSessionService,
+) -> None:
+    """A stored session-wide gate is neither loosened nor narrowed to one task."""
+    session = _create_session(
+        service,
+        allowed_tasks=RABI_AND_RB,
+        allowed_overrides=RABI_AND_RB_BOUNDS,
+        quality_gates={"average_gate_fidelity": NumericBounds(minimum=0.99)},
+    )
+    assert session.policy.quality_gates == {"average_gate_fidelity": NumericBounds(minimum=0.99)}
+    assert session.policy.task_quality_gates == {}
+    rabi, rb = _measure_rabi_and_rb(
+        service, session.session_id, rabi_metrics={"r2": 0.99723}, rb_metrics={"r2": 0.95}
+    )
+
+    for candidate in (rabi, rb):
+        assert not candidate.accepted
+        assert candidate.reason == (
+            "Required quality metric 'average_gate_fidelity' by the session-wide gate is missing"
+        )
+        assert [(g.scope.value, g.task_name) for g in candidate.applied_quality_gates] == [
+            ("all_tasks", None)
+        ]
+
+
+def _create_request(policy: dict[str, object]) -> CreateAgentSessionRequest:
+    return CreateAgentSessionRequest.model_validate(
+        {
+            "chip_id": "chip-001",
+            "policy": {
+                "qids": ["Q00"],
+                "allowed_tasks": RABI_AND_RB,
+                "allowed_overrides": {"maximum_rabi_frequency": {"minimum": 2000, "maximum": 3000}},
+                **policy,
+            },
+        }
+    )
+
+
+def test_new_session_rejects_a_session_wide_quality_gate() -> None:
+    """Creation refuses a gate that would check every task, before anything is stored."""
+    with pytest.raises(ValidationError) as caught:
+        _create_request({"quality_gates": {"average_gate_fidelity": {"minimum": 0.99}}})
+
+    message = str(caught.value)
+    assert "would check results of every task" in message
+    assert "task_quality_gates" in message
+
+
+@pytest.mark.parametrize(
+    ("gates", "expected"),
+    [
+        (
+            {"CheckRabi": {"average_gate_fidelity": {"minimum": 0.99}}},
+            "does not record as a quality metric (recorded: r2)",
+        ),
+        (
+            {"CheckT1": {"r2": {"minimum": 0.9}}},
+            "task_quality_gates tasks must be allowed tasks: CheckT1",
+        ),
+        ({"CheckRabi": {}}, "needs at least one metric for: CheckRabi"),
+    ],
+)
+def test_new_session_rejects_impossible_task_quality_gates(
+    gates: dict[str, object], expected: str
+) -> None:
+    """A gate on an output parameter, an unscoped task, or no metric is refused up front."""
+    with pytest.raises(ValidationError) as caught:
+        _create_request({"task_quality_gates": gates})
+
+    assert expected in str(caught.value)
+
+
+def test_new_session_stores_task_quality_gates(service: AgentSessionService) -> None:
+    """A valid task-scoped gate is stored as approved and read back unchanged."""
+    session = service.create_session(
+        project_id="project-1",
+        username="tester",
+        body=_create_request({"task_quality_gates": {"CheckRabi": {"r2": {"minimum": 0.9}}}}),
+    )
+
+    assert session.policy.task_quality_gates == {"CheckRabi": {"r2": NumericBounds(minimum=0.9)}}
+    assert session.policy.quality_gates == {}
 
 
 def test_commit_action_candidate_revalidates_and_audits_parameter_write(
@@ -655,6 +885,226 @@ def test_commit_candidate_set_rejects_set_before_any_write(
     assert qubit is not None
     assert "drive_amplitude" not in qubit.data
     assert "qubit_frequency" not in qubit.data
+
+
+def _candidate_set(
+    service: AgentSessionService, *, key: str = "candidate-set-commit-1"
+) -> tuple[str, CommitAgentCandidateSetRequest]:
+    """A session at state version 2 with two accepted candidates, and a set commit of both."""
+    session = _create_session(service, max_actions=2)
+    first = service.submit_action(
+        project_id="project-1", session_id=session.session_id, body=_run_task_action()
+    )
+    second = service.submit_action(
+        project_id="project-1",
+        session_id=session.session_id,
+        body=_run_task_action(idempotency_key="action-2", expected_state_version=1),
+    )
+    _attach_completed_task_result(
+        session_id=session.session_id,
+        action_id=first.action_id,
+        output_parameters={"drive_amplitude": {"value": 0.12, "unit": "a.u."}},
+    )
+    _attach_completed_task_result(
+        session_id=session.session_id,
+        action_id=second.action_id,
+        output_parameters={"qubit_frequency": {"value": 4.8, "unit": "GHz"}},
+        sequence=2,
+    )
+    body = CommitAgentCandidateSetRequest(
+        idempotency_key=key,
+        expected_state_version=2,
+        candidates=[
+            AgentCandidateReference(
+                action_id=first.action_id,
+                parameter_name="drive_amplitude",
+                task_id="task-result-1",
+            ),
+            AgentCandidateReference(
+                action_id=second.action_id,
+                parameter_name="qubit_frequency",
+                task_id="task-result-2",
+            ),
+        ],
+    )
+    return session.session_id, body
+
+
+def _commit_set(
+    service: AgentSessionService, session_id: str, body: CommitAgentCandidateSetRequest
+) -> AgentCandidateSetCommitResponse:
+    return service.commit_candidate_set(
+        project_id="project-1", session_id=session_id, username="reviewer", body=body
+    )
+
+
+def _state_version(service: AgentSessionService, session_id: str) -> int:
+    return service.get_session(project_id="project-1", session_id=session_id).state_version
+
+
+def test_commit_candidate_set_refuses_a_reused_idempotency_key(
+    service: AgentSessionService,
+) -> None:
+    """A key already committed for one set never commits a different set."""
+    session_id, body = _candidate_set(service)
+    committed = _commit_set(service, session_id, body)
+    other = body.model_copy(update={"candidates": body.candidates[:1], "expected_state_version": 3})
+
+    with pytest.raises(HTTPException) as refused:
+        _commit_set(service, session_id, other)
+
+    assert refused.value.status_code == 409
+    assert "different candidate set commit" in str(refused.value.detail)
+    assert AgentCandidateSetCommitDocument.count() == 1
+    assert _commit_set(service, session_id, body).commit_id == committed.commit_id
+    assert _state_version(service, session_id) == 3
+
+
+def test_commit_candidate_set_refuses_a_stale_state_version(
+    service: AgentSessionService,
+) -> None:
+    """A set checked against an older session state reserves and writes nothing."""
+    session_id, body = _candidate_set(service)
+
+    with pytest.raises(HTTPException) as refused:
+        _commit_set(service, session_id, body.model_copy(update={"expected_state_version": 1}))
+
+    assert refused.value.status_code == 409
+    assert "state version mismatch" in str(refused.value.detail)
+    assert AgentCandidateSetCommitDocument.count() == 0
+    assert _state_version(service, session_id) == 2
+
+
+def test_a_session_change_before_the_set_reservation_frees_the_key(
+    service: AgentSessionService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A set whose reservation loses to a session change leaves no record, so a retry works."""
+    session_id, body = _candidate_set(service)
+    candidates = service.list_action_candidates
+    bumped: list[bool] = []
+
+    def change_session_after_check(**kwargs: Any) -> Any:
+        result = candidates(**kwargs)
+        if not bumped:
+            bumped.append(True)
+            AgentSessionDocument.get_motor_collection().update_one(
+                {"session_id": session_id}, {"$inc": {"state_version": 1}}
+            )
+        return result
+
+    monkeypatch.setattr(service, "list_action_candidates", change_session_after_check)
+    with pytest.raises(HTTPException) as refused:
+        _commit_set(service, session_id, body)
+
+    assert refused.value.status_code == 409
+    assert "changed while the candidate set commit was being reserved" in str(refused.value.detail)
+    assert AgentCandidateSetCommitDocument.count() == 0
+    qubit = QubitDocument.find_one({"qid": "Q00"}).run()
+    assert qubit is not None
+    assert qubit.data == {}
+
+    retried = _commit_set(
+        service, session_id, body.model_copy(update={"expected_state_version": 3})
+    )
+    assert retried.status == "committed"
+    assert _state_version(service, session_id) == 4
+
+
+@pytest.mark.parametrize("same_request", [True, False])
+def test_a_concurrent_set_commit_with_the_same_key_is_replayed_or_refused(
+    service: AgentSessionService, monkeypatch: pytest.MonkeyPatch, same_request: bool
+) -> None:
+    """A request that loses the insert race replays the winner's record, never a second write."""
+    session_id, body = _candidate_set(service)
+    racing = body if same_request else body.model_copy(update={"candidates": body.candidates[:1]})
+    candidates = service.list_action_candidates
+    winners: list[AgentCandidateSetCommitResponse] = []
+
+    raced: list[bool] = []
+
+    def concurrent_commit_wins(**kwargs: Any) -> Any:
+        result = candidates(**kwargs)
+        if not raced:
+            raced.append(True)
+            winners.append(
+                service.candidate_commits.commit_candidate_set(
+                    project_id="project-1", session_id=session_id, username="other", body=racing
+                )
+            )
+        return result
+
+    monkeypatch.setattr(service, "list_action_candidates", concurrent_commit_wins)
+    if same_request:
+        replayed = _commit_set(service, session_id, body)
+        assert replayed.commit_id == winners[0].commit_id
+        assert replayed.committed_by == "other"
+    else:
+        with pytest.raises(HTTPException) as refused:
+            _commit_set(service, session_id, body)
+        assert refused.value.status_code == 409
+        assert "Idempotency key was already used" in str(refused.value.detail)
+
+    assert AgentCandidateSetCommitDocument.count() == 1
+    assert _state_version(service, session_id) == 3
+
+
+def test_a_failed_set_write_retains_a_failed_audit_record(
+    service: AgentSessionService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A write that fails after the reservation settles its record as failed, never in flight."""
+
+    def fail(**kwargs: Any) -> Any:
+        raise RuntimeError("storage unavailable")
+
+    session_id, body = _candidate_set(service)
+    monkeypatch.setattr(QubitDocument, "update_calib_data", fail)
+
+    with pytest.raises(HTTPException) as refused:
+        _commit_set(service, session_id, body)
+
+    record = AgentCandidateSetCommitDocument.find_one({"session_id": session_id}).run()
+    assert refused.value.status_code == 500
+    assert record is not None
+    assert record.commit_id in str(refused.value.detail)
+    assert record.status == "failed"
+    assert record.reason == "Candidate persistence failed: storage unavailable"
+    assert not record.after_snapshot
+    assert _commit_set(service, session_id, body).commit_id == record.commit_id
+
+
+def test_commit_action_candidate_refuses_a_reused_idempotency_key(
+    service: AgentSessionService,
+) -> None:
+    """A key already used for one candidate never commits another task's value."""
+    session = _create_session(service)
+    action = service.submit_action(
+        project_id="project-1", session_id=session.session_id, body=_run_task_action()
+    )
+    _attach_completed_task_result(
+        session_id=session.session_id,
+        action_id=action.action_id,
+        output_parameters={"drive_amplitude": {"value": 0.12}},
+    )
+
+    def commit(task_id: str, version: int) -> Any:
+        return service.commit_action_candidate(
+            project_id="project-1",
+            session_id=session.session_id,
+            action_id=action.action_id,
+            parameter_name="drive_amplitude",
+            username="reviewer",
+            body=CommitAgentCandidateRequest(
+                idempotency_key="commit-1", expected_state_version=version, task_id=task_id
+            ),
+        )
+
+    commit("task-result-1", 1)
+    with pytest.raises(HTTPException) as refused:
+        commit("task-result-other", 2)
+
+    assert refused.value.status_code == 409
+    assert "different candidate commit" in str(refused.value.detail)
+    assert _state_version(service, session.session_id) == 2
 
 
 @pytest.mark.asyncio
@@ -1000,6 +1450,97 @@ async def test_execute_authorized_action_runs_like_the_task_workbench(
         service.get_session(project_id="project-1", session_id=session.session_id).state_version
         == 1
     )
+    # The dispatch is a run of the session's automatic calibration session, recorded before
+    # the launch and handed to the worker, which stamps it on the execution.
+    run_id = f"cpr-action-{action.action_id}"
+    assert sent["ungrouped"] is False
+    run = CalibrationPipelineRunDocument.find_one({"run_id": run_id}).run()
+    assert run is not None
+    # The flow run receives the dispatch token of the run's launch, its proof of the run.
+    assert sent["calibration_run"] == CalibrationRunIdentity(
+        calibration_session_id=session.calibration_session_id,
+        run_id=run_id,
+        dispatch_token=run.dispatch_token,
+    )
+    assert run.run_kind == CalibrationRunKind.AGENT_ACTION
+    assert (run.agent_session_id, run.action_id) == (session.session_id, action.action_id)
+    assert run.status == CalibrationPipelineRunStatus.DISPATCHED
+    assert run.flow_run_id == "operation-1"
+    assert run.requested_by == session.created_by
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status_code", "outcome"),
+    [
+        (409, CalibrationPipelineRunStatus.REJECTED),
+        (500, CalibrationPipelineRunStatus.UNKNOWN),
+    ],
+)
+async def test_a_failed_action_launch_settles_its_run_like_any_run(
+    service: AgentSessionService,
+    monkeypatch: pytest.MonkeyPatch,
+    status_code: int,
+    outcome: CalibrationPipelineRunStatus,
+) -> None:
+    session = _create_session(service)
+    action = service.submit_action(
+        project_id="project-1", session_id=session.session_id, body=_run_task_action()
+    )
+
+    class FailingFlowService:
+        async def execute_single_task_from_snapshot(self, **kwargs: object) -> object:
+            raise HTTPException(status_code=status_code, detail="refused")
+
+    with pytest.raises(HTTPException):
+        await service.execute_action(
+            project_id="project-1",
+            session_id=session.session_id,
+            action_id=action.action_id,
+            body=ExecuteAgentActionRequest(),
+            flow_service=cast("FlowService", FailingFlowService()),
+            task_file_service=_catalog(monkeypatch),
+        )
+    run = CalibrationPipelineRunDocument.find_one(
+        {"run_id": f"cpr-action-{action.action_id}"}
+    ).run()
+    assert run is not None and run.status == outcome
+    # The action itself failed and is never dispatched again.
+    stored = AgentActionDocument.find_one({"action_id": action.action_id}).run()
+    assert stored is not None and stored.execution_status == "failed"
+
+
+@pytest.mark.asyncio
+async def test_an_action_of_a_legacy_session_stays_out_of_any_calibration_session(
+    service: AgentSessionService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = _create_session(service)
+    make_standalone_agent_session("project-1", session.session_id)
+    action = service.submit_action(
+        project_id="project-1", session_id=session.session_id, body=_run_task_action()
+    )
+    sent: dict[str, object] = {}
+
+    class FakeFlowService:
+        async def execute_single_task_from_snapshot(self, **kwargs: object) -> object:
+            sent.update(kwargs)
+            return type(
+                "Operation", (), {"execution_id": "20260713-002", "flow_run_id": "operation-1"}
+            )()
+
+    await service.execute_action(
+        project_id="project-1",
+        session_id=session.session_id,
+        action_id=action.action_id,
+        body=ExecuteAgentActionRequest(),
+        flow_service=cast("FlowService", FakeFlowService()),
+        task_file_service=_catalog(monkeypatch),
+    )
+    assert sent["calibration_run"] is None
+    # The worker is told not to record it in an automatic session of its own either.
+    assert sent["ungrouped"] is True
+    assert CalibrationPipelineRunDocument.find_all().count() == 0
 
 
 @pytest.mark.asyncio
@@ -1078,3 +1619,104 @@ async def test_execute_action_applies_the_workbench_override_rules(
     stored = AgentActionDocument.find_one({"action_id": action.action_id}).run()
     assert stored is not None
     assert stored.execution_status == "failed"
+
+
+def test_a_session_started_without_a_calibration_session_gets_an_automatic_one(
+    service: AgentSessionService,
+) -> None:
+    session = _create_session(service)
+    assert session.calibration_session_id is not None
+    assert session.calibration_session_id.startswith("cs-auto-")
+    assert session.calibration_admission == "admitted"
+    parent = CalibrationSessionDocument.find_one(
+        {"calibration_session_id": session.calibration_session_id}
+    ).run()
+    assert parent is not None and parent.origin == "automatic"
+    assert parent.pending_children == []
+    assert CalibrationSessionDocument.find_all().count() == 1
+
+
+@pytest.mark.asyncio
+async def test_a_stand_alone_session_record_still_records_its_action_runs_without_a_session(
+    service: AgentSessionService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A run's guarantees do not depend on a calibration session.
+
+    QDash no longer creates an agent session without one; the record is written directly to
+    show that the action's run is recorded and handed to the worker without a session.
+    """
+    session = _create_session(service)
+    AgentSessionDocument.get_motor_collection().update_one(
+        {"session_id": session.session_id},
+        {
+            "$set": {
+                "calibration_session_id": None,
+                "calibration_admission": None,
+                "calibration_reservation_id": None,
+            }
+        },
+    )
+    CalibrationSessionDocument.get_motor_collection().delete_many({})
+    action = service.submit_action(
+        project_id="project-1", session_id=session.session_id, body=_run_task_action()
+    )
+    sent: dict[str, object] = {}
+
+    class FakeFlowService:
+        async def execute_single_task_from_snapshot(self, **kwargs: object) -> object:
+            sent.update(kwargs)
+            return type(
+                "Operation", (), {"execution_id": "20260713-002", "flow_run_id": "operation-1"}
+            )()
+
+    await service.execute_action(
+        project_id="project-1",
+        session_id=session.session_id,
+        action_id=action.action_id,
+        body=ExecuteAgentActionRequest(),
+        flow_service=cast("FlowService", FakeFlowService()),
+        task_file_service=_catalog(monkeypatch),
+    )
+    run = CalibrationPipelineRunDocument.find_one(
+        {"run_id": f"cpr-action-{action.action_id}"}
+    ).run()
+    assert run is not None
+    assert run.calibration_session_id is None and run.association == "none"
+    assert (run.status, run.flow_run_id) == ("dispatched", "operation-1")
+    assert sent["ungrouped"] is False
+    assert sent["calibration_run"] == CalibrationRunIdentity(
+        calibration_session_id=None,
+        run_id=run.run_id,
+        dispatch_token=run.dispatch_token,
+    )
+
+
+def test_a_named_closed_calibration_session_refuses_the_start(
+    service: AgentSessionService,
+) -> None:
+    CalibrationSessionDocument(
+        calibration_session_id="cs-closed",
+        project_id="project-1",
+        chip_id="chip-001",
+        objective="Done",
+        created_by="tester",
+        status="closed",
+    ).insert()
+    with pytest.raises(HTTPException) as refused:
+        service.create_session(
+            project_id="project-1",
+            username="tester",
+            body=CreateAgentSessionRequest(
+                chip_id="chip-001",
+                policy=AgentSessionPolicy(
+                    qids=["Q00"], allowed_tasks=["CheckQubitSpectroscopy"], max_actions=1
+                ),
+                skill_name="single-qubit-bringup",
+                calibration_session_id="cs-closed",
+            ),
+        )
+    assert refused.value.status_code == 409
+    assert AgentSessionDocument.find_all().count() == 0
+    # Refused, never turned into a session in an automatic calibration session.
+    assert CalibrationSessionDocument.find({"origin": "automatic"}).count() == 0

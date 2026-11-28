@@ -6,4 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 
+/**
+ * Power (dB) just above the strongest analyzed row; peak heights are measured from it. Rows at or above top_power are dropped before the analysis runs, so the returned figure shows only the rows below it.
+ */
 export type ReanalyzeQubitSpectroscopyParamsTopPower = number | null;

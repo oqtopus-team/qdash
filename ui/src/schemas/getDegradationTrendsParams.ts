@@ -22,5 +22,5 @@ limit?: number;
 /**
  * Filter by parameter names
  */
-parameter_names?: string[] | null;
+parameter_names?: string[];
 };

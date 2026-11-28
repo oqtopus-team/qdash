@@ -10,10 +10,10 @@ from typing import Any
 
 import yaml
 
-from qdash.common.config.copilot_profile import (
-    copilot_profile_files,
-    load_copilot_profile_file,
-    selected_copilot_profile,
+from qdash.common.config.agent_profile import (
+    load_agent_profile_file,
+    resolve_agent_config_path,
+    resolve_agent_model_files,
 )
 from qdash.common.config.paths import CONFIG_DIR
 
@@ -83,27 +83,34 @@ class ConfigLoader:
         return cls._load_config("domain/metrics.yaml")
 
     @classmethod
-    @lru_cache(maxsize=1)
-    def load_copilot(cls) -> dict[str, Any]:
-        """Load copilot configuration.
+    def get_agent_config_path(cls) -> Path:
+        """The shared Agent ``config.yaml`` (see ``resolve_agent_config_path``)."""
+        return resolve_agent_config_path(cls.get_config_dir())
 
-        ``config.yaml`` is shared. The chat and evaluation models come from
-        ``chat.yaml`` and ``evaluation.yaml``, or from the profile that
-        ``QDASH_COPILOT_PROFILE`` names (see ``copilot_profile``). The
-        variable is read on every uncached load, so ``clear_cache`` picks up
-        the current selection.
+    @classmethod
+    @lru_cache(maxsize=1)
+    def load_agent(cls) -> dict[str, Any]:
+        """Load agent configuration.
+
+        ``config.yaml`` is shared: ``config/agent/config.yaml``, or the file
+        that ``AGENT_CONFIG_PATH`` names. The chat and evaluation models come
+        from ``chat.yaml`` and ``evaluation.yaml`` next to it, or from the
+        profile that ``QDASH_AGENT_PROFILE`` names (see ``agent_profile``).
+        The variables are read on every uncached load, so ``clear_cache``
+        picks up the current selection.
         """
-        config = cls._load_config("copilot/config.yaml")
-        profile = selected_copilot_profile()
-        if profile is None:
-            for filename in ("copilot/chat.yaml", "copilot/evaluation.yaml"):
-                config = _deep_merge(config, cls._load_config(filename))
+        config_path = cls.get_agent_config_path()
+        if not config_path.is_file():
+            logger.warning("Agent config %s not found; using defaults", config_path)
+        config = cls._load_yaml(config_path)
+        files = resolve_agent_model_files(config_path)
+        if files.profile is None:
+            for path in (files.chat, files.evaluation):
+                config = _deep_merge(config, cls._load_yaml(path))
             return config
-        files = copilot_profile_files(cls.get_config_dir() / "copilot", profile)
-        logger.info("Copilot profile %s: %s", profile, files["chat"].parent)
-        for kind, path in files.items():
-            config = _deep_merge(config, load_copilot_profile_file(kind, path))
-        return config
+        logger.info("Agent profile %s: %s", files.profile, files.chat.parent)
+        config = _deep_merge(config, load_agent_profile_file("chat", files.chat))
+        return _deep_merge(config, load_agent_profile_file("evaluation", files.evaluation))
 
     @classmethod
     @lru_cache(maxsize=1)
@@ -122,6 +129,6 @@ class ConfigLoader:
         """Clear all cached configurations."""
         cls.load_settings.cache_clear()
         cls.load_metrics.cache_clear()
-        cls.load_copilot.cache_clear()
+        cls.load_agent.cache_clear()
         cls.load_backend.cache_clear()
         cls.load_workflow.cache_clear()

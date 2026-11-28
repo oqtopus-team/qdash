@@ -13,6 +13,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -35,6 +36,28 @@ class CheckT1Average(QubexTask):
 
     name: str = "CheckT1Average"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Repeats the CheckT1 measurement n_runs times (10 by default) and writes the mean "
+            "t1_average and its standard deviation t1_std, with a fluctuation figure."
+        ),
+        when_to_use=(
+            "Run it when T1 must be compared over time or across qubits, or before "
+            "Check1QGateCoherenceLimit, which reads t1_average. It takes about n_runs times as "
+            "long as CheckT1."
+        ),
+        prerequisites=(
+            (
+                "Rabi parameters from a CheckRabi run under the current readout_duration, with "
+                "rabi_r2 at or above the R² threshold; they normalize the IQ data."
+            ),
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+    )
 
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # RabiParam normalizes measured IQ values; its readout duration is validated.

@@ -13,7 +13,6 @@ import {
   ExecutionHistoryModalContent,
   type ExecutionHistoryMobileTab,
 } from "@/components/features/task-history/ExecutionHistoryModalContent";
-import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
@@ -22,9 +21,13 @@ import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateW
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { useChatDock } from "@/contexts/ChatDockContext";
-import type { InvestigationTarget, TaskChatContext } from "@/types/copilotChat";
+import type { InvestigationTarget, TaskChatContext } from "@/types/agentChat";
 import { firstPublishedParameter, inExecution } from "@/lib/provenanceTarget";
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
+import {
+  TaskDetailsHeader,
+  TaskParametersTables,
+} from "@/components/features/task-history/TaskResultDetailParts";
 
 interface ExecutionTaskDetailModalProps {
   isOpen: boolean;
@@ -193,36 +196,12 @@ export function ExecutionTaskDetailModal({
 
   const renderTaskDetails = () => (
     <div className="flex flex-col">
-      <div className="flex items-center justify-between mb-3 shrink-0">
-        <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4 text-base-content/60" />
-          <h3 className="text-sm font-medium text-base-content">Task Details</h3>
-        </div>
-        {tasks.length > 0 && (
-          <div className="text-xs text-base-content/60">
-            {selectedTaskIndex + 1} / {tasks.length}
-          </div>
-        )}
-      </div>
-
-      {tasks.length > 1 && (
-        <div className="flex gap-2 mb-2 shrink-0">
-          <button
-            className="btn btn-xs btn-ghost"
-            disabled={selectedTaskIndex === 0}
-            onClick={() => handleSelectTask(Math.max(0, selectedTaskIndex - 1))}
-          >
-            ← Prev
-          </button>
-          <button
-            className="btn btn-xs btn-ghost"
-            disabled={selectedTaskIndex === tasks.length - 1}
-            onClick={() => handleSelectTask(Math.min(tasks.length - 1, selectedTaskIndex + 1))}
-          >
-            Next →
-          </button>
-        </div>
-      )}
+      <TaskDetailsHeader
+        position={tasks.length > 0 ? `${selectedTaskIndex + 1} / ${tasks.length}` : null}
+        index={selectedTaskIndex}
+        total={tasks.length}
+        onSelect={handleSelectTask}
+      />
 
       {selectedTask && (
         <ExecutionTaskProgress status={selectedTask.status} note={selectedTask.note} />
@@ -337,28 +316,7 @@ export function ExecutionTaskDetailModal({
       )}
 
       {selectedTask && (
-        <div className="flex flex-col gap-2 mt-2 mb-6">
-          {selectedTask.input_parameters &&
-            Object.keys(selectedTask.input_parameters).length > 0 && (
-              <ParametersTable
-                title="Input Parameters"
-                parameters={selectedTask.input_parameters as Record<string, unknown>}
-              />
-            )}
-          {selectedTask.output_parameters &&
-            Object.keys(selectedTask.output_parameters).length > 0 && (
-              <ParametersTable
-                title="Output Parameters"
-                parameters={selectedTask.output_parameters as Record<string, unknown>}
-              />
-            )}
-          {selectedTask.run_parameters && Object.keys(selectedTask.run_parameters).length > 0 && (
-            <ParametersTable
-              title="Run Parameters"
-              parameters={selectedTask.run_parameters as Record<string, unknown>}
-            />
-          )}
-        </div>
+        <TaskParametersTables task={selectedTask} className="flex flex-col gap-2 mt-2 mb-6" />
       )}
 
       {/* AI evaluations of this result, requested the same way as from the chip page */}

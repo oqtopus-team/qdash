@@ -10,6 +10,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -19,6 +20,7 @@ from qdash.workflow.calibtasks.qubex.base import (
     QubexTask,
     readout_duration_run_parameter,
 )
+from qdash.workflow.calibtasks.qubex.raw_data import extract_state_classifier_raw_data
 from qdash.workflow.calibtasks.qubex.validation import finite_value_error, first_validation_error
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
@@ -28,6 +30,27 @@ class ReadoutClassification(QubexTask):
 
     name: str = "ReadoutClassification"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Prepares 0 and 1 states, trains the Qubex state classifier (k-means or GMM, as the"
+            " session configures), saves it for later measurements, and writes "
+            "average_readout_fidelity, readout_fidelity_0, and readout_fidelity_1."
+        ),
+        when_to_use=(
+            "Run it after readout and pulse calibration to quantify two-state assignment "
+            "fidelity and refresh the classifier that subsequent Qubex measurements use."
+        ),
+        prerequisites=(
+            (
+                "drag_hpi_amplitude, drag_hpi_duration, and drag_hpi_beta stored by "
+                "CreateDRAGHPIPulse."
+            ),
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+    )
 
     # High resolution for accurate threshold detection
     GRID_RESOLUTION: int = 2001
@@ -183,6 +206,13 @@ class ReadoutClassification(QubexTask):
             figures=figures,
             validation_error=validation_error,
         )
+
+    def extract_raw_data(self, run_result: RunResult) -> list[Any]:
+        """Persist a per-task snapshot of the trained classifier as a NetCDF artifact."""
+        return [
+            *super().extract_raw_data(run_result),
+            *extract_state_classifier_raw_data(run_result.raw_result),
+        ]
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)

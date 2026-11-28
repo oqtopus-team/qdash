@@ -218,16 +218,7 @@ export function GlobalCommandPalette() {
               {!isChatPage && (
                 <CommandItem
                   value="Open agent chat"
-                  keywords={[
-                    "agent",
-                    "chat",
-                    "copilot",
-                    "ai",
-                    "ask",
-                    "assistant",
-                    "チャット",
-                    "エージェント",
-                  ]}
+                  keywords={["agent", "chat", "ai", "ask", "assistant", "チャット", "エージェント"]}
                   onSelect={openAgentChat}
                 >
                   <Bot size={15} className="shrink-0 opacity-60" aria-hidden="true" />

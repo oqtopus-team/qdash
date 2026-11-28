@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
-import { CopilotChatPage } from "@/components/features/chat/CopilotChatPage";
+import { AgentChatPage } from "@/components/features/chat/AgentChatPage";
 
 function ChatPageSkeleton() {
   return (
@@ -12,12 +12,12 @@ function ChatPageSkeleton() {
   );
 }
 
-// Sessions come from CopilotChatSessionProvider in AppLayout, shared with the
+// Sessions come from AgentChatSessionProvider in AppLayout, shared with the
 // in-app sidebar and floating window.
 export default function ChatPage() {
   return (
     <Suspense fallback={<ChatPageSkeleton />}>
-      <CopilotChatPage />
+      <AgentChatPage />
     </Suspense>
   );
 }

@@ -170,6 +170,9 @@ export function useListTasks<TData = Awaited<ReturnType<typeof listTasks>>, TErr
 
 /**
  * Execute one task without requiring a previous execution snapshot.
+ *
+ * The run is recorded before it is launched. It joins ``calibration_session_id`` when given;
+ * otherwise an automatic calibration session created for it.
  * @summary Execute a single task from the task catalog
  */
 export const quickRunTask = (
@@ -447,7 +450,7 @@ export const getTaskKnowledgeMarkdown = (
 ) => {
 
 
-      return customInstance<void>(
+      return customInstance<string>(
       {url: `/tasks/${taskName}/knowledge/markdown`, method: 'GET', signal
     },
       options);

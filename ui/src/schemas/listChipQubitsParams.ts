@@ -16,5 +16,5 @@ limit?: number;
  * @minimum 0
  */
 offset?: number;
-qids?: string[] | null;
+qids?: string[];
 };

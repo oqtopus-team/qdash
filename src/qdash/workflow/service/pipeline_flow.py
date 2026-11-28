@@ -3,7 +3,8 @@
 ``CalibrationPipelineSpec`` (``qdash.datamodel.calibration_pipeline``) is what
 an agent or the UI submits through ``POST /calibration-pipelines/execute``. The
 API validates it; this flow only maps it onto the same Step classes the
-templates use and runs them like ``CalibService.run``. Nothing in the spec can
+templates use and runs them like ``CalibrationSession.run``; a workflow's
+``qdash.calibration`` definitions go through the same mapping. Nothing in the spec can
 reach code outside that mapping.
 
 Registered on worker startup as the ``system-calibration-pipeline`` deployment
@@ -12,9 +13,10 @@ Registered on worker startup as the ``system-calibration-pipeline`` deployment
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
 from prefect import flow, get_run_logger
+from pydantic import Field
 
 from qdash.datamodel.calibration_pipeline import (
     SPEC_VERSION,
@@ -30,10 +32,17 @@ from qdash.datamodel.calibration_pipeline import (
     OneQubitCheckStep,
     OneQubitFineTuneStep,
     PipelineStep,
+    PipelineTargets,
     TwoQubitCalibrationStep,
     migrate_pipeline_spec,
     step_id,
 )
+from qdash.datamodel.calibration_plan import (
+    APPROVED_PLAN_CONTRACT,
+    APPROVED_PLAN_CONTRACT_KEY,
+    ApprovedPipelinePlan,
+)
+from qdash.datamodel.step_record import PLAN_RECORDS_TRANSFORMS
 from qdash.workflow.service._internal.runs import run_calibration, workflow_settings
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -41,6 +50,7 @@ from qdash.workflow.service.calib_service import (
     on_flow_failure,
 )
 from qdash.workflow.service.context import resolve_calib_context
+from qdash.workflow.service.plan_approval import ApprovedPlanCheck, check_dispatched_plan
 from qdash.workflow.service.steps import (
     BringUp,
     ConfigureAll,
@@ -54,15 +64,21 @@ from qdash.workflow.service.steps import (
     Step,
     TwoQubitCalibration,
 )
-from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
+from qdash.workflow.service.targets import CouplingTargets, MuxTargets, QubitTargets, Target
 
 
 def build_targets(spec: CalibrationPipelineSpec) -> Target:
     """The Target the spec starts from."""
-    targets = spec.targets
+    return build_target(spec.targets)
+
+
+def build_target(targets: PipelineTargets) -> Target:
+    """The runtime Target of a spec's ``targets``; pairs keep their direction."""
     if targets.mux_ids:
         return MuxTargets(mux_ids=list(targets.mux_ids), exclude_qids=list(targets.exclude_qids))
-    assert targets.qids is not None  # the spec validator guarantees one of the two
+    if targets.pairs:
+        return CouplingTargets(pairs=[(control, target) for control, target in targets.pairs])
+    assert targets.qids is not None  # the spec validator guarantees exactly one kind
     return QubitTargets(qids=list(targets.qids))
 
 
@@ -92,8 +108,10 @@ def build_step(step: PipelineStep) -> Step:
         )
     if isinstance(step, BringUpStep):
         if step.tasks is not None:
-            return BringUp(tasks=list(step.tasks), step_id=step.step_id)
-        return BringUp(step_id=step.step_id)
+            return BringUp(
+                tasks=list(step.tasks), execution_mode=step.execution_mode, step_id=step.step_id
+            )
+        return BringUp(execution_mode=step.execution_mode, step_id=step.step_id)
     if isinstance(step, OneQubitCheckStep):
         return OneQubitCheck(
             execution_mode=step.execution_mode,
@@ -153,16 +171,19 @@ def build_steps(spec: CalibrationPipelineSpec) -> list[Step]:
 def pipeline_note(spec: CalibrationPipelineSpec, steps: list[Step]) -> dict[str, Any]:
     """The plan, stored in every execution's note so the API can follow the run.
 
-    Each calibration step gets its own execution (see ``CalibService.run``);
-    they share ``note.flow_run_id`` and carry ``step_index``. This adds the
-    full step list so a reader of any one execution knows what else is
+    Every step the run reaches gets its own execution (see ``CalibrationSession.run``),
+    transform steps included; they share ``note.flow_run_id`` and carry ``step_index``.
+    This adds the full step list so a reader of any one execution knows what else is
     planned, which steps run hardware, and the spec it came from.
+    ``records_transform_steps`` tells readers that a transform without an execution has
+    not been reached yet, unlike in runs recorded before transforms had executions.
     """
     return {
         "pipeline": {
             "name": spec.name,
             "spec_version": SPEC_VERSION,
             "spec_digest": spec.plan_digest(),
+            PLAN_RECORDS_TRANSFORMS: True,
             "steps": [
                 {
                     "index": index,
@@ -210,6 +231,12 @@ def calibration_pipeline(
     flow_name: str | None = None,
     tags: list[str] | None = None,
     backend_name: str | None = None,
+    # The schema key tells the API this flow accepts and checks an approved plan; a
+    # deployment of a flow without it never receives one.
+    approved_plan: Annotated[
+        dict[str, Any] | None,
+        Field(json_schema_extra={APPROVED_PLAN_CONTRACT_KEY: APPROVED_PLAN_CONTRACT}),
+    ] = None,
 ) -> Any:
     """Run one validated pipeline spec as a calibration.
 
@@ -220,29 +247,57 @@ def calibration_pipeline(
             that bypassed the API is still held to the same shape; a queued
             version 1 spec is converted first (see ``parse_dispatched_spec``).
         project_id: Project the execution belongs to (injected by the API).
-        flow_name: Display name of the execution; defaults to the spec name.
+        flow_name: Display name of the run; defaults to the spec name. A run with
+            neither names each step's execution after the step alone.
         tags: Extra tags; merged with the spec's tags.
         backend_name: Hardware backend; defaults to the configured backend.
+        approved_plan: For a run started from a stored plan, the plan it was approved as
+            (``ApprovedPipelinePlan``). The run then uses only the plan's own run defaults,
+            never a saved flow's, and is stopped before anything is reserved or measured
+            when the spec, the resolved steps, or the targets' qubits differ from the plan
+            (see ``qdash.workflow.service.plan_approval``).
     """
     logger = get_run_logger()
+    approval = ApprovedPipelinePlan.model_validate(approved_plan) if approved_plan else None
     parsed = parse_dispatched_spec(spec, logger)
     targets = build_targets(parsed)
     steps = build_steps(parsed)
-    all_tags = sorted({*(tags or []), *parsed.tags, "pipeline"})
+    all_tags = sorted({*(tags or []), *parsed.tags})
+    # None leaves the run unnamed: each step's execution is then named after the step.
     name = flow_name or parsed.name
 
     logger.info(
-        f"Pipeline '{name}': {len(steps)} steps, {len(parsed.all_tasks())} task calls per target, "
+        f"Pipeline '{name or 'unnamed'}': {len(steps)} steps, "
+        f"{len(parsed.all_tasks())} task calls per target, "
         f"targets={parsed.targets.model_dump(exclude_none=True)}"
     )
 
     context = resolve_calib_context(username, chip_id, project_id=project_id, backend=backend_name)
+    check: ApprovedPlanCheck | None = None
+    note = pipeline_note(parsed, steps)
+    if approval is not None:
+        check_dispatched_plan(
+            approval,
+            chip_id=chip_id,
+            backend_name=context.backend_name,
+            spec=parsed.model_dump(mode="json", exclude_none=True),
+        )
+        check = ApprovedPlanCheck(approval)
+        note["pipeline"]["plan"] = {
+            "plan_id": approval.plan_id,
+            "review_digest": approval.review_digest,
+        }
     settings = workflow_settings(
         context,
         flow_name=name,
         tags=all_tags,
-        note=pipeline_note(parsed, steps),
+        note=note,
         default_run_parameters=parsed.default_run_parameters or None,
         task_defaults=parsed.canonical_task_parameters(),
+        # An approved plan runs with its own defaults only: a saved flow of the same name
+        # must not add any the approval did not show.
+        **({"saved_flow_name": None} if approval is not None else {}),
     )
-    return run_calibration(settings, targets, steps)
+    if check is None:
+        return run_calibration(settings, targets, steps)
+    return run_calibration(settings, targets, steps, approved_plan=check)

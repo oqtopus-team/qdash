@@ -1,11 +1,15 @@
 """Schema definitions for execution router."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import BaseModel, Field
 
-from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
+from qdash.datamodel.agent_session import AgentSessionStatus
+from qdash.datamodel.calibration_session import CalibrationSessionStatus
+from qdash.datamodel.field_types import ElapsedTime
+from qdash.datamodel.launch_origin import ReportedLaunchOrigin
+from qdash.datamodel.step_record import TransformStepRecord
 from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
 from qdash.datamodel.task_invocation import TaskInvocation
 
@@ -69,7 +73,7 @@ class Task(BaseModel):
     raw_data_path: list[str] | None = None
     start_at: datetime | None = None
     end_at: datetime | None = None
-    elapsed_time: timedelta | None = None
+    elapsed_time: ElapsedTime = None
     task_type: str | None = None
     invocation: TaskInvocation | None = Field(
         default=None,
@@ -77,17 +81,74 @@ class Task(BaseModel):
     )
     default_view: bool = True
 
-    @field_validator("elapsed_time", mode="before")
-    @classmethod
-    def _parse_elapsed_time(cls, v: Any) -> timedelta | None:
-        """Parse elapsed_time from various formats."""
-        return parse_elapsed_time(v)
 
-    @field_serializer("elapsed_time")
-    @classmethod
-    def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
-        """Serialize elapsed_time to H:MM:SS format."""
-        return format_elapsed_time(v) if v else None
+class ExecutionAgentSessionLink(BaseModel):
+    """The agent session an execution belongs to, as its records establish it."""
+
+    session_id: str
+    linked: bool = Field(
+        description=(
+            "True when an action of the session dispatched this execution on the same chip; "
+            "false when only a tag names the session, which is no authority to group it"
+        )
+    )
+    action_id: str | None = None
+    status: AgentSessionStatus | None = Field(
+        default=None, description="The session's state, when the session is in this project"
+    )
+    created_by: str | None = Field(
+        default=None,
+        description=(
+            "The user who created the session and is responsible for it; set only when linked. "
+            "Answers, resumes, and commit authorizations are recorded separately in the audit"
+        ),
+    )
+    model_name: str = Field(
+        default="",
+        description=(
+            "provider/model_id the creating host reported for the session (client reported, "
+            "not verified); empty when none was reported"
+        ),
+    )
+
+
+class CalibrationSessionRef(BaseModel):
+    """A calibration session another record belongs to, read in the request's project."""
+
+    calibration_session_id: str
+    chip_id: str
+    objective: str
+    status: CalibrationSessionStatus
+
+
+class ExecutionCalibrationSessionLink(CalibrationSessionRef):
+    """The calibration session an execution belongs to, and the server record that says so.
+
+    ``via`` names the record: ``pipeline_run`` when the execution is a step of a pipeline run
+    recorded in the session (matched by project, chip, and flow run), ``agent_session`` when an
+    action of an admitted agent session of the session dispatched it. Membership says what the
+    work was for; it never says that an agent ran it.
+    """
+
+    via: Literal["pipeline_run", "agent_session"]
+    pipeline_run_id: str | None = Field(
+        default=None, description="The pipeline run, when via is pipeline_run"
+    )
+    agent_session_id: str | None = Field(
+        default=None, description="The agent session, when via is agent_session"
+    )
+
+
+_CALIBRATION_SESSION_DESCRIPTION = (
+    "The calibration session this execution belongs to, from QDash's own records: a pipeline "
+    "run recorded in it, or an action of an agent session admitted to it. Null when no record "
+    "relates it, or when records disagree on the session"
+)
+_REPORTED_ORIGIN_DESCRIPTION = (
+    "How the caller that launched this execution's pipeline said it was started, such as an "
+    "agent tool. Client reported, not verified by QDash; null when nothing was reported. The "
+    "recorded user is still the one whose sign-in started it"
+)
 
 
 class ExecutionResponseSummary(BaseModel):
@@ -116,30 +177,41 @@ class ExecutionResponseSummary(BaseModel):
     username: str = ""
     start_at: datetime | None = None
     end_at: datetime | None = None
-    elapsed_time: timedelta | None = None
+    elapsed_time: ElapsedTime = None
     tags: list[str]
     note: dict[str, Any]
-
-    @field_validator("elapsed_time", mode="before")
-    @classmethod
-    def _parse_elapsed_time(cls, v: Any) -> timedelta | None:
-        """Parse elapsed_time from various formats."""
-        return parse_elapsed_time(v)
-
-    @field_serializer("elapsed_time")
-    @classmethod
-    def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
-        """Serialize elapsed_time to H:MM:SS format."""
-        return format_elapsed_time(v) if v else None
+    agent_session: ExecutionAgentSessionLink | None = Field(
+        default=None,
+        description=(
+            "Set only when an action of an agent session dispatched this execution; a tag "
+            "alone never sets it"
+        ),
+    )
+    calibration_session: ExecutionCalibrationSessionLink | None = Field(
+        default=None, description=_CALIBRATION_SESSION_DESCRIPTION
+    )
+    reported_origin: ReportedLaunchOrigin | None = Field(
+        default=None, description=_REPORTED_ORIGIN_DESCRIPTION
+    )
 
 
 class PipelineStepProgress(BaseModel):
-    """One planned step of a pipeline run and how far its execution got."""
+    """One planned step of a pipeline run and how far its execution got.
+
+    Every step the run reaches, calibration or transform, has its own execution.
+    """
 
     index: int = Field(description="1-based position in the pipeline spec")
     name: str
     step_id: str | None = Field(
         default=None, description="Plan-scoped step id; null for transforms and older runs"
+    )
+    key: str = Field(
+        default="",
+        description=(
+            "Identifier of this step occurrence in the plan: the step_id of a calibration "
+            "step; a transform's name, suffixed with its index when the name repeats"
+        ),
     )
     type: str = ""
     kind: str = Field(default="calibration", description='"calibration" or "transform"')
@@ -147,7 +219,18 @@ class PipelineStepProgress(BaseModel):
         default=None, description="The step's own execution, once it has started"
     )
     status: str = Field(
-        description='The execution status, "skipped" for transforms, or "pending" before it starts'
+        description=(
+            'The execution status; "pending" before the step starts while the run may still '
+            'reach it; "skipped" when the run ended without reaching it; "not_recorded" for a '
+            "transform of a run recorded before transform steps had executions"
+        )
+    )
+    transform: TransformStepRecord | None = Field(
+        default=None,
+        description=(
+            "A transform step's recorded outcome: candidates kept and excluded with reasons, "
+            "or the CR groups planned; null for calibration steps and unfinished transforms"
+        ),
     )
     task_total: int = 0
     task_finished: int = 0
@@ -158,7 +241,7 @@ class PipelineStepProgress(BaseModel):
 
 
 class PipelineProgress(BaseModel):
-    """A pipeline run as a whole: one execution per calibration step, same flow run.
+    """A pipeline run as a whole: one execution per step it reached, same flow run.
 
     ``status`` is the whole run's: running while any step runs or the run holds
     the project lock between steps, otherwise the outcome of the last step.
@@ -200,7 +283,7 @@ class ExecutionResponseDetail(BaseModel):
     username: str = ""
     start_at: datetime | None = None
     end_at: datetime | None = None
-    elapsed_time: timedelta | None = None
+    elapsed_time: ElapsedTime = None
     task: list[Task]
     note: dict[str, Any]
     tags: list[str] = []
@@ -209,18 +292,19 @@ class ExecutionResponseDetail(BaseModel):
         default=None,
         description="Set when this execution belongs to a pipeline run; covers every step of it",
     )
-
-    @field_validator("elapsed_time", mode="before")
-    @classmethod
-    def _parse_elapsed_time(cls, v: Any) -> timedelta | None:
-        """Parse elapsed_time from various formats."""
-        return parse_elapsed_time(v)
-
-    @field_serializer("elapsed_time")
-    @classmethod
-    def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
-        """Serialize elapsed_time to H:MM:SS format."""
-        return format_elapsed_time(v) if v else None
+    agent_session: ExecutionAgentSessionLink | None = Field(
+        default=None,
+        description=(
+            "The agent session whose action dispatched this execution, or the session only "
+            "its tag names (linked false); null for an execution outside agent sessions"
+        ),
+    )
+    calibration_session: ExecutionCalibrationSessionLink | None = Field(
+        default=None, description=_CALIBRATION_SESSION_DESCRIPTION
+    )
+    reported_origin: ReportedLaunchOrigin | None = Field(
+        default=None, description=_REPORTED_ORIGIN_DESCRIPTION
+    )
 
 
 class CancelExecutionResponse(BaseModel):

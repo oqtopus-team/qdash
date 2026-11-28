@@ -38,6 +38,9 @@ Run migrations with:
     python -m qdash.dbmodel.migration migrate-forum-status          # dry-run
     python -m qdash.dbmodel.migration migrate-forum-status --execute  # execute
 
+    python -m qdash.dbmodel.migration prepare-run-scope          # dry-run (optional cleanup)
+    python -m qdash.dbmodel.migration prepare-run-scope --execute --writers-quiesced
+
     python -m qdash.dbmodel.migration run          # dry-run all pending migrations
     python -m qdash.dbmodel.migration run --execute  # execute all pending migrations
 """
@@ -50,7 +53,7 @@ from typing import Any
 
 from pymongo import ASCENDING, MongoClient, ReturnDocument
 from pymongo.database import Database
-from pymongo.errors import DuplicateKeyError
+from pymongo.errors import DuplicateKeyError, OperationFailure
 
 logger = logging.getLogger(__name__)
 
@@ -1570,6 +1573,341 @@ def _migrate_task_name(
     return stats
 
 
+# Samples of each readiness finding listed in the report; the counts are always complete.
+_RUN_SCOPE_SAMPLE_LIMIT = 20
+
+
+def _utc(value: Any) -> datetime | None:
+    """An aware UTC datetime; pymongo reads stored datetimes back naive."""
+    if not isinstance(value, datetime):
+        return None
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+def _index_spec_problems(
+    info: dict[str, Any] | None,
+    *,
+    keys: tuple[tuple[str, int], ...],
+    partial_filter: dict[str, Any] | None,
+) -> list[str]:
+    """How an index read from ``index_information()`` differs from the expected spec."""
+    if info is None:
+        return ["absent"]
+    problems: list[str] = []
+    actual_keys = tuple((str(field), _index_direction(order)) for field, order in info["key"])
+    if actual_keys != keys:
+        problems.append(f"keys are {list(actual_keys)}, expected {list(keys)}")
+    if info.get("unique") is not True:
+        problems.append("not unique")
+    actual_filter = info.get("partialFilterExpression")
+    if partial_filter is None:
+        if actual_filter is not None:
+            problems.append(f"has partial filter {dict(actual_filter)}, expected none")
+    elif not _same_type_filter(actual_filter, partial_filter):
+        problems.append(
+            f"partial filter is {dict(actual_filter) if actual_filter else None}, "
+            f"expected {partial_filter}"
+        )
+    if info.get("sparse"):
+        problems.append("sparse")
+    collation = info.get("collation")
+    if collation and dict(collation).get("locale", "simple") != "simple":
+        problems.append(f"has collation {dict(collation)}")
+    return problems
+
+
+def _index_direction(order: Any) -> Any:
+    """1 and 1.0 are the same direction; anything else (text, hashed) is kept as it is."""
+    if isinstance(order, (int, float)) and not isinstance(order, bool) and order == int(order):
+        return int(order)
+    return order
+
+
+def _same_type_filter(actual: Any, expected: dict[str, Any]) -> bool:
+    """Whether a stored partial filter is ``expected``, with ``$type`` by name or by number."""
+    if actual is None:
+        return False
+    actual = {k: dict(v) if hasattr(v, "keys") else v for k, v in dict(actual).items()}
+    if actual == expected:
+        return True
+    # ``{"$type": "string"}`` may be stored as BSON type number 2.
+    numbered = {
+        field: {
+            op: (2 if op == "$type" and value == "string" else value) for op, value in cond.items()
+        }
+        for field, cond in expected.items()
+    }
+    return bool(actual == numbered)
+
+
+def _run_scope_readiness(database: Database[Any], *, at: datetime) -> dict[str, Any]:
+    """Report unresolved work without mutating it.
+
+    Age classifies diagnostic samples only. A stale request can still resume, and an
+    unknown dispatch can still have started work. Every unresolved record blocks the
+    index drop until reconciled through the normal operational paths. These checks
+    cannot prove that external writers are stopped.
+    """
+    from qdash.dbmodel.run import RUN_COLLECTION, RUN_DISPATCH_STALE_AFTER
+
+    cutoff = at - RUN_DISPATCH_STALE_AFTER
+
+    def fresh(value: Any) -> bool:
+        stamp = _utc(value)
+        return stamp is not None and stamp > cutoff
+
+    in_flight: dict[str, list[str]] = {
+        # A launch recorded and not yet reported back.
+        "dispatching_runs": [],
+        # A child reserved in a calibration session whose record or admission is not written.
+        "pending_children": [],
+        # An agent session waiting for its calibration session reservation to be finalized.
+        "pending_agent_admissions": [],
+        # A run recorded without a scope: only a release before scopes inserts one.
+        "unscoped_run_inserts": [],
+    }
+    stale: dict[str, list[str]] = {
+        # ``dispatching`` past the launch window: a read reports it ``unknown``.
+        "stale_dispatching_runs": [],
+        # Stale and never admitted: no flow run can bind it; a retry or a read of its
+        # calibration session records it ``rejected``.
+        "stale_unadmitted_runs": [],
+        "unknown_runs": [],
+        # A reservation past the launch window: reading or closing its calibration session,
+        # or the agent session it belongs to, resolves it as QDash always does.
+        "stale_pending_children": [],
+        "stale_pending_agent_admissions": [],
+    }
+    counts: dict[str, int] = dict.fromkeys([*in_flight, *stale], 0)
+
+    def add(bucket: dict[str, list[str]], name: str, label: str) -> None:
+        counts[name] += 1
+        if len(bucket[name]) < _RUN_SCOPE_SAMPLE_LIMIT:
+            bucket[name].append(label)
+
+    runs = database[RUN_COLLECTION]
+    projection = {"_id": 0, "run_id": 1, "project_id": 1, "admission": 1, "updated_at": 1}
+    for run in runs.find({"status": "dispatching"}, projection):
+        label = f"{run.get('project_id')}/{run.get('run_id')}"
+        if fresh(run.get("updated_at")):
+            add(in_flight, "dispatching_runs", label)
+        elif run.get("admission") == "pending":
+            add(stale, "stale_unadmitted_runs", label)
+        else:
+            add(stale, "stale_dispatching_runs", label)
+    for run in runs.find({"status": "unknown"}, projection):
+        add(stale, "unknown_runs", f"{run.get('project_id')}/{run.get('run_id')}")
+    unscoped = {"$or": [{"idempotency_scope": None}, {"idempotency_scope": {"$exists": False}}]}
+    for run in runs.find(unscoped, {"_id": 0, "run_id": 1, "project_id": 1, "requested_at": 1}):
+        if fresh(run.get("requested_at")):
+            add(in_flight, "unscoped_run_inserts", f"{run.get('project_id')}/{run.get('run_id')}")
+
+    sessions = database["calibration_sessions"].find(
+        {"pending_children.0": {"$exists": True}},
+        {"_id": 0, "calibration_session_id": 1, "project_id": 1, "pending_children": 1},
+    )
+    for session in sessions:
+        for child in session.get("pending_children") or []:
+            label = (
+                f"{session.get('project_id')}/{session.get('calibration_session_id')}: "
+                f"{child.get('kind')} {child.get('child_id')}"
+            )
+            if fresh(child.get("reserved_at")):
+                add(in_flight, "pending_children", label)
+            else:
+                add(stale, "stale_pending_children", label)
+
+    agents = database["agent_sessions"].find(
+        {"calibration_admission": "pending"},
+        {"_id": 0, "session_id": 1, "project_id": 1, "created_at": 1, "updated_at": 1},
+    )
+    for agent in agents:
+        label = f"{agent.get('project_id')}/{agent.get('session_id')}"
+        if fresh(agent.get("updated_at")) or fresh(agent.get("created_at")):
+            add(in_flight, "pending_agent_admissions", label)
+        else:
+            add(stale, "stale_pending_agent_admissions", label)
+
+    return {
+        "checked_at": at.isoformat(),
+        "window_minutes": int(RUN_DISPATCH_STALE_AFTER.total_seconds() // 60),
+        "counts": counts,
+        "in_flight": {k: v for k, v in in_flight.items() if v},
+        "unresolved_stale_or_unknown": {k: v for k, v in stale.items() if v},
+        "blocked": any(counts.values()),
+    }
+
+
+def _run_scope_index_state(database: Database[Any]) -> dict[str, Any]:
+    """Whether each run-scope index is present with exactly the spec this release relies on."""
+    from qdash.dbmodel.run import (
+        LEGACY_SESSION_KEY_INDEX,
+        LEGACY_SESSION_KEY_INDEX_KEYS,
+        RUN_COLLECTION,
+        RUN_SCOPE_INDEX,
+        RUN_SCOPE_INDEX_KEYS,
+    )
+
+    indexes = database[RUN_COLLECTION].index_information()
+    scope_problems = _index_spec_problems(
+        indexes.get(RUN_SCOPE_INDEX),
+        keys=RUN_SCOPE_INDEX_KEYS,
+        partial_filter={"idempotency_scope": {"$type": "string"}},
+    )
+    legacy_info = indexes.get(LEGACY_SESSION_KEY_INDEX)
+    legacy_problems = (
+        _index_spec_problems(legacy_info, keys=LEGACY_SESSION_KEY_INDEX_KEYS, partial_filter=None)
+        if legacy_info is not None
+        else []
+    )
+    # The earlier key scope held under another name would keep refusing runs without a
+    # session; it is reported, never dropped, since this migration did not create it.
+    others = [
+        name
+        for name, info in indexes.items()
+        if name != LEGACY_SESSION_KEY_INDEX
+        and info.get("unique")
+        and tuple((str(f), _index_direction(o)) for f, o in info["key"])
+        == LEGACY_SESSION_KEY_INDEX_KEYS
+    ]
+    return {
+        "scope_index": RUN_SCOPE_INDEX,
+        "scope_index_valid": not scope_problems,
+        "scope_index_problems": scope_problems,
+        "legacy_index": LEGACY_SESSION_KEY_INDEX,
+        "legacy_index_present": legacy_info is not None,
+        "legacy_index_problems": legacy_problems,
+        "legacy_key_indexes_under_other_names": others,
+    }
+
+
+def migrate_prepare_run_scope(
+    database: Database[Any],
+    dry_run: bool = True,
+    *,
+    writers_quiesced: bool = False,
+    at: datetime | None = None,
+) -> dict[str, Any]:
+    """Drop the unique index runs were keyed by before they had a scope.
+
+    Optional cleanup; no deployment step requires it. Runs recorded by this release are kept
+    unique by ``RUN_SCOPE_INDEX``: project and idempotency scope, unique only where the scope
+    is a string. The API and the worker create it at start-up. The earlier unique index,
+    ``(project_id, calibration_session_id, idempotency_key)``, holds every run without a
+    calibration session to one shared null session. This release never relies on it, and no
+    run it records collides on it: a run that names no session gets an automatic one, and a
+    run recorded without one (an action of an agent session that has none) is keyed by its
+    action. A run recorded before scopes existed is found by its original scope with an
+    ordinary query, and is never inserted again.
+
+    The earlier index is dropped only when every check passes, read again just before the
+    drop:
+
+    - ``RUN_SCOPE_INDEX`` exists with exactly its keys, ``unique``, and partial filter;
+    - the earlier index has exactly its keys and is unique (another index under its name is
+      left alone);
+    - nothing is in flight (see ``_run_scope_readiness``): no run dispatching, no reservation
+      pending, no unknown dispatch, and no agent session waiting for admission, regardless
+      of age; no run was recently inserted without a scope;
+    - the operator states, with ``writers_quiesced``, that every API, worker, scheduler, and
+      external client that writes runs is stopped for the migration. The migration cannot
+      prove that for processes it cannot see; the in-flight checks are evidence, not a lock.
+
+    A dry run only reports. Nothing is deleted, cleared, or rewritten to pass a check: a
+    stale or unknown record blocks the drop until reconciled through QDash's own paths. Rerunning after the
+    drop reports ``already_dropped``. An API or worker of a release before scopes still
+    relies on the earlier index to refuse a second launch with the same key, so it must not
+    run against the database afterwards; this migration does not make that safe.
+    """
+    stats: dict[str, Any] = {
+        "dry_run": dry_run,
+        "writers_quiesced_acknowledged": writers_quiesced,
+        **_run_scope_index_state(database),
+        "readiness": _run_scope_readiness(database, at=at or datetime.now(timezone.utc)),
+        "dropped": False,
+        "already_dropped": False,
+    }
+    from qdash.dbmodel.run import RUN_COLLECTION
+
+    reasons = _run_scope_refusals(stats)
+    stats["refusals"] = reasons
+    stats["checks_passed"] = not reasons
+    stats["ready"] = not reasons and writers_quiesced
+    if not stats["legacy_index_present"]:
+        # Nothing to drop. A scope index that is not this release's is still reported in
+        # ``refusals``; this migration never creates or rewrites it.
+        stats["already_dropped"] = True
+        return stats
+    if dry_run:
+        return stats
+    if not writers_quiesced:
+        reasons = [
+            *reasons,
+            "the operator has not acknowledged that every run writer is stopped "
+            "for the migration (--writers-quiesced)",
+        ]
+    if reasons:
+        raise MigrationError("prepare-run-scope kept the earlier index: " + "; ".join(reasons))
+    # Read everything again immediately before the drop: a writer or an index change since
+    # the first read makes the migration stop instead of acting on what it saw then.
+    recheck = {
+        **_run_scope_index_state(database),
+        "readiness": _run_scope_readiness(database, at=datetime.now(timezone.utc)),
+    }
+    late = _run_scope_refusals(recheck)
+    if late:
+        raise MigrationError(
+            "prepare-run-scope kept the earlier index; the recheck before the drop found: "
+            + "; ".join(late)
+        )
+    if not recheck["legacy_index_present"]:
+        stats["already_dropped"] = True
+        return stats
+    try:
+        database[RUN_COLLECTION].drop_index(stats["legacy_index"])
+    except OperationFailure:
+        # Another run of this migration may have dropped it first; anything else is real.
+        if stats["legacy_index"] in database[RUN_COLLECTION].index_information():
+            raise
+        stats["already_dropped"] = True
+        return stats
+    stats["dropped"] = True
+    return stats
+
+
+def _run_scope_refusals(state: dict[str, Any]) -> list[str]:
+    """Why the earlier index may not be dropped yet, from an index state and readiness."""
+    reasons: list[str] = []
+    if not state["scope_index_valid"]:
+        reasons.append(
+            f"index {state['scope_index']} is not the one this release creates "
+            f"({'; '.join(state['scope_index_problems'])}); start the API of this release, or "
+            "fix the index by hand, first"
+        )
+    if state["legacy_index_problems"]:
+        reasons.append(
+            f"index {state['legacy_index']} is not the earlier run index "
+            f"({'; '.join(state['legacy_index_problems'])}); inspect it by hand"
+        )
+    if state["legacy_key_indexes_under_other_names"]:
+        reasons.append(
+            "the earlier run key is also held unique by "
+            f"{', '.join(state['legacy_key_indexes_under_other_names'])}; inspect it by hand"
+        )
+    readiness = state["readiness"]
+    if readiness["blocked"]:
+        found = ", ".join(
+            f"{name}={readiness['counts'][name]}"
+            for name in readiness["counts"]
+            if readiness["counts"][name]
+        )
+        reasons.append(
+            f"work is in flight or unresolved ({found}); stop new launches, reconcile the work, "
+            "stop all writers, and rerun"
+        )
+    return reasons
+
+
 def _ensure_migration_ledger_index(database: Database[Any]) -> None:
     """Ensure each versioned migration has exactly one ledger entry."""
     database["migration_ledger"].create_index(
@@ -2011,6 +2349,24 @@ if __name__ == "__main__":
         help="Actually execute the migration (default is dry-run)",
     )
 
+    run_scope_parser = subparsers.add_parser(
+        "prepare-run-scope",
+        help="Optionally drop the unused unique index of the earlier run scope",
+    )
+    run_scope_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually drop the index (default is dry-run)",
+    )
+    run_scope_parser.add_argument(
+        "--writers-quiesced",
+        action="store_true",
+        help=(
+            "State that every API, worker, scheduler, and external client that writes runs is "
+            "stopped for the migration, including this release; required with --execute. Not verified."
+        ),
+    )
+
     project_calibration_parser = subparsers.add_parser(
         "project-scoped-calibration",
         help="Consolidate user-owned calibration data into project-shared state",
@@ -2034,6 +2390,17 @@ if __name__ == "__main__":
             allow_missing_artifacts=args.allow_missing_artifacts,
         )
         logger.info(f"Migration run complete: {stats}")
+    elif args.command == "prepare-run-scope":
+        client = _get_mongo_client()
+        try:
+            stats = migrate_prepare_run_scope(
+                client[os.getenv("MONGO_DB_NAME", "qdash")],
+                dry_run=not args.execute,
+                writers_quiesced=args.writers_quiesced,
+            )
+        finally:
+            client.close()
+        logger.info(f"Migration complete: {stats}")
     elif args.command == "fix-invalid-fidelity":
         from qdash.dbmodel.initialize import initialize
 

@@ -19,6 +19,7 @@ import dagre from "dagre";
 import type { Edge, Node, NodeProps, NodeTypes } from "@xyflow/react";
 
 import { QubitTile } from "@/components/ui/QubitTile";
+import { ViewSwitch } from "@/components/ui/ViewSwitch";
 import { formatParameterValue } from "@/lib/formatParameterValue";
 import type { LineageEdgeResponse, LineageNodeResponse } from "@/schemas";
 
@@ -479,20 +480,16 @@ export function ProvenanceGraph({
             </select>
           </label>
         )}
-        <div className="tabs tabs-boxed bg-base-200" role="tablist" aria-label="Graph view">
-          {(["values", "tasks"] as const).map((choice) => (
-            <button
-              key={choice}
-              type="button"
-              role="tab"
-              aria-selected={view === choice}
-              className={`tab tab-xs ${view === choice ? "tab-active" : ""}`}
-              onClick={() => setView(choice)}
-            >
-              {choice === "values" ? "Values and tasks" : "Tasks only"}
-            </button>
-          ))}
-        </div>
+        <ViewSwitch
+          ariaLabel="Graph view"
+          size="xs"
+          value={view}
+          onValueChange={setView}
+          items={[
+            { value: "values", label: "Values and tasks" },
+            { value: "tasks", label: "Tasks only" },
+          ]}
+        />
         <p className="ml-auto text-base-content/60">
           {shown.nodes.length} of {apiNodes.length} nodes
           {view === "values" ? `, ${counts.values} values and ${counts.tasks} tasks` : ""}

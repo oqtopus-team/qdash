@@ -5,10 +5,10 @@ import pytest
 
 from qdash.common.mux_mapping import MuxMapping
 from qdash.datamodel.task_call import TaskCall
-from qdash.workflow.service.steps.one_qubit import CustomOneQubit
+from qdash.workflow.service.steps.one_qubit import CustomOneQubit, OneQubitCheck, OneQubitFineTune
 
 if TYPE_CHECKING:
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
 
 
 def test_custom_one_qubit_direct_targets_reuse_step_execution(monkeypatch) -> None:
@@ -28,7 +28,7 @@ def test_custom_one_qubit_direct_targets_reuse_step_execution(monkeypatch) -> No
         finish_calibration=MagicMock(side_effect=AssertionError("pipeline owns completion")),
     )
     step = CustomOneQubit(step_name="simple_tasks", tasks=[TaskCall(name="CheckRabi")])
-    result = step._execute_direct(cast("CalibSession", session), ["1"])
+    result = step._execute_direct(cast("ExecutionRuntime", session), ["1"])
 
     assert result == {"direct": {"1": {"status": "success"}}}
     # Workers receive the step session's spec and borrow its Execution.
@@ -73,7 +73,7 @@ def test_custom_one_qubit_qubit_targets_use_scheduled_strategy(monkeypatch) -> N
         continue_on_failure=True,
     )
 
-    step.execute(cast("CalibSession", session), QubitTargets(["1", "4"]), StepContext())
+    step.execute(cast("ExecutionRuntime", session), QubitTargets(["1", "4"]), StepContext())
 
     assert len(calls) == 1
     assert calls[0].mux_ids == [0, 1]
@@ -114,7 +114,7 @@ def test_one_qubit_check_qubit_targets_use_scheduled_strategy(monkeypatch) -> No
     )
     step = OneQubitCheck(execution_mode="parallel_by_round", tasks=[TaskCall(name="CheckRabi")])
 
-    step.execute(cast("CalibSession", session), QubitTargets(["2", "5"]), StepContext())
+    step.execute(cast("ExecutionRuntime", session), QubitTargets(["2", "5"]), StepContext())
 
     assert len(calls) == 1
     assert calls[0].mux_ids == [0, 1]
@@ -136,12 +136,12 @@ def test_fine_tune_respects_coarse_status_filter(monkeypatch, successful_qids) -
             qid, QubitCalibData(status="success" if qid in successful_qids else "failed")
         )
     ctx = StepContext(candidate_qids=["0", "1"], one_qubit_check=coarse_result)
-    session = cast("CalibSession", SimpleNamespace(chip_id="64Q"))
+    session = cast("ExecutionRuntime", SimpleNamespace(chip_id="64Q"))
     targets = QubitTargets(["0", "1"])
     ctx = FilterByStatus().execute(session, targets, ctx)
     execute = MagicMock(return_value={})
     step = OneQubitFineTune()
-    monkeypatch.setattr(step, "_execute_with_qids", execute)
+    monkeypatch.setattr(step, "_execute_scheduled", execute)
 
     step.execute(session, targets, ctx)
 
@@ -151,3 +151,42 @@ def test_fine_tune_respects_coarse_status_filter(monkeypatch, successful_qids) -
         execute.assert_not_called()
         assert ctx.one_qubit_fine_tune is not None
         assert ctx.one_qubit_fine_tune.qubits == {}
+
+
+@pytest.mark.parametrize(
+    ("step_factory", "stage_name"),
+    [
+        (lambda: CustomOneQubit(step_name="custom", tasks=[TaskCall(name="CheckRabi")]), "custom"),
+        (OneQubitCheck, "one_qubit_check"),
+        (
+            lambda: OneQubitFineTune(execution_mode="sequential"),
+            "one_qubit_fine_tune",
+        ),
+    ],
+)
+def test_one_qubit_steps_schedule_explicit_qids_with_their_mode(
+    monkeypatch, step_factory, stage_name
+) -> None:
+    calls = []
+
+    def scheduled(session, **kwargs):
+        calls.append(kwargs)
+        return {}
+
+    monkeypatch.setattr(
+        "qdash.workflow.service.steps.one_qubit._execute_scheduled_one_qubit", scheduled
+    )
+    step = step_factory()
+    session = cast("ExecutionRuntime", SimpleNamespace(chip_id="64Qv3"))
+    plan = object()
+
+    step._execute_scheduled(session, ["1", "4"], plan)
+
+    assert calls == [
+        {
+            "qids": ["1", "4"],
+            "plan": plan,
+            "stage_name": stage_name,
+            "execution_mode": step.execution_mode,
+        }
+    ]

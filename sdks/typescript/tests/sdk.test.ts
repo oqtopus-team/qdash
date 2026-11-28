@@ -1,13 +1,15 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import * as clientPackage from "@oqtopus-team/qdash-client";
-import { QDashClient, QDashConfig } from "@oqtopus-team/qdash-client";
 import {
+  ApiError,
   QDash,
+  QDashConfig,
   QDashConfigError,
+  QDashApiError,
   QDashNotFoundError,
+  QDashResultUnknownError,
   QDashTimeoutError,
   QDashValidationError,
   customOneQubit,
@@ -44,14 +46,10 @@ function server(routes: Record<string, Reply[]>) {
   return { fetch, requests };
 }
 
-function client(fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>, projectId?: string) {
-  return new QDashClient(
-    new QDashConfig({
-      baseUrl: "https://qdash.example/api",
-      apiToken: "token",
-      ...(projectId ? { projectId } : {}),
-    }),
-    { fetch },
+function session(fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>, projectId?: string) {
+  return new QDash(
+    { baseUrl: "https://qdash.example/api", apiToken: "token", ...(projectId ? { projectId } : {}) },
+    { fetch, sleep: async () => {} },
   );
 }
 
@@ -112,7 +110,7 @@ const expectedSpec = {
 describe("QDash SDK session", () => {
   it("sends nothing while a session, chip or workflow scope is defined", () => {
     const { fetch, requests } = server({});
-    const qdash = new QDash(client(fetch, "p1"));
+    const qdash = session(fetch, "p1");
     const chip = qdash.chip("64Qv3");
     expect(chip.chipId).toBe("64Qv3");
     expect(qdash.workflows).toBeDefined();
@@ -120,18 +118,37 @@ describe("QDash SDK session", () => {
     expect(() => qdash.chip("")).toThrow(TypeError);
   });
 
-  it("scopes a project without changing the given client or its configuration", async () => {
-    const { fetch, requests } = server({ "GET /flows": [{ body: { flows: [] } }, { body: { flows: [] } }] });
-    const base = client(fetch, "default-project");
-    const qdash = new QDash(base, { projectId: "p2" });
+  it("scopes a project without changing the given config or the original session", async () => {
+    const { fetch, requests } = server({ "GET /flows": [{ body: { flows: [] } }, { body: { flows: [] } }, { body: { flows: [] } }] });
+    const config = new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token", projectId: "default-project" });
+    const base = new QDash(config, { fetch });
+    const qdash = new QDash(config, { projectId: "p2", fetch });
+    const other = base.withProject("p3");
 
     expect(qdash.projectId).toBe("p2");
-    expect(qdash.client).not.toBe(base);
-    expect(base.config.projectId).toBe("default-project");
+    expect(qdash.config.projectId).toBe("p2");
+    expect(config.projectId).toBe("default-project");
+    expect(base.projectId).toBe("default-project");
     await qdash.workflows.list();
-    await base.listFlows();
-    expect(requests.map((request) => request.project)).toEqual(["p2", "default-project"]);
-    expect(() => new QDash(base, { projectId: "" })).toThrow(QDashConfigError);
+    await base.workflows.list();
+    await other.api.flow.listFlows();
+    expect(requests.map((request) => request.project)).toEqual(["p2", "default-project", "p3"]);
+    expect(() => new QDash(config, { projectId: "" })).toThrow(QDashConfigError);
+    expect(() => base.withProject("")).toThrow(QDashConfigError);
+  });
+
+  it("keeps a frozen snapshot, so the reported project is the one sent", async () => {
+    const { fetch, requests } = server({ "GET /flows": [{ body: { flows: [] } }] });
+    const options = { baseUrl: "https://qdash.example/api", apiToken: "token", projectId: "p1" };
+    const qdash = new QDash(options, { fetch });
+    options.projectId = "changed";
+    expect(Object.isFrozen(qdash.config)).toBe(true);
+    expect(() => {
+      (qdash.config as { projectId?: string }).projectId = "x";
+    }).toThrow(TypeError);
+    await qdash.workflows.list();
+    expect(qdash.projectId).toBe("p1");
+    expect(requests[0]?.project).toBe("p1");
   });
 
   it("builds an owning session from the environment with a project", async () => {
@@ -139,7 +156,7 @@ describe("QDash SDK session", () => {
     const qdash = QDash.fromEnv({
       env: { QDASH_BASE_URL: "https://qdash.example/api", QDASH_API_TOKEN: "t", QDASH_PROJECT_ID: "env-p" },
       projectId: "p3",
-      clientOptions: { fetch },
+      fetch,
     });
     expect(qdash.projectId).toBe("p3");
     await qdash.workflows.list();
@@ -152,7 +169,7 @@ describe("Chip calibration", () => {
     const { fetch, requests } = server({
       "POST /calibration-pipelines/validate": [{ body: { valid: true, backend_name: "qubex", problems: [] } }],
     });
-    const chip = new QDash(client(fetch, "p1")).chip("64Qv3");
+    const chip = session(fetch, "p1").chip("64Qv3");
 
     const check = await chip.validateCalibration(targets, steps, { defaultRunParameters: runParameters });
 
@@ -166,7 +183,7 @@ describe("Chip calibration", () => {
     const { fetch, requests } = server({
       "POST /calibration-pipelines/validate": [{ body: { valid: true, backend_name: "fake" } }],
     });
-    await new QDash(client(fetch)).chip("16Q").validateCalibration(muxTargets([0, 1], { excludeQids: ["5"] }), steps, {
+    await session(fetch).chip("16Q").validateCalibration(muxTargets([0, 1], { excludeQids: ["5"] }), steps, {
       name: "coherence-t1-t2echo",
       tags: ["sdk"],
       backendName: "fake",
@@ -186,7 +203,7 @@ describe("Chip calibration", () => {
 
   it("calibrate dispatches once, returns the execution ID, and does not wait", async () => {
     const { fetch, requests } = server({ "POST /calibration-pipelines/execute": [{ body: dispatched }] });
-    const run = await new QDash(client(fetch, "p1")).chip("64Qv3").calibrate(targets, steps, {
+    const run = await session(fetch, "p1").chip("64Qv3").calibrate(targets, steps, {
       defaultRunParameters: runParameters,
     });
 
@@ -201,7 +218,7 @@ describe("Chip calibration", () => {
     const { fetch, requests } = server({
       "POST /calibration-pipelines/execute": [{ body: dispatched }, { body: dispatched }],
     });
-    const qdash = new QDash(client(fetch));
+    const qdash = session(fetch);
     expect(qdash.projectId).toBeUndefined();
     const run = await qdash.chip("64Qv3").calibrate(targets, steps, { defaultRunParameters: runParameters });
     await qdash.pipelines.execute(expectedSpec, { chipId: "64Qv3" });
@@ -213,12 +230,84 @@ describe("Chip calibration", () => {
     ]);
   });
 
+  it("records a run in a calibration session under its retry key", async () => {
+    const { fetch, requests } = server({
+      "GET /calibration-sessions": [{ body: { items: [{ calibration_session_id: "cs-1", chip_id: "64Qv3", status: "open" }], has_more: false } }],
+      "POST /calibration-pipelines/execute": [{ body: { ...dispatched, calibration_session_id: "cs-1", pipeline_run_id: "cpr-1", replayed: false } }],
+    });
+    const qdash = session(fetch, "p1");
+    const run = await qdash.pipelines.execute(expectedSpec, { chipId: "64Qv3" }, { calibrationSessionId: "cs-1", idempotencyKey: "key-1" });
+
+    expect(run.response.pipeline_run_id).toBe("cpr-1");
+    expect(requests).toEqual([
+      { method: "GET", path: "/calibration-sessions", body: undefined, project: "p1" },
+      {
+        method: "POST",
+        path: "/calibration-pipelines/execute",
+        body: { chip_id: "64Qv3", spec: expectedSpec, calibration_session_id: "cs-1", idempotency_key: "key-1" },
+        project: "p1",
+      },
+    ]);
+    await expect(
+      qdash.pipelines.execute(expectedSpec, { chipId: "64Qv3" }, { calibrationSessionId: "cs-1", idempotencyKey: "" }),
+    ).rejects.toThrow(TypeError);
+  });
+
+  it("names the decision a recorded run carries out", async () => {
+    const { fetch, requests } = server({
+      "GET /calibration-sessions": [{ body: { items: [{ calibration_session_id: "cs-1", chip_id: "64Qv3" }], has_more: false } }],
+      "POST /calibration-pipelines/execute": [{ body: { ...dispatched, calibration_session_id: "cs-1", pipeline_run_id: "cpr-1", decision_id: "d-1", replayed: false } }],
+    });
+    const qdash = session(fetch, "p1");
+    await qdash.pipelines.execute(expectedSpec, { chipId: "64Qv3" }, { calibrationSessionId: "cs-1", idempotencyKey: "key-1", decisionId: "d-1" });
+    expect(requests[1]?.body).toEqual({
+      chip_id: "64Qv3",
+      spec: expectedSpec,
+      calibration_session_id: "cs-1",
+      idempotency_key: "key-1",
+      decision_id: "d-1",
+    });
+  });
+
+  for (const [name, answer, recordIn] of [
+    ["drops the recording", { ...dispatched }, { idempotencyKey: "key-1" }],
+    ["records another session", { ...dispatched, calibration_session_id: "cs-other", pipeline_run_id: "cpr-1" }, { calibrationSessionId: "cs-1", idempotencyKey: "key-1" }],
+    ["drops the decision", { ...dispatched, calibration_session_id: "cs-1", pipeline_run_id: "cpr-1" }, { calibrationSessionId: "cs-1", idempotencyKey: "key-1", decisionId: "d-1" }],
+  ] as const) {
+    it(`reports a launch whose answer ${name} as result unknown, sent once`, async () => {
+      const { fetch, requests } = server({
+        "GET /calibration-sessions": [{ body: { items: [{ calibration_session_id: "cs-1", chip_id: "64Qv3" }], has_more: false } }],
+        "POST /calibration-pipelines/execute": [{ status: 201, body: answer }],
+      });
+      const error = await session(fetch, "p1")
+        .pipelines.execute(expectedSpec, { chipId: "64Qv3" }, recordIn)
+        .catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(QDashResultUnknownError);
+      expect(error).toBeInstanceOf(QDashApiError);
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).toMatchObject({ name: "QDashResultUnknownError", executionId: "exec-1", statusCode: 201, body: answer });
+      expect((error as Error).message).toMatch(/^Pipeline result unknown: .*Do not retry automatically/);
+      expect(requests.filter((request) => request.method === "POST")).toHaveLength(1);
+    });
+  }
+
+  it("sends a reported origin only when the caller gives one", async () => {
+    const { fetch, requests } = server({
+      "POST /calibration-pipelines/execute": [{ body: dispatched }],
+    });
+    const qdash = session(fetch, "p1");
+    const origin = { source: "agent_tool" as const, tool: "qdash_run_pipeline", client: "pi-qdash" };
+    await qdash.pipelines.execute(expectedSpec, { chipId: "64Qv3" }, undefined, { reportedOrigin: origin });
+
+    expect(requests[0]?.body).toEqual({ chip_id: "64Qv3", spec: expectedSpec, reported_origin: origin });
+  });
+
   it("propagates a 422 with its problems", async () => {
     const problems = [{ path: "steps[0].tasks[1]", message: "CheckT1 needs Rabi parameters" }];
     const { fetch } = server({
       "POST /calibration-pipelines/execute": [{ status: 422, body: { detail: { message: "not valid", problems } } }],
     });
-    const error = await new QDash(client(fetch, "p1"))
+    const error = await session(fetch, "p1")
       .chip("64Qv3")
       .calibrate(targets, steps)
       .catch((caught: unknown) => caught);
@@ -235,7 +324,7 @@ describe("Chip calibration", () => {
         { body: detail("completed", "failed") },
       ],
     });
-    const run = await new QDash(client(fetch, "p1")).chip("64Qv3").calibrate(targets, steps);
+    const run = await session(fetch, "p1").chip("64Qv3").calibrate(targets, steps);
     const result = await run.wait({ pollIntervalSeconds: 0 });
 
     expect(result.executionId).toBe("exec-1");
@@ -250,7 +339,7 @@ describe("Chip calibration", () => {
       "POST /calibration-pipelines/execute": [{ body: dispatched }],
       "GET /executions/exec-1": [{ body: detail("running") }, { body: detail("cancelled") }],
     });
-    const run = await new QDash(client(fetch, "p1")).chip("64Qv3").calibrate(targets, steps);
+    const run = await session(fetch, "p1").chip("64Qv3").calibrate(targets, steps);
     await expect(run.get()).resolves.toMatchObject({ status: "running" });
     await expect(run.wait({ pollIntervalSeconds: 0 })).resolves.toMatchObject({ status: "cancelled" });
   });
@@ -260,7 +349,7 @@ describe("Chip calibration", () => {
       "POST /calibration-pipelines/execute": [{ body: dispatched }],
       "GET /executions/exec-1": [{ status: 404 }, { status: 404 }],
     });
-    const run = await new QDash(client(fetch, "p1")).chip("64Qv3").calibrate(targets, steps);
+    const run = await session(fetch, "p1").chip("64Qv3").calibrate(targets, steps);
     await expect(run.wait({ timeoutSeconds: 0, pollIntervalSeconds: 0 })).rejects.toBeInstanceOf(QDashTimeoutError);
     await expect(run.get()).rejects.toBeInstanceOf(QDashNotFoundError);
     expect(requests.every((request) => request.method !== "DELETE" && !request.path.includes("cancel"))).toBe(true);
@@ -276,7 +365,7 @@ describe("Pipelines", () => {
       "POST /calibration-pipelines/execute": [{ body: dispatched }],
       "GET /executions/exec-1": [{ body: detail("completed", "completed") }],
     });
-    const qdash = new QDash(client(fetch, "p1"));
+    const qdash = session(fetch, "p1");
     await qdash.pipelines.catalog({ backendName: "fake" });
     await qdash.pipelines.validate(legacy, { chipId: "64Qv3" });
     const run = await qdash.pipelines.execute(expectedSpec, { chipId: "64Qv3" });
@@ -352,7 +441,7 @@ describe("Workflows", () => {
       "GET /flows": [{ body: { flows: [{ ...flow, code: undefined }] } }],
       "GET /flows/coherence_check": [{ body: flow }, { status: 404, body: { detail: "missing" } }],
     });
-    const qdash = new QDash(client(fetch, "p1"));
+    const qdash = session(fetch, "p1");
     const [summary] = await qdash.workflows.list();
     const workflow = await qdash.workflows.get("coherence_check");
 
@@ -366,7 +455,7 @@ describe("Workflows", () => {
 
   it("checks names before any request and runs without a project on the server's default", async () => {
     const { fetch, requests } = server({ "POST /flows/coherence_check/execute": [{ body: dispatched }] });
-    const qdash = new QDash(client(fetch));
+    const qdash = session(fetch);
     await expect(qdash.workflows.get("../chips")).rejects.toThrow(TypeError);
     await expect(qdash.workflows.run("bad name")).rejects.toThrow(TypeError);
     expect(requests).toEqual([]);
@@ -384,7 +473,7 @@ describe("Workflows", () => {
       "POST /flows/coherence_check/execute": [{ body: dispatched }, { body: dispatched }],
       "GET /executions/exec-1": [{ status: 404 }, { body: detail("completed", "completed") }],
     });
-    const qdash = new QDash(client(fetch, "p1"));
+    const qdash = session(fetch, "p1");
     const workflow = await qdash.workflows.get("coherence_check");
     const run = await workflow.run();
     await qdash.workflows.run("coherence_check", { parameters: { qids: ["0", "1"] } });
@@ -400,23 +489,53 @@ describe("Workflows", () => {
   });
 });
 
+describe("Workflows with a recorded run", () => {
+  for (const [name, answer, options] of [
+    ["drops the recorded run", { ...dispatched }, { idempotencyKey: "k" }],
+    ["records another session", { ...dispatched, calibration_session_id: "cs-other", calibration_run_id: "cr-1" }, { calibrationSessionId: "cs-1", idempotencyKey: "k" }],
+  ] as const) {
+    it(`reports a run whose answer ${name} as result unknown, sent once`, async () => {
+      const { fetch, requests } = server({ "POST /flows/coherence_check/execute": [{ body: answer }] });
+      const error = await session(fetch)
+        .workflows.run("coherence_check", options)
+        .catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(QDashResultUnknownError);
+      expect(error).toBeInstanceOf(QDashApiError);
+      expect(error).toMatchObject({ executionId: "exec-1", statusCode: 200 });
+      expect((error as Error).message).toMatch(/^Workflow result unknown: .*reconcile the execution first/);
+      expect(requests).toHaveLength(1);
+    });
+  }
+
+  it("returns a run whose answer echoes the session and recorded run", async () => {
+    const answer = { ...dispatched, calibration_session_id: "cs-1", calibration_run_id: "cr-1" };
+    const { fetch } = server({ "POST /flows/coherence_check/execute": [{ body: answer }] });
+    const run = await session(fetch).workflows.run("coherence_check", { calibrationSessionId: "cs-1", idempotencyKey: "k" });
+    expect(run.calibrationRunId).toBe("cr-1");
+  });
+});
+
 describe("package boundary", () => {
-  it("re-exports the client's own error classes, so instanceof works across packages", async () => {
-    const sdk = await import("../src/index.js");
-    for (const name of [
-      "QDashApiError",
-      "QDashAuthError",
-      "QDashConfigError",
-      "QDashNotFoundError",
-      "QDashTimeoutError",
-      "QDashTransportError",
-      "QDashValidationError",
-    ] as const) {
-      expect(sdk[name]).toBe(clientPackage[name]);
-    }
-    const { fetch } = server({ "GET /executions/exec-1": [{ status: 404 }] });
-    const caught = await new QDash(client(fetch)).client.getExecution("exec-1").catch((error: unknown) => error);
-    expect(caught).toBeInstanceOf(clientPackage.QDashNotFoundError);
+  it("raises its own errors, which are the generated client's ApiError", async () => {
+    const { fetch } = server({ "GET /executions/exec-1": [{ status: 404 }, { status: 404 }] });
+    const qdash = session(fetch);
+    const caught = await qdash.run("exec-1").get().catch((error: unknown) => error);
     expect(caught).toBeInstanceOf(QDashNotFoundError);
+    expect(caught).toBeInstanceOf(ApiError);
+    expect(caught).toMatchObject({ statusCode: 404 });
+    // The generated client raises ApiError itself; the SDK's errors are its subclasses.
+    const raw = await qdash.api.execution.getExecution({ execution_id: "exec-1" }).catch((error: unknown) => error);
+    expect(raw).toBeInstanceOf(ApiError);
+    expect(raw).not.toBeInstanceOf(QDashNotFoundError);
+  });
+
+  it("imports nothing from the legacy client", () => {
+    const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+    expect(manifest.dependencies["@oqtopus-team/qdash-client"]).toBeUndefined();
+    const sources = readdirSync(new URL("../src", import.meta.url), { recursive: true, withFileTypes: false }) as string[];
+    for (const name of sources.filter((file) => file.endsWith(".ts"))) {
+      const text = readFileSync(new URL(`../src/${name}`, import.meta.url), "utf8");
+      expect(text, name).not.toMatch(/(from\s+|import\(\s*)["']@oqtopus-team\/qdash-client/);
+    }
   });
 });

@@ -45,7 +45,7 @@ interface TaskNode {
 }
 
 /** Status classes use the theme's semantic colors so nodes stay readable on every theme. */
-const getStatusClasses = (status: string): string => {
+export const getStatusClasses = (status: string): string => {
   switch (status) {
     case "running":
       return "border-info bg-info/10 text-info";
@@ -63,7 +63,7 @@ const getStatusClasses = (status: string): string => {
 };
 
 /** Edge stroke and arrow follow the theme's content color. */
-const EDGE_COLOR = "color-mix(in oklch, var(--color-base-content) 45%, transparent)";
+export const EDGE_COLOR = "color-mix(in oklch, var(--color-base-content) 45%, transparent)";
 
 interface NodeData extends Record<string, unknown> {
   name: string;

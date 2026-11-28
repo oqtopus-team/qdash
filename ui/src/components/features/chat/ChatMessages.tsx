@@ -3,11 +3,16 @@
 import React, { memo, useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   AlertTriangle,
+  Bug,
   Check,
   CheckCircle2,
+  CircleSlash,
   Copy,
+  Download,
+  ExternalLink,
   GitBranch,
   ImageIcon,
+  LoaderCircle,
   Pencil,
   RotateCcw,
   Square,
@@ -28,32 +33,41 @@ import {
   type InteractionState,
 } from "@/components/features/chat/ChatInteractionCards";
 import { useOptionalChatDock } from "@/contexts/ChatDockContext";
-import { editTargetCode } from "@/lib/copilotEditTarget";
+import { editTargetCode } from "@/lib/agentEditTarget";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
-import { QdashBotAvatar } from "@/components/ui/UserAvatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toast";
 import { copyText } from "@/lib/utils/clipboard";
-import { answerStartIndex } from "@/lib/copilotChatStream";
-import { answerFeedback } from "@/hooks/useCopilotChat";
+import { BUG_REPORT_URL, buildChatErrorReport, classifyChatError } from "@/lib/chatErrorReport";
+import {
+  answerFileName,
+  answerMarkdown,
+  downloadText,
+  hasAnswerMarkdown,
+  writtenFiles,
+  type WrittenFile,
+} from "@/lib/chatDownloads";
+import { answerStartIndex } from "@/lib/agentChatStream";
+import { answerFeedback } from "@/hooks/useAgentChat";
 import type {
   AnswerFeedback,
   BlocksResult,
-  ChatMessage as CopilotMessage,
-  CopilotBlocksResult,
+  ChatMessage as AgentMessage,
+  AgentBlocksResult,
   LiveTurn,
-} from "@/types/copilotChat";
+  TurnConnection,
+} from "@/types/agentChat";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function parseBlocksContent(content: string): CopilotBlocksResult | null {
+function parseBlocksContent(content: string): AgentBlocksResult | null {
   if (!content.startsWith("{")) return null;
   try {
     const data = JSON.parse(content);
     if (data.blocks && Array.isArray(data.blocks)) {
-      return data as CopilotBlocksResult;
+      return data as AgentBlocksResult;
     }
   } catch {
     // Not JSON
@@ -75,7 +89,7 @@ export function messageText(content: string): string {
     .join("\n\n");
 }
 
-function isErrorMessage(message: CopilotMessage): boolean {
+function isErrorMessage(message: AgentMessage): boolean {
   return message.role === "assistant" && message.content.startsWith("Error: ");
 }
 
@@ -224,7 +238,7 @@ function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"
     ...expected_images.map((img) => ({
       key: `expected-${img.index}`,
       alt: img.alt_text,
-      src: `${baseURL}/copilot/expected-image?task_name=${encodeURIComponent(task_name)}&index=${img.index}`,
+      src: `${baseURL}/agent/expected-image?task_name=${encodeURIComponent(task_name)}&index=${img.index}`,
     })),
   ];
 
@@ -257,14 +271,57 @@ function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"
   );
 }
 
+/**
+ * Downloads of what the answer's `write` calls wrote, from the content the chat
+ * holds. Labeled as the original write: the workspace file may have changed since.
+ */
+function WrittenFiles({ files }: { files: WrittenFile[] }) {
+  return (
+    <div role="group" aria-label="Files written in this answer" className="mt-2">
+      <p className="mb-1 text-xs text-base-content/50">
+        Original write content from this answer. Later changes to these files are not included.
+      </p>
+      <div className="flex flex-wrap gap-1">
+        {files.map((file) => (
+          <button
+            key={file.path}
+            type="button"
+            className="btn btn-ghost btn-sm"
+            title={file.path}
+            aria-label={`Download original write content of ${file.path}`}
+            onClick={() => downloadText(file.fileName, file.content)}
+          >
+            <Download data-icon="inline-start" aria-hidden="true" />
+            <span className="max-w-60 truncate font-mono">{file.fileName}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Whether an answer's work is history behind it: the answer ended and has text of
+ * its own, apart from the updates in its work. Partial text of an answer that was
+ * stopped, cut off, or still runs is not an answer to fold the work behind.
+ */
+function workIsHistory(blocks: AgentBlocksResult): boolean {
+  if (blocks.in_progress || blocks.stopped || blocks.interrupted) return false;
+  return blocks.blocks.some((b) => b.type === "text" && Boolean(b.content?.trim()));
+}
+
 function BlocksContent({
   blocks,
   interaction,
+  finishedHere = false,
 }: {
-  blocks: CopilotBlocksResult;
+  blocks: AgentBlocksResult;
   interaction: InteractionState;
+  /** The answer of a turn this view streamed, now ended. */
+  finishedHere?: boolean;
 }) {
   const figures = blocks.trace ? figuresInSteps(blocks.trace.steps) : [];
+  const files = writtenFiles(blocks.trace?.steps);
   // Preview only the proposal's target; the dock checks again when applying it.
   const dock = useOptionalChatDock();
   const state: InteractionState = dock?.canApplyCode
@@ -276,7 +333,14 @@ function BlocksContent({
     : interaction;
   return (
     <>
-      {blocks.trace && <ChatTraceSummary trace={blocks.trace} />}
+      {blocks.trace && (
+        // With an answer of its own, the work and its updates are history behind it.
+        <ChatTraceSummary
+          trace={blocks.trace}
+          foldable={workIsHistory(blocks)}
+          finishedHere={finishedHere}
+        />
+      )}
       {figures.length > 0 && <FigureStrip paths={figures} className="mb-3" />}
       <ImageSentBadge imagesSent={blocks.images_sent} />
       {blocks.assessment && (
@@ -315,10 +379,23 @@ function BlocksContent({
         }
         return null;
       })}
+      {files.length > 0 && <WrittenFiles files={files} />}
       {blocks.stopped && (
         <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-base-content/45">
           <Square className="w-3 h-3" />
           Stopped
+        </div>
+      )}
+      {blocks.in_progress && !blocks.stopped && (
+        <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-base-content/45">
+          <LoaderCircle className="w-3 h-3" />
+          Answer in progress, saved by the server
+        </div>
+      )}
+      {blocks.interrupted && !blocks.stopped && (
+        <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-base-content/45">
+          <CircleSlash className="w-3 h-3" />
+          Interrupted before it ended
         </div>
       )}
     </>
@@ -334,7 +411,7 @@ export const UserMessage = memo(function UserMessage({
   canEdit,
   onEdit,
 }: {
-  message: CopilotMessage;
+  message: AgentMessage;
   /** Nothing is streaming, so the message can be edited and resent. */
   canEdit: boolean;
   onEdit: (text: string) => void;
@@ -447,6 +524,67 @@ export const UserMessage = memo(function UserMessage({
   );
 });
 
+/**
+ * A bug-report draft for the last answer that ended with an application error. The user
+ * reads and copies it and opens the repository's bug form themselves; nothing is sent.
+ */
+function ChatErrorReport({ error }: { error: string }) {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const draftId = useId();
+  const draft = open
+    ? buildChatErrorReport({ message: error, path: window.location.pathname })
+    : "";
+  const copy = () =>
+    copyText(draft).then(
+      () => toast.success("Report draft copied"),
+      () => toast.error("Failed to copy to clipboard"),
+    );
+  return (
+    <div className="flex w-full flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="btn btn-ghost btn-sm self-start"
+        aria-expanded={open}
+        aria-controls={draftId}
+      >
+        <Bug data-icon="inline-start" />
+        Report this error
+      </button>
+      {open && (
+        <div id={draftId} className="flex flex-col gap-2">
+          <p className="text-xs text-base-content/60">
+            This looks like an application fault. Review the draft, remove anything private, and
+            post it yourself; QDash does not file issues.
+          </p>
+          <textarea
+            readOnly
+            value={draft}
+            aria-label="Bug report draft"
+            className="textarea textarea-sm h-48 w-full font-mono"
+          />
+          <div className="flex flex-wrap gap-1">
+            <button type="button" onClick={copy} className="btn btn-ghost btn-sm">
+              <Copy data-icon="inline-start" />
+              Copy draft
+            </button>
+            <a
+              href={BUG_REPORT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-ghost btn-sm"
+            >
+              Open the GitHub bug form
+              <ExternalLink data-icon="inline-end" />
+            </a>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const AssistantMessage = memo(function AssistantMessage({
   message,
   isLast,
@@ -462,9 +600,12 @@ export const AssistantMessage = memo(function AssistantMessage({
   canBranch = false,
   branching = false,
   onBranch,
+  finishedHere = false,
 }: {
-  message: CopilotMessage;
+  message: AgentMessage;
   isLast: boolean;
+  /** The answer of a turn this view streamed, now ended, rather than one loaded with the chat. */
+  finishedHere?: boolean;
   canRetry: boolean;
   onRetry: () => void;
   /** The answer stopped or failed and can go on from where it ended, without a new message. */
@@ -507,6 +648,10 @@ export const AssistantMessage = memo(function AssistantMessage({
               Retry
             </button>
           )}
+          {/* Only the latest error, and only one that looks like a fault, offers a report. */}
+          {isLast && classifyChatError(message.content.slice("Error: ".length)).reportable && (
+            <ChatErrorReport error={message.content.slice("Error: ".length)} />
+          )}
         </div>
       </AssistantRow>
     );
@@ -520,6 +665,7 @@ export const AssistantMessage = memo(function AssistantMessage({
         <BlocksContent
           blocks={blocks}
           interaction={{ active: isLast && canRetry, answer, onAnswer, onDecide, onOther }}
+          finishedHere={finishedHere}
         />
       ) : (
         <ChatMarkdown>{message.content}</ChatMarkdown>
@@ -532,6 +678,16 @@ export const AssistantMessage = memo(function AssistantMessage({
         }`}
       >
         <CopyButton text={messageText(message.content)} />
+        {!blocks?.in_progress && !blocks?.stopped && hasAnswerMarkdown(message.content) && (
+          <ActionButton
+            label="Save as Markdown"
+            onClick={() =>
+              downloadText(answerFileName(message.content), answerMarkdown(message.content))
+            }
+          >
+            <Download className="w-3.5 h-3.5" />
+          </ActionButton>
+        )}
         <ActionButton
           label={feedback === "up" ? "Rated helpful" : "Helpful"}
           active={feedback === "up"}
@@ -579,9 +735,12 @@ export const AssistantMessage = memo(function AssistantMessage({
 export function LiveAssistantMessage({
   turn,
   statusMessage,
+  connection = null,
 }: {
   turn: LiveTurn;
   statusMessage: string | null;
+  /** The stream's health, shown apart from what the turn does. */
+  connection?: TurnConnection | null;
 }) {
   const split = answerStartIndex(turn.steps);
   const work = turn.steps.slice(0, split);
@@ -595,14 +754,13 @@ export function LiveAssistantMessage({
       (s.kind === "thinking" && s.endedAt === undefined),
   );
   const idle = !answer && !busy;
+  const figures = answer ? figuresInSteps(work) : [];
 
   return (
     // The activity footer is the live region; the streaming text itself is not announced.
     <AssistantRow className="animate-fade-in-up" aria-busy="true">
-      <LiveTrace steps={work} />
-      {answer && figuresInSteps(work).length > 0 && (
-        <FigureStrip paths={figuresInSteps(work)} className="mb-3" />
-      )}
+      <LiveTrace steps={work} figuresOutside={figures.length > 0} />
+      {figures.length > 0 && <FigureStrip paths={figures} className="mb-3" />}
       {turn.blocks?.map((block, i) =>
         block.type === "ui" ? (
           <ChatUiBlock key={i} ui={block.ui} />
@@ -616,10 +774,8 @@ export function LiveAssistantMessage({
         steps={turn.steps}
         startedAt={turn.startedAt}
         statusMessage={statusMessage}
+        connection={connection}
         className={`h-7 gap-2.5 ${idle ? "text-sm" : "mt-1"}`}
-        leading={
-          idle ? <QdashBotAvatar size={20} className="chat-avatar-active chat-bot-mark" /> : null
-        }
       />
     </AssistantRow>
   );

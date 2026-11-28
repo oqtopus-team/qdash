@@ -5,6 +5,12 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ExecutePipelineResponseCalibrationRunId } from './executePipelineResponseCalibrationRunId';
+import type { ExecutePipelineResponseCalibrationSessionId } from './executePipelineResponseCalibrationSessionId';
+import type { ExecutePipelineResponseDecisionId } from './executePipelineResponseDecisionId';
+import type { ExecutePipelineResponsePipelineRunId } from './executePipelineResponsePipelineRunId';
+import type { ExecutePipelineResponsePlanId } from './executePipelineResponsePlanId';
+import type { ExecutePipelineResponseReviewDigest } from './executePipelineResponseReviewDigest';
 import type { ExecutePipelineResponseTargets } from './executePipelineResponseTargets';
 import type { ResolvedPipelineStep } from './resolvedPipelineStep';
 
@@ -22,6 +28,20 @@ export interface ExecutePipelineResponse {
   qdash_ui_url: string;
   /** Success message */
   message: string;
+  /** The calibration session the run joined: the one the request named, or an automatic one; null when the run joined none */
+  calibration_session_id?: ExecutePipelineResponseCalibrationSessionId;
+  /** The run QDash recorded for the launch; every step execution carries it. Null only for a run the worker records when it starts (a saved flow with no chip) */
+  calibration_run_id?: ExecutePipelineResponseCalibrationRunId;
+  /** True when a retry returned the run an earlier request with its key started */
+  replayed?: boolean;
   steps?: ResolvedPipelineStep[];
   targets?: ExecutePipelineResponseTargets;
+  /** The run QDash recorded for the launch (calibration_run_id) */
+  pipeline_run_id?: ExecutePipelineResponsePipelineRunId;
+  /** The decision the recorded run carries out, as QDash linked it; null when the request named none. A client that sent a decision checks it is echoed here */
+  decision_id?: ExecutePipelineResponseDecisionId;
+  /** For a run of a stored plan: the plan it carries out. A client that ran a plan checks it and review_digest are echoed here */
+  plan_id?: ExecutePipelineResponsePlanId;
+  /** For a run of a stored plan: the review digest it ran. */
+  review_digest?: ExecutePipelineResponseReviewDigest;
 }

@@ -7,7 +7,16 @@ from typing import Any
 from prefect import flow, get_run_logger
 
 from qdash.common.config.backend import get_default_backend
-from qdash.dbmodel.agent_session import AgentCandidateCommitDocument
+from qdash.common.config.params_updater import ParamsApplyRecord
+from qdash.dbmodel.agent_parameter_state import (
+    StoredParameter,
+    acquire_backend_apply_lock,
+    holds_backend_apply_lock,
+    parameter_matches,
+    read_parameter,
+    release_backend_apply_lock,
+)
+from qdash.dbmodel.agent_session import AgentCandidateCommitDocument, AgentSessionDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.workflow.engine.backend import create_backend
 from qdash.workflow.engine.params_updater import (
@@ -33,6 +42,46 @@ def _extract_git_result(result: dict[str, Any]) -> str:
             raise RuntimeError(params_result)
         return params_result
     raise RuntimeError("GitHub params push returned no version result")
+
+
+def _hold_lease(project_id: str, session_id: str, commit: AgentCandidateCommitDocument) -> str:
+    """The chip whose apply lease this apply holds; raises when another apply holds it."""
+    chip_id = commit.chip_id
+    if not chip_id:
+        session = AgentSessionDocument.find_one(
+            {"project_id": project_id, "session_id": session_id}
+        ).run()
+        chip_id = session.chip_id if session is not None else ""
+    token = commit.backend_dispatch_token
+    if not chip_id or not token:
+        raise RuntimeError("The apply has no chip or dispatch reservation to hold a lease with")
+    if holds_backend_apply_lock(chip_id, commit.commit_id, token):
+        return chip_id
+    holder = acquire_backend_apply_lock(
+        project_id=project_id,
+        chip_id=chip_id,
+        session_id=session_id,
+        commit_id=commit.commit_id,
+        token=token,
+    )
+    if holder is not None:
+        raise RuntimeError(
+            f"The backend apply of commit {holder} on chip {chip_id} has not settled; "
+            "nothing was written"
+        )
+    return chip_id
+
+
+def _require_stored(commit: AgentCandidateCommitDocument, chip_id: str, when: str) -> None:
+    """Refuse a session-granted apply whose value is no longer the stored one."""
+    if commit.backend_authority != "session_policy" or commit.after_snapshot is None:
+        return
+    stored = read_parameter(commit.project_id, chip_id, commit.qid, commit.parameter_name)
+    if not parameter_matches(stored, StoredParameter(present=True, value=commit.after_snapshot)):
+        raise RuntimeError(
+            f"The stored {commit.parameter_name} of {commit.qid} is no longer the value commit "
+            f"{commit.commit_id} wrote ({when}); the backend files were not left changed"
+        )
 
 
 @flow(name="agent-candidate-apply")
@@ -71,10 +120,16 @@ def agent_candidate_apply(
         )
 
     updater = None
-    params_snapshot: dict[str, bytes | None] | None = None
+    # Filled as each YAML write lands, so a failure part way still undoes what was written.
+    params_record = ParamsApplyRecord()
+    lease_chip: str | None = None
     try:
         if commit.after_snapshot is None:
             raise ValueError("Candidate commit has no authoritative after snapshot")
+        # Hold the chip's apply lease for the whole write, then check, under it, that a
+        # session-granted value is still the stored one before and after writing the files.
+        lease_chip = _hold_lease(project_id, session_id, commit)
+        _require_stored(commit, lease_chip, "before the write")
         backend_name = get_default_backend()
         github_integration: Any | None = None
         base_git_commit: str | None = None
@@ -114,14 +169,14 @@ def agent_candidate_apply(
             raise ValueError(
                 f"Parameter '{commit.parameter_name}' has no configured params YAML mapping"
             )
-        params_snapshot = updater.snapshot(commit.qid, parameters)
-        changed_files = updater.update(commit.qid, parameters)
+        changed_files = updater.apply(commit.qid, parameters, params_record)
         verified_files = updater.verify(commit.qid, parameters)
         if verified_files != target_files:
             raise RuntimeError(
                 "Backend verification did not cover all target files: "
                 f"target={sorted(target_files)}, verified={sorted(verified_files)}"
             )
+        _require_stored(commit, lease_chip, "after the write")
 
         AgentCandidateCommitDocument.get_motor_collection().update_one(
             {"project_id": project_id, "commit_id": commit_id},
@@ -173,6 +228,7 @@ def agent_candidate_apply(
                 }
             },
         )
+        release_backend_apply_lock(lease_chip, commit_id, commit.backend_dispatch_token)
         logger.info(
             "Applied agent candidate commit=%s files=%s git=%s",
             commit_id,
@@ -191,12 +247,20 @@ def agent_candidate_apply(
         from qdash.common.utils.datetime import now
 
         rollback_error = ""
-        if updater is not None and params_snapshot is not None:
+        if updater is not None and params_record.files:
+            # Undo only the keys this apply wrote and that still hold its value; a value
+            # another writer saved to the same file in the meantime stays in place.
             try:
-                updater.restore(params_snapshot)
+                rollback = updater.rollback(params_record)
             except Exception as restore_exc:
                 rollback_error = f"; backend rollback failed: {restore_exc}"
                 logger.exception("Agent candidate backend rollback failed")
+            else:
+                if rollback.conflicts:
+                    rollback_error = "; backend rollback left later changes in place: " + "; ".join(
+                        rollback.conflicts
+                    )
+                    logger.warning("Agent candidate backend rollback conflicts: %s", rollback_error)
 
         AgentCandidateCommitDocument.get_motor_collection().update_one(
             {"project_id": project_id, "commit_id": commit_id},
@@ -209,5 +273,7 @@ def agent_candidate_apply(
                 }
             },
         )
+        if lease_chip is not None:
+            release_backend_apply_lock(lease_chip, commit_id, commit.backend_dispatch_token)
         logger.error("Agent candidate backend apply failed: %s", exc)
         raise

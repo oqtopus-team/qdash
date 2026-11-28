@@ -152,27 +152,30 @@ def _logistic(x: np.ndarray) -> np.ndarray:
 
 
 def _fit_step(time: np.ndarray, iq: np.ndarray) -> tuple[bool, float, float]:
-    """Fit one complex logistic step and return ``(ok, location_ns, snr)``.
+    """Fit one logistic step to the amplitude envelope and return ``(ok, location_ns, snr)``.
 
-    The two complex levels are solved linearly for each trial location and
-    width, so only those two values are optimized nonlinearly.
+    Fitting ``|iq|`` rather than complex ``iq`` makes edge detection immune to
+    phase rotation or dispersive phase transients during filter/resonator
+    ring-up while preserving the step location. The two real levels are solved
+    linearly for each trial location and width, so only those two values are
+    optimized nonlinearly.
     """
+    amp = np.abs(iq)
     dt = float(time[1] - time[0])
     head = max(2, time.size // 8)
-    distance = np.abs(iq - iq[:head].mean())
+    distance = np.abs(amp - amp[:head].mean())
     crossing = np.flatnonzero(distance >= (distance.min() + distance.max()) / 2)
     t0_init = float(time[crossing[0]]) if crossing.size else float(time.mean())
 
     def levels(params: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         step = _logistic((time - params[0]) / np.exp(params[1]))
         basis = np.column_stack([1.0 - step, step])
-        coefficients, *_ = np.linalg.lstsq(basis, iq, rcond=None)
+        coefficients, *_ = np.linalg.lstsq(basis, amp, rcond=None)
         return coefficients, basis @ coefficients
 
     def residuals(params: np.ndarray) -> np.ndarray:
         _, model = levels(params)
-        delta = iq - model
-        return np.concatenate([delta.real, delta.imag])
+        return np.asarray(amp - model, dtype=float)
 
     try:
         fitted = least_squares(
@@ -186,7 +189,7 @@ def _fit_step(time: np.ndarray, iq: np.ndarray) -> tuple[bool, float, float]:
     except (ValueError, np.linalg.LinAlgError):
         return False, math.nan, math.nan
     coefficients, model = levels(fitted.x)
-    noise = math.sqrt(float(np.mean(np.abs(iq - model) ** 2)) / 2)
+    noise = math.sqrt(float(np.mean((amp - model) ** 2)))
     contrast = float(abs(coefficients[1] - coefficients[0]))
     snr = contrast / max(noise, 1e-12)
     location = float(fitted.x[0])
@@ -210,7 +213,12 @@ def analyze_waveform(waveform: Waveform, *, snr_threshold: float, smoothing: int
         for part in (differences.real, differences.imag)
     ]
     noise = max(math.hypot(*mad) / math.sqrt(2), 1e-12)
-    low, high = np.percentile(smooth, [10, 90])
+    # A centered 1024 ns readout pulse inside a 1152 ns QuEL-1 capture window
+    # leaves only ~11% baseline samples (even less after rise/fall ramps), so a
+    # 10th-percentile floor lands inside the pulse. Because ``smooth`` is already
+    # averaged, the 2nd percentile stays on the quiet baseline without reacting
+    # to single-sample noise.
+    low, high = np.percentile(smooth, [2, 90])
     contrast = float(high - low)
     if contrast < snr_threshold * noise:
         return EdgeResult(waveform)
@@ -229,7 +237,11 @@ def analyze_waveform(waveform: Waveform, *, snr_threshold: float, smoothing: int
         return EdgeResult(waveform, reason=reason)
 
     start, stop = runs[0]
-    rising, falling = start >= guard, stop <= time.size - guard
+    # Allow edge fitting whenever at least 3 samples remain outside the coarse
+    # 50% crossing (24 ns at 8 ns/sample), so slow ring-down tails do not skip
+    # fitting when the true fitted edge still clears MARGIN_NS (32 ns).
+    edge_guard = 3
+    rising, falling = start >= edge_guard, stop <= time.size - edge_guard
     edge_kind = (
         "both"
         if rising and falling
@@ -321,6 +333,21 @@ def select_delay(
     """Center the pulse envelope using two consistent observations per target."""
     group = [result for result in results if result.mux == mux]
     targets = list(dict.fromkeys(result.target for result in group))
+    observed_durations: dict[str, float] = {}
+    for target in targets:
+        measured = [
+            float(result.fall_ns) - float(result.rise_ns)
+            for result in group
+            if result.target == target
+            and result.success
+            and result.rise_ns is not None
+            and result.fall_ns is not None
+            and math.isfinite(result.rise_ns)
+            and math.isfinite(result.fall_ns)
+            and result.fall_ns > result.rise_ns
+        ]
+        if measured:
+            observed_durations[target] = float(np.median(measured))
     estimates: list[dict[str, float | str]] = []
     for result in group:
         if not result.success:
@@ -336,7 +363,7 @@ def select_delay(
             for edge in observed
         ):
             continue
-        duration = result.waveform.pulse_duration_ns
+        duration = observed_durations.get(result.target, result.waveform.pulse_duration_ns)
         if not (has_rise and has_fall):
             # One clipped edge is inferred from the recorded readout duration.
             if not math.isfinite(duration) or duration <= 0:

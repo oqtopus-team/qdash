@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from fastapi import HTTPException
 from filelock import FileLock, Timeout
 
+from qdash.api.lib.errors import OperationFailedError
 from qdash.common.config.path_resolver import resolve_user_flows_dir, to_container_user_flow_path
 
 if TYPE_CHECKING:
@@ -24,6 +25,11 @@ _UNSAFE_PROJECT_CHARS = re.compile(r"[^a-zA-Z0-9_-]")
 # How long a save waits for another save of the same flow before giving up.
 _LOCK_TIMEOUT_SECONDS = 120.0
 _LOCK_POLL_SECONDS = 0.05
+
+# Codes of unexpected flow source failures; the handler logs the cause under an error ID.
+FLOW_SOURCE_READ_FAILED = "flow_source_read_failed"
+FLOW_SOURCE_WRITE_FAILED = "flow_source_write_failed"
+FLOW_SOURCE_DELETE_FAILED = "flow_source_delete_failed"
 
 
 class FlowSourceStore:
@@ -48,11 +54,7 @@ class FlowSourceStore:
         try:
             path.write_text(code, encoding="utf-8")
         except Exception as exc:
-            logger.error(f"Failed to write flow file: {exc}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to save flow file: {exc}",
-            ) from exc
+            raise _save_failed() from exc
         logger.info(f"Saved flow code to {path}")
 
     def create(self, path: Path, code: str) -> None:
@@ -71,11 +73,7 @@ class FlowSourceStore:
         except FileExistsError:
             raise
         except Exception as exc:
-            logger.error(f"Failed to create flow file: {exc}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to save flow file: {exc}",
-            ) from exc
+            raise _save_failed() from exc
         logger.info(f"Created flow code at {path}")
 
     @asynccontextmanager
@@ -109,10 +107,8 @@ class FlowSourceStore:
         try:
             return path.read_text(encoding="utf-8")
         except Exception as exc:
-            logger.error(f"Failed to read flow file: {exc}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to read flow file: {exc}",
+            raise OperationFailedError(
+                code=FLOW_SOURCE_READ_FAILED, message="Failed to read the flow file"
             ) from exc
 
     def delete(self, path: Path) -> None:
@@ -120,10 +116,8 @@ class FlowSourceStore:
         try:
             path.unlink()
         except Exception as exc:
-            logger.error(f"Failed to delete flow file: {exc}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to delete flow file: {exc}",
+            raise OperationFailedError(
+                code=FLOW_SOURCE_DELETE_FAILED, message="Failed to delete the flow file"
             ) from exc
         logger.info(f"Deleted flow file: {path}")
 
@@ -134,3 +128,10 @@ class FlowSourceStore:
     def to_deployment_path(self, path: Path) -> Path:
         """Map an API-local flow path to the deployment-service container path."""
         return to_container_user_flow_path(path, runtime_user_flows_dir=self._base_dir)
+
+
+def _save_failed() -> OperationFailedError:
+    """The error a write or create of a flow file reports for an unexpected failure."""
+    return OperationFailedError(
+        code=FLOW_SOURCE_WRITE_FAILED, message="Failed to save the flow file"
+    )

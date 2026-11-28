@@ -1,10 +1,9 @@
-import { useCallback, useMemo, useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 
 import { useQueryState, parseAsString } from "nuqs";
 
-import { dateToDateTimeLocal } from "@/lib/utils/datetime";
-
 import { type SelectionMode, type MetricType } from "./types";
+import { useRangeModeUrlState } from "./useRangeModeUrlState";
 
 interface UseMetricsUrlStateResult {
   selectedChip: string;
@@ -34,17 +33,7 @@ export function useMetricsUrlState(): UseMetricsUrlStateResult {
 
   const [selectedMetric, setSelectedMetricState] = useQueryState("metric", parseAsString);
 
-  const [startDate, setStartDateState] = useQueryState("start", parseAsString);
-  const [endDate, setEndDateState] = useQueryState("end", parseAsString);
-
-  const defaults = useMemo(() => {
-    const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    return {
-      start: dateToDateTimeLocal(sevenDaysAgo),
-      end: dateToDateTimeLocal(now),
-    };
-  }, []);
+  const { startDate, endDate, setStartDate, setEndDate, setQuickRange } = useRangeModeUrlState();
 
   useEffect(() => {
     setIsInitialized(true);
@@ -78,37 +67,13 @@ export function useMetricsUrlState(): UseMetricsUrlStateResult {
     [setSelectedMetricState],
   );
 
-  const setStartDate = useCallback(
-    (date: string) => {
-      setStartDateState(date && date.length > 0 ? date : null);
-    },
-    [setStartDateState],
-  );
-
-  const setEndDate = useCallback(
-    (date: string) => {
-      setEndDateState(date && date.length > 0 ? date : null);
-    },
-    [setEndDateState],
-  );
-
-  const setQuickRange = useCallback(
-    (days: number) => {
-      const now = new Date();
-      const past = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-      setStartDateState(dateToDateTimeLocal(past));
-      setEndDateState(dateToDateTimeLocal(now));
-    },
-    [setStartDateState, setEndDateState],
-  );
-
   return {
     selectedChip: selectedChip ?? "",
     selectionMode: (selectionMode as SelectionMode) ?? "latest",
     metricType: (metricType as MetricType) ?? "qubit",
     selectedMetric: selectedMetric ?? "t1",
-    startDate: startDate ?? defaults.start,
-    endDate: endDate ?? defaults.end,
+    startDate,
+    endDate,
     setSelectedChip,
     setSelectionMode,
     setMetricType,

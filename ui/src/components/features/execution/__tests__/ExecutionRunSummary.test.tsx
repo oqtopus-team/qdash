@@ -24,6 +24,20 @@ describe("ExecutionRunSummary", () => {
     expect(screen.queryByRole("progressbar")).toBeNull();
   });
 
+  it("announces the updated finished-task count as one phrase", () => {
+    const { rerender } = render(<ExecutionRunSummary status="running" tasks={tasks} />);
+    expect(screen.getByText("· 2 tasks done", { selector: ".sr-only" })).toBeInTheDocument();
+
+    rerender(
+      <ExecutionRunSummary
+        status="running"
+        tasks={[...tasks.slice(0, 2), { ...tasks[2], status: "completed" }, tasks[3]]}
+      />,
+    );
+    expect(screen.getByText("· 3 tasks done", { selector: ".sr-only" })).toBeInTheDocument();
+    expect(screen.queryByText("· 2 tasks done")).toBeNull();
+  });
+
   it("says when the run is waiting or being cancelled", () => {
     render(<ExecutionRunSummary status="scheduled" tasks={tasks.slice(3)} />);
     expect(screen.getByRole("status")).toHaveTextContent("Waiting to start");

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import functools
 import itertools
+import math
 import operator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, NamedTuple, cast
@@ -556,3 +557,52 @@ def estimate_and_mark_figure(
     marked_fig = create_marked_figure(fig, result)
 
     return marked_fig, result
+
+
+DEFAULT_COARSE_CONTROL_AMPLITUDE_HEADROOM_DB = 10.0
+DEFAULT_MAX_COARSE_CONTROL_AMPLITUDE = 1.0
+
+
+def compute_coarse_control_amplitude(
+    repr_db: float,
+    *,
+    headroom_db: float = DEFAULT_COARSE_CONTROL_AMPLITUDE_HEADROOM_DB,
+    max_amplitude: float = DEFAULT_MAX_COARSE_CONTROL_AMPLITUDE,
+) -> tuple[float, float]:
+    """Return the coarse control-amplitude seed for an f01 representative power.
+
+    The amplitude at ``repr_db`` is raised by ``headroom_db`` and capped at
+    ``max_amplitude``.
+
+    Args:
+        repr_db: Representative power (dB) at which the f01 line develops.
+        headroom_db: Uplift applied to the raw amplitude.
+        max_amplitude: Upper bound of the returned amplitude.
+
+    Returns:
+        A tuple of (coarse_control_amplitude, marker_db), where ``marker_db``
+        is the amplitude expressed in dB for drawing on the spectroscopy figure.
+    """
+    raw_amplitude = float(10 ** (repr_db / 20))
+    uplifted_amplitude = raw_amplitude * (10 ** (headroom_db / 20))
+    coarse_control_amplitude = min(uplifted_amplitude, max_amplitude)
+    marker_db = float(20 * math.log10(coarse_control_amplitude))
+    return coarse_control_amplitude, marker_db
+
+
+def mark_coarse_control_amplitude(
+    fig: go.Figure,
+    coarse_control_amplitude: float,
+    marker_db: float,
+) -> go.Figure:
+    """Draw the coarse control-amplitude seed as a red dashed horizontal line."""
+    fig.add_hline(
+        y=marker_db,
+        line_width=1,
+        line_color="red",
+        line_dash="dash",
+        annotation_text=f"coarse A = {coarse_control_amplitude:.4f} a.u.",
+        annotation_position="top left",
+        annotation_font_color="red",
+    )
+    return fig

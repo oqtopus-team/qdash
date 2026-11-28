@@ -1,0 +1,32 @@
+# Fern generation of qdash.sdk._generated; run through scripts/generate_python_sdk.py.
+# docs/oas/openapi.json is the only API definition: it is read in place, never copied.
+api:
+  specs:
+    - openapi: ../../../docs/oas/openapi.json
+  # Every project-scoped route declares X-Project-Id. As a global header it is set once on the
+  # client and sent with every request, instead of a per-call argument that defaults to absent.
+  headers:
+    X-Project-Id:
+      name: project_id
+      type: optional<string>
+default-group: python-sdk
+groups:
+  python-sdk:
+    generators:
+      - name: fernapi/fern-python-sdk
+        version: 5.42.5
+        output:
+          location: local-file-system
+          path: ../build/fern-python
+        config:
+          package_name: qdash.sdk._generated
+          output_directory: source-root
+          client:
+            class_name: QDashApi
+          default_max_retries: 0
+          encode_path_params: true
+          omit_fern_headers: true
+          lazy_imports: false
+          include_legacy_wire_tests: false
+          pydantic_config:
+            version: v2

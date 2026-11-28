@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  // Declarations are emitted per source file: bundling them would rewrite the generated
+  // client's type-only namespaces into invalid value references.
+  "compilerOptions": {
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["tests"]
+}

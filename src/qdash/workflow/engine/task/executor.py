@@ -15,9 +15,11 @@ import traceback
 from contextlib import AbstractContextManager, nullcontext
 from typing import TYPE_CHECKING, Any, cast
 
+from qdash.datamodel.quality_metrics import QUALITY_METRIC_R2
 from qdash.repository import FilesystemCalibDataSaver
 from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.progress import ProgressPlan
+from qdash.workflow.engine.task import snapshot_parameters
 from qdash.workflow.engine.task.backend_saver import BackendSaver, resolve_publish_targets
 from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
 from qdash.workflow.engine.task.mux_distributor import MuxDistributor
@@ -30,6 +32,7 @@ from qdash.workflow.engine.task.snapshot_loader import SnapshotParameterLoader
 from qdash.workflow.engine.task.state_manager import TaskStateManager
 from qdash.workflow.engine.task.types import (
     BackendProtocol,
+    PostprocessValidationError,
     TaskExecutionError,
     TaskExecutionResult,
     TaskProtocol,
@@ -155,6 +158,10 @@ class TaskExecutor:
         qid: str,
     ) -> RunResult | None:
         """Run the main task logic."""
+        # Only the fake backend acts here (opt-in validation faults); see BaseBackend.
+        before_task_run = getattr(backend, "before_task_run", None)
+        if callable(before_task_run):
+            before_task_run(task.get_name(), qid)
         return task.run(backend, qid)
 
     def _progress_context(
@@ -367,32 +374,10 @@ class TaskExecutor:
             if execution_service is not None and getattr(task, "is_mux_level", False):
                 self._mux_distributor.require_mapping(task_name)
 
-            # 1.5 Apply snapshot overrides early so initial history record
-            #     contains the correct (overridden) parameter values.
-            if self._snapshot_loader is not None:
-                self._apply_snapshot_overrides(task, task_name, task_type, qid)
-
-            task.resolve_run_parameters(backend, qid)
-
-            # Record run_parameters (experiment configuration used)
-            run_params = {k: v.model_dump() for k, v in task.run_parameters.items()}
-            if run_params:
-                self.state_manager.put_run_parameters(task_name, run_params, task_type, qid)
-
-            # Record task start to history (production only)
+            # 1.5 Apply snapshot overrides, resolve and record run parameters,
+            #     and record the task start (production only).
+            self._prepare_run_parameters(task, backend, qid, execution_service)
             if execution_service is not None:
-                executed_task = self.state_manager.get_task(task_name, task_type, qid)
-                self.history_recorder.record_task_result(
-                    executed_task, execution_service.to_datamodel()
-                )
-                # Set source_task_id immediately so parent's re_executions
-                # list includes this task while it is still running.
-                if self._source_task_id:
-                    self.history_recorder.set_source_task_id(
-                        project_id=execution_service.project_id,
-                        task_id=executed_task.task_id,
-                        source_task_id=self._source_task_id,
-                    )
                 execution_service = self._update_execution(execution_service)
 
             # 2. Preprocess
@@ -430,10 +415,7 @@ class TaskExecutor:
                 run_result = self._run_task(task, backend, qid)
             result.r2 = run_result.r2 if run_result else None
             if run_result is not None and run_result.r2 is not None:
-                r2_value = run_result.r2.get(qid)
-                if r2_value is not None:
-                    task_model = self.state_manager.get_task(task_name, task_type, qid)
-                    task_model.quality_metrics["r2"] = float(r2_value)
+                self._record_r2_metric(task_name, task_type, qid, run_result.r2.get(qid))
 
             if run_result is None:
                 self._complete_task(task_name, task_type, qid, "No run result")
@@ -449,100 +431,23 @@ class TaskExecutor:
             postprocess_result = self._run_postprocess(task, backend, run_result, qid)
 
             if postprocess_result:
-                # 5a. Validate fidelity
-                if postprocess_result.output_parameters:
-                    try:
-                        self.result_processor.validate_fidelity(
-                            postprocess_result.output_parameters, task_name
-                        )
-                    except FidelityValidationError as e:
-                        raise ValueError(str(e)) from e
-
-                # 5b. Process output parameters
-                if postprocess_result.output_parameters:
-                    task_model = self.state_manager.get_task(task_name, task_type, qid)
-                    task.attach_task_id(task_model.task_id)
-                    processed_params = self.result_processor.process_output_parameters(
-                        postprocess_result.output_parameters,
-                        task_name,
-                        self.execution_id,
-                        task_model.task_id,
+                is_mux = getattr(task, "is_mux_level", False)
+                # 5. Validate, persist and save the postprocess result. A MUX-level
+                #    result is judged per qid: the representative's own validation
+                #    error must not withhold the other members' results, so it is
+                #    raised only after the fan-out below.
+                representative_error: PostprocessValidationError | None = None
+                try:
+                    result.output_parameters = self._apply_postprocess_result(
+                        task, backend, run_result, postprocess_result, qid, execution_service
                     )
-                    self.state_manager.put_output_parameters(
-                        task_name,
-                        processed_params,
-                        task_type,
-                        qid,
-                        publish_targets=resolve_publish_targets(task, processed_params),
-                    )
-
-                # 5c. Save figures and raw data
-                self._save_artifacts(postprocess_result, task_name, task_type, qid)
-
-                # 5c.1 Check for postprocess validation error (after artifacts are saved)
-                if postprocess_result.validation_error:
-                    if postprocess_result.output_parameters:
-                        self.state_manager.clear_output_parameters(task_name, task_type, qid)
-                    if execution_service is not None:
-                        self._backend_saver.save(task, execution_service, qid, backend, False)
-                    raise ValueError(postprocess_result.validation_error)
-
-                # 5d. Validate R² (rollback output params on failure)
-                backend_success = True
-                r2_error_msg: str | None = None
-                if run_result.has_r2() and run_result.r2 is not None:
-                    logger.warning(
-                        "Validating R² for task=%s qid=%s threshold=%s r2=%s",
-                        task_name,
-                        qid,
-                        task.r2_threshold,
-                        run_result.r2,
-                    )
-                    r2_value = run_result.r2.get(qid)
-                    if r2_value is None:
-                        logger.warning(
-                            "R² validation skipped because value is missing: task=%s qid=%s r2=%s",
-                            task_name,
-                            qid,
-                            run_result.r2,
-                        )
-                        backend_success = False
-                    else:
-                        try:
-                            self.result_processor.validate_r2(run_result.r2, qid, task.r2_threshold)
-                        except R2ValidationError:
-                            logger.warning(
-                                "R² validation failed for task=%s qid=%s value=%.4f threshold=%s",
-                                task_name,
-                                qid,
-                                r2_value,
-                                task.r2_threshold,
-                            )
-                            if postprocess_result.output_parameters:
-                                self.state_manager.clear_output_parameters(
-                                    task_name, task_type, qid
-                                )
-                            backend_success = False
-                            r2_error_msg = f"{task_name} R² value too low: {r2_value:.4f} (threshold = {task.r2_threshold})"
-
-                    if not backend_success and postprocess_result.output_parameters:
-                        self.state_manager.clear_output_parameters(task_name, task_type, qid)
-
-                # 5e. Backend save (production only, always runs even on R² failure)
-                if execution_service is not None:
-                    self._backend_saver.save(task, execution_service, qid, backend, backend_success)
-
-                # Raise after save so calibration note is updated
-                if r2_error_msg is not None:
-                    raise ValueError(r2_error_msg)
-
-                result.output_parameters = dict(
-                    self.state_manager.get_task(task_name, task_type, qid).output_parameters
-                )
+                except PostprocessValidationError as e:
+                    if execution_service is None or not is_mux:
+                        raise
+                    representative_error = e
 
                 # 5.5 MUX distribution (production only)
                 if execution_service is not None:
-                    is_mux = getattr(task, "is_mux_level", False)
                     logger.debug(
                         "Checking MUX distribution: task=%s, is_mux_level=%s, qid=%s",
                         task_name,
@@ -559,6 +464,9 @@ class TaskExecutor:
                         logger.debug(
                             "Finished MUX distribution for task=%s, qid=%s", task_name, qid
                         )
+
+                if representative_error is not None:
+                    raise representative_error
 
             # 6. Complete task
             self._complete_task(task_name, task_type, qid, f"{task_name} is completed")
@@ -641,26 +549,7 @@ class TaskExecutor:
                 self._mux_distributor.require_mapping(task_name)
 
             for qid in qids:
-                if self._snapshot_loader is not None:
-                    self._apply_snapshot_overrides(task, task_name, task_type, qid)
-
-                task.resolve_run_parameters(backend, qid)
-
-                run_params = {k: v.model_dump() for k, v in task.run_parameters.items()}
-                if run_params:
-                    self.state_manager.put_run_parameters(task_name, run_params, task_type, qid)
-
-                if execution_service is not None:
-                    executed_task = self.state_manager.get_task(task_name, task_type, qid)
-                    self.history_recorder.record_task_result(
-                        executed_task, execution_service.to_datamodel()
-                    )
-                    if self._source_task_id:
-                        self.history_recorder.set_source_task_id(
-                            project_id=execution_service.project_id,
-                            task_id=executed_task.task_id,
-                            source_task_id=self._source_task_id,
-                        )
+                self._prepare_run_parameters(task, backend, qid, execution_service)
 
             if execution_service is not None:
                 execution_service = self._update_execution(execution_service)
@@ -677,9 +566,7 @@ class TaskExecutor:
             for qid, result in results.items():
                 r2_value = run_result.r2.get(qid) if run_result and run_result.r2 else None
                 result.r2 = {qid: r2_value} if r2_value is not None else None
-                if r2_value is not None:
-                    task_model = self.state_manager.get_task(task_name, task_type, qid)
-                    task_model.quality_metrics["r2"] = float(r2_value)
+                self._record_r2_metric(task_name, task_type, qid, r2_value)
 
             if run_result is None:
                 for qid, result in results.items():
@@ -696,91 +583,8 @@ class TaskExecutor:
                 try:
                     postprocess_result = self._run_postprocess(task, backend, run_result, qid)
 
-                    if postprocess_result.output_parameters:
-                        try:
-                            self.result_processor.validate_fidelity(
-                                postprocess_result.output_parameters, task_name
-                            )
-                        except FidelityValidationError as e:
-                            raise ValueError(str(e)) from e
-
-                        task_model = self.state_manager.get_task(task_name, task_type, qid)
-                        task.attach_task_id(task_model.task_id)
-                        processed_params = self.result_processor.process_output_parameters(
-                            postprocess_result.output_parameters,
-                            task_name,
-                            self.execution_id,
-                            task_model.task_id,
-                        )
-                        self.state_manager.put_output_parameters(
-                            task_name,
-                            processed_params,
-                            task_type,
-                            qid,
-                            publish_targets=resolve_publish_targets(task, processed_params),
-                        )
-
-                    self._save_artifacts(postprocess_result, task_name, task_type, qid)
-
-                    if postprocess_result.validation_error:
-                        if postprocess_result.output_parameters:
-                            self.state_manager.clear_output_parameters(task_name, task_type, qid)
-                        if execution_service is not None:
-                            self._backend_saver.save(task, execution_service, qid, backend, False)
-                        raise ValueError(postprocess_result.validation_error)
-
-                    backend_success = True
-                    r2_error_msg: str | None = None
-                    if run_result.has_r2() and run_result.r2 is not None:
-                        logger.warning(
-                            "Validating R² for task=%s qid=%s threshold=%s r2=%s",
-                            task_name,
-                            qid,
-                            task.r2_threshold,
-                            run_result.r2,
-                        )
-                        r2_value = run_result.r2.get(qid)
-                        if r2_value is None:
-                            logger.warning(
-                                "R² validation skipped because value is missing: task=%s qid=%s r2=%s",
-                                task_name,
-                                qid,
-                                run_result.r2,
-                            )
-                            backend_success = False
-                        else:
-                            try:
-                                self.result_processor.validate_r2(
-                                    run_result.r2, qid, task.r2_threshold
-                                )
-                            except R2ValidationError:
-                                logger.warning(
-                                    "R² validation failed for task=%s qid=%s value=%.4f threshold=%s",
-                                    task_name,
-                                    qid,
-                                    r2_value,
-                                    task.r2_threshold,
-                                )
-                                if postprocess_result.output_parameters:
-                                    self.state_manager.clear_output_parameters(
-                                        task_name, task_type, qid
-                                    )
-                                backend_success = False
-                                r2_error_msg = f"{task_name} R² value too low: {r2_value:.4f} (threshold = {task.r2_threshold})"
-
-                        if not backend_success and postprocess_result.output_parameters:
-                            self.state_manager.clear_output_parameters(task_name, task_type, qid)
-
-                    if execution_service is not None:
-                        self._backend_saver.save(
-                            task, execution_service, qid, backend, backend_success
-                        )
-
-                    if r2_error_msg is not None:
-                        raise ValueError(r2_error_msg)
-
-                    result.output_parameters = dict(
-                        self.state_manager.get_task(task_name, task_type, qid).output_parameters
+                    result.output_parameters = self._apply_postprocess_result(
+                        task, backend, run_result, postprocess_result, qid, execution_service
                     )
                     self._complete_task(task_name, task_type, qid, f"{task_name} is completed")
                     result.success = True
@@ -829,23 +633,168 @@ class TaskExecutor:
 
         return execution_service, results
 
-    @staticmethod
-    def _reconstruct_param(
-        model_cls: type,
-        key: str,
-        value: Any,
-    ) -> Any | None:
-        """Reconstruct a single parameter model from snapshot data.
+    def _prepare_run_parameters(
+        self,
+        task: TaskProtocol,
+        backend: "BaseBackend",
+        qid: str,
+        execution_service: "ExecutionService | None",
+    ) -> None:
+        """Resolve and record the run parameters of a started task.
 
-        Returns the model instance, or None if the data is invalid.
+        Snapshot overrides are applied first so the initial history record
+        carries the overridden values. In production the task start is recorded
+        to history, with ``source_task_id`` set immediately so the parent's
+        ``re_executions`` list includes this task while it is still running.
         """
-        try:
-            if isinstance(value, dict):
-                return model_cls(**value)
-            return model_cls(value=value)
-        except (TypeError, ValueError) as e:
-            logger.error("Invalid snapshot parameter %s=%r: %s", key, value, e)
-            return None
+        task_name = task.get_name()
+        task_type = task.get_task_type()
+        if self._snapshot_loader is not None:
+            self._apply_snapshot_overrides(task, task_name, task_type, qid)
+
+        task.resolve_run_parameters(backend, qid)
+
+        # Record run_parameters (experiment configuration used)
+        run_params = {k: v.model_dump() for k, v in task.run_parameters.items()}
+        if run_params:
+            self.state_manager.put_run_parameters(task_name, run_params, task_type, qid)
+
+        if execution_service is None:
+            return
+        executed_task = self.state_manager.get_task(task_name, task_type, qid)
+        self.history_recorder.record_task_result(executed_task, execution_service.to_datamodel())
+        if self._source_task_id:
+            self.history_recorder.set_source_task_id(
+                project_id=execution_service.project_id,
+                task_id=executed_task.task_id,
+                source_task_id=self._source_task_id,
+            )
+
+    def _record_r2_metric(
+        self, task_name: str, task_type: str, qid: str, r2_value: float | None
+    ) -> None:
+        """Store a qid's R² as a task quality metric when the run reported one."""
+        if r2_value is None:
+            return
+        task_model = self.state_manager.get_task(task_name, task_type, qid)
+        task_model.quality_metrics[QUALITY_METRIC_R2] = float(r2_value)
+
+    def _apply_postprocess_result(
+        self,
+        task: TaskProtocol,
+        backend: "BaseBackend",
+        run_result: RunResult,
+        postprocess_result: PostProcessResult,
+        qid: str,
+        execution_service: "ExecutionService | None",
+    ) -> dict[str, Any]:
+        """Validate, persist and save one qid's postprocess result.
+
+        Output parameters are validated for fidelity and stored, figures and raw
+        data are saved, then a postprocess validation error or a failed R²
+        check clears the outputs. In production the backend save always runs,
+        with ``success=False`` on either failure, before the error is raised so
+        the calibration note is updated.
+
+        Returns
+        -------
+        dict[str, Any]
+            The qid's stored output parameters.
+
+        Raises
+        ------
+        ValueError
+            On a fidelity, postprocess validation, or R² failure.
+        """
+        task_name = task.get_name()
+        task_type = task.get_task_type()
+
+        if postprocess_result.output_parameters:
+            # Validate fidelity before anything is stored
+            try:
+                self.result_processor.validate_fidelity(
+                    postprocess_result.output_parameters, task_name
+                )
+            except FidelityValidationError as e:
+                raise ValueError(str(e)) from e
+
+            # Process output parameters
+            task_model = self.state_manager.get_task(task_name, task_type, qid)
+            task.attach_task_id(task_model.task_id)
+            processed_params = self.result_processor.process_output_parameters(
+                postprocess_result.output_parameters,
+                task_name,
+                self.execution_id,
+                task_model.task_id,
+            )
+            self.state_manager.put_output_parameters(
+                task_name,
+                processed_params,
+                task_type,
+                qid,
+                publish_targets=resolve_publish_targets(task, processed_params),
+            )
+
+        # Save figures and raw data
+        self._save_artifacts(postprocess_result, task_name, task_type, qid)
+
+        # Postprocess validation error (after artifacts are saved)
+        if postprocess_result.validation_error:
+            if postprocess_result.output_parameters:
+                self.state_manager.clear_output_parameters(task_name, task_type, qid)
+            if execution_service is not None:
+                self._backend_saver.save(task, execution_service, qid, backend, False)
+            raise PostprocessValidationError(postprocess_result.validation_error)
+
+        # Validate R² (rollback output params on failure)
+        backend_success = True
+        r2_error_msg: str | None = None
+        if run_result.has_r2() and run_result.r2 is not None:
+            logger.warning(
+                "Validating R² for task=%s qid=%s threshold=%s r2=%s",
+                task_name,
+                qid,
+                task.r2_threshold,
+                run_result.r2,
+            )
+            r2_value = run_result.r2.get(qid)
+            if r2_value is None:
+                logger.warning(
+                    "R² validation skipped because value is missing: task=%s qid=%s r2=%s",
+                    task_name,
+                    qid,
+                    run_result.r2,
+                )
+                backend_success = False
+            else:
+                try:
+                    self.result_processor.validate_r2(run_result.r2, qid, task.r2_threshold)
+                except R2ValidationError:
+                    logger.warning(
+                        "R² validation failed for task=%s qid=%s value=%.4f threshold=%s",
+                        task_name,
+                        qid,
+                        r2_value,
+                        task.r2_threshold,
+                    )
+                    backend_success = False
+                    r2_error_msg = (
+                        f"{task_name} R² value too low: {r2_value:.4f} "
+                        f"(threshold = {task.r2_threshold})"
+                    )
+
+            if not backend_success and postprocess_result.output_parameters:
+                self.state_manager.clear_output_parameters(task_name, task_type, qid)
+
+        # Backend save (production only, always runs even on R² failure)
+        if execution_service is not None:
+            self._backend_saver.save(task, execution_service, qid, backend, backend_success)
+
+        # Raise after save so calibration note is updated
+        if r2_error_msg is not None:
+            raise ValueError(r2_error_msg)
+
+        return dict(self.state_manager.get_task(task_name, task_type, qid).output_parameters)
 
     def _apply_snapshot_overrides(
         self,
@@ -857,13 +806,10 @@ class TaskExecutor:
         """Apply snapshot parameter overrides from a previous execution.
 
         Replaces the task's input_parameters and run_parameters with values
-        from the snapshot, and updates state_manager accordingly.
+        from the snapshot, and updates state_manager accordingly. The snapshot
+        data itself is resolved by :mod:`snapshot_parameters`.
         """
-        from qdash.datamodel.task import (
-            InputParameterModel,
-            InputParameterSpec,
-            RunParameterModel,
-        )
+        from qdash.datamodel.task import InputParameterModel, RunParameterModel
 
         assert self._snapshot_loader is not None
         invocation = self.state_manager.get_task(task_name, task_type, qid).invocation
@@ -883,48 +829,18 @@ class TaskExecutor:
         snap_input, snap_run = snapshot
         # Explicit overrides are part of the requested execution conditions, so
         # they replace the recorded values before the snapshot is applied.
-        snap_input = self._merge_overrides(snap_input, task.input_overrides)
-        if task.run_overrides:
-            # Seed parameters missing from older snapshots with the current
-            # declaration so explicit overrides retain their value_type and
-            # unrelated declared defaults remain available.
-            snap_run = {
-                **{name: model.model_dump() for name, model in task.run_parameters.items()},
-                **snap_run,
-            }
-        snap_run = self._merge_overrides(snap_run, task.run_overrides)
+        snap_input = snapshot_parameters.merge_overrides(snap_input, task.input_overrides)
+        snap_run = snapshot_parameters.apply_run_overrides(
+            snap_run, task.run_overrides, task.run_parameters
+        )
         declarations = getattr(task.__class__, "input_spec", {})
-        normalized_input = dict(snap_input)
-        for param_name, declaration in declarations.items():
-            if not isinstance(declaration, InputParameterSpec):
-                continue
-            lookup_key = declaration.parameter_name or param_name
-            prefix = param_name[: -len(lookup_key)] if param_name.endswith(lookup_key) else ""
-            compatible_names = (
-                *declaration.parameter_aliases,
-                *declaration.fallback_parameter_names,
+        requires_snapshot = self._snapshot_loader.requires_snapshot(task_name)
+        if snap_input or requires_snapshot:
+            snap_input = snapshot_parameters.normalize_snapshot_inputs(snap_input, declarations)
+        if requires_snapshot:
+            snapshot_parameters.ensure_snapshot_inputs_compatible(
+                task_name, qid, snap_input, declarations
             )
-            for compatible_name in compatible_names:
-                compatible_key = f"{prefix}{compatible_name}"
-                if param_name not in normalized_input and compatible_key in snap_input:
-                    compatible_value = snap_input[compatible_key]
-                    if isinstance(compatible_value, dict):
-                        compatible_value = dict(compatible_value)
-                        if not compatible_value.get("parameter_name"):
-                            compatible_value["parameter_name"] = compatible_name
-                    normalized_input[param_name] = compatible_value
-                if compatible_key not in declarations:
-                    normalized_input.pop(compatible_key, None)
-        snap_input = normalized_input
-        if self._snapshot_loader.requires_snapshot(task_name):
-            missing_inputs = set(declarations) - set(snap_input)
-            if missing_inputs:
-                missing = ", ".join(sorted(missing_inputs))
-                raise ValueError(
-                    f"Snapshot inputs for task '{task_name}' and qid '{qid}' are incompatible "
-                    f"with the current task definition; run a fresh calibration instead. "
-                    f"Missing inputs: {missing}"
-                )
         logger.info(
             "Applying snapshot overrides for task=%s, qid=%s (input_params=%d, run_params=%d)",
             task_name,
@@ -935,25 +851,19 @@ class TaskExecutor:
 
         # Override input_parameters on the task instance
         if snap_input:
-            reconstructed_input = {
-                k: m
-                for k, v in snap_input.items()
-                if (m := self._reconstruct_param(InputParameterModel, k, v)) is not None
-            }
+            reconstructed_input = snapshot_parameters.reconstruct_params(
+                InputParameterModel, snap_input
+            )
             task.input_parameters = reconstructed_input
             # Re-record in state_manager
             self.state_manager.put_input_parameters(task_name, reconstructed_input, task_type, qid)
 
-        if self._snapshot_loader.requires_snapshot(task_name):
+        if requires_snapshot:
             task.input_parameters_from_snapshot = True
 
         # Override run_parameters on the task instance
         if snap_run:
-            reconstructed_run = {
-                k: m
-                for k, v in snap_run.items()
-                if (m := self._reconstruct_param(RunParameterModel, k, v)) is not None
-            }
+            reconstructed_run = snapshot_parameters.reconstruct_params(RunParameterModel, snap_run)
             task.run_parameters = reconstructed_run
             # Re-record in state_manager
             run_params_dict = {k: v.model_dump() for k, v in reconstructed_run.items()}
@@ -995,28 +905,6 @@ class TaskExecutor:
             task_type,
             qid,
         )
-
-    @staticmethod
-    def _merge_overrides(
-        snapshot_dict: dict[str, Any], overrides: dict[str, Any]
-    ) -> dict[str, Any]:
-        """Merge explicit overrides on top of snapshot parameters.
-
-        For each key in *overrides*, if the snapshot entry is a dict with a
-        ``"value"`` key the override replaces only the ``"value"`` field
-        (preserving ``unit``, ``value_type``, ``description``, etc.).
-        Otherwise the entry is replaced entirely.
-        """
-        if not overrides:
-            return snapshot_dict
-        merged = {**snapshot_dict}
-        for key, new_value in overrides.items():
-            existing = merged.get(key)
-            if isinstance(existing, dict) and "value" in existing:
-                merged[key] = {**existing, "value": new_value}
-            else:
-                merged[key] = new_value
-        return merged
 
     @staticmethod
     def _validate_effective_inputs(task: TaskProtocol) -> None:

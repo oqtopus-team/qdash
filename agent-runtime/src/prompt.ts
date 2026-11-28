@@ -1,7 +1,10 @@
-import { investigationPolicyBullets } from "@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts";
+import {
+  investigationPolicyBullets,
+  requestPolicyBullets,
+} from "@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts";
 
 /**
- * System prompt for the QDash Copilot chat agent.
+ * System prompt for the QDash Agent chat agent.
  *
  * Pi's default system prompt assumes a coding agent working in a project
  * checkout. This runtime replaces it entirely: QDash tools first, and the
@@ -9,7 +12,7 @@ import { investigationPolicyBullets } from "@oqtopus-team/pi-qdash/extensions/li
  * is configured. Workflow guidance comes from the pi-qdash skills, read
  * through `read_skill`.
  *
- * The investigation policy and the tool routing guide are shared with the pi
+ * The investigation policy, the request policy, and the tool routing guide are shared with the pi
  * CLI and come from pi-qdash (extensions/lib/qdash-guidance.ts); the rules
  * written here are the ones specific to this host: chat rendering, approval
  * cards, `ask_user`, the workspace, Code Mode and deferred tools.
@@ -20,7 +23,7 @@ export function buildSystemPrompt(
   skills: ReadonlyArray<{ name: string; description: string }> = [],
   /** Routing guide from the pi-qdash `qdash` skill; see tool-guide.ts. */
   toolGuide: string | null = null,
-  /** Guidelines of tools from local extension checkouts; see local-extensions.ts. */
+  /** Guidelines of tools from trusted bundled extensions; see bundled-extensions.ts. */
   localToolGuide: string | null = null,
   /** Whether the workspace tools (`bash`, `read`, `write`, `edit`) are offered; see exec-env.ts. */
   workspaceTools = false,
@@ -28,12 +31,12 @@ export function buildSystemPrompt(
   presentationGuideline: string | null = null,
   /** Guideline of `classify`, when a classifier is usable; see classify-tool.ts. */
   classifyGuideline: string | null = null,
-  /** Guidelines of `codemode` and of the deferred tools; see codemode.ts. */
-  tooling: { codemode?: string | null; deferredTools?: string | null } = {},
+  /** Guidelines of `codemode` and of the deferred tools (codemode.ts), and the request-type guide (tool-guide.ts). */
+  tooling: { codemode?: string | null; deferredTools?: string | null; intentGuide?: string | null } = {},
 ): string {
   const thinkingLanguageName = languageName(thinkingLanguage);
   return [
-    "You are QDash Copilot, assisting experimentalists who calibrate superconducting quantum processors.",
+    "You are QDash Agent, assisting experimentalists who calibrate superconducting quantum processors.",
     "",
     "You answer questions about chips, qubits, couplings, calibration task results, and their trends by querying QDash through the available tools.",
     ...(workspaceTools
@@ -45,7 +48,9 @@ export function buildSystemPrompt(
     "",
     "Guidelines:",
     ...investigationPolicyBullets(),
+    ...requestPolicyBullets(),
     "- Prefer a short direct answer over an exhaustive report. Expand only when asked.",
+    ...progressUpdateBullets(),
     "- Use `render_chart` when a plot communicates better than text.",
     "- Use `render_ui` for a compact read-only view of values from tool results (metric cards, a comparison table, a status alert, links to QDash pages). Only show values a tool returned, and still answer in text.",
     ...(presentationGuideline ? [presentationGuideline] : []),
@@ -58,7 +63,10 @@ export function buildSystemPrompt(
     ...(tooling.codemode ? [tooling.codemode] : []),
     "- When you need the user to choose between concrete options (which qubit, which task, whether to proceed), call `ask_user` with 2-4 short options instead of asking in prose. The turn ends there and their pick arrives as the next message.",
     "- Write-capable QDash tools never run from your call: calling one shows the user an approval card with the exact arguments, and the turn ends there. Call it with the exact arguments you intend instead of asking for confirmation in prose. The runtime runs it only if the user approves and then tells you the outcome. If they decline, do not call it again unless they ask.",
+    "- The exception is `qdash_run_agent_session_step` and `qdash_request_agent_human`: they run at once, without a card, because the user already approved the agent session (autonomy auto) they act in; they refuse anything outside that session. `qdash_record_agent_decision` also runs without a card: it only appends your reading of a result to the audit of a session you created. `qdash_record_calibration_decision` does the same for a calibration session you created; each `qdash_run_pipeline` it plans still waits for its own card. `qdash_commit_agent_session_update` runs without a card only in a session whose approval granted parameter updates (`policy.parameter_updates`): it commits a candidate of a result you assess as pass, within that grant; for a failed, uncertain, or unexplained result commit nothing and call `qdash_request_agent_human`. A stopped conversation does not continue by itself: after an expert answers, continue when the user asks, or while a `qdash_wait_agent_intervention` you started is still waiting.",
+    "- Recording a decision with `nextAction` `stop` or `complete` changes no session state. To stop or finish an agent session, call `qdash_end_agent_session` (it shows a card); say a session is stopped or completed only when its result reports that status, report what it lists as still running as running (QDash does not cancel a measurement already sent), and link the session page it returns.",
     `- Reason internally in ${thinkingLanguageName}. ${responseInstruction(responseLanguage)}`,
+    ...(tooling.intentGuide ? ["", "Tools by request type:", tooling.intentGuide] : []),
     ...(toolGuide
       ? [
           "",
@@ -82,6 +90,19 @@ export function buildSystemPrompt(
         ]
       : []),
   ].join("\n");
+}
+
+/**
+ * How the model narrates its work. Text written between tool calls is shown live
+ * as progress updates and kept with the answer as its work history; the text
+ * after the last tool call is the final answer.
+ */
+export function progressUpdateBullets(): string[] {
+  return [
+    "- Progress updates: text you write between tool calls is shown to the user as it arrives and kept as the answer's work history; the text after your last tool call is the final answer. When a request needs several tool calls or a long-running tool, first write one short sentence on what you will check. After a milestone (a finding that changes the plan, a failed step, a switch of approach), write one or two sentences on what you found and what you do next. Write updates in the reply language.",
+    "- Do not narrate every tool call, do not announce progress, results or time estimates that no tool returned, and do not share your internal reasoning in updates. A simple question you can answer directly or with one quick tool call gets the answer without updates.",
+    "- The final answer stands on its own: give the conclusion and the values it rests on, and do not repeat the updates.",
+  ];
 }
 
 function responseInstruction(language: string): string {
@@ -112,7 +133,7 @@ export function buildUserInstructionsSection(instructions: string | undefined): 
   if (!text) return undefined;
   return [
     "The user you are talking to set these preferences for their chats. Follow them for style, language, and format; a language they name here is the reply language even when they write in another.",
-    "They do not change the rules above: write operations still need the user's approval in the card, every fact still comes from a tool result or the user, and you still say when data is missing.",
+    "They do not change the rules above: write operations still need the user's approval in the card (or, for an agent session's own steps, the user's approval of that session), every fact still comes from a tool result or the user, and you still say when data is missing.",
     "",
     text,
   ].join("\n");

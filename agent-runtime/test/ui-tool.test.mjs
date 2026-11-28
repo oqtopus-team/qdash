@@ -10,7 +10,7 @@ import { stream as responses } from "@earendil-works/pi-ai/api/openai-responses"
 import { normalizeContext, toToolDeclaration } from "@earendil-works/pi-ai/utils/transcript";
 import { validateToolArguments } from "@earendil-works/pi-ai/utils/validation";
 
-import { UI_COMPONENT_TYPES } from "../../ui/src/lib/copilotUiSpec.ts";
+import { UI_COMPONENT_TYPES } from "../../ui/src/lib/agentUiSpec.ts";
 import { toNdjsonEvents } from "../src/events.ts";
 import { buildModelsConfig } from "../src/models-config.ts";
 import { UI_INPUT_GROUPS } from "../src/ui-tool-input.ts";
@@ -258,7 +258,7 @@ test("every catalog component has an argument list, with the catalog's enums", (
   assert.deepEqual(properties.alerts.items.properties.tone.enum, ["info", "success", "warning", "error"]);
 });
 
-/** Keywords Anthropic's strict tool mode rejects (pi-ai 1.6.0 anthropic-messages.js). */
+/** Keywords Anthropic's strict tool mode rejects (pi-ai 1.7.0 anthropic-messages.js). */
 const ANTHROPIC_STRICT_UNSUPPORTED = [
   "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "maxItems",
   "uniqueItems", "minContains", "maxContains", "minProperties", "maxProperties", "minItems", "format",
@@ -579,14 +579,14 @@ test("tool details with an unknown version or invalid spec stream no ui line", (
   assert.deepEqual(events, [{ type: "tool_end", name: "render_ui", isError: false }]);
 });
 
-// ui/src/lib/copilotUiSpec.ts lives outside every root workspace package, so its
+// ui/src/lib/agentUiSpec.ts lives outside every root workspace package, so its
 // bare imports resolve by walking up from ui/src/lib: to ui/node_modules in the UI
 // build, and to the root workspace's node_modules in the runtime (CI and the
 // image install no UI dependencies). The root manifest must declare each of them,
 // with the UI's range, so both ends validate with the same libraries.
 test("the shared render_ui catalog's dependencies are declared by the root workspace", () => {
   const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
-  const source = read("../../ui/src/lib/copilotUiSpec.ts");
+  const source = read("../../ui/src/lib/agentUiSpec.ts");
   const imports = new Set(
     [...source.matchAll(/^import\s[^;]*?\sfrom\s+"([^"./][^"]*)"/gms)].map(([, name]) => name),
   );

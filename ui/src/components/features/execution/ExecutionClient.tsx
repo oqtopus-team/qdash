@@ -1,26 +1,31 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import {
-  ArrowLeft,
-  Calendar,
-  ChevronRight,
-  Clock,
-  Download,
-  StopCircle,
-  UserRound,
-} from "lucide-react";
+import { Calendar, ChevronRight, Clock, Download, StopCircle, UserRound } from "lucide-react";
+import { useQueryStates } from "nuqs";
 import Select, { type SingleValue, type StylesConfig } from "react-select";
 
+import {
+  type ExecutionCrumb,
+  type SessionReturnContext,
+  calibrationSessionDetailHref,
+  executionListHref,
+  executionViewParsers,
+  runAnchorId,
+} from "@/lib/executionArea";
 import { isExecutionCancellable } from "@/lib/executionStatus";
+import { isTransformExecution } from "@/lib/transformStep";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime as formatDateTimeUtil } from "@/lib/utils/datetime";
 
+import { ExecutionAgentSessionNotice } from "./ExecutionAgentSessionNotice";
+import { ExecutionBreadcrumbs } from "./ExecutionAreaNav";
+import { ExecutionCalibrationNotice, ReportedOriginBadge } from "./ExecutionCalibrationContext";
 import { ExecutionDAG } from "./ExecutionDAG";
 import { ExecutionParameterChanges } from "./ExecutionParameterChanges";
 import { ExecutionRunSummary } from "./ExecutionRunSummary";
+import { TransformStepOutcome } from "./TransformStepOutcome";
 
 import type { ExecutionResponseDetail } from "@/schemas";
 
@@ -28,14 +33,22 @@ import { useGetExecution, useCancelExecution } from "@/client/execution/executio
 import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
 import { ExecutionTopologyView } from "@/components/features/execution/ExecutionTopologyView";
+import {
+  ExecutionActor,
+  isAgentDispatched,
+  recordedUserLabel,
+} from "@/components/features/execution/ExecutionAttribution";
 import { distinctCallId } from "@/components/features/execution/executionTopologyTasks";
 import { gridFullscreenPanelClass } from "@/components/ui/GridFullscreenButton";
 import { ExecutionDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toast";
+import { ViewSwitch } from "@/components/ui/ViewSwitch";
+import { useProject } from "@/contexts/ProjectContext";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useSelectStyles } from "@/hooks/useSelectStyles";
+import { saveBlob } from "@/lib/utils/download";
 
 type FilterOption = {
   value: string;
@@ -44,19 +57,9 @@ type FilterOption = {
 
 type TopologyMode = "1q" | "2q";
 
-type ActorFields = {
-  user_id?: string | null;
-  username?: string;
-};
-
 interface ExecutionDetailClientProps {
   chipId: string;
   executionId: string;
-}
-
-function formatActorLabel(actor?: ActorFields | null) {
-  if (actor?.username) return `@${actor.username}`;
-  return actor?.user_id || "Unknown";
 }
 
 export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailClientProps) {
@@ -90,6 +93,10 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
     return parts.join(", ");
   };
 
+  // The project the execution was read from; links to its calibration session stay in it.
+  const { projectId } = useProject();
+  // The Executions list view this page was opened from; an absent or invalid value is the default.
+  const [listView] = useQueryStates(executionViewParsers);
   const {
     data: executionDetailData,
     isLoading: isDetailLoading,
@@ -215,14 +222,43 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
   if (isDetailError) return <div>Error loading execution details.</div>;
   if (!executionDetailData || !execution) return <div>No data found.</div>;
 
+  const executionChip = execution.chip_id || chipId;
+  const calibration = execution.calibration_session;
+  // A filter or schedule step: no tasks, figures or published parameters to show.
+  const transformStep = isTransformExecution(execution.note);
+  // The Executions list on this chip, with the day, grouping and page this page was opened
+  // from; the session page it links to returns there too.
+  const listContext = { chip: executionChip, ...listView };
+  const sessionReturn: SessionReturnContext = { from: "executions", list: listContext };
+  const crumbs: ExecutionCrumb[] = [
+    {
+      label: "Execution",
+      href: executionListHref({ chipId: executionChip, projectId, ...listView }),
+    },
+  ];
+  // Only the session and run the server recorded for this execution; nothing is inferred.
+  if (calibration) {
+    const sessionHref = calibrationSessionDetailHref(
+      calibration.calibration_session_id,
+      projectId,
+      sessionReturn,
+    );
+    const objective = calibration.objective || calibration.calibration_session_id;
+    crumbs.push({ label: objective, title: objective, href: sessionHref });
+    if (calibration.via === "pipeline_run" && calibration.pipeline_run_id) {
+      const runId = calibration.pipeline_run_id;
+      crumbs.push({
+        label: `Run ${runId.slice(0, 8)}`,
+        title: `Run ${runId}`,
+        href: `${sessionHref}#${runAnchorId(runId)}`,
+      });
+    }
+  }
+
   return (
     <div className="w-full px-4 py-6">
       <div className="space-y-6">
-        {/* Back navigation */}
-        <Link href="/execution" className="btn btn-ghost btn-sm w-fit">
-          <ArrowLeft data-icon="inline-start" />
-          Back to Executions
-        </Link>
+        <ExecutionBreadcrumbs crumbs={crumbs} />
 
         <div className="space-y-4">
           <div
@@ -268,11 +304,35 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
               </TooltipContent>
             </Tooltip>
             <div className="flex items-center text-base-content/70 min-w-0">
-              <UserRound className="mr-2 text-info/70 flex-shrink-0" size={14} />
-              <span className="font-medium mr-1">User:</span>
-              <span className="truncate">{formatActorLabel(execution)}</span>
+              {isAgentDispatched(execution.agent_session) ? (
+                <>
+                  <span className="font-medium mr-1">Run by:</span>
+                  <ExecutionActor actor={execution} link={execution.agent_session} />
+                </>
+              ) : (
+                <>
+                  <UserRound className="mr-2 text-info/70 flex-shrink-0" size={14} />
+                  <span className="font-medium mr-1">User:</span>
+                  <span className="truncate">{recordedUserLabel(execution)}</span>
+                  {execution.reported_origin ? (
+                    <span className="ml-2">
+                      <ReportedOriginBadge origin={execution.reported_origin} />
+                    </span>
+                  ) : null}
+                </>
+              )}
             </div>
           </div>
+          <ExecutionAgentSessionNotice
+            link={execution.agent_session}
+            chipId={execution.chip_id || chipId}
+          />
+          <ExecutionCalibrationNotice
+            link={execution.calibration_session}
+            origin={execution.reported_origin}
+            projectId={projectId}
+            sessionReturn={sessionReturn}
+          />
           <ExecutionRunSummary status={execution.status} tasks={execution.task ?? []} />
           {execution.status === "failed" && (
             <TaskMessagePanel
@@ -289,36 +349,45 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
           )}
         </div>
 
-        <div className="card bg-base-100 p-6">
-          <h2 className="text-sm font-medium mb-4">Execution Flow</h2>
-          <ExecutionDAG tasks={validTasks} />
-        </div>
+        {transformStep ? (
+          <div className="card bg-base-100 p-6">
+            <h2 className="text-sm font-medium mb-4">Step outcome</h2>
+            <TransformStepOutcome note={execution.note} status={execution.status} />
+          </div>
+        ) : (
+          <div className="card bg-base-100 p-6">
+            <h2 className="text-sm font-medium mb-4">Execution Flow</h2>
+            <ExecutionDAG tasks={validTasks} />
+          </div>
+        )}
 
-        <div id="parameter-changes" className="card bg-base-100 p-6">
-          <details className="group" open={parameterChangesOpen}>
-            <summary
-              className="flex cursor-pointer list-none items-start gap-1.5"
-              onClick={(event) => {
-                // Controlled so the comparison (and its requests) exists only while open.
-                event.preventDefault();
-                setParameterChangesOpen((current) => !current);
-              }}
-            >
-              <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-base-content/60 transition-transform group-open:rotate-90" />
-              <div>
-                <h2 className="text-sm font-medium mb-1">Parameter changes</h2>
-                <p className="text-xs text-base-content/60">
-                  Values this run wrote to the calibration database, against the previous run.
-                </p>
-              </div>
-            </summary>
-            {parameterChangesOpen && (
-              <div className="mt-3">
-                <ExecutionParameterChanges chipId={chipId} executionId={executionId} />
-              </div>
-            )}
-          </details>
-        </div>
+        {!transformStep && (
+          <div id="parameter-changes" className="card bg-base-100 p-6">
+            <details className="group" open={parameterChangesOpen}>
+              <summary
+                className="flex cursor-pointer list-none items-start gap-1.5"
+                onClick={(event) => {
+                  // Controlled so the comparison (and its requests) exists only while open.
+                  event.preventDefault();
+                  setParameterChangesOpen((current) => !current);
+                }}
+              >
+                <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-base-content/60 transition-transform group-open:rotate-90" />
+                <div>
+                  <h2 className="text-sm font-medium mb-1">Parameter changes</h2>
+                  <p className="text-xs text-base-content/60">
+                    Values this run wrote to the calibration database, against the previous run.
+                  </p>
+                </div>
+              </summary>
+              {parameterChangesOpen && (
+                <div className="mt-3">
+                  <ExecutionParameterChanges chipId={chipId} executionId={executionId} />
+                </div>
+              )}
+            </details>
+          </div>
+        )}
 
         {/* Execution Note (if available) */}
         {execution.note &&
@@ -336,14 +405,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
                           const blob = new Blob([jsonStr], {
                             type: "application/json",
                           });
-                          const url = URL.createObjectURL(blob);
-                          const link = document.createElement("a");
-                          link.href = url;
-                          link.download = `execution_note_${chipId}_${executionId}.json`;
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                          URL.revokeObjectURL(url);
+                          saveBlob(blob, `execution_note_${chipId}_${executionId}.json`);
                         }}
                         className="btn btn-sm btn-primary"
                       >
@@ -360,77 +422,72 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
             </div>
           )}
 
-        <div className={isFullscreen ? gridFullscreenPanelClass : "card bg-base-100 p-4 sm:p-6"}>
-          <div
-            className={`flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 ${
-              isFullscreen ? "shrink-0" : "mb-4"
-            }`}
-          >
-            <div>
-              <h2 className="text-sm font-medium">Task Topology</h2>
-              <p className="mt-1 text-xs text-base-content/60">
-                {filteredTasks.length} {topologyMode === "2q" ? "coupling" : "one-qubit"} tasks
-                shown on the chip layout
-              </p>
-            </div>
-            <div className="tabs tabs-boxed bg-base-200 w-fit">
-              <button
-                type="button"
-                className={`tab ${topologyMode === "1q" ? "tab-active" : ""}`}
-                onClick={() => {
-                  setTopologyMode("1q");
+        {!transformStep && (
+          <div className={isFullscreen ? gridFullscreenPanelClass : "card bg-base-100 p-4 sm:p-6"}>
+            <div
+              className={`flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 ${
+                isFullscreen ? "shrink-0" : "mb-4"
+              }`}
+            >
+              <div>
+                <h2 className="text-sm font-medium">Task Topology</h2>
+                <p className="mt-1 text-xs text-base-content/60">
+                  {filteredTasks.length} {topologyMode === "2q" ? "coupling" : "one-qubit"} tasks
+                  shown on the chip layout
+                </p>
+              </div>
+              <ViewSwitch
+                ariaLabel="Topology target"
+                size="sm"
+                value={topologyMode}
+                onValueChange={(mode) => {
+                  setTopologyMode(mode);
                   setFilterTaskName("");
                 }}
-              >
-                Qubit
-              </button>
-              <button
-                type="button"
-                className={`tab ${topologyMode === "2q" ? "tab-active" : ""}`}
-                onClick={() => {
-                  setTopologyMode("2q");
-                  setFilterTaskName("");
-                }}
-              >
-                Coupling
-              </button>
-            </div>
-          </div>
-
-          {/* Filter Controls */}
-          <div
-            className={`flex flex-col sm:flex-row gap-2 sm:gap-4 ${isFullscreen ? "shrink-0" : "mb-4"}`}
-          >
-            <div className="form-control flex-1 min-w-0">
-              <label className="label py-1">
-                <span className="label-text text-xs font-medium">Task Name</span>
-              </label>
-              <Select<FilterOption, false>
-                className="text-sm"
-                classNamePrefix="react-select"
-                options={taskFilterOptions}
-                value={taskFilterOptions.find((option) => option.value === filterTaskName) ?? null}
-                onChange={(option: SingleValue<FilterOption>) => {
-                  setFilterTaskName(option?.value ?? "");
-                }}
-                placeholder="Select task"
-                isSearchable
-                styles={filterSelectStyles}
+                items={[
+                  { value: "1q", label: "Qubit" },
+                  { value: "2q", label: "Coupling" },
+                ]}
               />
             </div>
-          </div>
 
-          <ExecutionTopologyView
-            chipId={chipId}
-            executionId={executionId}
-            executionName={execution.name}
-            tasks={execution.task || []}
-            topologyMode={topologyMode}
-            filterTaskName={filterTaskName}
-            isFullscreen={isFullscreen}
-            onToggleFullscreen={toggleFullscreen}
-          />
-        </div>
+            {/* Filter Controls */}
+            <div
+              className={`flex flex-col sm:flex-row gap-2 sm:gap-4 ${isFullscreen ? "shrink-0" : "mb-4"}`}
+            >
+              <div className="form-control flex-1 min-w-0">
+                <label className="label py-1">
+                  <span className="label-text text-xs font-medium">Task Name</span>
+                </label>
+                <Select<FilterOption, false>
+                  className="text-sm"
+                  classNamePrefix="react-select"
+                  options={taskFilterOptions}
+                  value={
+                    taskFilterOptions.find((option) => option.value === filterTaskName) ?? null
+                  }
+                  onChange={(option: SingleValue<FilterOption>) => {
+                    setFilterTaskName(option?.value ?? "");
+                  }}
+                  placeholder="Select task"
+                  isSearchable
+                  styles={filterSelectStyles}
+                />
+              </div>
+            </div>
+
+            <ExecutionTopologyView
+              chipId={chipId}
+              executionId={executionId}
+              executionName={execution.name}
+              tasks={execution.task || []}
+              topologyMode={topologyMode}
+              filterTaskName={filterTaskName}
+              isFullscreen={isFullscreen}
+              onToggleFullscreen={toggleFullscreen}
+            />
+          </div>
+        )}
       </div>
 
       <CancelExecutionModal

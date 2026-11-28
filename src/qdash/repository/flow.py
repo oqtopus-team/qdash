@@ -4,7 +4,7 @@ from typing import Any
 
 from qdash.common.utils.datetime import now
 from qdash.dbmodel.flow import FlowDocument
-from qdash.dbmodel.user import UserDocument
+from qdash.dbmodel.lookups import user_id_for_username
 
 
 class MongoFlowRepository:
@@ -138,7 +138,7 @@ class MongoFlowRepository:
         flow_doc = FlowDocument(
             project_id=project_id,
             name=name,
-            user_id=self._user_id_for_username(username),
+            user_id=user_id_for_username(username),
             username=username,
             chip_id=chip_id,
             description=description,
@@ -215,8 +215,3 @@ class MongoFlowRepository:
             FlowDocument if found, None otherwise
         """
         return FlowDocument.find_one(query).run()
-
-    @staticmethod
-    def _user_id_for_username(username: str) -> str | None:
-        user = UserDocument.find_one({"username": username}).run()
-        return user.user_id if user else None

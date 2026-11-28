@@ -6,10 +6,14 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ExecutePipelineRequestBackendName } from './executePipelineRequestBackendName';
+import type { ExecutePipelineRequestCalibrationSessionId } from './executePipelineRequestCalibrationSessionId';
+import type { ExecutePipelineRequestDecisionId } from './executePipelineRequestDecisionId';
+import type { ExecutePipelineRequestIdempotencyKey } from './executePipelineRequestIdempotencyKey';
+import type { ExecutePipelineRequestReportedOrigin } from './executePipelineRequestReportedOrigin';
 import type { ExecutePipelineRequestSpec } from './executePipelineRequestSpec';
 
 /**
- * Validate, then dispatch the pipeline as one execution.
+ * Dispatch one pipeline run with a separate execution for each step reached.
  */
 export interface ExecutePipelineRequest {
   /** @minLength 1 */
@@ -18,4 +22,12 @@ export interface ExecutePipelineRequest {
   spec: ExecutePipelineRequestSpec;
   /** Defaults to the configured backend. */
   backend_name?: ExecutePipelineRequestBackendName;
+  /** Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it. */
+  calibration_session_id?: ExecutePipelineRequestCalibrationSessionId;
+  /** A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run. */
+  idempotency_key?: ExecutePipelineRequestIdempotencyKey;
+  /** With calibration_session_id: the decision of that session this run carries out, recorded before dispatch with an experiment. QDash checks it belongs to the session and records the link on the run; it grants nothing. */
+  decision_id?: ExecutePipelineRequestDecisionId;
+  /** How the caller says it started the run, such as an agent tool. QDash stores it as given and shows it as reported: it is not verified, does not link the run to an agent session, and grants nothing. The signed-in user stays responsible for the run. */
+  reported_origin?: ExecutePipelineRequestReportedOrigin;
 }

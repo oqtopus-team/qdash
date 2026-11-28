@@ -10,6 +10,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -28,6 +29,29 @@ class CheckRamsey(QubexTask):
 
     name: str = "CheckRamsey"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Runs Ramsey interference at a fixed detuning with X and Y second rotations, fits "
+            "the axis with the better R², and writes the Ramsey frequency, the qubit frequency,"
+            " and T2*."
+        ),
+        when_to_use=(
+            "Run it to refine the qubit frequency and measure T2* once a half-pi pulse is "
+            "calibrated. The qubit_frequency it writes is also published as control_frequency; "
+            "repeat it with a longer time range and smaller detuning for a finer estimate."
+        ),
+        prerequisites=(
+            "Rabi parameters stored by CheckRabi, used to normalize the measured IQ data.",
+            (
+                "hpi_amplitude and hpi_duration stored by a half-pi pulse calibration such as "
+                "CreateHPIPulse."
+            ),
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # RabiParam normalizes measured IQ values; its readout duration is validated.
         **required_rabi_normalization_inputs(),

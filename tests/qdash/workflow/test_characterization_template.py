@@ -19,23 +19,21 @@ from qdash.workflow.service.steps import (
     OneQubitFineTune,
 )
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
+from tests.qdash.workflow.calibration_session_fake import (
+    fake_session_class,
+    install_fake_session,
+)
 from tests.qdash.workflow.task_call_helpers import effective_settings, names, settings
 
 characterization_module = importlib.import_module("qdash.workflow.templates.characterization")
 
 
-class FakeCalibService:
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.args = args
-        self.kwargs = kwargs
-
-    def run(self, targets: Any, *, steps: list[Any]) -> dict[str, Any]:
-        return {"targets": targets, "steps": steps, "kwargs": self.kwargs}
+FakeCalibService = fake_session_class()
 
 
 @pytest.fixture(autouse=True)
 def fake_calibration_service(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(characterization_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, characterization_module, FakeCalibService)
 
 
 def test_characterization_builds_full_pipeline_in_dependency_order() -> None:

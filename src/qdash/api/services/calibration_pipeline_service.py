@@ -43,6 +43,7 @@ from qdash.common.config.backend import (
 from qdash.common.manual_rounds import mux_target_qids
 from qdash.common.mux_mapping import (
     MuxMappingError,
+    canonical_qid,
     qubex_mux_mapping_errors,
     resolve_topology_mux_mapping,
 )
@@ -67,12 +68,14 @@ from qdash.datamodel.calibration_pipeline import (
 from qdash.datamodel.one_qubit_execution_mode import ONE_QUBIT_STEP_EXECUTION_MODES
 from qdash.datamodel.two_qubit_execution_mode import TWO_QUBIT_EXECUTION_MODES
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.qubit import QubitDocument
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
+    from collections.abc import Callable, Iterable, Mapping
 
     from qdash.api.schemas.task_file import TaskInfo
+    from qdash.datamodel.task import TaskDocumentation
     from qdash.repository.task_definition import MongoTaskDefinitionRepository
 
 logger = logging.getLogger(__name__)
@@ -189,8 +192,9 @@ class CalibrationPipelineService:
     def catalog(self, project_id: str, backend_name: str | None) -> PipelineCatalogResponse:
         """Step types, task names, and the spec schema for writing a spec."""
         backend, _ = self.resolve_backend(backend_name)
+        task_types = self.task_types(project_id, backend)
         by_type: dict[str, list[str]] = {}
-        for name, task_type in sorted(self.task_types(project_id, backend).items()):
+        for name, task_type in sorted(task_types.items()):
             by_type.setdefault(task_type, []).append(name)
         return PipelineCatalogResponse(
             backend_name=backend,
@@ -211,9 +215,32 @@ class CalibrationPipelineService:
             one_qubit_execution_modes=list(ONE_QUBIT_STEP_EXECUTION_MODES),
             two_qubit_execution_modes=list(TWO_QUBIT_EXECUTION_MODES),
             tasks=by_type,
+            task_documentation=self._task_documentation(backend, task_types),
             spec_version=SPEC_VERSION,
             spec_schema=pipeline_spec_json_schema(),
         )
+
+    def _task_documentation(
+        self, backend: str, task_names: Iterable[str]
+    ) -> dict[str, TaskDocumentation]:
+        """Declared documentation of the listed tasks, from the task catalog.
+
+        Documentation is guidance only, so an unavailable catalog leaves it empty
+        rather than failing the pipeline catalog.
+        """
+        if self._task_catalog is None:
+            return {}
+        try:
+            catalog = self._task_catalog(backend)
+        except LookupError as exc:
+            logger.warning("Task documentation unavailable for backend %s: %s", backend, exc)
+            return {}
+        documentation: dict[str, TaskDocumentation] = {}
+        for name in sorted(task_names):
+            info = catalog.get(name)
+            if info is not None and info.documentation is not None:
+                documentation[name] = info.documentation
+        return documentation
 
     # --------------------------------------------------------------- validation
 
@@ -276,6 +303,68 @@ class CalibrationPipelineService:
             ),
         )
 
+    def initial_target_qids(
+        self, project_id: str, chip_id: str, spec: CalibrationPipelineSpec
+    ) -> tuple[list[str] | None, PipelineProblem | None]:
+        """The qubits a run of ``spec`` starts from, as the worker resolves its targets.
+
+        Qubit and pair targets name them. MUX targets are expanded with the chip's MUX
+        mapping and wiring, as ``MuxTargets`` does on the worker; when that data cannot be
+        read the expansion is a problem, never a guess. On a chip with a topology, a
+        selected MUX without a wiring row is a problem too, as the worker refuses it; a
+        chip without a topology skips unwired MUXes, as the worker does. A resolved qubit
+        without a qubit record on the chip is a problem: the worker would schedule it, and
+        dropping it would run fewer qubits than were reviewed.
+        """
+        targets = spec.targets
+        if targets.qids:
+            return list(targets.qids), None
+        if targets.pairs:
+            return targets.pair_qids(), None
+        model = self._chip_round_model(project_id, chip_id)
+        if model.mapping_error is not None:
+            return None, _problem("targets.mux_ids", model.mapping_error)
+        if model.wiring is None:
+            reason = model.wiring_error or f"the wiring of chip {chip_id!r} could not be read"
+            return None, _problem(
+                "targets.mux_ids", f"the MUX targets could not be expanded to qubits: {reason}"
+            )
+        qids = mux_target_qids(
+            targets.mux_ids or [], targets.exclude_qids, model.wiring, model.mux_mapping
+        )
+        if not qids:
+            return None, _problem("targets.mux_ids", "the MUX targets select no qubit")
+        mapping = model.mux_mapping
+        if mapping is not None and not mapping.unbounded:
+            # The worker's scheduler refuses a topology MUX with selected qubits but no
+            # wiring row; a chip without a topology keeps skipping unwired MUXes instead.
+            wired = {entry["mux"] for entry in model.wiring}
+            unwired = sorted(
+                {
+                    mux
+                    for qid in qids
+                    if (mux := mapping.find_mux(qid)) is not None and mux not in wired
+                }
+            )
+            if unwired:
+                return None, _problem(
+                    "targets.mux_ids",
+                    f"MUXes {unwired} of the chip topology have no row in the wiring of chip "
+                    f"{chip_id}; add them to wiring.yaml or leave them out of the targets",
+                )
+        recorded = {
+            canonical_qid(doc.qid)
+            for doc in QubitDocument.find({"project_id": project_id, "chip_id": chip_id}).run()
+        }
+        missing = [qid for qid in qids if canonical_qid(qid) not in recorded]
+        if missing:
+            return None, _problem(
+                "targets.mux_ids",
+                f"qubits {missing} of the MUX targets have no qubit record on chip {chip_id}; "
+                "add their records or list them in targets.exclude_qids",
+            )
+        return qids, None
+
     def _validate_manual_rounds(
         self,
         project_id: str,
@@ -301,6 +390,8 @@ class CalibrationPipelineService:
         initial: list[str] | None
         if targets.qids:
             initial = list(targets.qids)
+        elif targets.pairs:
+            initial = targets.pair_qids()
         elif model.wiring is not None:
             initial = mux_target_qids(
                 targets.mux_ids or [], targets.exclude_qids, model.wiring, model.mux_mapping
@@ -474,6 +565,8 @@ class CalibrationPipelineService:
             for doc in QubitDocument.find({"project_id": project_id, "chip_id": chip_id}).run()
         }
         targets = spec.targets
+        if targets.pairs:
+            return self._validate_pair_targets(project_id, chip_id, chip, spec, known, problems)
         if targets.qids:
             try:
                 mapping = resolve_topology_mux_mapping(chip.topology_id)
@@ -535,23 +628,85 @@ class CalibrationPipelineService:
                     )
                 )
         self._validate_configure_all_mux_ids(spec, groups, chip_id, problems)
+        mux_qids = [qid for mux in targets.mux_ids or [] if mux in groups for qid in groups[mux]]
+        # A member of a selected MUX may be excluded without a qubit record: excluding it
+        # is how a MUX with a missing record is targeted.
+        members = {canonical_qid(qid) for qid in mux_qids}
         for index, qid in enumerate(targets.exclude_qids):
-            if qid not in known:
+            if qid not in known and canonical_qid(qid) not in members:
                 problems.append(
                     _problem(
                         f"targets.exclude_qids[{index}]",
                         f"qubit {qid!r} is not on chip {chip_id}",
                     )
                 )
-        excluded = set(targets.exclude_qids)
-        mux_qids = [qid for mux in targets.mux_ids or [] if mux in groups for qid in groups[mux]]
+        excluded = {canonical_qid(qid) for qid in targets.exclude_qids}
         return (
             ResolvedPipelineTargets(
                 qids=[],
                 mux_ids=list(targets.mux_ids or []),
                 exclude_qids=list(targets.exclude_qids),
             ),
-            [qid for qid in mux_qids if qid in known and qid not in excluded],
+            [qid for qid in mux_qids if qid in known and canonical_qid(qid) not in excluded],
+        )
+
+    def _validate_pair_targets(
+        self,
+        project_id: str,
+        chip_id: str,
+        chip: ChipDocument,
+        spec: CalibrationPipelineSpec,
+        known: set[str],
+        problems: list[PipelineProblem],
+    ) -> tuple[ResolvedPipelineTargets | None, list[str]]:
+        """Pair targets: both qubits of every pair on the chip, and each pair a coupling.
+
+        The direction is the pair's own; a pair the chip only has the other way round is
+        reported, never reversed.
+        """
+        targets = spec.targets
+        try:
+            mapping = resolve_topology_mux_mapping(chip.topology_id)
+        except MuxMappingError as exc:
+            problems.append(_problem("targets.pairs", str(exc)))
+            return None, []
+        couplings = {
+            doc.qid
+            for doc in CouplingDocument.find({"project_id": project_id, "chip_id": chip_id}).run()
+        }
+        for index, (control, target) in enumerate(targets.pairs or []):
+            path = f"targets.pairs[{index}]"
+            missing = [qid for qid in (control, target) if qid not in known]
+            if missing:
+                problems.append(
+                    _problem(
+                        path,
+                        f"qubits {missing} of pair {control}-{target} are not on chip {chip_id}",
+                    )
+                )
+                continue
+            if couplings and f"{control}-{target}" not in couplings:
+                problems.append(
+                    _problem(path, f"{control}-{target} is not a coupling of chip {chip_id}")
+                )
+        for index, step in enumerate(spec.steps):
+            if step.type == "BringUp" or (
+                isinstance(step, ConfigureAllStep) and step.mux_ids is None
+            ):
+                problems.append(
+                    _problem(
+                        f"steps[{index}]",
+                        f"{step.type} works on whole MUXes; pair targets name no MUX, so set "
+                        "MUX or qubit targets for it",
+                    )
+                )
+        self._validate_configure_all_mux_ids(
+            spec, mapping.groups_for_qubit_count(int(chip.size)), chip_id, problems
+        )
+        qids = targets.pair_qids()
+        return (
+            ResolvedPipelineTargets(qids=qids, pairs=[list(pair) for pair in targets.pairs or []]),
+            [qid for qid in qids if qid in known],
         )
 
     def _preflight(

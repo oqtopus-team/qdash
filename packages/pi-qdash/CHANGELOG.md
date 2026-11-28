@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Snapshot plan previews before CLI approval so later resolver mutations cannot change the approved content.
+
+- Store validated pipeline proposals from Code Mode and run them by reference with a preserved approval preview.
+
+- Add SDK-backed task-result summaries with bounded pagination and completeness diagnostics.
+
+- Preserve execution reconciliation guidance when an SDK launch outcome is unknown.
+- Allow custom tool hosts to supply SDK fetch and environment settings through `sdkSessionFactory`.
+
 ## [v0.1.10](https://github.com/oqtopus-team/pi-qdash/compare/v0.1.9...v0.1.10) - 2026-10-09
 
 - feat: add calibration pipeline tools by @orangekame3 in https://github.com/oqtopus-team/pi-qdash/pull/30

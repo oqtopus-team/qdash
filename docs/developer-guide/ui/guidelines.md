@@ -1,311 +1,94 @@
 # UI Development Guidelines
 
-Code under `ui/` follows QDash-specific placement, export, and tooling conventions so routes stay
-small and features remain testable.
-
-## Stack
-
-| Tool | Role |
-| --- | --- |
-| Next.js and React | App Router and component runtime |
-| TypeScript | Strict application types |
-| Bun | Package manager and script runtime |
-| TanStack Query | Generated server-state hooks and caching |
-| `nuqs` | URL query state |
-| Tailwind CSS and DaisyUI | Layout, components, semantic colors, and themes |
-| Radix UI | Accessible behavior for dialogs, menus, and tooltips |
-| Vitest and Testing Library | Unit and component tests |
-| Oxlint, Oxfmt, and Knip | Lint, format, and unused-code checks |
-
-Package versions live in `ui/package.json`; do not duplicate them elsewhere in the codebase.
+Use the shared components and styling rules so new features fit the rest of QDash.
 
 ## Place Files by Responsibility
 
-| Code | Location |
-| --- | --- |
-| Route entry | `ui/src/app/**/page.tsx` |
-| Feature page or component | `ui/src/components/features/<feature>/` |
-| Reusable interaction or presentation | `ui/src/components/ui/` |
-| Charts | `ui/src/components/charts/` |
-| Global navigation and layout | `ui/src/components/layout/` |
-| Context provider | `ui/src/contexts/` |
-| Reusable hook | `ui/src/hooks/` |
-| URL-backed hook | `ui/src/hooks/url-state/` |
-| Utility | `ui/src/lib/` or `ui/src/lib/utils/` |
-| Manual application type | `ui/src/types/` |
-| Generated API code | `ui/src/client/`, `ui/src/schemas/` |
-
-Do not edit generated API code. A route file delegates substantial rendering and state to a
-`*PageContent` component.
-
-A preview of one task result, opened from a Task Results row or an Execution Flow node, is
-`TaskResultPreviewSidebar` in `ui/src/components/features/task-results/`. It fetches the result
-from the task id and links to the full page, so a page holds only the selected id and does not
-build a result panel of its own.
+Keep routes thin and rendering in named `*PageContent` components. Use the locations in
+[UI Architecture](./architecture.md#responsibility-boundaries); never edit generated clients or
+schemas. Reuse `TaskResultPreviewSidebar` for result previews.
 
 ## Name and Export Modules
 
-Use PascalCase for React component and context files, `use` plus camelCase for hooks, and camelCase
-for utilities. Give components a role-specific name such as `EvaluationRequestModal`; avoid names
-such as `Modal2` or `Data`.
-
-`page.tsx` and `layout.tsx` use default exports because Next.js requires them. Components, hooks,
-contexts, and utilities use named exports. A dynamically imported component can expose both when
-the loader requires a default export.
-
-Use established aliases:
-
-- `@/contexts/*` for context;
-- `@/hooks/url-state` or `@/hooks/useUrlState` for URL state;
-- `@/lib/utils/*` for focused utilities;
-- generated hooks from `@/client/<tag>/<tag>` and types from `@/schemas`.
+Use PascalCase for components and contexts, `useCamelCase` for hooks, and camelCase for utilities.
+Ordinary modules use named exports; `page.tsx` and `layout.tsx` use default exports.
+Use established aliases: `@/contexts`, `@/hooks/url-state`, `@/lib/utils`, `@/client`, and `@/schemas`.
 
 ## Keep Boundaries Explicit
 
-Follow [State Ownership](./architecture.md#state-ownership): generated queries own API data,
-URL hooks own shareable filters, contexts own cross-route state, and local state owns a component
-subtree. Do not copy query results into context; invalidate affected query keys after mutations.
-
-Keep feature-specific composition in `components/features/`. Move a component to
-`components/ui/` only when its API no longer depends on a feature model and at least two callers
-can reuse it. Search the existing primitives before adding one; QDash already provides dialogs,
-menus, tooltips, page framing, tables, loading and empty states, errors, confirmation, and toast
-feedback.
-
-Use DaisyUI for buttons, cards, inputs, badges, tables, alerts, and other visual components. Reuse
-the shared Radix-based `Dialog`, `DropdownMenu`, `Popover`, and `Tooltip` wrappers when focus
-management, keyboard navigation, portals, dismissal, or collision handling requires them. Feature
-code does not import another headless primitive to replace an established wrapper. The app root
-mounts one `TooltipProvider`, so moving between neighbouring tooltips skips the open delay; feature
-code does not add its own provider. An inline autocomplete, such as the mention list in
-`MarkdownEditor`, keeps focus in its text field, which `DropdownMenu` would move into the menu; it
-renders a `listbox` and marks the field as a `combobox` with `aria-activedescendant` instead.
-
-Links that navigate to a page show no hover popup: no `Tooltip`, no hover card, and no native
-`title` that only repeats the destination. A visible label names the link; an icon-only link or
-navigation button carries an `aria-label` instead. The collapsed sidebar follows the same rule:
-its rows keep their labels mounted, faded and clipped, so each row keeps its accessible name, and
-only the expand/collapse toggle keeps a tooltip. A tooltip or `title` stays where it adds
-information the visible text lacks, such as a chart day's counts, a truncated identifier, or the
-reason an action is disabled.
-
-Links in chat answers are the exception: they get a hover card from the root
-`LinkHoverCardProvider` in `ui/src/components/features/link-preview/`, mounted with
-`scope="chat"` so it reacts only to links inside a `data-link-preview="chat"` subtree. The
-provider finds those `<a href>` elements, including ones rendered by Next.js `Link`, through event
-delegation on the document, so a click keeps its normal navigation. A pointer opens the card after
-400 ms and keyboard focus opens it at once; touch and focus that follows a pointer press open
-nothing. `describeLink` in `ui/src/lib/linkPreview.ts` names the destination from the URL alone. A
-task result, execution, forum post, or figure route on the current origin loads a short summary
-when the card opens. Other links show their page, host, file, or address and are never requested.
-An empty `href`, a bare `#`, a `javascript:` URL, and `aria-disabled="true"` get no card, and
-buttons are never treated as links. In a chat answer, a record route on any host is still read as
-a QDash record, matching the click preview in `ChatLinkPreviewProvider`, because older answers may
-name a misconfigured host. Mark a subtree with `data-link-preview="off"` when its links must not
-show a card, as the card's own content does.
-
-How these boundaries connect: [UI Architecture](./architecture.md).
+Follow [state ownership](./architecture.md#state-ownership). DaisyUI provides visual components;
+shared Radix wrappers provide focus, dismissal, portals, and keyboard behavior. Reuse the root
+`TooltipProvider`. Navigation links need clear labels. In the collapsed desktop sidebar, show
+those labels in tooltips on hover and keyboard focus; omit them when labels are visible or in
+the mobile More sheet.
+Chat links alone use `LinkHoverCardProvider`; external links are described without fetching them.
+Inline autocomplete keeps focus in its text field and uses combobox/listbox semantics.
 
 ## Set Type with Three Sizes and Two Weights
 
-Text uses three sizes and two weights. Hierarchy comes from spacing and color, not from a larger
-or bolder font. `body` in `ui/src/app/globals.css` sets 14px, so unsized text is body text.
-
-The typeface is Geist Sans, with Geist Mono for identifiers and numbers (`font-mono`). Both are
-self-hosted from the `geist` package: `ui/src/app/layout.tsx` loads them through `next/font` and
-exposes `--font-geist-sans` and `--font-geist-mono`; the `@theme` block in `globals.css` maps them
-to Tailwind's `--font-sans` and `--font-mono`, so no page needs a `font-sans` class. Libraries that
-bypass the cascade (Monaco, Plotly) take `sansFontFamily` and `monoFontFamily` from
-`ui/src/lib/fonts.ts`; do not write a font stack anywhere else.
-
 | Role | Classes |
 | --- | --- |
-| Page title (`h1`, `PageHeader`) | `text-xl font-medium` |
-| Section, card, dialog, and item title (`h2`, `h3`, `card-title`, `DialogTitle`) | `text-sm font-medium` |
-| Body, labels, buttons, table cells | `text-sm` |
-| Supporting text, timestamps, badges | `text-xs text-base-content/60` |
-| Sub-section label inside a card, table header, sidebar section | `text-xs font-medium text-base-content/60`, sentence case |
-| Numeral in a stat tile | `stat-value` |
+| Page title | `text-xl font-medium` |
+| Section, card, dialog title | `text-sm font-medium` |
+| Body, labels, controls | `text-sm` |
+| Supporting text | `text-xs text-base-content/60` |
+| Stat numeral | `stat-value` |
 
-`font-medium` is the only emphasis; do not use `font-semibold` or `font-bold`. Do not use
-`text-base`, `text-lg`, `text-2xl` and above, arbitrary sizes such as `text-[11px]`, or responsive
-size variants such as `sm:text-lg`; pick one size for every viewport. When primary and secondary
-text share a line, separate them with color, not size.
-Labels are sentence case; no `uppercase` or `tracking-*` on interface text.
-
-`globals.css` applies the same scale to DaisyUI: `.btn`, `.badge`, `.card-title`, `.table th`, and
-`.stat-value` use weight 500, and `.stat-value` is the one step above the page title (1.5rem,
-tabular numerals). `ui/src/lib/react-select-theme.ts` and
-`ui/src/components/features/cryo/blocknote-theme.css` follow the same values.
-
-Exceptions: the error and not-found pages, the sign-in hero title, Monaco editor font settings,
-and chip, coupling, and topology grid cells whose text scales with the cell size.
+Use sentence case, regular or medium weight, and no arbitrary or responsive text sizes.
+Geist fonts come from `ui/src/app/layout.tsx`; libraries needing explicit fonts use
+`ui/src/lib/fonts.ts`. Editors, error pages, sign-in heroes, and scalable topology cells have
+special sizing needs.
 
 ## Write Interface Copy
 
-A page title is the navigation label (`Metrics`, not `Chip Metrics Dashboard`); the description
-under it is one line of what the page shows, without a trailing period. Headings, labels, buttons
-and placeholders end without a period and never carry an exclamation mark. Empty states name the
-context, not the visitor: `Ask about calibration data`, not `Good evening, Alice`. Placeholders
-are short (`Ask a question`, `Search tasks`).
+Use the navigation label as the page title. Keep descriptions to one line. Labels, buttons,
+headings, and placeholders omit final periods and exclamation marks.
 
 ## Keep Surfaces Flat
 
-Depth comes from borders and spacing, not from gradients, glow, or motion. `globals.css` sets the
-DaisyUI components once; feature code does not add decoration on top. Corner radii come from the
-active theme's DaisyUI tokens (`--radius-field`, `--radius-box`, `--radius-selector`): the light
-and dark themes set `0.5rem` fields and `0.75rem` boxes, and every other theme keeps its own shape.
-Shared primitives use `rounded-[var(--radius-box)]` rather than a fixed `rounded-*` step.
-`globals.css` sets the button radius outside a cascade layer, so a `rounded-*` utility on a `.btn`
-never applies; leave the shape to the theme. Theme colors come from DaisyUI 5 variables such as
-`var(--color-primary)`; the DaisyUI 4 channels (`oklch(var(--p))`) no longer exist and resolve to
-no color. `ui/src/lib/__tests__/designTokens.test.ts` fails on either pattern and on a button
-radius rule that does not exclude `.btn-circle`.
-
-| Surface | Rule |
-| --- | --- |
-| Button | Solid DaisyUI fill, `--radius-field` radius (`.btn-circle` stays round), no shadow, no hover lift |
-| Card, table, alert, dropdown, dialog | 1px border in `base-content/10`, hairline shadow, `--radius-box` radius |
-| Input | 1px border, primary border plus a 3px soft ring on focus |
-| Active navigation or tab | Tinted background (`primary` at 12%) with primary text, not a filled gradient |
-| Floating layer (modal, drawer, menu) | One soft shadow; this is the only place `shadow-md` or larger belongs |
-| Transitions | `transition-colors` or `transition-transform`; `transition-all` only where a width or height must animate |
-| Motion | No `animate-ping`, no `hover:scale`, no pulsing status dots; `animate-pulse` only on skeletons and `animate-spin` only on loaders |
-
-Color means status. `success`, `warning`, `error`, and `info` mark state; `primary` marks the one
-action or selection on screen. A number in a stat tile is neutral unless it reports a state, and
-decorative uses of `secondary` and `accent` are avoided.
-
-A qubit or coupling id is always a `QubitTile` (`ui/src/components/ui/QubitTile.tsx`): a mono id in a
-small square-cornered box, the same shape as a cell of the chip grid, with a status dot when the
-reference carries a status. Do not render ids as plain badges.
-
-Icons come from `lucide-react`, 16px to 18px outside buttons, in the color of their text role (`text-base-content/60`
-for meta), never in `secondary` or `accent`. Product UI does not use emoji or emoji images; `EmptyState` renders
-a lucide icon from its `emoji` name map, and toasts use lucide status icons. `UserAvatar` renders
-the user's glyph avatar locally; see [User Avatars](./architecture.md#user-avatars).
+Use borders and spacing, not gradients, glow, hover lifts, or decorative animation.
+Theme tokens own corner radii: `--radius-field` for controls and `--radius-box` for panels.
+Do not override button radii or use obsolete DaisyUI 4 color variables.
+Use semantic status colors and reserve primary emphasis for an action or selection.
+Render target IDs with `QubitTile` and icons with Lucide, not emoji.
 
 ## Space Icon Buttons Optically
 
-An icon next to a label reads lighter than the word, so equal geometry looks lopsided. A labeled
-`.btn` marks its leading or trailing icon with `data-icon="inline-start"` or
-`data-icon="inline-end"` on the direct child, and the shared rule in `ui/src/app/globals.css`
-applies four corrections:
-
-| Principle | Rule |
-| --- | --- |
-| Less outer padding on the icon side | The icon side gets 75% of the button's `--btn-p`; the label side keeps it |
-| Slightly smaller icons | The icon is `1em + 2px` of the button's font size: 13px on `btn-xs`, 14px on `btn-sm`, 16px on the default size |
-| Tighter icon-label gap | `0.375em`, replacing DaisyUI's fixed `0.375rem` |
-| Nudge only where the shape warrants it | Only shapes whose mass sits off center move; Lucide `Play` shifts right by one grid unit (1/24 of its box) |
-
-```tsx
-<button type="button" className="btn btn-primary btn-sm">
-  <Plus data-icon="inline-start" aria-hidden="true" />
-  Add
-</button>
-<button type="button" className="btn btn-ghost btn-sm">
-  Export
-  <ChevronDown data-icon="inline-end" aria-hidden="true" />
-</button>
-```
-
-Put the hook on a loading spinner that replaces the icon too, so the swap keeps the same size.
-Do not add `gap-*` to a hooked button or `h-*`, `w-*`, `size-*`, or `size={...}` to a hooked
-icon; the rule overrides them. Height, vertical padding, and `.btn-square` or `.btn-circle`
-icon-only controls are unchanged, so DaisyUI size classes still set the hit target. A button
-with an explicit `px-*`, `ps-*`, `pe-*`, `pl-*`, or `pr-*` utility keeps that padding. A label
-hidden below a breakpoint (`hidden sm:inline`) keeps padding symmetric while only the icon
-shows.
-
-`ui/src/lib/__tests__/buttonIconSpacing.test.ts` fails when a labeled `.btn` has an
-unhooked leading or trailing icon, or when an icon-only button carries a hook. Start-aligned rows
-(`justify-start`, `justify-between`, `justify-end`) and labels rendered only conditionally
-(`{open && <span>Label</span>}`) are exempt because the icon aligns to a list edge or can stand
-alone.
+A labeled `.btn` marks its direct-child icon or replacement spinner with
+`data-icon="inline-start"` or `data-icon="inline-end"`. The shared CSS owns icon size, gap, and
+optical padding; do not add competing size or gap utilities. Icon-only buttons use
+`btn-square` or `btn-circle`, an accessible name, and no `data-icon` hook.
+Start-aligned rows and conditionally rendered labels follow the existing spacing exceptions.
 
 ## Label Checkboxes and Radios with the Whole Row
 
-A DaisyUI checkbox, radio, or toggle with visible text sits inside
-`<label className="choice-field">` as a direct child. Put checkboxes and radios before their
-text; a toggle can follow its text or sit between two state labels.
-The shared rule in `ui/src/app/globals.css` makes the whole label the click target, keeps the
-label at least 24px tall, centers the control on the first line of text however far the text
-wraps, and dims the text and shows a not-allowed cursor when the control is disabled. The control
-keeps its DaisyUI size class, so a dense list can still use `checkbox-xs` or `checkbox-sm`.
-
-```tsx
-<label className="choice-field gap-3 rounded-lg border border-base-300 p-3">
-  <input type="radio" name="mode" className="radio radio-sm" />
-  <span>
-    <span className="block font-medium">Fixed prompt</span>
-    <span className="block text-xs text-base-content/60">QDash builds the prompt</span>
-  </span>
-</label>
-```
-
-The rule sits in the components layer, so utilities on the label (`gap-*`, padding, borders,
-`items-center` for a one-line row with a trailing control) still apply. Do not combine
-`choice-field` with DaisyUI's `label` class, which keeps text on one line, and do not put
-`mt-*` or `my-*` on the control, which overrides the alignment. Give every radio group one
-`name`. A control without visible text, such as a table selection cell, takes an `aria-label`
-instead of a label.
-
-`ui/src/lib/__tests__/choiceField.test.ts` fails when a labeled checkbox, radio, or toggle is not the
-direct child of a `choice-field` label, carries a margin utility, or has no accessible name.
+Put a labeled checkbox, radio, or toggle directly inside a `choice-field` label. Checkboxes and
+radios precede their text; radio groups share a name. Do not combine `choice-field` with DaisyUI's
+`label` class or add vertical margins to the control. Unlabeled controls need `aria-label`.
 
 ## Size Controls That Share a Row
 
-Inputs, selects, and buttons in one row use the same DaisyUI size step: `input`, `select`, and
-`btn` together, or `input-sm`, `select-sm`, and `btn-sm` together. Icon-only buttons in that
-row use `btn-square` at the same step. Set heights with these size classes, not with `h-*`,
-`min-h-*`, or pixel values, so a theme's `--size-field` keeps the row aligned.
-
-React-Select controls take their styles from `useSelectStyles` in
-`ui/src/hooks/useSelectStyles.ts`, or from `getDaisySelectStyles` in
-`ui/src/lib/react-select-theme.ts`. A single select is `SELECT_CONTROL_HEIGHT`, the height of
-a default `input` or `btn`; a multi-select starts at that height and grows with its values. A
-call site may override colors or borders but not the control height.
-`ui/src/lib/__tests__/reactSelectTheme.test.ts` fails when a call site sets a numeric control
-height.
+Use matching DaisyUI size steps for inputs, selects, and buttons; do not force their height.
+React-Select uses `useSelectStyles` or `getDaisySelectStyles`, without call-site height overrides.
 
 ## Draw Charts from One Theme
 
-Every Plotly chart renders through `Plot` in `ui/src/components/charts/Plot.tsx`, which merges
-`themedLayout` from `ui/src/lib/chartTheme.ts` under the caller's layout: transparent backgrounds,
-a hairline grid, muted ticks and legend, the interface font and a shared `colorway`. A chart file
-therefore sets only what is specific to it (titles, ranges, margins, axis types) and never
-`plot_bgcolor`, `paper_bgcolor`, `gridcolor` or legend backgrounds. A fetched figure that paints
-its own `paper_bgcolor` keeps its own text, grid and series colors, because the theme cannot know
-which text reads on that background; it receives only the font family.
-
-Series colors come from `chartTheme(useIsDarkTheme())`: `accent` for the one series that matters,
-`secondary` for a right-hand axis, `seriesColor(theme, i)` for the i-th of several, and `pass` /
-`fail` / `warn` only when a color means a threshold result. Do not write hex colors in chart
-code; the palette has a light and a dark variant and the hook keeps charts readable on every theme.
+Use `ui/src/components/charts/Plot.tsx` and `ui/src/lib/chartTheme.ts`. Set chart-specific axes,
+ranges, and titles, not duplicate background, grid, or legend colors. Use the shared series
+palette with `useIsDarkTheme()`; fetched figures with their own background retain their colors.
 
 ## Write TypeScript
 
-`ui/tsconfig.json` enables strict checking, unused-symbol checks, fallthrough checks, and
-`noEmit`. Model finite UI states with string or discriminated unions instead of independent
-booleans that allow impossible combinations.
-
-Import API request and response types from `@/schemas`; do not copy generated interfaces into a
-feature. Use `unknown` and narrow it at an untyped boundary instead of spreading `any` through
-props or state. Keep unavoidable assertions at the deserialization, DOM, or third-party library
-boundary, and render reachable missing states instead of hiding them with a non-null assertion.
-
-Generated hooks already type their data, errors, variables, and callbacks. Add explicit types
-when data crosses a generic boundary, not to repeat inference that is already precise.
+Use strict types and discriminated unions for finite states. Import API types from `@/schemas`.
+Narrow `unknown` at external boundaries; avoid `any`, blanket assertions, and duplicate interfaces.
 
 ## Run the Development Loop
 
-Start development with `task dev-local-setup` and `task dev-local` from the repository root.
-Use [UI Testing](./testing.md#run-tests) for focused tests, static checks, and production builds.
+Complete [Developer Setup](../setup.md), including `.env` and the MongoDB version, before
+`task dev-local-setup` and `task dev-local`. Use Bun in `ui/`.
+Follow [UI Testing](./testing.md) for checks.
 
 ## Regenerate the API Client
 
-Run `task generate` from the repository root after a backend route or schema changes. Review the
-generated OpenAPI and TypeScript diffs, then update feature code and tests to the new contract.
-
-See [API Integration](./api-integration.md) for generated hook usage and invalidation.
+Run `task generate` after contract changes and review the generated diff.
+[API Integration](./api-integration.md) covers hooks and invalidation.

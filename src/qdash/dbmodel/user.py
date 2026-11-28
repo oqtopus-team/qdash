@@ -42,9 +42,11 @@ class UserDocument(Document):
         description="The user's organization or affiliation",
     )
     avatar_key: str | None = Field(default=None, description="The selected avatar preset key")
-    copilot_instructions: str | None = Field(
+    agent_instructions: str | None = Field(
         default=None,
-        description="The user's own instructions for Copilot chat, appended to its system prompt",
+        # Legacy stored field name from the Copilot era, so saved instructions stay readable.
+        alias="copilot_instructions",
+        description="The user's own instructions for Agent chat, appended to its system prompt",
     )
     default_project_id: str | None = Field(
         default=None,
@@ -63,6 +65,7 @@ class UserDocument(Document):
 
     model_config = ConfigDict(
         from_attributes=True,
+        populate_by_name=True,
     )
 
     class Settings:

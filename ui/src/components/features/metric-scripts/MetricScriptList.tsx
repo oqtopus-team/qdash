@@ -15,7 +15,7 @@ import {
   useListMetricScripts,
 } from "@/client/metric-script/metric-script";
 import type { MetricScriptSummary } from "@/schemas";
-import { VisibilityLabel } from "@/components/features/dashboards/VisibilityLabel";
+import { VisibilityLabel } from "@/components/ui/VisibilityLabel";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorCard } from "@/components/ui/ErrorCard";

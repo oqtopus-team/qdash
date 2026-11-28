@@ -2,7 +2,8 @@
 
 The execution dialog previews what a run will do. A Python workflow is not
 declarative, so this module only accepts what it can read with certainty: one
-or more ``CalibService.run(targets, steps)`` calls in the entrypoint whose step
+or more ``CalibrationSession.run(targets, steps)`` calls in the entrypoint (or the
+legacy ``CalibrationSession.run``) whose step
 lists are literal constructor calls of built-in steps, with literal or simply
 bound arguments. The bounded resolver of :mod:`.target_defaults` supplies the
 literal values. Anything else (branches on values only known at run time,
@@ -15,7 +16,7 @@ it unresolved, because that run never gets past it. A check that may raise on
 a value only known at run time stops a failing run without changing the steps
 of one that proceeds, so it does not affect the plan. A ``return`` that may
 happen on such a value, or an exception a ``with`` block may suppress, could
-skip later runs of a run that succeeds, so any later ``CalibService.run``
+skip later runs of a run that succeeds, so any later ``CalibrationSession.run``
 leaves the plan unresolved. Without manual rounds the execution dialog may
 replace the target parameters, so their saved values count as unknown.
 
@@ -73,6 +74,8 @@ _KNOWN_FUNCTIONS = frozenset(
         *_OVERRIDABLE_TARGETS,
         "TaskCall",
         "CalibService",
+        "CalibrationSession",
+        "calibration_flow",
         "resolve_calib_context",
         "get_run_logger",
         "getLogger",
@@ -154,7 +157,8 @@ class StaticStep:
 
 @dataclass(frozen=True)
 class StaticRun:
-    """One ``CalibService.run`` call; ``targets`` is None when not literal."""
+    """One ``CalibrationSession.run`` (or ``CalibrationSession.run``) call; ``targets`` is None when
+    not literal."""
 
     targets: FlowTargetOverride | None
     steps: tuple[StaticStep, ...]
@@ -325,7 +329,7 @@ def _static_steps(node: ast.expr, resolver: _PlanResolver) -> tuple[StaticStep, 
         reason = resolver.unresolved.get(node.id)
         raise _Unresolved(reason or f"the step list {node.id!r} is built or changed at run time")
     if not isinstance(node, (ast.List, ast.Tuple)):
-        raise _Unresolved("the steps passed to CalibService.run are not a list of step calls")
+        raise _Unresolved("the steps passed to CalibrationSession.run are not a list of step calls")
     steps: list[StaticStep] = []
     for element in node.elts:
         if isinstance(element, ast.Call):
@@ -344,7 +348,8 @@ def _static_steps(node: ast.expr, resolver: _PlanResolver) -> tuple[StaticStep, 
 
 
 def _service_runs(node: ast.AST, resolver: _Resolver) -> list[ast.Call]:
-    """``CalibService.run`` calls in ``node``; any other ``.run(...)`` is not followed."""
+    """``CalibrationSession.run`` and ``CalibrationSession.run`` calls in ``node``; any other
+    ``.run(...)`` is not followed."""
     runs: list[ast.Call] = []
     for child in ast.walk(node):
         if not (isinstance(child, ast.Call) and isinstance(child.func, ast.Attribute)):
@@ -355,7 +360,7 @@ def _service_runs(node: ast.AST, resolver: _Resolver) -> list[ast.Call]:
             root = _root_name(child.func.value)
             raise _Unresolved(
                 f"the entrypoint calls {root + '.' if root else ''}run(), which is not "
-                "a CalibService created in the entrypoint"
+                "a CalibrationSession (or CalibService) created in the entrypoint"
             )
     return runs
 
@@ -376,13 +381,13 @@ def _skip_reason(node: ast.stmt, in_with: bool, why: str) -> str | None:
     if returned is not None:
         return (
             f"the return at line {returned.lineno} may end the entrypoint {why}, so a later "
-            "CalibService.run may not be called"
+            "CalibrationSession.run may not be called"
         )
     raised = _first(node, (ast.Raise, ast.Assert))
     if raised is not None and (in_with or _first(node, _CATCHES) is not None):
         return (
             f"the exception at line {raised.lineno} may be suppressed by a with block "
-            f"{why}, so a later CalibService.run may not be called"
+            f"{why}, so a later CalibrationSession.run may not be called"
         )
     return None
 
@@ -493,7 +498,9 @@ def _resolve_runs(
     try:
         _prepare(tree, function, parameters, resolver)
     except _Unknown as exc:
-        raise _Unresolved("targets or a CalibService are built outside the entrypoint") from exc
+        raise _Unresolved(
+            "targets or a calibration session are built outside the entrypoint"
+        ) from exc
     for name in selected:
         resolver.invalidate(name)
     local_defs = {
@@ -514,12 +521,12 @@ def _resolve_runs(
         if any(isinstance(arg, ast.Starred) for arg in run.args) or any(
             kw.arg is None for kw in run.keywords
         ):
-            raise _Unresolved("CalibService.run unpacks its arguments")
+            raise _Unresolved("CalibrationSession.run unpacks its arguments")
         arguments = dict(zip(("targets", "steps"), run.args, strict=False))
         arguments.update({kw.arg: kw.value for kw in run.keywords if kw.arg is not None})
         targets, steps = arguments.get("targets"), arguments.get("steps")
         if targets is None or steps is None:
-            raise _Unresolved("CalibService.run is called without targets and steps")
+            raise _Unresolved("CalibrationSession.run is called without targets and steps")
         target_type: str | None = None
         if isinstance(targets, ast.Call) and _call_name(targets) in _OVERRIDABLE_TARGETS:
             target = _target(targets, resolver)
@@ -560,7 +567,7 @@ def _resolve_runs(
                     if _service_runs(statement, resolver):
                         raise _Unresolved(
                             "an if statement whose condition is only known at run time "
-                            "decides whether CalibService.run is called"
+                            "decides whether CalibrationSession.run is called"
                         ) from None
                     may_end(statement, in_with, "on a condition only known at run time")
                 else:
@@ -570,18 +577,18 @@ def _resolve_runs(
             elif isinstance(statement, (ast.With, ast.AsyncWith)):
                 for item in statement.items:
                     if _service_runs(item.context_expr, resolver):
-                        raise _Unresolved("CalibService.run is called inside a with item")
+                        raise _Unresolved("CalibrationSession.run is called inside a with item")
                     resolver.enter(item)
                 if visit(statement.body, in_with=True):
                     return True
                 continue
             elif isinstance(statement, ast.Raise):
                 if _service_runs(statement, resolver):
-                    raise _Unresolved("CalibService.run is called inside a raise statement")
+                    raise _Unresolved("CalibrationSession.run is called inside a raise statement")
                 raise raises(statement)
             elif isinstance(statement, ast.Assert):
                 if _service_runs(statement, resolver):
-                    raise _Unresolved("CalibService.run is called inside an assert statement")
+                    raise _Unresolved("CalibrationSession.run is called inside an assert statement")
                 try:
                     holds = resolver.truth(statement.test)
                 except _Unknown:
@@ -593,7 +600,7 @@ def _resolve_runs(
                 if _service_runs(statement, resolver):
                     kind = type(statement).__name__.lower()
                     raise _Unresolved(
-                        f"CalibService.run is called inside a {kind} block, so the number "
+                        f"CalibrationSession.run is called inside a {kind} block, so the number "
                         "of runs is only known at run time"
                     )
                 kind = type(statement).__name__.lower()
@@ -602,7 +609,7 @@ def _resolve_runs(
                 for node in ast.walk(statement):
                     if isinstance(node, _CONDITIONAL_EXPRESSIONS) and _service_runs(node, resolver):
                         raise _Unresolved(
-                            "CalibService.run is called inside a comprehension or conditional "
+                            "CalibrationSession.run is called inside a comprehension or conditional "
                             "expression, so the number of runs is only known at run time"
                         )
                 for run in _service_runs(statement, resolver):
@@ -611,7 +618,7 @@ def _resolve_runs(
                     if not runs:
                         raise _Unresolved(
                             f"the entrypoint returns at line {statement.lineno} before any "
-                            "CalibService.run(targets, steps) call"
+                            "CalibrationSession.run(targets, steps) call"
                         )
                     return True
             resolver.bind(statement)
@@ -619,5 +626,5 @@ def _resolve_runs(
 
     visit(function.body)
     if not runs:
-        raise _Unresolved("the entrypoint has no CalibService.run(targets, steps) call")
+        raise _Unresolved("the entrypoint has no CalibrationSession.run(targets, steps) call")
     return tuple(runs)

@@ -9,7 +9,7 @@ from qdash.analysis.spectroscopy import (
     NUM_RESONATORS,
     BareShiftBoundary,
     EstimateResonatorFrequencyConfig,
-    RemoveFalseSpikeRange,
+    annotate_resonator_assignments,
     create_bare_shift_boundary_estimator,
     create_marked_figure,
     estimate_local_bare_shift_boundary,
@@ -19,13 +19,14 @@ from qdash.analysis.spectroscopy import (
     guess_sorted_slots_for_partial_mux,
     peak_positions_from_assignment_order,
     qid_for_sorted_slot,
-    remove_false_spike_from_figure,
+    remove_known_false_spikes_from_figure,
 )
 from qdash.common.visualization.figure_metadata import set_figure_role
 from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -60,6 +61,23 @@ class CheckResonatorSpectroscopy(QubexTask):
 
     name: str = "CheckResonatorSpectroscopy"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "MUX-level 2D readout frequency and power sweep that locates each resonator of the "
+            "MUX and the power at which it shifts to its bare (punched-out) frequency. It "
+            "writes resonator_frequency (also published as readout_frequency) and a "
+            "readout_amplitude derived from an optimal power set a margin below that power "
+            "boundary."
+        ),
+        when_to_use=(
+            "Run it at the start of bring-up, after capture delay correction, to obtain the "
+            "first readout frequency and amplitude. Check resonator_assignment_order when the "
+            "MUX's resonator frequency order differs from the default."
+        ),
+        prerequisites=(
+            "None from calibration storage; the frequency range defaults by readout band.",
+        ),
+    )
     is_mux_level: bool = True
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
@@ -226,32 +244,14 @@ class CheckResonatorSpectroscopy(QubexTask):
                 frequencies,
             )
             if marked_fig is not None:
-                for sorted_slot, frequency in zip(sorted_slots, frequencies, strict=False):
-                    if sorted_slot is None:
-                        continue
-                    marked_fig.add_annotation(
-                        x=frequency,
-                        y=1.02,
-                        yref="paper",
-                        text=(
-                            f"Q{qid_for_sorted_slot(int(qid) // NUM_RESONATORS, sorted_slot, peak_positions):02d} "
-                            f"/ s{sorted_slot}"
-                        ),
-                        showarrow=False,
-                        font={"color": "red", "size": 11},
-                        align="center",
-                    )
-                if assignment_mode != "full":
-                    marked_fig.add_annotation(
-                        xref="paper",
-                        yref="paper",
-                        x=0.01,
-                        y=1.08,
-                        text=assignment_mode,
-                        showarrow=False,
-                        font={"color": "red", "size": 11},
-                        align="left",
-                    )
+                annotate_resonator_assignments(
+                    marked_fig,
+                    mux_index=int(qid) // NUM_RESONATORS,
+                    sorted_slots=sorted_slots,
+                    frequencies=frequencies,
+                    peak_positions=peak_positions,
+                    assignment_mode=assignment_mode,
+                )
             assigned_slot = peak_positions[id_in_mux]
             resonance_index = (
                 sorted_slots.index(assigned_slot) if assigned_slot in sorted_slots else None
@@ -339,34 +339,7 @@ class CheckResonatorSpectroscopy(QubexTask):
 
     def _prepare_analysis_figure(self, raw_fig: go.Figure) -> go.Figure:
         """Apply script-compatible denoising to a copy of the raw figure."""
-        import plotly.graph_objects as pgo
-
-        analysis_fig = pgo.Figure(raw_fig)
-        trace = analysis_fig.data[0]
-        xs = list(trace.x)
-        if not xs:
-            return analysis_fig
-
-        spike_ranges = (
-            [
-                RemoveFalseSpikeRange(5.998, 6.000),
-                RemoveFalseSpikeRange(6.498, 6.500),
-            ]
-            if max(xs) < 7.0
-            else [
-                RemoveFalseSpikeRange(9.998, 10.000),
-                RemoveFalseSpikeRange(10.248, 10.250),
-                RemoveFalseSpikeRange(10.498, 10.500),
-            ]
-        )
-        rounded_xs = {f"{x:.3f}": index for index, x in enumerate(xs)}
-        applicable_ranges = []
-        for spike_range in spike_ranges:
-            idx_min = rounded_xs.get(f"{spike_range.x_min:.3f}")
-            idx_max = rounded_xs.get(f"{spike_range.x_max:.3f}")
-            if idx_min not in (None, 0) and idx_max not in (None, len(xs) - 1):
-                applicable_ranges.append(spike_range)
-        return remove_false_spike_from_figure(analysis_fig, applicable_ranges)
+        return remove_known_false_spikes_from_figure(raw_fig)
 
     def _frequency_range(self) -> Any:
         """Return an explicit override, or let qubex select by readout box type."""

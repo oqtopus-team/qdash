@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
 import secrets
@@ -29,6 +30,7 @@ from qdash.api.schemas.success import SuccessResponse
 from qdash.common.config.paths import CALIB_DATA_BASE
 from qdash.common.utils.datetime import now
 from qdash.datamodel.project import ProjectRole
+from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.forum import (
     FORUM_THREAD_STATUSES,
     ForumCategoryDocument,
@@ -36,6 +38,7 @@ from qdash.dbmodel.forum import (
     ForumLabelDocument,
     ForumPostDocument,
 )
+from qdash.dbmodel.lookups import user_id_for_username
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.dbmodel.user import UserDocument
@@ -88,6 +91,46 @@ DEFAULT_FORUM_CATEGORIES = [
         "sort_order": 50,
     },
 ]
+
+# Created once per project. They are ordinary labels afterwards: users can edit or
+# delete them, and a deleted default is never recreated (see ForumLabelDocument.is_deleted).
+DEFAULT_FORUM_LABELS = [
+    {
+        "key": "agent",
+        "name": "agent",
+        "description": "Calibration agent activity and interventions",
+        "color": "#8b5cf6",
+    },
+    {
+        "key": "calibration",
+        "name": "calibration",
+        "description": "Calibration results, tasks, and parameters",
+        "color": "#0ea5e9",
+    },
+    {
+        "key": "hardware",
+        "name": "hardware",
+        "description": "Chip, wiring, control devices, and fridge",
+        "color": "#f97316",
+    },
+    {
+        "key": "software",
+        "name": "software",
+        "description": "QDash, workflows, and tooling",
+        "color": "#22c55e",
+    },
+    {
+        "key": "question",
+        "name": "question",
+        "description": "Questions for the team",
+        "color": "#eab308",
+    },
+]
+
+DEFAULT_FORUM_LABEL_KEYS = frozenset(item["key"] for item in DEFAULT_FORUM_LABELS)
+
+# Matches labels that are not deleted; rows created before ``is_deleted`` lack the field.
+LIVE_LABEL_FILTER: dict[str, Any] = {"is_deleted": {"$ne": True}}
 
 CATEGORY_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 LABEL_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
@@ -193,12 +236,6 @@ class ForumService:
         """Initialize the service with an optional notification dependency."""
         self._notifications = notification_service
         self._slack_notifications = slack_notification_service
-
-    @staticmethod
-    def _user_id_for_username(username: str) -> str | None:
-        """Return the user ID for *username*, or None when the user is unknown."""
-        user = UserDocument.find_one({"username": username}).run()
-        return user.user_id if user else None
 
     @staticmethod
     def _is_author(doc: ForumPostDocument, *, user_id: str | None) -> bool:
@@ -340,7 +377,7 @@ class ForumService:
         return {
             label.key
             for label in ForumLabelDocument.find(
-                {"project_id": project_id, "key": {"$in": list(keys)}}
+                {"project_id": project_id, "key": {"$in": list(keys)}, **LIVE_LABEL_FILTER}
             ).to_list()
         }
 
@@ -411,7 +448,7 @@ class ForumService:
         Falls back to a JSON code block when the conversion returns empty.
         Returns ``None`` only if even the fallback fails.
         """
-        from qdash.copilot.blocks import blocks_to_markdown
+        from qdash.agent.blocks import blocks_to_markdown
 
         markdown_content = blocks_to_markdown(result)
         if markdown_content:
@@ -616,14 +653,51 @@ class ForumService:
                 return candidate
         raise HTTPException(status_code=500, detail="Failed to generate a unique label key")
 
+    @staticmethod
+    def _ensure_default_labels(project_id: str) -> None:
+        """Insert the default labels whose key has never had a row in the project.
+
+        Each default key gets at most one row per project, enforced by the unique
+        project/key index, and this method only ever inserts. A row with the key, live
+        or deleted, therefore makes the insert fail with ``DuplicateKeyError`` and keeps
+        that row unchanged. Because ``delete_label`` keeps a deleted default as a row
+        with ``is_deleted`` set, no seeder, however delayed, can recreate it.
+
+        A default whose name (ignoring case) is already used by a label with another
+        key is inserted as a deleted row, so it stays out of the project for good, like
+        a deleted default. A request that fails part way leaves the remaining defaults
+        to a later request.
+        """
+        rows = ForumLabelDocument.get_motor_collection().find(
+            {"project_id": project_id}, {"key": 1, "name": 1, "is_deleted": 1}
+        )
+        present_keys: set[str] = set()
+        live_names: set[str] = set()
+        for row in rows:
+            present_keys.add(row["key"])
+            if not row.get("is_deleted"):
+                live_names.add(str(row.get("name", "")).strip().lower())
+
+        for item in DEFAULT_FORUM_LABELS:
+            if item["key"] in present_keys:
+                continue
+            doc = ForumLabelDocument(
+                project_id=project_id,
+                is_deleted=item["name"].lower() in live_names,
+                **item,
+            )
+            with contextlib.suppress(DuplicateKeyError):
+                doc.insert()
+
     def _normalize_forum_labels(self, project_id: str, labels: list[str] | None) -> list[str]:
         """Normalize user-provided labels and require each to exist for the project."""
         normalized = _dedupe_forum_label_keys(labels)
         if not normalized:
             return []
 
+        self._ensure_default_labels(project_id)
         docs = ForumLabelDocument.find(
-            {"project_id": project_id, "key": {"$in": normalized}}
+            {"project_id": project_id, "key": {"$in": normalized}, **LIVE_LABEL_FILTER}
         ).to_list()
         existing_keys = {doc.key for doc in docs}
         if any(value not in existing_keys for value in normalized):
@@ -632,9 +706,15 @@ class ForumService:
 
     def list_labels(self, *, project_id: str) -> ListForumLabelsResponse:
         """List forum labels for a project."""
+        self._ensure_default_labels(project_id)
         docs = (
-            ForumLabelDocument.find({"project_id": project_id})
-            .sort("system_info.created_at")
+            ForumLabelDocument.find({"project_id": project_id, **LIVE_LABEL_FILTER})
+            .sort(
+                [
+                    ("system_info.created_at", SortDirection.ASCENDING),
+                    ("_id", SortDirection.ASCENDING),
+                ]
+            )
             .to_list()
         )
         return ListForumLabelsResponse(labels=[self._label_to_response(doc) for doc in docs])
@@ -648,25 +728,62 @@ class ForumService:
         color: str,
     ) -> ForumLabelResponse:
         """Create a forum label; the key is always generated from the name, never from a client."""
+        self._ensure_default_labels(project_id)
         existing = ForumLabelDocument.find({"project_id": project_id}).to_list()
         normalized_name = name.strip().lower()
-        if any(doc.name.strip().lower() == normalized_name for doc in existing):
+        if any(
+            not doc.is_deleted and doc.name.strip().lower() == normalized_name for doc in existing
+        ):
             raise HTTPException(status_code=409, detail="Forum label already exists")
-
-        label_key = self._make_label_key(name, {doc.key for doc in existing})
 
         doc = ForumLabelDocument(
             project_id=project_id,
-            key=label_key,
+            key="",
             name=name,
             description=description,
             color=color.lower(),
         )
+        deleted_keys = {row.key for row in existing if row.is_deleted}
+        live_keys = {row.key for row in existing if not row.is_deleted}
+        preferred_key = self._make_label_key(name, live_keys)
+        if preferred_key in deleted_keys and self._restore_deleted_label(doc, preferred_key):
+            return self._label_to_response(doc)
+
+        # Deleted rows keep their key taken, so a new row needs a key no row has.
+        doc.key = self._make_label_key(name, live_keys | deleted_keys)
         try:
             doc.insert()
         except DuplicateKeyError as e:
             raise HTTPException(status_code=409, detail="Forum label already exists") from e
         return self._label_to_response(doc)
+
+    @staticmethod
+    def _restore_deleted_label(doc: ForumLabelDocument, key: str) -> bool:
+        """Turn the deleted row with ``key`` into the label described by ``doc``.
+
+        A user recreating a deleted default by name gets its key back. The single
+        conditional update either finds the row still deleted and restores it, or
+        changes nothing (another request restored it first) and returns False. No
+        thread is changed, so threads tagged with the restored label keep the tag.
+        """
+        doc.key = key
+        doc.system_info = SystemInfoModel()
+        result = ForumLabelDocument.get_motor_collection().update_one(
+            {"project_id": doc.project_id, "key": key, "is_deleted": True},
+            {
+                "$set": {
+                    "name": doc.name,
+                    "description": doc.description,
+                    "color": doc.color,
+                    "is_deleted": False,
+                    "system_info": {
+                        "created_at": doc.system_info.created_at,
+                        "updated_at": doc.system_info.updated_at,
+                    },
+                }
+            },
+        )
+        return result.modified_count == 1
 
     def update_label(
         self,
@@ -678,13 +795,18 @@ class ForumService:
         color: str | None,
     ) -> ForumLabelResponse:
         """Update a forum label. The label key is immutable."""
-        doc = ForumLabelDocument.find_one({"project_id": project_id, "key": key}).run()
+        self._ensure_default_labels(project_id)
+        doc = ForumLabelDocument.find_one(
+            {"project_id": project_id, "key": key, **LIVE_LABEL_FILTER}
+        ).run()
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum label not found")
 
         if name is not None:
             normalized_name = name.strip().lower()
-            others = ForumLabelDocument.find({"project_id": project_id}).to_list()
+            others = ForumLabelDocument.find(
+                {"project_id": project_id, **LIVE_LABEL_FILTER}
+            ).to_list()
             if any(
                 other.key != key and other.name.strip().lower() == normalized_name
                 for other in others
@@ -696,16 +818,40 @@ class ForumService:
         if color is not None:
             doc.color = color.lower()
         doc.system_info.update_time()
-        doc.save()
+        # A conditional $set instead of save(): replacing the whole row could undo a
+        # delete that ran after the read above.
+        result = ForumLabelDocument.get_motor_collection().update_one(
+            {"_id": doc.id, **LIVE_LABEL_FILTER},
+            {
+                "$set": {
+                    "name": doc.name,
+                    "description": doc.description,
+                    "color": doc.color,
+                    "system_info.updated_at": doc.system_info.updated_at,
+                }
+            },
+        )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Forum label not found")
         return self._label_to_response(doc)
 
     def delete_label(self, *, project_id: str, key: str) -> SuccessResponse:
         """Delete a forum label and remove it from every thread that used it."""
-        doc = ForumLabelDocument.find_one({"project_id": project_id, "key": key}).run()
-        if doc is None:
+        self._ensure_default_labels(project_id)
+        labels = ForumLabelDocument.get_motor_collection()
+        label_filter = {"project_id": project_id, "key": key, **LIVE_LABEL_FILTER}
+        if key in DEFAULT_FORUM_LABEL_KEYS:
+            # Keep the row so its key stays taken and seeding cannot recreate the default.
+            result = labels.update_one(
+                label_filter,
+                {"$set": {"is_deleted": True, "system_info.updated_at": now()}},
+            )
+            found = result.matched_count == 1
+        else:
+            found = labels.delete_one(label_filter).deleted_count == 1
+        if not found:
             raise HTTPException(status_code=404, detail="Forum label not found")
 
-        doc.delete()
         ForumPostDocument.get_motor_collection().update_many(
             {"project_id": project_id, "labels": key},
             {"$pull": {"labels": key}},
@@ -940,7 +1086,7 @@ class ForumService:
             project_id=project_id,
             number=thread_number,
             category=category,
-            user_id=self._user_id_for_username(username),
+            user_id=user_id_for_username(username),
             username=username,
             title=title if parent_id is None else None,
             content=content,
@@ -1189,7 +1335,7 @@ class ForumService:
         ).run()
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum post not found")
-        user_id = self._user_id_for_username(username)
+        user_id = user_id_for_username(username)
         can_edit_content = self._is_author(doc, user_id=user_id) or role == ProjectRole.OWNER
         can_edit_metadata = doc.parent_id is None and role == ProjectRole.EDITOR
         content_blocks_changed = content_blocks is not None and content_blocks != doc.content_blocks
@@ -1295,7 +1441,7 @@ class ForumService:
         ).run()
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum post not found")
-        user_id = self._user_id_for_username(username)
+        user_id = user_id_for_username(username)
         if not self._is_author(doc, user_id=user_id) and role != ProjectRole.OWNER:
             raise HTTPException(
                 status_code=403, detail="Only the author or project owner can delete this post"
@@ -1334,7 +1480,7 @@ class ForumService:
         ).run()
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum thread not found")
-        user_id = self._user_id_for_username(username)
+        user_id = user_id_for_username(username)
         if not self._is_author(doc, user_id=user_id) and role != ProjectRole.OWNER:
             raise HTTPException(
                 status_code=403, detail="Only the author or project owner can close this thread"
@@ -1381,7 +1527,7 @@ class ForumService:
         ).run()
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum thread not found")
-        user_id = self._user_id_for_username(username)
+        user_id = user_id_for_username(username)
         if not self._is_author(doc, user_id=user_id) and role != ProjectRole.OWNER:
             raise HTTPException(
                 status_code=403, detail="Only the author or project owner can reopen this thread"

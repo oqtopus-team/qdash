@@ -97,3 +97,46 @@ def remove_false_spike_from_figure(
     fig.data[0].z = zs
 
     return fig
+
+
+def remove_known_false_spikes_from_figure(fig: go.Figure) -> go.Figure:
+    """Return a copy of a resonator spectroscopy figure without known instrument spikes.
+
+    The spike ranges depend on the readout band (low band below 7 GHz, high band
+    above). A range is applied only when both of its edges are interior grid
+    points of the sweep, so the interpolation always has neighbors.
+
+    Args:
+        fig: Raw resonator spectroscopy figure. It is not modified.
+
+    Returns:
+        A denoised copy of ``fig``.
+    """
+    import plotly.graph_objects as pgo
+
+    analysis_fig = pgo.Figure(fig)
+    trace = analysis_fig.data[0]
+    xs = list(trace.x)
+    if not xs:
+        return analysis_fig
+
+    spike_ranges = (
+        [
+            RemoveFalseSpikeRange(5.998, 6.000),
+            RemoveFalseSpikeRange(6.498, 6.500),
+        ]
+        if max(xs) < 7.0
+        else [
+            RemoveFalseSpikeRange(9.998, 10.000),
+            RemoveFalseSpikeRange(10.248, 10.250),
+            RemoveFalseSpikeRange(10.498, 10.500),
+        ]
+    )
+    rounded_xs = {f"{x:.3f}": index for index, x in enumerate(xs)}
+    applicable_ranges = []
+    for spike_range in spike_ranges:
+        idx_min = rounded_xs.get(f"{spike_range.x_min:.3f}")
+        idx_max = rounded_xs.get(f"{spike_range.x_max:.3f}")
+        if idx_min not in (None, 0) and idx_max not in (None, len(xs) - 1):
+            applicable_ranges.append(spike_range)
+    return remove_false_spike_from_figure(analysis_fig, applicable_ranges)

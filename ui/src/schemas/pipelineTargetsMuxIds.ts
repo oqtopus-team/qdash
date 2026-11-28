@@ -7,6 +7,6 @@
  */
 
 /**
- * MUX ids; every qubit of each MUX is a target. Set exactly one of qids and mux_ids, as a nonempty list without duplicates.
+ * MUX ids; every qubit of each MUX is a target. Set exactly one of qids, mux_ids and pairs, as a nonempty list without duplicates.
  */
 export type PipelineTargetsMuxIds = number[] | null;

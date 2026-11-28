@@ -29,6 +29,8 @@ from qdash.client.services.client_models import (
     AgentCandidateListResponse,
     AgentCandidateResponse,
     AgentCandidateSetCommitResponse,
+    AgentInterventionListResponse,
+    AgentInterventionResponse,
     AgentSessionResponse,
     CandidateGateResponse,
     CreateEvaluationRunResponse,
@@ -722,15 +724,44 @@ class QDashClient:
         name: str,
         *,
         parameters: dict[str, Any] | None = None,
+        calibration_session_id: str | None = None,
+        idempotency_key: str | None = None,
     ) -> ExecuteFlowResponse:
-        """Run a saved flow; ``parameters`` override its saved defaults for this run only."""
+        """Run a saved flow; ``parameters`` override its saved defaults for this run only.
+
+        The run is recorded before it is launched. It joins ``calibration_session_id`` when
+        given; otherwise an automatic calibration session created for it. The response names the run, and its session
+        when it has one. ``idempotency_key`` makes a retry return the recorded run
+        instead of starting another; without one every call starts a new run.
+        """
+        for label, value in (
+            ("calibration_session_id", calibration_session_id),
+            ("idempotency_key", idempotency_key),
+        ):
+            if value is not None and not value.strip():
+                raise ValueError(f"{label} must be non-empty")
         # The request's parameters are an object; null is rejected, so None sends {}.
-        response = self._request(
-            "POST",
-            f"/flows/{name}/execute",
-            json={"parameters": parameters if parameters is not None else {}},
-        )
-        return self._validate_model_payload(ExecuteFlowResponse, response.data)
+        body: dict[str, Any] = {"parameters": parameters if parameters is not None else {}}
+        if calibration_session_id is not None:
+            body["calibration_session_id"] = calibration_session_id
+        if idempotency_key is not None:
+            body["idempotency_key"] = idempotency_key
+        response = self._request("POST", f"/flows/{name}/execute", json=body)
+        data = response.data
+        if calibration_session_id is not None or idempotency_key is not None:
+            # A server that predates run recording ignores both fields and starts the flow
+            # anyway, so a missing echo means the run started without them.
+            recorded = isinstance(data, dict) and isinstance(data.get("calibration_run_id"), str)
+            named = calibration_session_id is None or (
+                isinstance(data, dict)
+                and data.get("calibration_session_id") == calibration_session_id
+            )
+            if not (recorded and named):
+                raise RuntimeError(
+                    "Workflow result unknown: the run may have started without its calibration "
+                    "session or key. Do not retry automatically; reconcile the execution first."
+                )
+        return self._validate_model_payload(ExecuteFlowResponse, data)
 
     def schedule_flow(
         self,
@@ -861,17 +892,61 @@ class QDashClient:
         chip_id: str,
         spec: Mapping[str, Any],
         backend_name: str | None = None,
+        calibration_session_id: str | None = None,
+        idempotency_key: str | None = None,
+        decision_id: str | None = None,
     ) -> ExecutePipelineResponse:
-        """Validate a pipeline spec on the server and dispatch it as one execution.
+        """Dispatch a validated pipeline run with an execution for each step reached.
 
         A spec with problems raises :class:`QDashValidationError` (422) whose ``payload`` holds
-        the server's problem list; nothing is dispatched.
+        the server's problem list; nothing is dispatched. The run is recorded before it is
+        launched. It joins ``calibration_session_id`` when given; otherwise an automatic
+        session created for it. A retry with the same ``idempotency_key`` returns the
+        recorded run; without a key every call starts a new run.
+        ``decision_id`` names the decision of that session the run carries out; it needs
+        ``calibration_session_id``. A response that does not echo the decision means the link
+        may be lost, so it raises instead of returning, and the run must be reconciled.
         """
+        if decision_id is not None:
+            if calibration_session_id is None:
+                raise ValueError("decision_id needs calibration_session_id")
+            if not decision_id.strip():
+                raise ValueError("decision_id must be non-empty")
+        if idempotency_key is not None and not idempotency_key.strip():
+            raise ValueError("idempotency_key must be non-empty")
+        if calibration_session_id is not None:
+            self._preflight_calibration_session(calibration_session_id, chip_id)
         response = self._request(
             "POST",
             "/calibration-pipelines/execute",
-            json=self._query_params(chip_id=chip_id, spec=dict(spec), backend_name=backend_name),
+            json=self._query_params(
+                chip_id=chip_id,
+                spec=dict(spec),
+                backend_name=backend_name,
+                calibration_session_id=calibration_session_id,
+                idempotency_key=idempotency_key,
+                decision_id=decision_id,
+            ),
         )
+        if calibration_session_id is not None:
+            data = response.data
+            if (
+                not isinstance(data, dict)
+                or data.get("calibration_session_id") != calibration_session_id
+                or not isinstance(data.get("pipeline_run_id"), str)
+                or not data["pipeline_run_id"].strip()
+            ):
+                raise RuntimeError(
+                    "Pipeline result unknown: the execution may have started without its "
+                    "association. Do not retry automatically or use a new key; "
+                    "reconcile the execution first."
+                )
+            if decision_id is not None and data.get("decision_id") != decision_id:
+                raise RuntimeError(
+                    "Pipeline result unknown: the run may have been recorded without its "
+                    f"decision {decision_id!r}. Do not retry automatically or use a new key; "
+                    "reconcile the run in the calibration session audit first."
+                )
         return self._validate_model_payload(ExecutePipelineResponse, response.data)
 
     def get_execution_activity(
@@ -954,6 +1029,21 @@ class QDashClient:
                 )
             self._sleep(poll_interval_seconds)
 
+    def _preflight_calibration_session(self, session_id: str, chip_id: str) -> None:
+        """Prove server support before an associated write, without blocking closed replays."""
+        if not session_id.strip():
+            raise ValueError("calibration_session_id must be non-empty")
+        parent = self._request("GET", f"/calibration-sessions/{quote(session_id, safe='')}").data
+        if (
+            not isinstance(parent, dict)
+            or parent.get("calibration_session_id") != session_id
+            or parent.get("chip_id") != chip_id
+        ):
+            raise ValueError(
+                "Calibration session preflight failed; nothing dispatched. "
+                "Check server compatibility."
+            )
+
     def create_agent_session(
         self,
         *,
@@ -963,22 +1053,41 @@ class QDashClient:
         skill_name: str = "",
         skill_version: str = "",
         skill_hash: str = "",
-        model_name: str = "",
+        model: dict[str, str] | None = None,
+        calibration_session_id: str | None = None,
     ) -> AgentSessionResponse:
-        """Create a bounded authorization session for a local agent."""
-        response = self._request(
-            "POST",
-            "/agent-sessions",
-            json={
-                "chip_id": chip_id,
-                "policy": policy,
-                "expires_in_seconds": expires_in_seconds,
-                "skill_name": skill_name,
-                "skill_version": skill_version,
-                "skill_hash": skill_hash,
-                "model_name": model_name,
-            },
-        )
+        """Create a bounded authorization session for a local agent.
+
+        ``model`` is the provider and model the calling host runs the agent with
+        (``{"provider": ..., "model_id": ..., "host": ...}``). QDash records it as client
+        reported and does not verify it; omit it when the host does not know it.
+        """
+        body: dict[str, Any] = {
+            "chip_id": chip_id,
+            "policy": policy,
+            "expires_in_seconds": expires_in_seconds,
+            "skill_name": skill_name,
+            "skill_version": skill_version,
+            "skill_hash": skill_hash,
+        }
+        if model is not None:
+            body["model"] = model
+        if calibration_session_id is not None:
+            self._preflight_calibration_session(calibration_session_id, chip_id)
+            body["calibration_session_id"] = calibration_session_id
+        response = self._request("POST", "/agent-sessions", json=body)
+        if calibration_session_id is not None:
+            data = response.data
+            if (
+                not isinstance(data, dict)
+                or data.get("calibration_session_id") != calibration_session_id
+                or data.get("calibration_admission") != "admitted"
+            ):
+                raise RuntimeError(
+                    "Agent session creation result unknown: a session may exist without its "
+                    "requested admission. Do not retry automatically or run actions; "
+                    "reconcile the session first."
+                )
         return self._validate_model_payload(AgentSessionResponse, response.data)
 
     def get_agent_session(self, session_id: str) -> AgentSessionResponse:
@@ -1236,6 +1345,89 @@ class QDashClient:
                 )
             self._sleep(poll_interval_seconds)
 
+    def create_agent_intervention(
+        self,
+        session_id: str,
+        *,
+        idempotency_key: str,
+        reason: str,
+        summary: str,
+        question: str,
+        node_id: str | None = None,
+        task_name: str | None = None,
+        qids: list[str] | None = None,
+        attempts: list[dict[str, Any]] | None = None,
+        checkpoint: dict[str, Any] | None = None,
+        previous_intervention_id: str | None = None,
+    ) -> AgentInterventionResponse:
+        """Record that the agent needs a person; QDash pauses the session if it is active."""
+        response = self._request(
+            "POST",
+            f"/agent-sessions/{session_id}/interventions",
+            json={
+                "idempotency_key": idempotency_key,
+                "reason": reason,
+                "summary": summary,
+                "question": question,
+                "node_id": node_id,
+                "task_name": task_name,
+                "qids": qids or [],
+                "attempts": attempts or [],
+                "checkpoint": checkpoint,
+                "previous_intervention_id": previous_intervention_id,
+            },
+        )
+        return self._validate_model_payload(AgentInterventionResponse, response.data)
+
+    def get_agent_intervention(
+        self, session_id: str, intervention_id: str
+    ) -> AgentInterventionResponse:
+        """Get an intervention, the expert's answer, and whether it can resume."""
+        response = self._request(
+            "GET", f"/agent-sessions/{session_id}/interventions/{intervention_id}"
+        )
+        return self._validate_model_payload(AgentInterventionResponse, response.data)
+
+    def list_agent_interventions(self, session_id: str) -> list[AgentInterventionResponse]:
+        """List a session's interventions, newest first."""
+        response = self._request("GET", f"/agent-sessions/{session_id}/interventions")
+        payload = self._validate_model_payload(AgentInterventionListResponse, response.data)
+        return payload.items
+
+    def claim_agent_resume(
+        self, session_id: str, intervention_id: str, *, claim_key: str
+    ) -> AgentInterventionResponse:
+        """Claim an expert-authorized resume; QDash reactivates the session for this runner."""
+        response = self._request(
+            "POST",
+            f"/agent-sessions/{session_id}/interventions/{intervention_id}/claim-resume",
+            json={"claim_key": claim_key},
+        )
+        return self._validate_model_payload(AgentInterventionResponse, response.data)
+
+    def record_agent_resume_outcome(
+        self,
+        session_id: str,
+        intervention_id: str,
+        *,
+        claim_key: str,
+        transition: str,
+        reason: str = "",
+        follow_up_intervention_id: str | None = None,
+    ) -> AgentInterventionResponse:
+        """Record how a resumed plan ended."""
+        response = self._request(
+            "POST",
+            f"/agent-sessions/{session_id}/interventions/{intervention_id}/resume-outcome",
+            json={
+                "claim_key": claim_key,
+                "transition": transition,
+                "reason": reason[:2000],
+                "follow_up_intervention_id": follow_up_intervention_id,
+            },
+        )
+        return self._validate_model_payload(AgentInterventionResponse, response.data)
+
     def list_agent_actions(self, session_id: str) -> list[AgentActionResponse]:
         """List the audit trail for a local-agent session."""
         response = self._request("GET", f"/agent-sessions/{session_id}/actions")
@@ -1377,10 +1569,11 @@ class QDashClient:
             update_params=update_params,
             reconfigure=reconfigure,
         )
+        # Only what was given: the server decides whether the run joins an automatic session.
         response = self._request(
             "POST",
             f"/task-results/{task_id}/re-execute",
-            json=body.model_dump(mode="json"),
+            json=body.model_dump(mode="json", exclude_unset=True),
         )
         return self._validate_model_payload(ExecuteFlowResponse, response.data)
 

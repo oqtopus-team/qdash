@@ -110,6 +110,20 @@ async def _capture_deployment_state(
     return schedules, parameters
 
 
+def _parameter_openapi_schema(flow_obj: Any, deployment_name: str) -> dict[str, Any] | None:
+    """The OpenAPI schema of a flow's parameters, as Prefect builds it; ``None`` if it cannot."""
+    try:
+        from prefect.utilities.callables import parameter_schema
+
+        schema = parameter_schema(getattr(flow_obj, "fn", flow_obj)).model_dump_for_openapi()
+    except Exception as e:
+        logger.warning(
+            f"Could not build the parameter schema of '{deployment_name}': {type(e).__name__}: {e}"
+        )
+        return None
+    return schema if isinstance(schema, dict) else None
+
+
 @app.post("/register-deployment", response_model=RegisterDeploymentResponse)
 async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDeploymentResponse:
     """Register a user flow as a Prefect deployment.
@@ -204,6 +218,12 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
                     f"Failed to delete old deployment {request.old_deployment_id}: {type(e).__name__}: {e}"
                 )
 
+        # Record the flow's parameter schema on the deployment, so the API can see which
+        # parameters this registered code accepts (a stored pipeline plan is only dispatched to
+        # a deployment that advertises the approved-plan contract). It is recorded, not
+        # enforced: Prefect does not validate run parameters against it, as before.
+        openapi_schema = _parameter_openapi_schema(flow_obj, deployment_name)
+
         # Register flow and create deployment using Prefect 3 client API
         logger.info(f"Creating deployment with work pool: {WORK_POOL_NAME}")
         async with get_client() as client:
@@ -223,6 +243,8 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
                 path=str(working_dir),
                 schedules=preserved_schedules or None,
                 parameters=preserved_parameters,
+                parameter_openapi_schema=openapi_schema,
+                enforce_parameter_schema=False,
             )
 
         logger.info(f"Deployment created successfully: {deployment_id}")

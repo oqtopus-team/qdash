@@ -85,7 +85,7 @@ function deps(results, knowledge = REFERENCE) {
         { id: "e1", title: "Short T1", outcome: "suboptimal", status: "SHORT_T1", suggested_range: "", parameters: '{"t1": 14}', analysis: "Short.", images: [{ data: PNG, mimeType: "image/png" }], paths: ["examples/figures/t1.png"] },
       ];
     },
-    evaluator: { name: "@oqtopus-team/pi-qcaleval", version: "0.0.2-beta.5", source: "checkout", commit: "042e454323b2" },
+    evaluator: { name: "@oqtopus-team/pi-qcaleval", version: "0.0.2-beta.5", source: "package" },
   };
 }
 
@@ -148,7 +148,7 @@ test("evidence feeds the selected evaluation model: task, target, figure and ref
   assert.match(result.evaluation.prompt, /^Reference for this experiment/);
   assert.deepEqual(result.evaluation.usage, { input: 1200, output: 80 });
   assert.ok(result.evaluation.duration_ms >= 0);
-  assert.equal(result.evaluator.commit, "042e454323b2");
+  assert.deepEqual(result.evaluator, { name: "@oqtopus-team/pi-qcaleval", version: "0.0.2-beta.5", source: "package" });
 });
 
 test("with examples requested, the labeled examples are fetched, passed, and recorded by hash", async () => {
@@ -325,6 +325,21 @@ test("the context names the task, target and status, and the task's message, nev
   assert.equal(evidenceContext({ evidence: { target: { id: "Q05" } } }), undefined);
 });
 
+test("the context states sweeps in the runtime's own number format", () => {
+  const context = (sweeps) => evidenceContext({ evidence: { task: { name: "CheckT1" }, sweeps } })?.split("\n")[1];
+  // A near-integer log-spaced endpoint keeps the runtime's four-significant-digit form;
+  // pi-qdash's evidence tool rounds the same value to 500000.
+  assert.equal(
+    context([{ name: "time_range", unit: "ns", spacing: "log", start: 100, stop: 499999.99999994, points: 51 }]),
+    "Sweep: time_range 100 to 5e+5 ns, 51 points log-spaced.",
+  );
+  // A sweep reported without a unit, or in arbitrary units, names none.
+  assert.equal(
+    context([{ name: "amp", spacing: "linear", start: 0, stop: 0.5, points: 6, step: 0.1 }, { name: "detuning", unit: "a.u.", spacing: "list", start: -1, stop: 1, points: 3 }]),
+    "Sweep: amp 0 to 0.5 in steps of 0.1 (6 points); detuning -1 to 1, 3 points.",
+  );
+});
+
 test("without evidence details the evidence text is the context", async () => {
   const evidence = evidenceResult({ details: { tool: EVIDENCE_TOOL, taskId: "task-1" } });
   const d = deps({ [EVIDENCE_TOOL]: evidence, [EVALUATION_TOOL]: evaluationResult() });
@@ -365,7 +380,7 @@ test("a planner turn's qcal_evaluate result yields the same record as a direct e
   };
   const record = recordFromDetails("task-1", details, {
     mode: "planner",
-    evaluator: { name: "@oqtopus-team/pi-qcaleval", version: "0.0.1", source: "checkout" },
+    evaluator: { name: "@oqtopus-team/pi-qcaleval", version: "0.0.1", source: "package" },
     planner: { model: "openai-compatible/qwen", answer: "Looks good.", tool_calls: [EVIDENCE_TOOL, EVALUATION_TOOL], duration_ms: 40000 },
   });
   assert.equal(record.mode, "planner");

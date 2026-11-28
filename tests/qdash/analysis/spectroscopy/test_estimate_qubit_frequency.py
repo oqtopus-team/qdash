@@ -2,6 +2,8 @@ import importlib
 from collections.abc import Sequence
 from types import SimpleNamespace
 
+import pytest
+
 from qdash.analysis.spectroscopy.estimate_qubit_frequency import (
     EstimateQubitFrequencyConfig,
     estimate_qubit_frequency,
@@ -47,3 +49,17 @@ def test_retry_with_trim_retries_one_additional_top_row(monkeypatch) -> None:
         ([-40.0, -30.0, -20.0], -10.0),
         ([-40.0, -30.0], -20.0),
     ]
+
+
+def test_top_power_at_the_highest_row_is_rejected_before_any_retry_trim() -> None:
+    # The reanalysis service drops rows at or above a top_power inside the sweep
+    # before calling the estimator, because the estimator itself rejects it, even
+    # with retry_with_trim, before the first retry can run.
+    with pytest.raises(ValueError, match="top_power"):
+        estimate_qubit_frequency(
+            xs=[4.0, 4.1],
+            ys=[-15.0, -10.0, -5.0],
+            zs=[[0.0, 1.0], [0.0, 1.0], [0.0, 1.0]],
+            config=EstimateQubitFrequencyConfig(top_power=-5.0, f01_height_min=8.0),
+            retry_with_trim=True,
+        )

@@ -3,15 +3,19 @@ import { Type } from "typebox";
 
 import { createOwnershipCheck, type SourceInfoLike } from "./extension-identity.js";
 import { CODEMODE_TOOL_NAME, TOOL_SEARCH_TOOL_NAME } from "./qdash-guidance.js";
+import { prepareScriptSource } from "./script-prelude.js";
+import { withIntentSearchText } from "./tool-intents.js";
 import {
   boundScriptData,
   isDeferredTool,
+  isNestedProposalTool,
   isNestedReadTool,
   isReviewedWriteTool,
+  isScriptCallableTool,
   nestedBlockMessage,
   QDASH_TOOL_NAMESPACE,
+  SCRIPT_DATA_DESCRIPTION,
   scriptDataOf,
-  withScriptDeadline,
 } from "./tool-policy.js";
 import {
   branchSelection,
@@ -29,7 +33,9 @@ import {
  * batches and discovers QDash tools the way QDash chat does:
  *
  * - Audited read tools declare an output schema, and a script calling one
- *   gets its redacted response data as JSON, bounded per call.
+ *   gets its redacted response data as a parsed value, bounded per call.
+ *   The audited proposal tool (`qdash_create_pipeline_plan`) is reached the
+ *   same way; it declares that it is not read-only but idempotent.
  * - Every other QDash tool is model-only (unreachable from scripts) or, when
  *   deferred, blocked from scripts by the `tool_call` hook. Writes keep the
  *   write gate's confirmation, which a script cannot pass.
@@ -39,7 +45,8 @@ import {
  * - Deferred tools use `exposure: "deferred"`, and pi-qdash activates
  *   `tool_search` for them like pi's MCP extension does. Without an active
  *   `tool_search` tool they are registered again as direct tools.
- * - Scripts get the same default and maximum deadline as in QDash chat.
+ * - Scripts get the same default and maximum deadline as in QDash chat, and
+ *   the same pure `qdash.calibration` builders (script-prelude.ts).
  * - A QDash tool name keeps script access only while pi runs pi-qdash's own
  *   registration for it (extension-identity.ts); another extension's tool
  *   with an audited name is blocked from scripts.
@@ -55,10 +62,7 @@ import {
 export const CODEMODE_ENV = "PI_QDASH_CODEMODE";
 
 /** What a script receives from an audited read tool. */
-export const SCRIPT_DATA_SCHEMA = Type.Unknown({
-  description:
-    "The tool's redacted QDash response data as JSON: the data its text answer summarizes, not truncated.",
-});
+export const SCRIPT_DATA_SCHEMA = Type.Unknown({ description: SCRIPT_DATA_DESCRIPTION });
 
 /** pi built-ins that run commands or change files; never callable from a script while pi-qdash is loaded. */
 const SIDE_EFFECT_BUILTINS = new Set(["bash", "powershell", "write", "edit"]);
@@ -68,6 +72,7 @@ type Exposure = "direct" | "model-only" | "codemode" | "deferred" | "hidden";
 /** The fields of a tool definition the policy reads and sets. */
 export interface PolicyToolDefinition {
   name: string;
+  description?: string;
   parameters?: unknown;
   exposure?: Exposure;
   outputSchema?: unknown;
@@ -98,16 +103,31 @@ export function applyToolPolicy<T extends PolicyToolDefinition>(definition: T): 
   const name = definition.name;
   if (!name.startsWith("qdash_")) return definition;
   const read = isNestedReadTool(name);
+  const proposal = isNestedProposalTool(name);
   const exposure: Exposure | undefined =
-    definition.exposure ?? (isDeferredTool(name) ? "deferred" : read ? undefined : "model-only");
+    definition.exposure ?? (isDeferredTool(name) ? "deferred" : read || proposal ? undefined : "model-only");
+  // pi's tool_search ranks deferred tools by their description: the request-type
+  // words let a search phrased as a request type find them (tool-intents.ts).
+  const searchable =
+    exposure === "deferred" && typeof definition.description === "string"
+      ? { description: withIntentSearchText(name, definition.description) }
+      : {};
   return {
     ...definition,
+    ...searchable,
     namespace: definition.namespace ?? QDASH_TOOL_NAMESPACE,
     ...(exposure ? { exposure } : {}),
     ...(read
       ? {
           outputSchema: definition.outputSchema ?? SCRIPT_DATA_SCHEMA,
           annotations: { readOnlyHint: true, destructiveHint: false, ...definition.annotations },
+        }
+      : {}),
+    ...(proposal
+      ? {
+          outputSchema: definition.outputSchema ?? SCRIPT_DATA_SCHEMA,
+          // It stores a record, so it is never labelled a read; repeating a call is harmless.
+          annotations: { ...definition.annotations, readOnlyHint: false, destructiveHint: false, idempotentHint: true },
         }
       : {}),
     ...(isReviewedWriteTool(name)
@@ -128,7 +148,7 @@ export function nestedCallBlock(
   },
 ): string | undefined {
   if (name.startsWith("qdash_") || isReviewedWriteTool(name)) {
-    return isNestedReadTool(name) && options.ownTool ? undefined : nestedBlockMessage(name);
+    return isScriptCallableTool(name) && options.ownTool ? undefined : nestedBlockMessage(name);
   }
   // Another extension's orchestrating tool is not ours to police; a script is.
   if (options.parent !== undefined && options.parent !== CODEMODE_TOOL_NAME) return undefined;
@@ -196,7 +216,7 @@ export function installQDashToolPolicy(pi: ExtensionAPI, options: QDashToolPolic
       if (parents.size > PARENT_MEMORY) parents.delete(parents.keys().next().value as string);
       if (event.toolName === CODEMODE_TOOL_NAME) {
         const input = event.input as { code?: unknown };
-        if (typeof input.code === "string") input.code = withScriptDeadline(input.code);
+        if (typeof input.code === "string") input.code = prepareScriptSource(input.code);
       }
       return undefined;
     }
@@ -215,7 +235,7 @@ export function installQDashToolPolicy(pi: ExtensionAPI, options: QDashToolPolic
       parents.delete(event.toolCallId);
       return undefined;
     }
-    if (event.isError || !isNestedReadTool(event.toolName)) return undefined;
+    if (event.isError || !isScriptCallableTool(event.toolName)) return undefined;
     if (!info(event.toolName).ownTool) return undefined;
     const bounded = boundScriptData(event.toolName, scriptDataOf(event));
     if (bounded.ok) return { structuredContent: bounded.value as never };

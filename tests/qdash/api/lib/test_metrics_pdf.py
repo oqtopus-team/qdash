@@ -159,17 +159,23 @@ def test_summary_exact_capacity_uses_one_page(monkeypatch):
 
 def test_summary_overflow_all_populated_metrics(monkeypatch):
     total = len(_metric_slots())
-    assert total == 34
     generator = _make_generator(total)
     capacity = generator._summary_rows_per_page()
+    assert total > capacity
+    full_pages, remaining_rows = divmod(total, capacity)
+    expected_row_counts = [capacity] * full_pages
+    if remaining_rows:
+        expected_row_counts.append(remaining_rows)
+
     c, drawn_rows = _draw_summary(generator, monkeypatch)
 
-    assert len(c.pages) == 2
-    assert [len(rows) for rows in drawn_rows] == [capacity, total - capacity]
+    page_count = len(expected_row_counts)
+    assert len(c.pages) == page_count
+    assert [len(rows) for rows in drawn_rows] == expected_row_counts
     # Order preserved, nothing dropped or duplicated.
     assert _medians(drawn_rows) == list(range(total))
-    _assert_page_layout(c.pages[0], "Summary 1/2")
-    _assert_page_layout(c.pages[1], "Summary 2/2")
+    for page_index, page in enumerate(c.pages, start=1):
+        _assert_page_layout(page, f"Summary {page_index}/{page_count}")
 
 
 def test_summary_without_metrics_keeps_one_page(monkeypatch):

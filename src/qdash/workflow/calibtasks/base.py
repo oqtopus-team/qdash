@@ -11,6 +11,7 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     RunParameterModel,
     RunParameterSpec,
+    TaskDocumentation,
     TaskTypes,
     compatible_value_type,
 )
@@ -40,10 +41,15 @@ class BaseTask(ABC):
         Class-level declarations for experiment configuration.
     output_spec : Mapping[str, OutputParameterSpec]
         Class-level declarations for calibration values produced by the task.
+    documentation : TaskDocumentation | None
+        Human-readable guidance published in the task catalog. When unset, the
+        catalog falls back to the class docstring for the task description.
     """
 
     name: str = ""
     task_type: str
+    # Human-readable guidance; the task catalog parses this declaration statically.
+    documentation: ClassVar[TaskDocumentation | None] = None
     # Class-level parameter declarations
     input_spec: ClassVar[Mapping[str, InputParameterSpec]] = {}
     # Experiment run configuration declarations

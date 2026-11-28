@@ -9,8 +9,8 @@ from pymongo.errors import DuplicateKeyError
 from qdash.common.config.topology import TopologyDefinition, load_topology
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.coupling import CouplingDocument
+from qdash.dbmodel.lookups import user_id_for_username
 from qdash.dbmodel.qubit import QubitDocument
-from qdash.dbmodel.user import UserDocument
 
 logger = logging.getLogger(__name__)
 
@@ -27,11 +27,6 @@ class ChipInitializer:
         """Check the same identity as the database's unique chip index."""
         if ChipDocument.find_one({"project_id": project_id, "chip_id": chip_id}).run():
             raise ChipAlreadyExistsError(f"Chip {chip_id} already exists in this project")
-
-    @staticmethod
-    def _user_id_for_username(username: str) -> str | None:
-        user = UserDocument.find_one({"username": username}).run()
-        return user.user_id if user else None
 
     @staticmethod
     def _bi_direction(edges: list[list[int]]) -> list[tuple[int, int]]:
@@ -84,7 +79,7 @@ class ChipInitializer:
 
         """
         documents = []
-        user_id = ChipInitializer._user_id_for_username(username)
+        user_id = user_id_for_username(username)
         for qid in topology_qubits:
             qubit_doc = QubitDocument(
                 project_id=project_id,
@@ -121,7 +116,7 @@ class ChipInitializer:
 
         """
         documents = []
-        user_id = ChipInitializer._user_id_for_username(username)
+        user_id = user_id_for_username(username)
         for edge in edges:
             coupling_doc = CouplingDocument(
                 project_id=project_id,
@@ -189,7 +184,7 @@ class ChipInitializer:
             # Create and save ChipDocument (without embedded qubits/couplings)
             chip = ChipDocument(
                 project_id=project_id,
-                user_id=cls._user_id_for_username(username),
+                user_id=user_id_for_username(username),
                 username=username,
                 chip_id=chip_id,
                 size=size,

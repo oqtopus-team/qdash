@@ -43,8 +43,10 @@ import { Harness, MemoryStorage, ToolResultEntry } from "@earendil-works/pi-dura
 import { NESTED_READ_TOOL_NAMES } from "@oqtopus-team/pi-qdash/extensions/lib/tool-policy.ts";
 
 import { ALLOWLISTED_PACKAGES } from "../src/allowed-tools.ts";
-import { buildChatRegistry, buildCopilotExtension } from "../src/chat-registry.ts";
-import { bundledExtensionCheckouts, trustedCheckoutRoots } from "../src/local-extensions.ts";
+import { buildChatRegistry, buildAgentExtension } from "../src/chat-registry.ts";
+import { buildSystemPrompt } from "../src/prompt.ts";
+import { buildSkillTool } from "../src/skill-tool.ts";
+import { bundledExtensions, createBundledResourceLoader, trustedBundleRoots } from "../src/bundled-extensions.ts";
 
 const context = BACKGROUND_CONTEXT;
 const packagesDir = fileURLToPath(new URL("../../packages/", import.meta.url));
@@ -79,7 +81,93 @@ const T1_RESULTS = {
   B: [{ qid: "0", t1: 80 }, { qid: "1", t1: 100 }, { qid: "2", t1: 90 }],
 };
 
+// Task results of chip P as the API pages them: 250 rows newest first, every
+// tenth on qubit "16" (so an exact qid "6" filter must not match it) and the
+// rest on "6". FAIL fails on its second page; EMPTY has none.
+const PAGED_CHIPS = new Set(["P", "FAIL", "EMPTY"]);
+const P_ROWS = Array.from({ length: 250 }, (_, index) => ({
+  task_id: `p-${String(index).padStart(3, "0")}`,
+  task_name: index % 2 ? "CheckT1" : "CheckRabi",
+  qid: index % 10 === 0 ? "16" : "6",
+  chip_id: "P",
+  status: index % 25 === 0 ? "failed" : "completed",
+  execution_id: `e-${Math.floor(index / 50)}`,
+  message: "",
+  start_at: new Date(Date.UTC(2026, 10, 20) - index * 60_000).toISOString(),
+}));
+
+function pagedTaskResults(params) {
+  const limit = Number(params.get("limit") ?? 50);
+  const skip = Number(params.get("skip") ?? 0);
+  // The API's own bounds; pi-qdash should never let a request reach them.
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(skip) || skip < 0) {
+    return [422, { detail: [{ loc: ["query", "limit"], msg: "Input should be less than or equal to 100" }] }];
+  }
+  const chip = params.get("chip_id");
+  if (chip === "FAIL" && skip > 0) return [500, { detail: "database unavailable" }];
+  const qid = params.get("qid");
+  const rows = chip === "EMPTY" ? [] : P_ROWS.filter((row) => qid === null || row.qid === qid);
+  const counts = {};
+  for (const row of rows) counts[row.status] = (counts[row.status] ?? 0) + 1;
+  return [200, { items: rows.slice(skip, skip + limit), total: rows.length, skip, limit, status_counts: counts }];
+}
+
+// ChipMetricsResponse: metric key -> qid -> MetricValue, with a null value and no timestamps.
+const CHIP_METRICS = {
+  chip_id: "P",
+  username: "fixture",
+  qubit_count: 16,
+  within_hours: null,
+  start_at: null,
+  end_at: null,
+  qubit_metrics: {
+    t1: { 6: { value: 42.5, task_id: "p-001", execution_id: "e-0", stddev: 1.5 }, 16: { value: null, task_id: "p-010", execution_id: "e-0", stddev: null } },
+    qubit_frequency: { 6: { value: 7.9, task_id: "p-003", execution_id: "e-0", stddev: null } },
+  },
+  coupling_metrics: { zx90_gate_fidelity: { "6-7": { value: 0.99, task_id: "p-020", execution_id: "e-0", stddev: null } } },
+};
+
+// TimeSeriesData: qid -> points, oldest first; only qubit_frequency exists on P.
+function timeseries(params) {
+  if (params.get("chip_id") === "BAD") return { data: [{ value: 1 }] };
+  if (params.get("parameter") !== "qubit_frequency") return { data: {} };
+  const point = (value, day) => ({
+    parameter_name: "", qid_role: "", source: null, required: false, value, value_type: "float", error: 0.001, unit: "GHz", description: "",
+    calibrated_at: `2026-11-${day}T00:00:00Z`, execution_id: `e-${day}`, task_id: `t-${day}`,
+  });
+  const all = { 6: [point(7.91, 18), point(7.92, 19)], 7: [point(8.1, 19)] };
+  const qid = params.get("qid");
+  return { data: qid === null ? all : qid in all ? { [qid]: all[qid] } : {} };
+}
+
 /** The read-only QDash fixture both hosts query, with a log of every request. */
+// The plan the fixture stores for any creation: QDash's answer, with MUX 0 and 1 expanded.
+const FIXTURE_PLAN = {
+  plan_id: "cpp-fixture",
+  backend_name: "fake",
+  created_by: "fixture",
+  created_at: "2026-11-26T00:00:00Z",
+  expires_at: "2999-01-01T00:00:00Z",
+  expired: false,
+  review_version: 1,
+  review_digest: `sha256:v1:${"c".repeat(64)}`,
+  target_qids: ["0", "1", "2", "4", "5", "6", "7"],
+  steps: [
+    { index: 1, type: "CustomOneQubit", name: "coherence", step_id: "coherence", kind: "calibration", tasks: ["CheckT1", "CheckT2Echo"], calls: [
+      { call_id: "t1", name: "CheckT1", on_failure: "stop", settings: { run: { time_range: { value: [2, 5, 31], value_type: "np.logspace" } } } },
+      { call_id: "CheckT2Echo", name: "CheckT2Echo", on_failure: "stop", settings: { update_calibration_parameters: false } },
+    ] },
+    { index: 2, type: "FilterByStatus", name: "filter_by_status", step_id: null, kind: "transform", tasks: [], calls: [], reference: { step: "coherence", call_id: "t1" } },
+  ],
+  warnings: [],
+  task_run_count: 2,
+  default_run_parameters: { shots: 1024 },
+  task_parameters: {},
+  replayed: false,
+};
+const plans = new Map();
+const planRuns = new Map();
+
 function startFixture() {
   const requests = [];
   const server = createServer((request, response) => {
@@ -89,19 +177,58 @@ function startFixture() {
       response.writeHead(status, { "content-type": "application/json" });
       response.end(JSON.stringify(body));
     };
+    // Planning a pipeline only validates it; storing a plan and running a stored plan are
+    // the other POSTs the fixture answers, and it records each body.
+    const planRun = /^\/calibration-pipelines\/plans\/([^/]+)\/execute$/.exec(url.pathname);
+    if (request.method === "POST" && (url.pathname === "/calibration-pipelines/validate" || url.pathname === "/calibration-pipelines/plans" || planRun)) {
+      const chunks = [];
+      request.on("data", (chunk) => chunks.push(chunk));
+      request.on("end", () => {
+        const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        requests[requests.length - 1].body = body;
+        if (url.pathname === "/calibration-pipelines/plans") {
+          plans.set(FIXTURE_PLAN.plan_id, { ...FIXTURE_PLAN, chip_id: body.chip_id, spec: body.spec, targets: body.spec.targets });
+          return json(201, plans.get(FIXTURE_PLAN.plan_id));
+        }
+        if (planRun) {
+          const prior = planRuns.get(body.idempotency_key);
+          if (prior) return json(202, { ...prior, replayed: true });
+          const plan = plans.get(planRun[1]);
+          if (!plan) return json(404, { detail: "no plan" });
+          // QDash refuses a new dispatch of an expired plan, whatever its approval.
+          if (plan.expired) return json(410, { detail: `Calibration pipeline plan ${plan.plan_id} expired at ${plan.expires_at}; it cannot be run or renewed.` });
+          if (body.expected_review_digest !== plan.review_digest) return json(409, { detail: "digest mismatch" });
+          const result = { execution_id: "exec-plan", flow_run_id: "flow-plan", flow_run_url: "", qdash_ui_url: "", message: "started", steps: [], calibration_session_id: "cs-auto", pipeline_run_id: "cpr-plan", plan_id: plan.plan_id, review_digest: plan.review_digest };
+          planRuns.set(body.idempotency_key, result);
+          return json(202, result);
+        }
+        json(200, { valid: true, backend_name: "fake", spec: body.spec, targets: body.spec.targets, task_run_count: 1, problems: [], warnings: [], steps: [] });
+      });
+      return;
+    }
     if (request.method !== "GET") return json(405, { detail: "fixture is read-only" });
+    const storedPlan = /^\/calibration-pipelines\/plans\/([^/]+)$/.exec(url.pathname);
+    if (storedPlan) return plans.has(storedPlan[1]) ? json(200, plans.get(storedPlan[1])) : json(404, { detail: "no plan" });
+    // No agent session is paused for an expert.
+    if (url.pathname === "/agent-sessions") return json(200, { items: [], total: 0, has_more: false });
     if (url.pathname === "/chips") {
       return json(200, { chips: [{ chip_id: "A", size: 16, activity_status: "active" }, { chip_id: "B", size: 64 }] });
     }
+    if (url.pathname === "/task-results" && PAGED_CHIPS.has(url.searchParams.get("chip_id"))) {
+      return json(...pagedTaskResults(url.searchParams));
+    }
+    const metrics = url.pathname.match(/^\/metrics\/chips\/([^/]+)\/metrics$/);
+    if (metrics) return metrics[1] === "BAD" ? json(200, { results: [] }) : json(200, CHIP_METRICS);
+    if (url.pathname === "/task-results/timeseries") return json(200, timeseries(url.searchParams));
     if (url.pathname === "/task-results") {
       const chip = url.searchParams.get("chip_id") ?? "A";
       const items = (T1_RESULTS[chip] ?? []).map((row) => ({
-        task_id: `${chip}-${row.qid}`, task_name: "CheckT1", chip_id: chip, qid: row.qid, status: "completed",
+        task_id: `${chip}-${row.qid}`, task_name: "CheckT1", chip_id: chip, qid: row.qid, status: "completed", execution_id: `${chip}-run`,
         output_parameters: { t1: { value: row.t1, unit: "us" } },
         // Credentials never reach a script or the model.
         api_token: "fixture-secret-should-be-redacted",
       }));
-      return json(200, { items, total: items.length });
+      return json(200, { items, total: items.length, skip: 0, limit: 50, status_counts: { completed: items.length } });
     }
     if (url.pathname === "/cryostats") return json(200, { items: [{ cryostat_id: "fridge-1", name: "Fridge 1" }] });
     const task = url.pathname.match(/^\/tasks\/([^/]+)\/result$/);
@@ -149,9 +276,9 @@ after(() => {
   rmSync(workDir, { recursive: true, force: true });
 });
 
-/** The bundled pi-qdash and pi-qcaleval checkouts, as both hosts load them. */
+/** The bundled pi-qdash and pi-qcaleval packages, as both hosts load them. */
 function bundledPaths() {
-  return bundledExtensionCheckouts(packagesDir).map(({ path }) => path);
+  return bundledExtensions(packagesDir).map(({ path }) => path);
 }
 
 /** Tools offered in a request: the transcript's tool additions and removals, plus any request-level tools. */
@@ -179,7 +306,7 @@ function scriptedModel(steps) {
 }
 
 /** A real pi CLI session with the bundled packages and pi's codemode and tool_search. */
-async function openCli(steps, { capture, before = [] } = {}) {
+async function openCli(steps, { capture, before = [], confirm } = {}) {
   const { faux, offered } = scriptedModel(steps);
   const model = faux.getModel();
   const agentDir = join(workDir, "agent");
@@ -218,7 +345,8 @@ async function openCli(steps, { capture, before = [] } = {}) {
     settingsManager: SettingsManager.inMemory(),
     modelRuntime,
   });
-  await session.bindExtensions({});
+  // `confirm`: a pi client that answers confirmation dialogs (RPC mode, as pi's own clients do).
+  await session.bindExtensions(confirm ? { uiContext: uiAnswering(confirm), mode: "rpc" } : {});
   await session.setModel(modelRuntime.getModel(model.provider, model.id));
   return {
     session,
@@ -238,11 +366,20 @@ async function openCli(steps, { capture, before = [] } = {}) {
   };
 }
 
+/** A pi UI context whose confirmation dialogs `confirm(title, message)` answers; the rest do nothing. */
+function uiAnswering(confirm) {
+  return new Proxy({ confirm: async (title, message) => confirm(title, message) }, {
+    get(target, key) {
+      if (key in target) return target[key];
+      return () => undefined;
+    },
+  });
+}
+
 /** The production chat registry on a durable harness, with the same packages. */
-async function openChat(steps, { capture } = {}) {
+async function openChat(steps, { capture, systemPrompt = "QDash parity test prompt", agentTools = [] } = {}) {
   const { faux, offered } = scriptedModel(steps);
-  const paths = bundledPaths();
-  const loader = new DefaultResourceLoader({ cwd: workDir, agentDir: join(workDir, "runtime-agent"), additionalExtensionPaths: paths });
+  const loader = createBundledResourceLoader({ cwd: workDir, agentDir: join(workDir, "runtime-agent"), bundled: bundledExtensions(packagesDir) });
   await loader.reload();
   assert.deepEqual(loader.getExtensions().errors, []);
   let extensions = loader.getExtensions().extensions;
@@ -277,9 +414,8 @@ async function openChat(steps, { capture } = {}) {
       extensions,
       modelRuntime,
       workDir,
-      extensionPaths: trustedCheckoutRoots(bundledExtensionCheckouts(packagesDir), ALLOWLISTED_PACKAGES),
-      trustedPackages: [],
-      copilot: buildCopilotExtension("QDash parity test prompt", []),
+      extensionPaths: trustedBundleRoots(bundledExtensions(packagesDir), ALLOWLISTED_PACKAGES),
+      agent: buildAgentExtension(systemPrompt, agentTools),
       internalCalls: {},
       codingTools: false,
     },
@@ -290,6 +426,7 @@ async function openChat(steps, { capture } = {}) {
   harness.resume();
   return {
     offered,
+    writeTools: chat.writeTools,
     async ask(text) {
       const submission = await conversation.submit({ type: "input", content: text }, context);
       await submission.wait(context);
@@ -377,6 +514,511 @@ test("a script aggregates several chips the same way in the pi CLI and in chat, 
   });
   assert.deepEqual(outcomes.cli, outcomes.chat);
   assert.deepEqual(outcomes.cli.refused, { write: "refused", figure: "refused", evaluate: "refused", shell: "refused" });
+});
+
+const QUERY_CONTRACTS_SCRIPT = `
+const fail = async (call) => { try { await call(); return "ran"; } catch (error) { return String(error?.message ?? error); } };
+const readRows = async (chipId, want) => {
+  const rows = [];
+  let skip = 0;
+  let total = Infinity;
+  while (rows.length < want && skip < total) {
+    const page = await tools.qdash_list_task_results({ chipId, limit: Math.min(100, want - rows.length), skip });
+    rows.push(...page.items);
+    total = page.total;
+    skip += page.items.length;
+    if (page.items.length === 0) break;
+  }
+  return { rows, total };
+};
+const out = {};
+const paged = await readRows("P", 200);
+out.paged = { count: paged.rows.length, first: paged.rows[0].task_id, last: paged.rows.at(-1).task_id, total: paged.total, unique: new Set(paged.rows.map((row) => row.task_id)).size };
+out.empty = (await readRows("EMPTY", 200)).rows.length;
+out.failedPage = await fail(() => readRows("FAIL", 200));
+out.limit200 = await fail(() => tools.qdash_query({ action: "task_results", chipId: "P", limit: 200 }));
+out.fraction = await fail(() => tools.qdash_query({ action: "task_results", chipId: "P", limit: 2.5 }));
+out.negativeSkip = await fail(() => tools.qdash_query({ action: "task_results", chipId: "P", skip: -1 }));
+out.dedicatedLimit200 = await fail(() => tools.qdash_list_task_results({ chipId: "P", limit: 200 }));
+const q6 = await tools.qdash_list_task_results({ chipId: "P", qid: "6", limit: 100 });
+out.q6 = { qids: [...new Set(q6.items.map((row) => row.qid))], total: q6.total, keys: Object.keys(q6).filter((key) => key !== "_links").sort() };
+const m = await tools.qdash_get_chip_metrics({ chipId: "P" });
+out.metrics = { isArray: Array.isArray(m), metrics: Object.keys(m.qubit_metrics).sort(), t1: m.qubit_metrics.t1, couplings: Object.keys(m.coupling_metrics.zx90_gate_fidelity) };
+out.badMetrics = await fail(() => tools.qdash_get_chip_metrics({ chipId: "BAD" }));
+const window = { startAt: "2026-11-01T00:00:00Z", endAt: "2026-11-21T00:00:00Z" };
+const one = await tools.qdash_get_timeseries({ chipId: "P", parameter: "qubit_frequency", qid: "6", ...window });
+const many = await tools.qdash_get_timeseries({ chipId: "P", parameter: "qubit_frequency", ...window });
+const absent = await tools.qdash_get_timeseries({ chipId: "P", parameter: "qubit_frequency", qid: "99", ...window });
+const unknown = await tools.qdash_get_timeseries({ chipId: "P", parameter: "frequency", qid: "6", ...window });
+const series = (ts, qid) => (Array.isArray(ts.data[qid]) ? ts.data[qid].map((point) => [point.calibrated_at, point.value]) : null);
+out.timeseries = {
+  dataIsArray: Array.isArray(one.data),
+  one: { keys: Object.keys(one.data), q6: series(one, "6") },
+  many: { keys: Object.keys(many.data).sort(), q7: series(many, "7") },
+  absent: { keys: Object.keys(absent.data), q99: series(absent, "99") },
+  unknownParameter: Object.keys(unknown.data),
+};
+out.badTimeseries = await fail(() => tools.qdash_get_timeseries({ chipId: "BAD", parameter: "qubit_frequency", ...window }));
+text("RESULT " + JSON.stringify(out));
+`;
+
+const SPEC_SCRIPT = `// @options: {"timeout_ms": 60000}
+const { taskCall, customOneQubit, filterByMetric, filterByStatus, muxTargets, sweep, calibrationSpec } = qdash.calibration;
+const spec = calibrationSpec(
+  muxTargets([0, 1], { exclude_qids: ["3"] }),
+  [
+    customOneQubit({
+      step_name: "coherence",
+      tasks: [
+        taskCall("CheckT1", { call_id: "t1", run: { time_range: sweep.logspace(2, 5, 31) } }),
+        taskCall("CheckT2Echo", { update_calibration_parameters: false, rounds: undefined }),
+      ],
+    }),
+    filterByStatus({ step: "coherence", call_id: "t1" }),
+  ],
+  { name: "coherence", default_run_parameters: { shots: 1024 } },
+);
+const plan = await tools.qdash_plan_pipeline({ chipId: "A", spec });
+const refusal = (run) => { try { run(); return "accepted"; } catch (error) { return error.name + ": " + error.message; } };
+const attempt = async (call) => { try { await call(); return "ran"; } catch (error) { return "refused"; } };
+const frozen = (() => { try { qdash.calibration = null; } catch (error) { return error.name; } return Object.isFrozen(qdash) && typeof qdash.calibration.taskCall === "function" ? "frozen" : "writable"; })();
+text("RESULT " + JSON.stringify({
+  valid: plan.valid,
+  backend: plan.backend_name,
+  local: refusal(() => filterByMetric({ metric: "t1" })),
+  frozen,
+  ambient: [typeof fetch, typeof process, typeof require, typeof setTimeout],
+  run: await attempt(() => tools.qdash_run_pipeline({ chipId: "A", spec, confirmWrite: true })),
+  session: await attempt(() => tools.qdash_run_agent_session_step({ sessionId: "s", confirmWrite: true })),
+}));
+`;
+
+// What both hosts must send for SPEC_SCRIPT: the builders' JSON, with only the fields given.
+const SPEC_SCRIPT_SPEC = {
+  spec_version: 2,
+  name: "coherence",
+  targets: { mux_ids: [0, 1], exclude_qids: ["3"] },
+  steps: [
+    {
+      type: "CustomOneQubit",
+      step_name: "coherence",
+      tasks: [
+        { name: "CheckT1", call_id: "t1", run: { time_range: { value: [2, 5, 31], value_type: "np.logspace" } } },
+        { name: "CheckT2Echo", update_calibration_parameters: false },
+      ],
+    },
+    { type: "FilterByStatus", step: "coherence", call_id: "t1" },
+  ],
+  default_run_parameters: { shots: 1024 },
+};
+
+test("a script composes a spec with qdash.calibration and plans it through qdash_plan_pipeline the same way in the pi CLI and in chat", async () => {
+  const outputs = {};
+  for (const host of ["cli", "chat"]) {
+    const start = fixture.requests.length;
+    const run = await (host === "cli" ? openCli : openChat)([
+      fauxAssistantMessage([fauxToolCall("codemode", { code: SPEC_SCRIPT })], { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxText("planned")),
+    ]);
+    try {
+      await run.ask("Plan a coherence check on MUX 0 and 1");
+      const script = (await run.results()).find((result) => result.name === "codemode");
+      assert.ok(script, `${host}: no codemode result`);
+      outputs[host] = { script, requests: requestsSince(start) };
+    } finally {
+      await run.close();
+    }
+  }
+  for (const host of ["cli", "chat"]) {
+    const { script, requests } = outputs[host];
+    // The rounds: undefined above is a mistake on purpose: it is unset, so it is left out, not refused.
+    assert.match(script.text, /RESULT /, `${host}: ${script.text}`);
+    assert.equal(script.isError, false, `${host}: ${script.text}`);
+    const result = scriptResult(script.text);
+    assert.deepEqual(result, {
+      valid: true,
+      backend: "fake",
+      local: "TypeError: filterByMetric: needs threshold",
+      // Scripts are sloppy-mode code: the assignment is ignored, and the helpers stay.
+      frozen: "frozen",
+      ambient: ["undefined", "undefined", "undefined", "undefined"],
+      run: "refused",
+      session: "refused",
+    }, host);
+    // The tool path sent the builders' JSON to the validate route, and nothing ran or wrote.
+    const plans = requests.filter((request) => request.method === "POST");
+    assert.deepEqual(plans.map((request) => request.path), ["/calibration-pipelines/validate"], host);
+    assert.deepEqual(plans[0].body.spec, SPEC_SCRIPT_SPEC, host);
+    assert.equal(plans[0].body.chip_id, "A", host);
+  }
+  assert.deepEqual(scriptResult(outputs.cli.script.text), scriptResult(outputs.chat.script.text));
+});
+
+const PLAN_SCRIPT = `// @options: {"timeout_ms": 60000}
+const { taskCall, customOneQubit, filterByStatus, muxTargets, sweep, calibrationSpec } = qdash.calibration;
+const spec = calibrationSpec(
+  muxTargets([0, 1], { exclude_qids: ["3"] }),
+  [
+    customOneQubit({
+      step_name: "coherence",
+      tasks: [
+        taskCall("CheckT1", { call_id: "t1", run: { time_range: sweep.logspace(2, 5, 31) } }),
+        taskCall("CheckT2Echo", { update_calibration_parameters: false }),
+      ],
+    }),
+    filterByStatus({ step: "coherence", call_id: "t1" }),
+  ],
+  { name: "coherence", default_run_parameters: { shots: 1024 } },
+);
+const checked = await tools.qdash_plan_pipeline({ chipId: "A", spec });
+const plan = await tools.qdash_create_pipeline_plan({ chipId: "A", spec });
+const attempt = async (call) => { try { await call(); return "ran"; } catch (error) { return "refused"; } };
+text("RESULT " + JSON.stringify({
+  valid: checked.valid,
+  planId: plan.plan_id,
+  digest: plan.review_digest,
+  run: await attempt(() => tools.qdash_run_pipeline({ chipId: "A", planId: plan.plan_id })),
+  runSpec: await attempt(() => tools.qdash_run_pipeline({ chipId: "A", spec })),
+  wait: await attempt(() => tools.qdash_wait_execution({ executionId: "exec-plan" })),
+  step: await attempt(() => tools.qdash_run_agent_session_step({ sessionId: "s" })),
+}));
+`;
+
+test("a script stores a plan and the model runs it by ID after approving the fetched plan, the same way in the pi CLI and in chat", async () => {
+  const outcomes = {};
+  for (const host of ["cli", "chat"]) {
+    plans.clear();
+    planRuns.clear();
+    const start = fixture.requests.length;
+    const shown = [];
+    const steps = [
+      fauxAssistantMessage([fauxToolCall("codemode", { code: PLAN_SCRIPT })], { stopReason: "toolUse" }),
+      fauxAssistantMessage([fauxToolCall("tool_search", { query: "qdash_run_pipeline run pipeline" })], { stopReason: "toolUse" }),
+      // The model passes only the plan's ID: no spec, no digest.
+      fauxAssistantMessage([fauxToolCall("qdash_run_pipeline", { chipId: "A", planId: FIXTURE_PLAN.plan_id })], { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxText("done")),
+    ];
+    const run = host === "cli"
+      ? await openCli(steps, { confirm: (title, message) => { shown.push(message); return true; } })
+      : await openChat(steps);
+    try {
+      await run.ask("Store a coherence plan for MUX 0 and 1 and run it");
+      const results = await run.results();
+      const script = results.find((result) => result.name === "codemode");
+      assert.ok(script, `${host}: no codemode result`);
+      assert.equal(script.isError, false, `${host}: ${script.text}`);
+      const pipeline = results.find((result) => result.name === "qdash_run_pipeline");
+      assert.ok(pipeline, `${host}: no qdash_run_pipeline result`);
+      if (host === "chat") {
+        // The card carries the plan the runtime fetched, frozen with the approval.
+        const approval = pipeline.details.approval;
+        assert.deepEqual(approval.args, { chipId: "A", planId: FIXTURE_PLAN.plan_id });
+        assert.equal(approval.preview.reviewDigest, FIXTURE_PLAN.review_digest);
+        assert.deepEqual(approval.preview.targetQids, FIXTURE_PLAN.target_qids);
+        assert.deepEqual(approval.preview.plan.steps, FIXTURE_PLAN.steps);
+        shown.push(JSON.stringify(approval.preview));
+        const planFetches = () => fixture.requests.filter((request) => request.method === "GET" && request.path.startsWith("/calibration-pipelines/plans/")).length;
+        // The approved call runs from the preview stored with the card, without fetching the
+        // plan again (the plan is still valid here).
+        plans.set("cpp-gone", plans.get(FIXTURE_PLAN.plan_id));
+        const fetchesBefore = planFetches();
+        const text = await run.writeTools.runApproved(approval);
+        assert.match(text, new RegExp(`Plan ${FIXTURE_PLAN.plan_id} \\(review digest ${FIXTURE_PLAN.review_digest}\\)`));
+        assert.equal(planFetches(), fetchesBefore);
+        // An approval request that lost its preview, or names another plan, runs nothing.
+        await assert.rejects(run.writeTools.runApproved({ ...approval, preview: undefined }), /does not carry the stored plan/);
+        await assert.rejects(run.writeTools.runApproved({ ...approval, args: { ...approval.args, planId: "cpp-gone" } }), /differs from the one the user approved/);
+        // The requests of the approved run, before the expiry case below adds its own.
+        outcomes.chatRequests = requestsSince(start);
+
+        // A completed dispatch replays after expiry; it does not validate the plan again.
+        plans.set(FIXTURE_PLAN.plan_id, { ...plans.get(FIXTURE_PLAN.plan_id), expired: true });
+        const replayStart = fixture.requests.length;
+        const replay = await run.writeTools.runApproved(approval);
+        assert.match(replay, /Plan cpp-fixture/);
+        assert.equal(planRuns.size, 1);
+        assert.equal(planFetches(), fetchesBefore);
+        const replayPosts = fixture.requests.slice(replayStart).filter((request) => request.method === "POST");
+        assert.equal(replayPosts.length, 1);
+        assert.equal(replayPosts[0].body.idempotency_key, outcomes.chatRequests.find((request) => request.path.endsWith("/execute")).body.idempotency_key);
+      } else {
+        assert.equal(pipeline.isError, false, `${host}: ${pipeline.text}`);
+        assert.equal(pipeline.details.reviewDigest, FIXTURE_PLAN.review_digest);
+      }
+      outcomes[host] = { script: scriptResult(script.text), shown, requests: host === "chat" ? outcomes.chatRequests : requestsSince(start) };
+    } finally {
+      await run.close();
+    }
+  }
+  for (const host of ["cli", "chat"]) {
+    const { script, shown, requests } = outcomes[host];
+    assert.deepEqual(script, {
+      valid: true,
+      planId: FIXTURE_PLAN.plan_id,
+      digest: FIXTURE_PLAN.review_digest,
+      run: "refused",
+      runSpec: "refused",
+      wait: "refused",
+      step: "refused",
+    }, host);
+    // What the user approved names the fetched plan's digest and its expanded qubits.
+    assert.ok(shown.some((message) => message.includes(FIXTURE_PLAN.review_digest)), `${host}: ${shown.join("\n")}`);
+    // The exact starting qubits, not a substring that "shots: 1024" could also match.
+    if (host === "cli") {
+      assert.ok(
+        shown.some((message) => message.includes(`Starting qubits (${FIXTURE_PLAN.target_qids.length}): ${FIXTURE_PLAN.target_qids.join(", ")} (`)),
+        `${host}: ${shown.join("\n")}`,
+      );
+    } else {
+      assert.ok(shown.some((message) => JSON.parse(message).targetQids?.join(",") === FIXTURE_PLAN.target_qids.join(",")), host);
+    }
+    const posts = requests.filter((request) => request.method === "POST");
+    assert.deepEqual(posts.map((request) => request.path), [
+      "/calibration-pipelines/validate",
+      "/calibration-pipelines/plans",
+      `/calibration-pipelines/plans/${FIXTURE_PLAN.plan_id}/execute`,
+    ], host);
+    // The script's spec reached the plan store; the run carried only the approved digest.
+    assert.deepEqual(posts[1].body.spec, SPEC_SCRIPT_SPEC, host);
+    assert.match(posts[1].body.idempotency_key, /^qdash_create_pipeline_plan:/, host);
+    assert.equal("spec" in posts[2].body, false, host);
+    assert.equal(posts[2].body.expected_review_digest, FIXTURE_PLAN.review_digest, host);
+    assert.equal(posts[2].body.chip_id, "A", host);
+  }
+});
+
+test("chat refuses a plan that expires after approval but before its first dispatch without fetching a replacement", async () => {
+  planRuns.clear();
+  const planId = "cpp-expire-before-dispatch";
+  plans.set(planId, { ...FIXTURE_PLAN, plan_id: planId, chip_id: "A" });
+  const run = await openChat([
+    fauxAssistantMessage([fauxToolCall("tool_search", { query: "qdash_run_pipeline run pipeline" })], { stopReason: "toolUse" }),
+    fauxAssistantMessage([fauxToolCall("qdash_run_pipeline", { chipId: "A", planId })], { stopReason: "toolUse" }),
+    fauxAssistantMessage(fauxText("done")),
+  ]);
+  try {
+    await run.ask("Run the stored plan");
+    const result = (await run.results()).find((item) => item.name === "qdash_run_pipeline");
+    assert.ok(result, JSON.stringify(await run.results()));
+    const approval = result.details.approval;
+    assert.equal(approval.preview.planId, planId);
+    assert.equal(planRuns.size, 0);
+    plans.set(planId, { ...plans.get(planId), expired: true });
+    const start = fixture.requests.length;
+    await assert.rejects(run.writeTools.runApproved(approval), /expired/);
+    const requests = fixture.requests.slice(start);
+    assert.deepEqual(requests.filter((request) => request.method === "GET" && request.path.startsWith("/calibration-pipelines/plans/")), []);
+    const posts = requests.filter((request) => request.method === "POST");
+    assert.deepEqual(posts.map((request) => request.path), [`/calibration-pipelines/plans/${planId}/execute`]);
+    assert.equal(posts[0].body.expected_review_digest, approval.preview.reviewDigest);
+    assert.equal(planRuns.size, 0);
+  } finally {
+    await run.close();
+    plans.delete(planId);
+  }
+});
+
+test("a script error inside or after the builders keeps its own line number in both hosts", async () => {
+  const code = [
+    "const c = qdash.calibration;",
+    "const step = c.customOneQubit({ tasks: [c.taskCall('CheckT1')] });",
+    "c.customOneQubit({ tasks: [] });",
+  ].join("\n");
+  for (const host of ["cli", "chat"]) {
+    const run = await (host === "cli" ? openCli : openChat)([
+      fauxAssistantMessage([fauxToolCall("codemode", { code })], { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxText("failed")),
+    ]);
+    try {
+      await run.ask("build a step");
+      const script = (await run.results()).find((result) => result.name === "codemode");
+      assert.ok(script, `${host}: no codemode result`);
+      assert.equal(script.isError, true, host);
+      assert.match(script.text, /RangeError: customOneQubit: tasks needs at least 1 task call/, host);
+      // The deadline's options line is line 1, so the model's third line is line 4.
+      assert.match(script.text, /codemode\.js:4\b/, `${host}: ${script.text}`);
+    } finally {
+      await run.close();
+    }
+  }
+});
+
+test("task-result paging, chip metrics, and timeseries reach a script with the API's shape in the pi CLI and in chat", async () => {
+  const outcomes = {};
+  for (const [host, open] of [["cli", openCli], ["chat", openChat]]) {
+    const start = fixture.requests.length;
+    const run = await open([
+      fauxAssistantMessage([fauxToolCall("codemode", { code: QUERY_CONTRACTS_SCRIPT })], { stopReason: "toolUse" }),
+      fauxAssistantMessage([fauxText("done")]),
+    ]);
+    try {
+      await run.ask("Read Q6 task results, metrics and frequency trend");
+      const results = await run.results();
+      const script = results.find((result) => result.name === "codemode");
+      assert.ok(script, `${host}: no codemode result`);
+      outcomes[host] = scriptResult(script.text);
+      const pageRequests = requestsSince(start).filter((request) => request.path === "/task-results");
+      // Invalid paging never reached the API, so it never answered 422.
+      assert.ok(pageRequests.every((request) => request.query.limit === undefined || (Number(request.query.limit) >= 1 && Number(request.query.limit) <= 100)), `${host}: ${JSON.stringify(pageRequests)}`);
+      assert.ok(pageRequests.every((request) => request.query.skip === undefined || Number(request.query.skip) >= 0));
+      const p = pageRequests.filter((request) => request.query.chip_id === "P" && request.query.qid === undefined);
+      assert.deepEqual(p.map((request) => [request.query.skip, request.query.limit]), [["0", "100"], ["100", "100"]], host);
+      assert.ok(pageRequests.some((request) => request.query.qid === "6"), `${host}: qid not sent exactly`);
+    } finally {
+      await run.close();
+    }
+  }
+  const cli = outcomes.cli;
+  assert.deepEqual(cli.paged, { count: 200, first: "p-000", last: "p-199", total: 250, unique: 200 });
+  assert.equal(cli.empty, 0);
+  assert.notEqual(cli.failedPage, "ran", "a failed second page must fail the read");
+  for (const key of ["limit200", "fraction", "negativeSkip"]) {
+    assert.notEqual(cli[key], "ran", key);
+    assert.match(outcomes.chat[key], /No request was sent/, `chat ${key}: ${outcomes.chat[key]}`);
+  }
+  assert.match(cli.limit200, /limit must be an integer from 1 to 100 \(got 200\).*skip increased by the rows already read/s);
+  assert.match(cli.fraction, /limit must be an integer from 1 to 100 \(got 2\.5\)/);
+  assert.match(cli.negativeSkip, /skip must be an integer of 0 or more \(got -1\)/);
+  assert.notEqual(cli.dedicatedLimit200, "ran");
+  assert.match(cli.dedicatedLimit200, /100/);
+  assert.deepEqual(cli.q6, { qids: ["6"], total: 225, keys: ["items", "limit", "skip", "status_counts", "total"] });
+  assert.deepEqual(cli.metrics, {
+    isArray: false,
+    metrics: ["qubit_frequency", "t1"],
+    t1: {
+      6: { value: 42.5, task_id: "p-001", execution_id: "e-0", stddev: 1.5 },
+      16: { value: null, task_id: "p-010", execution_id: "e-0", stddev: null },
+    },
+    couplings: ["6-7"],
+  });
+  assert.match(cli.badMetrics, /chip_metrics response that does not match its documented shape.*qubit_metrics/s);
+  assert.deepEqual(cli.timeseries, {
+    dataIsArray: false,
+    one: { keys: ["6"], q6: [["2026-11-18T00:00:00Z", 7.91], ["2026-11-19T00:00:00Z", 7.92]] },
+    many: { keys: ["6", "7"], q7: [["2026-11-19T00:00:00Z", 8.1]] },
+    absent: { keys: [], q99: null },
+    unknownParameter: [],
+  });
+  assert.match(cli.badTimeseries, /timeseries response that does not match its documented shape.*\/data/s);
+  // Both hosts give a script the same data and the same failures (error wording aside).
+  const shape = (outcome) => ({ ...outcome, failedPage: outcome.failedPage !== "ran", dedicatedLimit200: outcome.dedicatedLimit200 !== "ran", limit200: /No request was sent/.test(outcome.limit200), fraction: /No request was sent/.test(outcome.fraction), negativeSkip: /No request was sent/.test(outcome.negativeSkip), badMetrics: /documented shape/.test(outcome.badMetrics), badTimeseries: /documented shape/.test(outcome.badTimeseries) });
+  assert.deepEqual(shape(outcomes.chat), shape(cli));
+});
+
+test("a script discovers the response shape and paging bounds of the query tools in the pi CLI and in chat", async () => {
+  const code = `
+const out = {};
+for (const name of ["qdash_list_task_results", "qdash_get_chip_metrics", "qdash_get_timeseries"]) {
+  const tool = await describeTool(name);
+  out[name] = typeof tool === "string" ? tool : JSON.stringify(tool);
+}
+text("RESULT " + JSON.stringify(out));
+`;
+  for (const [host, open] of [["cli", openCli], ["chat", openChat]]) {
+    const run = await open([
+      fauxAssistantMessage([fauxToolCall("codemode", { code })], { stopReason: "toolUse" }),
+      fauxAssistantMessage([fauxText("done")]),
+    ]);
+    try {
+      await run.ask("What do the query tools return?");
+      const script = (await run.results()).find((result) => result.name === "codemode");
+      const declared = scriptResult(script.text);
+      const list = declared.qdash_list_task_results;
+      for (const fragment of ["status_counts", "total", "skip", "@maximum 100", "@minimum 1"]) {
+        assert.ok(list.includes(fragment), `${host} task results: ${fragment} in ${list}`);
+      }
+      assert.ok(declared.qdash_get_chip_metrics.includes("qubit_metrics.t1"), `${host}: ${declared.qdash_get_chip_metrics}`);
+      assert.ok(declared.qdash_get_chip_metrics.includes("stddev"), host);
+      assert.ok(declared.qdash_get_timeseries.includes("calibrated_at"), host);
+      assert.ok(declared.qdash_get_timeseries.includes("An object, not an array"), host);
+      for (const text of Object.values(declared)) assert.doesNotMatch(text, /updated_at/, host);
+    } finally {
+      await run.close();
+    }
+  }
+});
+
+/** The system prompt of a request: its own text, and the content and named sections of system messages. */
+function systemText(ctx) {
+  const sections = {};
+  const parts = ctx.systemPrompt ? [ctx.systemPrompt] : [];
+  for (const message of ctx.messages ?? []) {
+    if (message.role !== "system") continue;
+    if (typeof message.content === "string" && message.content) parts.push(message.content);
+    for (const [name, text] of Object.entries(message.sections ?? {})) {
+      if (text === null) delete sections[name];
+      else sections[name] = text;
+    }
+  }
+  return [...parts, ...Object.values(sections)].join("\n");
+}
+
+// The skills a plain-language experiment request should be able to reach.
+const EXPERIMENT_SKILLS = [
+  "qdash-characterization",
+  "qdash-one-qubit-calibration",
+  "qdash-two-qubit-calibration",
+  "qdash-zx90-optimization",
+  "qdash-chip-bringup",
+  "qdash-agent-calibration",
+  "qdash-rabi-after-configure",
+];
+
+test("a plain-language request reaches the experiment skills and the shared request policy in the pi CLI and in chat", async () => {
+  // This checks what each host sends the model and that the scripted skill read works. Whether
+  // a real model picks the right skill from a plain request is not something a faux model shows.
+  const { requestPolicyBullets } = await import("@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts");
+  const loader = createBundledResourceLoader({ cwd: workDir, agentDir: join(workDir, "skills-agent"), bundled: bundledExtensions(packagesDir) });
+  await loader.reload();
+  const skills = loader.getSkills().skills.filter((skill) => !skill.disableModelInvocation);
+  const characterization = skills.find((skill) => skill.name === "qdash-characterization");
+  assert.ok(characterization);
+
+  const prompts = {};
+  const record = (host) => (ctx) => {
+    prompts[host] = systemText(ctx);
+    return host === "cli"
+      ? fauxAssistantMessage([fauxToolCall("read", { path: characterization.filePath })], { stopReason: "toolUse" })
+      : fauxAssistantMessage([fauxToolCall("read_skill", { name: "qdash-characterization" })], { stopReason: "toolUse" });
+  };
+  const hosts = [
+    ["cli", () => openCli([record("cli"), fauxAssistantMessage([fauxText("done")])])],
+    ["chat", () => openChat([record("chat"), fauxAssistantMessage([fauxText("done")])], {
+      // As runtime.ts builds them from the same loader.
+      systemPrompt: buildSystemPrompt("auto", "en", skills),
+      agentTools: [buildSkillTool(skills)],
+    })],
+  ];
+  for (const [host, open] of hosts) {
+    const run = await open();
+    try {
+      await run.ask("Q0のT1を測り直したい");
+      const prompt = prompts[host];
+      assert.ok(prompt, `${host}: no model request`);
+      for (const bullet of requestPolicyBullets()) {
+        assert.equal(prompt.split(bullet).length, 2, `${host}: request rule missing or repeated: ${bullet}`);
+      }
+      for (const name of EXPERIMENT_SKILLS) {
+        const { description } = skills.find((skill) => skill.name === name);
+        assert.ok(prompt.includes(name), `${host}: ${name} is not listed`);
+        // pi escapes the description as XML in the CLI listing.
+        const listed = host === "cli" ? description.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;") : description;
+        assert.ok(prompt.includes(listed), `${host}: ${name} description is not listed`);
+      }
+      // The CLI loads skills with its own file reader; read_skill is the hosted Agent's.
+      if (host === "cli") {
+        assert.match(prompt, /Use the read tool to load a skill's file/);
+        assert.doesNotMatch(prompt, /read_skill/);
+      } else {
+        assert.match(prompt, /call `read_skill` with its name/);
+      }
+      const read = (await run.results()).find((result) => result.name === (host === "cli" ? "read" : "read_skill"));
+      assert.ok(read && !read.isError, `${host}: the skill could not be read`);
+      assert.match(read.text, /# QDash Characterization/);
+    } finally {
+      await run.close();
+    }
+  }
 });
 
 test("a deferred tool is offered only after tool_search loads it, in the pi CLI and in chat", async () => {

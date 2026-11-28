@@ -12,7 +12,12 @@ import numpy.typing as npt
 from qubex.core import DataModel
 from qubex.experiment.experiment_constants import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
-from qdash.datamodel.task import InputParameterSpec, OutputParameterSpec, RunParameterSpec
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+    TaskDocumentation,
+)
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import (
     QubexTask,
@@ -65,6 +70,25 @@ class CheckQuantumEfficiency(QubexTask):
 
     name: str = "CheckQuantumEfficiency"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Sweeps readout amplitude and measures both the readout signal-to-noise ratio and "
+            "the measurement-induced dephasing of a Ramsey superposition, then writes the "
+            "quantum_efficiency from the fitted scalings."
+        ),
+        when_to_use="Run it during characterization to assess the readout amplifier chain.",
+        prerequisites=(
+            (
+                "Rabi parameters from a CheckRabi run under the current readout_duration, with "
+                "rabi_r2 at or above the R² threshold; they normalize the IQ data."
+            ),
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         **required_rabi_normalization_inputs(),
         "control_frequency": InputParameterSpec.required_database(

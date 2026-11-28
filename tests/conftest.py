@@ -47,6 +47,7 @@ if "prefect" not in sys.modules:
 
 import mongomock
 import pytest
+from pymongo import IndexModel
 from pymongo.database import Database
 
 # Configure pytest-asyncio
@@ -66,14 +67,16 @@ os.environ["SLACK_BOT_TOKEN"] = "test-token"  # noqa: S105
 os.environ["SLACK_CHANNEL_ID"] = "test-channel"
 os.environ["SLACK_FORUM_NOTIFICATION"] = "false"
 os.environ["SLACK_FORUM_CHANNEL_ID"] = ""
+os.environ["SLACK_AGENT_NOTIFICATION"] = "false"
+os.environ["SLACK_AGENT_CHANNEL_ID"] = ""
 os.environ.setdefault("POSTGRES_DATA_PATH", "/tmp/postgres")
 os.environ.setdefault("MONGO_DATA_PATH", "/tmp/mongo")
 os.environ.setdefault("CALIB_DATA_PATH", "/tmp/calib")
 os.environ.setdefault("QPU_DATA_PATH", "/tmp/qpu")
 os.environ["SLACK_APP_TOKEN"] = "test-app-token"  # noqa: S105
 os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")
-# Tests read the default Copilot model files unless they select a profile.
-os.environ.pop("QDASH_COPILOT_PROFILE", None)
+# Tests read the default Agent model files unless they select a profile.
+os.environ.pop("QDASH_AGENT_PROFILE", None)
 
 # Qubex fitting helpers call ``fig.show()`` by default. Where a browser is discoverable (a
 # desktop host or an inherited ``BROWSER``), Plotly's default renderer serves the figure from
@@ -110,6 +113,32 @@ def _patched_command(self: Any, command: dict[str, Any] | str, **kwargs: Any) ->
     return {"ok": 1.0}
 
 
+def _patched_create_indexes(self: Any, indexes: list[IndexModel], session: Any = None) -> list[str]:
+    """Create IndexModel indexes as MongoDB does, keeping ``partialFilterExpression``.
+
+    mongomock's own ``create_indexes`` drops the partial filter, which turns a unique partial
+    index into a unique index over every document.
+    """
+    names: list[str] = []
+    for index in indexes:
+        document = index.document
+        options = {
+            key: document[key]
+            for key in ("expireAfterSeconds", "partialFilterExpression", "name")
+            if key in document
+        }
+        names.append(
+            self.create_index(
+                list(document["key"].items()),
+                session=session,
+                unique=document.get("unique", False),
+                sparse=document.get("sparse", False),
+                **options,
+            )
+        )
+    return names
+
+
 @pytest.fixture
 def init_db() -> Generator[Database[Any], None, None]:
     """Initialize Bunnet with in-memory mongomock database.
@@ -134,7 +163,10 @@ def init_db() -> Generator[Database[Any], None, None]:
     db_name = "qdash_test"
 
     # Patch mongomock's command method to support Bunnet
-    with patch.object(mongomock.Database, "command", _patched_command):
+    with (
+        patch.object(mongomock.Database, "command", _patched_command),
+        patch.object(mongomock.Collection, "create_indexes", _patched_create_indexes),
+    ):
         set_test_client(client, db_name=db_name)
         db = client[db_name]
         yield db

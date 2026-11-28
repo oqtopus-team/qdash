@@ -1,5 +1,5 @@
 /**
- * pi-durable 1.6 lets a tool's `execute()` park (`{ sleep }` or `{ wait }`)
+ * pi-durable 1.7.0 lets a tool's `execute()` park (`{ kind: "sleep" }` or `{ kind: "wait" }`)
  * instead of returning a result, and run again once woken. QDash's waiting
  * tools park (see durable-waits.test.mjs); these tests pin that QDash's
  * layer around durable tools (model-only exposure and the tool policy's
@@ -88,7 +88,7 @@ test("a caller that parks keeps its park, wakes on a signal, and may call its in
         if (api.wake === undefined) {
           // Before the park, the internal call is the caller's own.
           await api.executeTool("internal_check", { n: 1 }, ctx);
-          return { sleep: { checkpoint: { step: 1 }, signals: [Go.key("go")] } };
+          return { kind: "sleep", checkpoint: { step: 1 }, signals: [Go.key("go")] };
         }
         wakes.push({ reason: api.wake.reason, checkpoint: api.checkpoint });
         const signal = await api.readSignal(Go, "go", ctx);
@@ -133,7 +133,7 @@ test("a tool that is not an internal tool's caller stays blocked from it after a
       parameters: Type.Object({}),
       replay: "safe",
       execute: async (_args, api, ctx) => {
-        if (api.wake === undefined) return { sleep: { signals: [Go.key("go")] } };
+        if (api.wake === undefined) return { kind: "sleep", signals: [Go.key("go")] };
         const nested = await api.executeTool("internal_check", { n: 9 }, ctx, { key: "after-wake" });
         return { output: [{ type: "text", text: nested.isError ? "blocked" : "ran" }] };
       },
@@ -165,7 +165,7 @@ test("aborting a parked caller runs the tool's own cancel", async () => {
       description: "parks until signalled",
       parameters: Type.Object({}),
       replay: "safe",
-      execute: async () => ({ sleep: { checkpoint: { job: "j-1" }, signals: [Go.key("go")] } }),
+      execute: async () => ({ kind: "sleep", checkpoint: { job: "j-1" }, signals: [Go.key("go")] }),
       cancel: async (_args, api) => {
         cancelled.push(api.checkpoint);
       },
@@ -199,7 +199,7 @@ test("a caller may park on an internal call it started without waiting", async (
         // so no code of the caller is executing in this process by then.
         if (api.wake === undefined) {
           const started = await api.executeTool("internal_check", { n: 3 }, ctx, { key: "check", wait: false });
-          return { wait: { checkpoint: { taskId: started.taskId }, on: [started.taskId], policy: "all" } };
+          return { kind: "wait", checkpoint: { taskId: started.taskId }, on: [started.taskId], policy: "all" };
         }
         const again = await api.executeTool("internal_check", { n: 3 }, ctx, { key: "check", wait: false });
         const result = await again.result(ctx);

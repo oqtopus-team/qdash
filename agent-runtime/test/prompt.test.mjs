@@ -19,16 +19,40 @@ test("write tools always require approval by the user, not the model", () => {
   assert.doesNotMatch(prompt, /confirmWrite/);
 });
 
+test("only the steps of an approved auto agent session run without a card, and nothing continues by itself", () => {
+  const prompt = buildSystemPrompt("auto", "en");
+  assert.match(prompt, /`qdash_run_agent_session_step` and `qdash_request_agent_human`: they run at once, without a card, because the user already approved the agent session \(autonomy auto\)/);
+  // A recorded stop decision is not a stop: only the end tool ends a session.
+  assert.match(prompt, /`nextAction` `stop` or `complete` changes no session state\. To stop or finish an agent session, call `qdash_end_agent_session`/);
+  assert.match(prompt, /A stopped conversation does not continue by itself/);
+});
+
+test("nontrivial work gets brief progress updates in the reply language, apart from the final answer", () => {
+  const prompt = buildSystemPrompt("ja", "en");
+  assert.match(prompt, /first write one short sentence on what you will check/);
+  assert.match(prompt, /After a milestone .* what you found and what you do next/);
+  assert.match(prompt, /Write updates in the reply language/);
+  // No per-tool chatter, invented progress or reasoning disclosure; simple answers stay direct.
+  assert.match(prompt, /Do not narrate every tool call/);
+  assert.match(prompt, /results or time estimates that no tool returned/);
+  assert.match(prompt, /do not share your internal reasoning in updates/);
+  assert.match(prompt, /answer directly or with one quick tool call gets the answer without updates/);
+  assert.match(prompt, /The final answer stands on its own/);
+  // The update rules come after the direct-answer rule and before the language rule.
+  assert.ok(prompt.indexOf("short direct answer") < prompt.indexOf("Progress updates:"));
+  assert.ok(prompt.indexOf("Progress updates:") < prompt.indexOf("Reason internally"));
+});
+
 test("choices go through ask_user", () => {
   assert.match(buildSystemPrompt("auto", "en"), /call `ask_user` with 2-4 short options/);
 });
 
 test("listed skills point the model at read_skill", () => {
   const prompt = buildSystemPrompt("auto", "en", [
-    { name: "qdash-calibration-agent", description: "Run agent calibration sessions." },
+    { name: "qdash-one-qubit-calibration", description: "Calibrate single qubits." },
   ]);
   assert.match(prompt, /call `read_skill`/);
-  assert.match(prompt, /- qdash-calibration-agent: Run agent calibration sessions\./);
+  assert.match(prompt, /- qdash-one-qubit-calibration: Calibrate single qubits\./);
   assert.doesNotMatch(buildSystemPrompt("auto", "en"), /read_skill/);
 });
 
@@ -71,6 +95,10 @@ test("code mode and deferred tools are explained when offered", async () => {
   });
   assert.match(prompt, /Use `codemode` when a question needs many read-only QDash calls/);
   assert.match(prompt, /Scripts can call only QDash's read-only tools/);
+  // Script results are parsed values: read fields directly, JSON.parse only real JSON strings.
+  assert.match(prompt, /already parsed\), not to its text answer/);
+  assert.match(prompt, /`const page = await tools\.qdash_list_task_results\(\{ limit: 100 \}\); text\(page\.total\)`/);
+  assert.match(prompt, /do not call `JSON\.parse` on it, which fails on an object; parse only a value that is actually a JSON string/);
   assert.match(prompt, /call `tool_search` with the tool name/);
   assert.match(prompt, /Deferred tools: qdash_list_cooldowns, qdash_list_cryostats/);
   assert.equal(deferredToolsGuideline([]), null);
@@ -89,6 +117,11 @@ test("the investigation policy shared with pi CLI sits beside the runtime's own 
   for (const bullet of investigationPolicyBullets()) {
     assert.ok(guidelines.includes(`${bullet}\n`), `missing shared rule: ${bullet}`);
     assert.equal(prompt.split(bullet).length, 2, `shared rule appears more than once: ${bullet}`);
+  }
+  const { requestPolicyBullets } = await import("@oqtopus-team/pi-qdash/extensions/lib/qdash-guidance.ts");
+  for (const bullet of requestPolicyBullets()) {
+    assert.ok(guidelines.includes(`${bullet}\n`), `missing request rule: ${bullet}`);
+    assert.equal(prompt.split(bullet).length, 2, `request rule appears more than once: ${bullet}`);
   }
   // Host-specific rules stay in the runtime prompt.
   assert.match(prompt, /`render_ui`/);

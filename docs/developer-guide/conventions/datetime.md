@@ -1,119 +1,36 @@
 # Datetime Handling
 
-QDash stores native `datetime` objects in MongoDB, returns ISO8601 UTC strings via the API, and converts them to the configured UI timezone for display in the frontend. The default UI timezone is Asia/Tokyo.
-
-## Data Flow
-
-<Diagram name="datetime-flow" caption="Timestamps stay in UTC until the UI formats them; elapsed time travels as seconds, then as an H:MM:SS string." />
+Store UTC timestamps and convert them only for display or calendar labels.
 
 ## Backend (Python)
 
-### Calendar Timezone Configuration
+Use `src/qdash/common/utils/datetime.py`:
 
-The server calendar timezone is configured in `src/qdash/config.py` and is used
-only for server-generated calendar labels such as `recorded_date` and execution
-ID date prefixes:
-
-```python
-timezone: str = "Asia/Tokyo"
-```
-
-### Utility Module
-
-All datetime operations should use `src/qdash/common/utils/datetime.py`:
-
-| Function | Description |
+| Helper | Use |
 | --- | --- |
-| `now()` | Get current UTC datetime for DB/API storage |
-| `local_now()` | Get current datetime in configured calendar timezone for server labels such as YYYYMMDD |
-| `now_iso()` | Get current UTC datetime as ISO8601 string |
-| `ensure_timezone(value)` | Ensure datetime is timezone-aware (handles naive MongoDB datetimes) |
-| `to_datetime(value)` | Convert string/datetime/pendulum to standard datetime |
-| `format_iso(dt)` | Format datetime as ISO8601 string |
-| `parse_elapsed_time(elapsed_str)` | Parse elapsed time string to timedelta |
-| `format_elapsed_time(elapsed)` | Format timedelta as "H:MM:SS" string |
+| `now()`, `now_iso()` | Current UTC timestamp |
+| `local_now()` | Calendar labels in the configured server timezone |
+| `ensure_timezone()` | Treat naive MongoDB timestamps as UTC |
+| `to_datetime()`, `format_iso()` | Parse and serialize timestamps |
+| `parse_elapsed_time()`, `format_elapsed_time()` | Convert durations |
 
-### Pydantic Serialization
-
-```python
-# In API schema models
-@field_validator("elapsed_time", mode="before")
-def _parse_elapsed_time(cls, v: Any) -> timedelta | None:
-    return parse_elapsed_time(v)
-
-@field_serializer("elapsed_time")
-def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
-    return format_elapsed_time(v) if v else None
-```
-
-### MongoDB Considerations
-
-MongoDB returns naive datetimes (without timezone info), assumed to be UTC. Use `ensure_timezone()` to convert them:
-
-```python
-# In dbmodel validators
-@field_validator("start_at", "end_at", mode="before")
-@classmethod
-def _ensure_timezone(cls, v: Any) -> datetime | None:
-    if v is None:
-        return None
-    if isinstance(v, datetime):
-        return ensure_timezone(v)
-    return v
-```
+MongoDB stores native datetimes; the API returns ISO8601 UTC strings. Store elapsed time as
+seconds, then format it as `H:MM:SS`. Server calendar labels default to Asia/Tokyo through
+`src/qdash/config.py`; this does not change timestamp storage.
 
 ## Frontend (TypeScript)
 
-### Utility Module
+Use `ui/src/lib/utils/datetime.ts`, not `toLocaleString()`:
 
-All datetime formatting should use `ui/src/lib/utils/datetime.ts`:
+| Helper | Display |
+| --- | --- |
+| `formatDateTime()` | Date and time |
+| `formatDate()` | Date |
+| `formatTime()` | Time |
+| `formatDateTimeCompact()` | Compact date and time |
 
-| Function | Format | Example Output |
-| --- | --- | --- |
-| `formatDateTime(utcString)` | `yyyy-MM-dd HH:mm:ss` | `2025-12-21 10:30:45` |
-| `formatDate(utcString)` | `yyyy-MM-dd` | `2025-12-21` |
-| `formatTime(utcString)` | `HH:mm:ss` | `10:30:45` |
-| `formatDateTimeCompact(utcString)` | `MM/dd HH:mm` | `12/21 10:30` |
+The default timezone is `NEXT_PUBLIC_TIMEZONE`, falling back to Asia/Tokyo. Missing timestamps
+render as `-`. Use `dateToDateInput()`, `dateToDateTimeLocal()`, or `toDateTimeLocal()` for native
+inputs, and `toIsoSeconds()` when submitting `datetime-local` values so the offset is explicit.
 
-By default, frontend utilities use `NEXT_PUBLIC_TIMEZONE`, falling back to
-`Asia/Tokyo`. Pass an explicit timezone only for tests or a UI that intentionally
-needs a different fixed timezone.
-
-### Usage Example
-
-```typescript
-import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
-
-// Full datetime
-<span>{formatDateTime(execution.start_at)}</span>
-// Output: "2025-12-21 10:30:45"
-
-// Compact format for lists
-<span>{formatDateTimeCompact(task.end_at)}</span>
-// Output: "12/21 10:30"
-
-// Null handling (returns "-" for null/undefined)
-<span>{formatDateTime(task.start_at)}</span>
-// Output: "-" if null/undefined
-```
-
-### Dependencies
-
-- `date-fns`: Date manipulation utilities
-- `date-fns-tz`: Timezone conversion with `formatInTimeZone()`
-
-## Conventions
-
-- Always use utility functions — never use `new Date().toLocaleString()` directly
-- Use `dateToDateInput()`, `dateToDateTimeLocal()`, and `toDateTimeLocal()` before putting dates into native date/datetime inputs
-- Use `toIsoSeconds()` when submitting `datetime-local` values so the configured UI timezone offset is explicit
-- Handle null/undefined — API responses may have null datetime fields
-- Use `formatDateTimeCompact()` for space-constrained UIs
-- Store `elapsed_time` as seconds (float) before MongoDB storage
-
-## Implementation Files
-
-- `src/qdash/common/utils/datetime.py` — backend utilities
-- `ui/src/lib/utils/datetime.ts` — frontend utilities
-- `src/qdash/api/schemas/*.py` — API schemas
-- `src/qdash/dbmodel/*.py` — DB models
+Test timezone boundaries, naive database values, and missing timestamps when changing these helpers.

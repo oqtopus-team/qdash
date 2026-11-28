@@ -9,27 +9,34 @@ import {
   useRef,
   useState,
 } from "react";
-import { useGetCopilotPreferences } from "@/client/copilot/copilot";
+import { useGetAgentPreferences, useListAgentSkills } from "@/client/agent/agent";
 import { ArrowDown, GitBranch, LayoutDashboard } from "lucide-react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
+import { useChatScrollIntent } from "@/hooks/useChatScrollIntent";
 import { useChatSuggestions, type ChatSuggestion } from "@/hooks/useChatSuggestions";
-import { replyAfter, useCopilotChat } from "@/hooks/useCopilotChat";
+import { replyAfter, useAgentChat } from "@/hooks/useAgentChat";
 import { useChatAttachments } from "@/hooks/useChatAttachments";
 import { useChatGreeting } from "@/hooks/useChatGreeting";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChatPageSummary } from "@/contexts/ChatDockContext";
+import { ChatFollowProvider } from "@/contexts/ChatFollowContext";
 import { withViewTransition } from "@/lib/viewTransition";
 import { ChatComposer, type ChatComposerHandle } from "@/components/features/chat/ChatComposer";
 import { ChatContextBar } from "@/components/features/chat/ChatContextBar";
 import { ChatLinkPreviewProvider } from "@/components/features/chat/ChatLinkPreview";
 import { ChatNotice, ChatPendingSteers } from "@/components/features/chat/ChatPendingSteers";
+import { DetachedTurnRow } from "@/components/features/chat/ChatTurnStatus";
+import { ChatAgentSessionStatus } from "@/components/features/chat/ChatAgentSessionStatus";
+import { ChatCalibrationSessions } from "@/components/features/chat/ChatCalibrationSessions";
+import { linkedAgentSessions } from "@/lib/chatAgentSession";
+import { linkedCalibrationSessions } from "@/lib/chatCalibrationSession";
 import { QdashBotAvatar } from "@/components/ui/UserAvatar";
 import {
   AssistantMessage,
   LiveAssistantMessage,
   UserMessage,
 } from "@/components/features/chat/ChatMessages";
-import type { TaskChatContext } from "@/types/copilotChat";
+import type { TaskChatContext } from "@/types/agentChat";
 
 /**
  * - page: the /chat page, roomy, greeting centered with the composer
@@ -38,8 +45,21 @@ import type { TaskChatContext } from "@/types/copilotChat";
  */
 type ChatThreadVariant = "page" | "panel" | "compact";
 
-function ScrollToBottomButton() {
+/**
+ * Jump-to-latest control. It shows once the user scrolls away from the bottom,
+ * which also stops the thread following new content; it, scrolling back down,
+ * or sending a message resumes following.
+ */
+function ScrollToBottomButton({ followKey }: { followKey: number }) {
   const { isAtBottom, scrollToBottom } = useStickToBottomContext();
+  useChatScrollIntent();
+  const lastFollowKey = useRef(followKey);
+  useEffect(() => {
+    if (followKey === lastFollowKey.current) return;
+    lastFollowKey.current = followKey;
+    // What the user just sent is what they want to read the answer to.
+    void scrollToBottom();
+  }, [followKey, scrollToBottom]);
   if (isAtBottom) return null;
   return (
     <button
@@ -174,6 +194,8 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
     isStreaming,
     liveTurn,
     statusMessage,
+    connection,
+    detachedTurn,
     model,
     thinking,
     send,
@@ -196,8 +218,12 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
     branchFrom,
     canBranchAt,
     branchingIndex,
-  } = useCopilotChat(sessionId);
-  const { data: preferences } = useGetCopilotPreferences({ query: { staleTime: 60_000 } });
+  } = useAgentChat(sessionId);
+  const { data: preferences } = useGetAgentPreferences({ query: { staleTime: 60_000 } });
+  // Offered after `/` in the composer; without the runtime the menu simply stays closed.
+  const { data: skillList } = useListAgentSkills({
+    query: { staleTime: 5 * 60_000, retry: false },
+  });
   const [input, setInput] = useState("");
   const { attachments, attach, remove, clear, isStaging, notice, isPending } = useChatAttachments(
     session?.id,
@@ -220,8 +246,31 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
         : generalSuggestions,
     [context, generalSuggestions, pageSuggestions],
   );
-  const isEmpty = messages.length === 0 && !liveTurn && steers.length === 0;
+  const isEmpty = messages.length === 0 && !liveTurn && !detachedTurn && steers.length === 0;
+  // The agent session this chat's own tool calls last acted on, if any.
+  const liveSteps = liveTurn?.steps;
+  const agentSessionId = useMemo(
+    () => linkedAgentSessions(messages, liveSteps).slice(-1)[0] ?? null,
+    [messages, liveSteps],
+  );
+  // The calibration sessions (objectives) this chat's tool calls named, oldest first.
+  const calibrationSessionIds = useMemo(
+    () => linkedCalibrationSessions(messages, liveSteps),
+    [messages, liveSteps],
+  );
+  const chatTurn = isStreaming ? "live" : detachedTurn ? "detached" : "none";
   const lastIndex = messages.length - 1;
+  // While a turn streams here, the messages it will end in start at the current count:
+  // those answer it, not the chat as loaded. Only how a message mounts reads it.
+  const [streamed, setStreamed] = useState<{ session?: string; from: number } | null>(null);
+  const streaming = liveTurn !== null;
+  const messageCount = messages.length;
+  const sessionKey = session?.id;
+  useEffect(() => {
+    if (streaming && !isLoadingMessages) setStreamed({ session: sessionKey, from: messageCount });
+  }, [streaming, isLoadingMessages, messageCount, sessionKey]);
+  const streamedFrom = streamed && streamed.session === sessionKey ? streamed.from : null;
+  const sentCount = messages.filter((m) => m.role === "user").length + steers.length;
 
   // Focus the composer on session switch
   useEffect(() => {
@@ -274,8 +323,14 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
         onSubmit={() => submit(input)}
         onStop={stop}
         isStreaming={isStreaming}
-        disabled={isLoadingMessages}
-        placeholder={context ? "Ask about this result" : "Ask a question"}
+        disabled={isLoadingMessages || model.status === "none"}
+        placeholder={
+          model.status === "none"
+            ? "No chat model is available"
+            : context
+              ? "Ask about this result"
+              : "Ask a question"
+        }
         attachments={attachments}
         onAttach={attach}
         onRemoveAttachment={remove}
@@ -291,6 +346,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
         instructionsActive={Boolean(preferences?.data.instructions)}
         compact={variant !== "page"}
         steerable
+        skills={skillList?.data.skills}
       />
     </>
   );
@@ -340,59 +396,88 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
         className={`flex-1 min-h-0 flex flex-col ${variant === "page" ? "chat-page-thread" : ""} ${density}`}
       >
         <StickToBottom className="relative flex-1 min-h-0" resize="smooth" initial="instant">
-          <StickToBottom.Content
-            className={`${variant === "page" ? "max-w-3xl mx-auto px-4 pt-6 pb-10 space-y-7" : `${pad} pt-3 pb-6 space-y-5`}`}
-          >
-            {session?.branch && <BranchOrigin />}
-            {isLoadingMessages && (
-              <div className="space-y-6 pt-4" aria-label="Loading messages">
-                <div className="ml-auto h-10 w-1/2 rounded-3xl bg-base-content/5 animate-pulse" />
-                <div className="h-24 w-5/6 rounded-[var(--radius-box)] bg-base-content/5 animate-pulse" />
-              </div>
-            )}
-            {messages.map((msg, idx) =>
-              msg.role === "user" ? (
-                <UserMessage
-                  key={idx}
-                  message={msg}
-                  canEdit={!isLoadingMessages && canEditMessage(idx)}
-                  onEdit={(text) => editMessage(idx, text)}
+          <ChatFollowProvider>
+            <StickToBottom.Content
+              className={`${variant === "page" ? "max-w-3xl mx-auto px-4 pt-6 pb-10 space-y-7" : `${pad} pt-3 pb-6 space-y-5`}`}
+            >
+              {session?.branch && <BranchOrigin />}
+              {isLoadingMessages && (
+                <div className="space-y-6 pt-4" aria-label="Loading messages">
+                  <div className="ml-auto h-10 w-1/2 rounded-3xl bg-base-content/5 animate-pulse" />
+                  <div className="h-24 w-5/6 rounded-[var(--radius-box)] bg-base-content/5 animate-pulse" />
+                </div>
+              )}
+              {messages.map((msg, idx) =>
+                msg.role === "user" ? (
+                  <UserMessage
+                    key={idx}
+                    message={msg}
+                    canEdit={!isLoadingMessages && canEditMessage(idx)}
+                    onEdit={(text) => editMessage(idx, text)}
+                  />
+                ) : (
+                  <AssistantMessage
+                    key={idx}
+                    message={msg}
+                    isLast={idx === lastIndex && !liveTurn}
+                    canRetry={canRetryLast}
+                    onRetry={retryLast}
+                    answer={replyAfter(messages, idx)}
+                    onAnswer={submit}
+                    onDecide={decide}
+                    onOther={focusComposer}
+                    onRate={(feedback) => rateAnswer(idx, feedback)}
+                    canContinue={canContinue}
+                    onContinue={continueLast}
+                    canBranch={canBranchAt(idx)}
+                    branching={idx === branchingIndex}
+                    onBranch={() => branchFrom(idx)}
+                    finishedHere={streamedFrom !== null && idx >= streamedFrom}
+                  />
+                ),
+              )}
+              {liveTurn && (
+                <LiveAssistantMessage
+                  turn={liveTurn}
+                  statusMessage={statusMessage}
+                  connection={connection}
                 />
-              ) : (
-                <AssistantMessage
-                  key={idx}
-                  message={msg}
-                  isLast={idx === lastIndex && !liveTurn}
-                  canRetry={canRetryLast}
-                  onRetry={retryLast}
-                  answer={replyAfter(messages, idx)}
-                  onAnswer={submit}
-                  onDecide={decide}
-                  onOther={focusComposer}
-                  onRate={(feedback) => rateAnswer(idx, feedback)}
-                  canContinue={canContinue}
-                  onContinue={continueLast}
-                  canBranch={canBranchAt(idx)}
-                  branching={idx === branchingIndex}
-                  onBranch={() => branchFrom(idx)}
-                />
-              ),
-            )}
-            {liveTurn && <LiveAssistantMessage turn={liveTurn} statusMessage={statusMessage} />}
-            <ChatPendingSteers
-              steers={steers}
-              isStreaming={isStreaming}
-              onResend={resendSteer}
-              onCheck={checkSteer}
-              onDismiss={dismissSteer}
-            />
-            {chatNotice && <ChatNotice text={chatNotice} onDismiss={dismissNotice} />}
-          </StickToBottom.Content>
-          <ScrollToBottomButton />
+              )}
+              {!liveTurn && detachedTurn && <DetachedTurnRow turn={detachedTurn} />}
+              <ChatPendingSteers
+                steers={steers}
+                isStreaming={isStreaming}
+                onResend={resendSteer}
+                onCheck={checkSteer}
+                onDismiss={dismissSteer}
+              />
+              {chatNotice && <ChatNotice text={chatNotice} onDismiss={dismissNotice} />}
+            </StickToBottom.Content>
+          </ChatFollowProvider>
+          <ScrollToBottomButton followKey={sentCount} />
         </StickToBottom>
 
         <div className={`shrink-0 ${pad} pb-3`}>
           <div className={variant === "page" ? "max-w-3xl mx-auto" : ""}>
+            {calibrationSessionIds.length > 0 && (
+              <div className="mb-2">
+                <ChatCalibrationSessions calibrationSessionIds={calibrationSessionIds} />
+              </div>
+            )}
+            {agentSessionId && (
+              <div className="mb-2">
+                <ChatAgentSessionStatus
+                  agentSessionId={agentSessionId}
+                  chatTurn={chatTurn}
+                  // An explicit, ordinary message: the user's model and approvals apply.
+                  onContinue={
+                    isLoadingMessages
+                      ? undefined
+                      : () => submit(`Continue agent session ${agentSessionId}.`)
+                  }
+                />
+              </div>
+            )}
             {composer}
             {variant === "page" && (
               <p className="text-xs text-base-content/35 text-center mt-2">

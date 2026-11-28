@@ -9,8 +9,8 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/contexts/ChatDockContext", () => ({
   useChatDock: () => ({ miniChat: { isOpen: true } }),
 }));
-vi.mock("@/contexts/CopilotChatSessionContext", () => ({
-  useCopilotChatSessionContext: () => ({ runs: {}, activeSession: null }),
+vi.mock("@/contexts/AgentChatSessionContext", () => ({
+  useAgentChatSessionContext: () => ({ runs: {}, activeSession: null }),
 }));
 vi.mock("@/components/features/chat/ChatThread", () => ({ ChatThread: () => null }));
 vi.mock("@/components/features/chat/ChatSurfaceControls", () => ({

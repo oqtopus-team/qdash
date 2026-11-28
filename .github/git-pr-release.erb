@@ -1,8 +1,8 @@
 release: <%= Time.now.strftime('%Y-%m-%d %H:%M') %>
 > [!NOTE]
 > **Create Merge Commit** is recommended to merge this PR. After merging, create and push a
-> `v<version>` tag on `main`. The tag creates the GitHub Release and publishes both clients with
-> the same version.
+> `vX.Y.Z` tag on `main`. The tag triggers the GitHub Release and publishes the Python and
+> TypeScript clients and SDKs and both pi extensions at version `X.Y.Z`.
 
 <% pull_requests.each do |pr| -%>
 - #<%= pr.number %> <%= pr.mention %>

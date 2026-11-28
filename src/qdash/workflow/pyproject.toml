@@ -10,6 +10,7 @@ dependencies = [
     "slack-sdk==3.41.0",
     "python-dotenv>=1.2.2",
     "numpy>=1.26.0",
+    "scipy",
     "matplotlib>=3.8.0,<4.0.0",
     "pyyaml==6.0.3",
     "qubex[backend]",

@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PageContextSummary } from "@/contexts/ChatDockContext";
-import type { InvestigationTarget, TaskChatContext } from "@/types/copilotChat";
+import type { InvestigationTarget, TaskChatContext } from "@/types/agentChat";
 import { ChatThread } from "../ChatThread";
 
 const { chat, dock } = vi.hoisted(() => ({
@@ -16,14 +16,15 @@ const { chat, dock } = vi.hoisted(() => ({
   dock: { present: true, page: null as PageContextSummary | null },
 }));
 
-vi.mock("@/client/copilot/copilot", () => ({
-  useGetCopilotPreferences: () => ({ data: undefined }),
+vi.mock("@/client/agent/agent", () => ({
+  useGetAgentPreferences: () => ({ data: undefined }),
+  useListAgentSkills: () => ({ data: undefined }),
 }));
 vi.mock("@/contexts/ChatDockContext", () => ({
   useChatPageSummary: () => (dock.present ? dock.page : null),
 }));
-vi.mock("@/hooks/useCopilotChat", () => ({
-  useCopilotChat: () => ({
+vi.mock("@/hooks/useAgentChat", () => ({
+  useAgentChat: () => ({
     session: chat.session,
     messages: [],
     isLoadingMessages: false,

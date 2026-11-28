@@ -35,6 +35,37 @@ class MongoProjectMembershipRepository:
         """
         return ProjectMembershipDocument.find_one(query).run()
 
+    def find_for_user(
+        self,
+        project_id: str,
+        username: str,
+        user_id: str,
+        *,
+        status: str | None = None,
+    ) -> ProjectMembershipDocument | None:
+        """Find membership by current user_id, then repair stale rows by username.
+
+        Historical rows can retain an old user_id when an account is deleted and
+        recreated with the same username. In that case the username is still the
+        durable external key the operator sees, so reconcile the row in place.
+        """
+        query: dict[str, Any] = {"project_id": project_id, "user_id": user_id}
+        if status is not None:
+            query["status"] = status
+        membership = self.find_one(query)
+        if membership:
+            return membership
+
+        fallback_query: dict[str, Any] = {"project_id": project_id, "username": username}
+        if status is not None:
+            fallback_query["status"] = status
+        membership = self.find_one(fallback_query)
+        if membership and membership.user_id != user_id:
+            membership.user_id = user_id
+            membership.system_info.update_time()
+            self.save(membership)
+        return membership
+
     def find(self, query: dict[str, Any]) -> list[ProjectMembershipDocument]:
         """Find memberships by query.
 

@@ -1,3 +1,5 @@
+import { formatNumber, plainBox } from "./render.js";
+
 type PlotlyTrace = Record<string, unknown>;
 
 export type FigureAnalysis = {
@@ -22,14 +24,6 @@ function matrixValue(matrix: number[][], row: number, column: number): number | 
   return matrix[row]?.[column];
 }
 
-function formatNumber(value: number): string {
-  const abs = Math.abs(value);
-  if (abs >= 1000 || (abs > 0 && abs < 0.001)) return value.toExponential(2);
-  if (abs >= 100) return value.toFixed(1);
-  if (abs >= 10) return value.toFixed(3);
-  return value.toFixed(5).replace(/0+$/, "").replace(/\.$/, "");
-}
-
 function formatMaybeNumber(value: number | undefined): string {
   return typeof value === "number" && Number.isFinite(value) ? formatNumber(value) : "n/a";
 }
@@ -40,15 +34,6 @@ function compactStats(values: number[]): string {
   const max = Math.max(...values);
   const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
   return `n=${values.length} min=${formatNumber(min)} max=${formatNumber(max)} mean=${formatNumber(mean)}`;
-}
-
-function boxed(title: string, body: string[]): string[] {
-  const rawLines = [` ${title} `, ...body];
-  const width = Math.min(100, Math.max(...rawLines.map((line) => line.length), title.length + 4));
-  const top = `╭${` ${title} `.padEnd(width, "─")}╮`;
-  const bottom = `╰${"─".repeat(width)}╯`;
-  const middle = body.map((line) => `│ ${line.padEnd(width - 2)} │`);
-  return [top, ...middle, bottom];
 }
 
 export function analyzePlotlyFigure(path: string, figure: unknown, taskId?: string): FigureAnalysis {
@@ -98,7 +83,7 @@ export function analyzePlotlyFigure(path: string, figure: unknown, taskId?: stri
 }
 
 export function figureAnalysisText(analysis: FigureAnalysis): string {
-  return boxed("QDash Figure Analysis", [
+  return plainBox("QDash Figure Analysis", [
     `path ${analysis.path}`,
     ...(analysis.taskId ? [`task ${analysis.taskId}`] : []),
     `traces ${analysis.traceCount}`,

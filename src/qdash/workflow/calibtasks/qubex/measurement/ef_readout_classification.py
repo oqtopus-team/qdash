@@ -5,9 +5,15 @@ from typing import Any, ClassVar
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
-from qdash.datamodel.task import InputParameterSpec, OutputParameterSpec, RunParameterSpec
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+    TaskDocumentation,
+)
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import QubexTask, readout_duration_run_parameter
+from qdash.workflow.calibtasks.qubex.raw_data import extract_state_classifier_raw_data
 from qdash.workflow.calibtasks.qubex.validation import (
     finite_value_error,
     first_validation_error,
@@ -21,6 +27,30 @@ class EFReadoutClassification(QubexTask):
 
     name: str = "EFReadoutClassification"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Prepares g, e, and f states, trains a three-state Qubex classifier, saves it, and "
+            "writes average_ef_readout_fidelity and per-state fidelities "
+            "ef_readout_fidelity_g/e/f."
+        ),
+        when_to_use=(
+            "Run it at the end of EF calibration, before measurements that classify f, such as "
+            "CheckGEFRelaxation or CheckReadoutMIST."
+        ),
+        prerequisites=(
+            (
+                "GE and EF drive targets configured in the current session: run ConfigureEF, or"
+                " start with ConfigureAll, using configuration_mode ge-ef-cr or ge-ef-fh."
+            ),
+            "control_frequency_ef (or ef_frequency) stored by CheckAdaptiveEFChevron.",
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            "ef_hpi_amplitude and ef_hpi_duration stored by CreateEFHPIPulse.",
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "control_frequency": InputParameterSpec.required_database(
             fallback_parameter_names=("qubit_frequency",), unit="GHz"
@@ -66,6 +96,13 @@ class EFReadoutClassification(QubexTask):
             unit="a.u.", description="Readout fidelity for prepared second-excited state"
         ),
     }
+
+    def extract_raw_data(self, run_result: RunResult) -> list[Any]:
+        """Persist a per-task snapshot of the trained classifier as a NetCDF artifact."""
+        return [
+            *super().extract_raw_data(run_result),
+            *extract_state_classifier_raw_data(run_result.raw_result),
+        ]
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)

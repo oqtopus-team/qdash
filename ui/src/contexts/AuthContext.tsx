@@ -9,6 +9,7 @@ import type { User } from "@/schemas";
 import { useGetCurrentUser, useLogin, useLogout } from "@/client/auth/auth";
 import { startAvatarSpecSession } from "@/lib/avatar/avatarSpecs";
 import { getAccessToken } from "@/lib/auth/session";
+import { forgetChatTabState } from "@/lib/agentTurnStore";
 
 interface AuthContextType {
   user: User | null;
@@ -50,6 +51,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Remove authentication info
   const removeAuth = useCallback(() => {
     document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+    // What the chat kept in this tab (running turns, unresolved steers) goes with the
+    // sign-in, before the page leaves: nothing of it is restored for the next one.
+    forgetChatTabState();
     setAccessToken(null);
     setUsername(null);
   }, []);

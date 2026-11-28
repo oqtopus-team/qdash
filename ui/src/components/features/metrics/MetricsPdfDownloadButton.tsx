@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { downloadMetricsPdf } from "@/client/metrics/metrics";
 import { getApiErrorMessage, parseBlobErrorBody } from "@/lib/utils/apiError";
+import { saveBlob } from "@/lib/utils/download";
 
 interface MetricsPdfDownloadButtonProps {
   chipId: string;
@@ -54,15 +55,7 @@ export function MetricsPdfDownloadButton({
         .replace(/(\d{8})(\d{6})/, "$1_$2");
       const filename = `metrics_report_${chipId}_${timestamp}.pdf`;
 
-      // Download the PDF
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = downloadUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(downloadUrl);
-      document.body.removeChild(a);
+      saveBlob(blob, filename);
     } catch (err) {
       console.error("PDF download failed:", err);
       setError(getApiErrorMessage(await parseBlobErrorBody(err), "Download failed"));

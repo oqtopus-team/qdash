@@ -38,6 +38,30 @@ def _build_start_at_filter(
     return bounds or None
 
 
+def _metric_match_stage(
+    *,
+    chip_id: str,
+    project_id: str,
+    entity_type: str,
+    metric_keys: set[str],
+    cutoff_time: datetime | None,
+    end_time: datetime | None,
+) -> dict[str, Any]:
+    """Match completed, non-excluded results of the project that report any of the metrics."""
+    match_stage: dict[str, Any] = {
+        "chip_id": chip_id,
+        "project_id": project_id,
+        "task_type": entity_type,
+        "status": "completed",
+        "excluded": {"$ne": True},
+        "$or": [{f"output_parameters.{m}": {"$exists": True}} for m in metric_keys],
+    }
+    start_at_filter = _build_start_at_filter(cutoff_time, end_time)
+    if start_at_filter:
+        match_stage["start_at"] = start_at_filter
+    return match_stage
+
+
 class MongoTaskResultHistoryRepository:
     """MongoDB implementation of TaskResultHistoryRepository.
 
@@ -374,18 +398,14 @@ class MongoTaskResultHistoryRepository:
         if not metric_keys:
             return {}
 
-        # Build match stage - filter by project_id to allow all project members to see metrics
-        match_stage: dict[str, Any] = {
-            "chip_id": chip_id,
-            "project_id": project_id,
-            "task_type": entity_type,
-            "status": "completed",
-            "excluded": {"$ne": True},
-            "$or": [{f"output_parameters.{m}": {"$exists": True}} for m in metric_keys],
-        }
-        start_at_filter = _build_start_at_filter(cutoff_time, end_time)
-        if start_at_filter:
-            match_stage["start_at"] = start_at_filter
+        match_stage = _metric_match_stage(
+            chip_id=chip_id,
+            project_id=project_id,
+            entity_type=entity_type,
+            metric_keys=metric_keys,
+            cutoff_time=cutoff_time,
+            end_time=end_time,
+        )
 
         # Aggregation pipeline:
         # 1. Match relevant documents
@@ -482,18 +502,14 @@ class MongoTaskResultHistoryRepository:
 
         metric_keys = set(metric_modes.keys())
 
-        # Build match stage - filter by project_id to allow all project members to see metrics
-        match_stage: dict[str, Any] = {
-            "chip_id": chip_id,
-            "project_id": project_id,
-            "task_type": entity_type,
-            "status": "completed",
-            "excluded": {"$ne": True},
-            "$or": [{f"output_parameters.{m}": {"$exists": True}} for m in metric_keys],
-        }
-        start_at_filter = _build_start_at_filter(cutoff_time, end_time)
-        if start_at_filter:
-            match_stage["start_at"] = start_at_filter
+        match_stage = _metric_match_stage(
+            chip_id=chip_id,
+            project_id=project_id,
+            entity_type=entity_type,
+            metric_keys=metric_keys,
+            cutoff_time=cutoff_time,
+            end_time=end_time,
+        )
 
         # For best metrics, we need to run separate aggregations for
         # maximize and minimize modes, as MongoDB doesn't support
@@ -554,18 +570,14 @@ class MongoTaskResultHistoryRepository:
         if not metric_keys:
             return {}
 
-        # Build match stage
-        match_stage: dict[str, Any] = {
-            "chip_id": chip_id,
-            "project_id": project_id,
-            "task_type": entity_type,
-            "status": "completed",
-            "excluded": {"$ne": True},
-            "$or": [{f"output_parameters.{m}": {"$exists": True}} for m in metric_keys],
-        }
-        start_at_filter = _build_start_at_filter(cutoff_time, end_time)
-        if start_at_filter:
-            match_stage["start_at"] = start_at_filter
+        match_stage = _metric_match_stage(
+            chip_id=chip_id,
+            project_id=project_id,
+            entity_type=entity_type,
+            metric_keys=metric_keys,
+            cutoff_time=cutoff_time,
+            end_time=end_time,
+        )
 
         pipeline: list[dict[str, Any]] = [
             {"$match": match_stage},

@@ -1,60 +1,39 @@
-"""Workflow service module for Python Flow Editor.
-
-This module provides the main calibration API with a step-based pipeline approach.
+"""Workflow service module: the worker-side calibration API.
 
 Main API:
-    CalibService: Runs calibration steps for one validated context
+    CalibrationSession: The launch's calibration session; ``run(targets, steps)``
+    calibration_flow: Prefect ``@flow`` with QDash's terminal hooks and a session name
     CalibContext: The checked user, chip and project of a run
-    resolve_calib_context: Resolve a CalibContext for direct Python use
+    resolve_calib_context: Resolve a CalibContext
+    CalibService: Legacy entry point, kept for saved flows
     generate_execution_id: Generate unique execution IDs
 
-Targets:
-    Target: Abstract base class for calibration targets
-    MuxTargets: Target qubits by MUX IDs
-    QubitTargets: Target specific qubit IDs
-    CouplingTargets: Target specific coupling pairs
-    AllMuxTargets: Target all MUXes (full chip)
-    AllQubitTargets: Target every qubit, multiplexed or standalone
-
-Steps:
-    Step: Abstract base class for calibration steps
-    StepContext: Context shared between steps
-    OneQubitCheck: Basic 1Q characterization
-    OneQubitFineTune: Advanced 1Q calibration (DRAG, RB)
-    CustomOneQubit: Custom 1Q calibration with user-defined tasks
-    CustomTwoQubit: Custom 2Q calibration with user-defined tasks
-    FilterByMetric: Filter qubits by named metric threshold
-    FilterByStatus: Filter qubits by success status
-    GenerateCRSchedule: Generate CR schedule for 2Q calibration
-    TwoQubitCalibration: 2Q coupling calibration
+Targets and steps:
+    Write them with :mod:`qdash.calibration`. The runtime classes re-exported here
+    (``MuxTargets``, ``OneQubitCheck``, ``Step``, ...) are the worker's implementation;
+    they remain for custom steps and saved flows that build them directly.
 
 Example:
-    from prefect import flow
-    from qdash.workflow.service import CalibService
-    from qdash.workflow.service.targets import MuxTargets
-    from qdash.workflow.service.steps import (
-        OneQubitCheck,
-        OneQubitFineTune,
-        FilterByMetric,
-        TwoQubitCalibration,
-    )
+    from qdash.calibration import FilterByMetric, MuxTargets, OneQubitCheck, OneQubitFineTune
+    from qdash.workflow import CalibrationSession, calibration_flow, resolve_calib_context
 
-    @flow
-    def full_calibration(username: str, chip_id: str, project_id: str | None = None):
-        cal = CalibService(username, chip_id, project_id=project_id)
-        targets = MuxTargets([0, 1, 2, 3])
-
-        results = cal.run(targets, steps=[
-            OneQubitCheck(),
-            OneQubitFineTune(),
-            FilterByMetric(metric="x90_fidelity", threshold=0.9),
-            TwoQubitCalibration(),
-        ])
-        return results
+    @calibration_flow(session_name="Full calibration")
+    def full_calibration(username, chip_id, flow_name=None, project_id=None):
+        context = resolve_calib_context(username, chip_id, project_id=project_id)
+        return CalibrationSession.from_context(context).run(
+            targets=MuxTargets([0, 1, 2, 3]),
+            steps=[
+                OneQubitCheck(),
+                OneQubitFineTune(),
+                FilterByMetric(metric="x90_fidelity", threshold=0.9),
+            ],
+        )
 """
 
 from qdash.datamodel.task_call import TaskCall
 from qdash.workflow.service.calib_service import CalibService
+from qdash.workflow.service.calibration_flow import calibration_flow
+from qdash.workflow.service.calibration_session import CalibrationSession
 from qdash.workflow.service.context import (
     CalibContext,
     CalibContextError,
@@ -76,7 +55,6 @@ from qdash.workflow.service.steps import (
     GenerateCRSchedule,
     OneQubitCheck,
     OneQubitFineTune,
-    Pipeline,
     Step,
     StepContext,
     TransformStep,
@@ -109,6 +87,7 @@ __all__ = [
     "CalibContext",
     "CalibContextError",
     "CalibService",
+    "CalibrationSession",
     "CalibrationStep",
     "ConfigFileType",
     "ConfigureAll",
@@ -124,7 +103,6 @@ __all__ = [
     "MuxTargets",
     "OneQubitCheck",
     "OneQubitFineTune",
-    "Pipeline",
     "QubitTargets",
     # === Steps ===
     "Step",
@@ -134,6 +112,7 @@ __all__ = [
     "TaskCall",
     "TransformStep",
     "TwoQubitCalibration",
+    "calibration_flow",
     "generate_execution_id",
     "resolve_calib_context",
 ]

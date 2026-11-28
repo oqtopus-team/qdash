@@ -1,24 +1,15 @@
-"""Target classes for calibration workflows.
+"""Runtime target classes: the worker's resolution of targets to qubits and couplings.
 
-This module defines the target abstraction for specifying which qubits,
-MUXes, or coupling pairs to calibrate.
+Write targets with :mod:`qdash.calibration` (``QubitTargets``, ``MuxTargets``,
+``CouplingTargets``); the worker converts them into the classes here. The runtime
+classes remain for saved flows that build them directly, and ``AllMuxTargets`` and
+``AllQubitTargets`` (whole-chip selections) exist only here, on the worker-only path.
 
 Example:
-    from qdash.workflow.service import CalibService
-    from qdash.workflow.service.targets import MuxTargets, QubitTargets
+    from qdash.workflow.service.targets import AllQubitTargets
 
-    # Target by MUX IDs
-    targets = MuxTargets([0, 1, 2, 3])
-
-    # Target every qubit of the chip, multiplexed or standalone
-    targets = AllQubitTargets()
-
-    # Target specific qubits
-    targets = QubitTargets(["0", "1", "4", "5"])
-
-    # Use in calibration
-    service = CalibService(username, chip_id)
-    service.run(targets, steps=[...])
+    # Every qubit of the chip, multiplexed or standalone (worker only)
+    session.run(targets=AllQubitTargets(), steps=[...])
 """
 
 from __future__ import annotations
@@ -35,6 +26,31 @@ if TYPE_CHECKING:
 
 # MUX count assumed by AllMuxTargets when the chip has no topology (legacy 64Q).
 LEGACY_ALL_MUX_COUNT = 16
+
+
+def _scheduled_coupling_ids(
+    chip_id: str,
+    qids: list[str],
+    project_id: str,
+    mux_mapping: MuxMapping | None,
+) -> list[str]:
+    """Coupling IDs that the CR scheduler finds among ``qids``.
+
+    This returns every schedulable pair; steps filter them later.
+    """
+    from qdash.workflow.engine import CRScheduler
+
+    scheduler = CRScheduler(
+        username="",  # Not needed for pair generation
+        chip_id=chip_id,
+        wiring_config_path=str(get_qubex_paths().wiring_yaml(chip_id)),
+        project_id=project_id,
+        mux_mapping=mux_mapping,
+    )
+    schedule = scheduler.generate(candidate_qubits=qids, max_parallel_ops=100)
+    return [
+        f"{control}-{target}" for group in schedule.parallel_groups for control, target in group
+    ]
 
 
 @dataclass
@@ -128,32 +144,13 @@ class MuxTargets(Target):
         mux_mapping: MuxMapping | None = None,
     ) -> list[str]:
         """Get coupling IDs for qubits in targeted MUXes."""
-        from qdash.workflow.engine import CRScheduler
-
         if not project_id:
             raise ValueError("project_id is required to resolve coupling targets")
 
         if mux_mapping is None:
             mux_mapping = resolve_chip_mux_mapping(project_id, chip_id)
         qids = self.to_qids(chip_id, mux_mapping=mux_mapping)
-        wiring_config_path = str(get_qubex_paths().wiring_yaml(chip_id))
-
-        # Use CRScheduler to get valid coupling pairs
-        # Note: This returns all possible pairs, filtering happens in steps
-        scheduler = CRScheduler(
-            username="",  # Not needed for pair generation
-            chip_id=chip_id,
-            wiring_config_path=wiring_config_path,
-            project_id=project_id,
-            mux_mapping=mux_mapping,
-        )
-        schedule = scheduler.generate(candidate_qubits=qids, max_parallel_ops=100)
-
-        coupling_ids = []
-        for group in schedule.parallel_groups:
-            for control, target in group:
-                coupling_ids.append(f"{control}-{target}")
-        return coupling_ids
+        return _scheduled_coupling_ids(chip_id, qids, project_id, mux_mapping)
 
 
 @dataclass
@@ -184,26 +181,10 @@ class QubitTargets(Target):
         mux_mapping: MuxMapping | None = None,
     ) -> list[str]:
         """Get coupling IDs for the specified qubits."""
-        from qdash.workflow.engine import CRScheduler
-
         if not project_id:
             raise ValueError("project_id is required to resolve coupling targets")
 
-        wiring_config_path = str(get_qubex_paths().wiring_yaml(chip_id))
-        scheduler = CRScheduler(
-            username="",
-            chip_id=chip_id,
-            wiring_config_path=wiring_config_path,
-            project_id=project_id,
-            mux_mapping=mux_mapping,
-        )
-        schedule = scheduler.generate(candidate_qubits=self.qids, max_parallel_ops=100)
-
-        coupling_ids = []
-        for group in schedule.parallel_groups:
-            for control, target in group:
-                coupling_ids.append(f"{control}-{target}")
-        return coupling_ids
+        return _scheduled_coupling_ids(chip_id, self.qids, project_id, mux_mapping)
 
 
 @dataclass

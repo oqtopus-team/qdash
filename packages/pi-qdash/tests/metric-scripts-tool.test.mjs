@@ -10,6 +10,7 @@ import {
   registerMetricScriptTools,
   scriptSaveProblems,
 } from "../.test-dist/tools/metric-scripts.js";
+import { sdkOver } from "./helpers/sdk-session.mjs";
 
 const SOURCE = [
   "from qdash_metrics import metric",
@@ -77,13 +78,15 @@ function setup(overrides = {}) {
     previewDashboardTemplate: record("previewTemplate", overrides.previewTemplate),
   };
   registerMetricScriptTools({ registerTool(tool) { tools.set(tool.name, tool); } }, {
-    async makeClient() { return client; },
+    sdk: sdkOver, async makeClient() { return client; },
     async resolveChipId(_client, explicit) { return explicit ?? "64Qv3"; },
     pageUrl: (_client, path) => `https://qdash.example${path}`,
   });
   return { tools, calls };
 }
 
+// A host that collected the user's approval of call `toolCallId` in its own UI (write-approval.ts).
+const approved = (toolCallId, toolName = "qdash_save_dashboard") => ({ hasUI: false, qdashWriteApproval: { toolCallId, toolName } });
 const uiContext = (answer, asked = { count: 0 }) => ({
   hasUI: true,
   ui: { async confirm() { asked.count += 1; return answer; } },
@@ -275,10 +278,10 @@ test("without scriptId the save creates a script; with one it saves a revision g
 
   const updated = await save.execute(
     "t",
-    { scriptId: "ms_0123456789ab", name: "ZX90", description: "median", source: SOURCE, expectedRevision: 2, confirmWrite: true },
+    { scriptId: "ms_0123456789ab", name: "ZX90", description: "median", source: SOURCE, expectedRevision: 2 },
     undefined,
     undefined,
-    { hasUI: false },
+    approved("t", "qdash_save_metric_script"),
   );
   assert.deepEqual(calls[3], ["update", "ms_0123456789ab", { name: "ZX90", source: SOURCE, description: "median", expected_revision: 2 }]);
   assert.equal(updated.details.created, false);
@@ -289,10 +292,10 @@ test("a concurrent save (409) is reported, not thrown", async () => {
   const { tools } = setup({ update: () => { throw apiFailure(409, "The script is at revision 5, not 4; reload it"); } });
   const result = await tools.get("qdash_save_metric_script").execute(
     "t",
-    { scriptId: "ms_1", name: "x", source: SOURCE, expectedRevision: 4, confirmWrite: true },
+    { scriptId: "ms_1", name: "x", source: SOURCE, expectedRevision: 4 },
     undefined,
     undefined,
-    { hasUI: false },
+    approved("t", "qdash_save_metric_script"),
   );
   assert.equal(result.details.saved, false);
   assert.equal(result.details.status, 409);
@@ -325,10 +328,10 @@ test("dashboard saves send the API's shape: create with a template, update with 
 
   const created = await save.execute(
     "t",
-    { name: "Couplings", visibility: "project", chipId: "64Qv3", panels: [PANEL], confirmWrite: true },
+    { name: "Couplings", visibility: "project", chipId: "64Qv3", panels: [PANEL] },
     undefined,
     undefined,
-    { hasUI: false },
+    approved("t"),
   );
   assert.deepEqual(calls[0], ["createDashboard", { name: "Couplings", visibility: "project", chip_id: "64Qv3", panels: [PANEL] }]);
   assert.match(created.content[0].text, /Created dashboard 'Couplings' \(cd_1\), project, chip 64Qv3, 1 panel\./);
@@ -345,11 +348,11 @@ test("dashboard saves send the API's shape: create with a template, update with 
   );
   assert.deepEqual(calls[1], ["updateDashboard", "cd_1", { panels: [PANEL] }]);
 
-  await save.execute("t", { name: "Starter", templateId: "frequency-collision-map", confirmWrite: true }, undefined, undefined, { hasUI: false });
+  await save.execute("t", { name: "Starter", templateId: "frequency-collision-map" }, undefined, undefined, approved("t"));
   assert.deepEqual(calls[2], ["previewTemplate", "frequency-collision-map"]);
   assert.deepEqual(calls[3], ["createDashboard", { name: "Starter", template_id: "frequency-collision-map" }]);
 
-  await save.execute("t", { dashboardId: "cd_1", name: "Renamed", expectedVersion: 3, confirmWrite: true }, undefined, undefined, { hasUI: false });
+  await save.execute("t", { dashboardId: "cd_1", name: "Renamed", expectedVersion: 3 }, undefined, undefined, approved("t"));
   assert.deepEqual(calls[4], ["updateDashboard", "cd_1", { name: "Renamed", expected_version: 3 }]);
 });
 
@@ -379,7 +382,7 @@ test("a template-based dashboard save names the shared scripts it adds before as
 
   // Explicit panels never copy the template, so nothing is previewed or disclosed.
   calls.length = 0;
-  await save.execute("t", { name: "Own", panels: [PANEL], confirmWrite: true }, undefined, undefined, { hasUI: false });
+  await save.execute("t", { name: "Own", panels: [PANEL] }, undefined, undefined, approved("t"));
   assert.deepEqual(calls.map(([name]) => name), ["createDashboard"]);
 });
 

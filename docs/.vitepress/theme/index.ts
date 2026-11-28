@@ -8,8 +8,6 @@ import Diagram from "./Diagram.vue";
 import "./custom.css";
 import { REDIRECTS } from "./redirects";
 
-import spec from "../../oas/openapi.json" assert { type: "json" };
-
 /** Where an old page path leads now, or undefined when the path is current. */
 function redirectTarget(pathname: string, base: string): string | undefined {
   const path = pathname.startsWith(base) ? `/${pathname.slice(base.length)}` : pathname;
@@ -23,10 +21,9 @@ export default {
   async enhanceApp({ app, router, siteData }) {
     app.component("Diagram", Diagram);
 
-    const openapi = OpenApiTheme.useOpenapi({
-      spec,
-    });
-    OpenApiTheme.theme?.enhanceApp?.({ app, openapi });
+    // Registers the vitepress-openapi components. ApiReference.vue loads the
+    // spec on the one page that renders it.
+    OpenApiTheme.theme?.enhanceApp?.({ app, router, siteData });
 
     // Pages that moved keep their old links working: the static site serves
     // its 404 page for an old path, and this sends the reader on.

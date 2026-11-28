@@ -1,12 +1,12 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, ClassVar
 
 from bunnet import Document
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
 
-from qdash.common.utils.datetime import ensure_timezone, parse_elapsed_time
 from qdash.datamodel.execution import ExecutionModel
+from qdash.datamodel.field_types import ElapsedSeconds, TimezoneAwareDatetime
 from qdash.datamodel.note import NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task import (
@@ -17,7 +17,7 @@ from qdash.datamodel.task import (
     validate_task_result_output_parameters,
 )
 from qdash.datamodel.task_invocation import TaskInvocation
-from qdash.dbmodel.user import UserDocument
+from qdash.dbmodel.lookups import current_cooldown_id, user_id_for_username
 
 
 class TaskResultHistoryDocument(Document):
@@ -71,9 +71,9 @@ class TaskResultHistoryDocument(Document):
     figure_path: list[str] = Field(..., description="The path to the figure")
     json_figure_path: list[str] = Field([], description="The path to the JSON figure")
     raw_data_path: list[str] = Field([], description="The path to the raw data")
-    start_at: datetime | None = Field(..., description="The time when the execution started")
-    end_at: datetime | None = Field(..., description="The time when the execution ended")
-    elapsed_time: float | None = Field(..., description="The elapsed time in seconds")
+    start_at: TimezoneAwareDatetime = Field(..., description="The time when the execution started")
+    end_at: TimezoneAwareDatetime = Field(..., description="The time when the execution ended")
+    elapsed_time: ElapsedSeconds = Field(..., description="The elapsed time in seconds")
     task_type: str = Field(..., description="The task type")
     system_info: SystemInfoModel = Field(..., description="The system information")
     qid: str = Field("", description="The qubit ID")
@@ -125,30 +125,6 @@ class TaskResultHistoryDocument(Document):
     model_config = ConfigDict(
         from_attributes=True,
     )
-
-    @field_validator("start_at", "end_at", mode="before")
-    @classmethod
-    def _ensure_timezone(cls, v: Any) -> datetime | Any:
-        """Ensure datetime fields are timezone-aware."""
-        if v is None:
-            return None
-        if isinstance(v, datetime):
-            return ensure_timezone(v)
-        # For other inputs (e.g., strings), let pydantic handle the conversion
-        return v
-
-    @field_validator("elapsed_time", mode="before")
-    @classmethod
-    def _parse_elapsed_time(cls, v: Any) -> float | None:
-        """Parse elapsed_time from various formats and return seconds."""
-        if v is None:
-            return None
-        if isinstance(v, (int, float)):
-            return float(v)
-        if isinstance(v, timedelta):
-            return v.total_seconds()
-        td = parse_elapsed_time(v)
-        return td.total_seconds() if td else None
 
     class Settings:
         """Settings for the document."""
@@ -232,33 +208,12 @@ class TaskResultHistoryDocument(Document):
         ]
 
     @classmethod
-    def _user_id_for_username(cls, username: str) -> str | None:
-        user = UserDocument.find_one({"username": username}).run()
-        return user.user_id if user else None
-
-    @classmethod
-    def _resolve_cooldown_id(cls, *, project_id: str | None, chip_id: str) -> str:
-        """Look up the chip's current_cooldown_id at write time.
-
-        Empty string if the chip has no active cool-down or isn't found.
-        """
-        if not project_id:
-            return ""
-        # Local import to avoid circular dependency at module import time.
-        from qdash.dbmodel.chip import ChipDocument
-
-        chip = ChipDocument.find_one({"project_id": project_id, "chip_id": chip_id}).run()
-        if chip is None:
-            return ""
-        return getattr(chip, "current_cooldown_id", None) or ""
-
-    @classmethod
     def from_datamodel(
         cls, task: BaseTaskResultModel, execution_model: ExecutionModel
     ) -> "TaskResultHistoryDocument":
         return cls(
             project_id=execution_model.project_id,
-            user_id=cls._user_id_for_username(execution_model.username),
+            user_id=user_id_for_username(execution_model.username),
             username=execution_model.username,
             task_id=task.task_id,
             name=task.name,
@@ -285,7 +240,7 @@ class TaskResultHistoryDocument(Document):
             execution_id=execution_model.execution_id,
             tags=execution_model.tags,
             chip_id=execution_model.chip_id,
-            cooldown_id=cls._resolve_cooldown_id(
+            cooldown_id=current_cooldown_id(
                 project_id=execution_model.project_id,
                 chip_id=execution_model.chip_id,
             ),
@@ -303,7 +258,7 @@ class TaskResultHistoryDocument(Document):
             doc.save()
             return doc
         doc.project_id = execution_model.project_id
-        doc.user_id = cls._user_id_for_username(execution_model.username)
+        doc.user_id = user_id_for_username(execution_model.username)
         doc.username = execution_model.username
         doc.name = task.name
         doc.upstream_id = task.upstream_id
@@ -330,7 +285,7 @@ class TaskResultHistoryDocument(Document):
         doc.tags = execution_model.tags
         doc.chip_id = execution_model.chip_id
         # Refresh the cool-down tag in case it changed between writes.
-        doc.cooldown_id = cls._resolve_cooldown_id(
+        doc.cooldown_id = current_cooldown_id(
             project_id=execution_model.project_id,
             chip_id=execution_model.chip_id,
         )

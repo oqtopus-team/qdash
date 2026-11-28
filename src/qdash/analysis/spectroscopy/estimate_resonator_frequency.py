@@ -24,6 +24,7 @@ from scipy.ndimage import convolve1d
 from scipy.signal import find_peaks as scipy_find_peaks
 
 from qdash.analysis.spectroscopy.bare_shift import BareShiftBoundary
+from qdash.analysis.spectroscopy.mux import qid_for_sorted_slot
 
 
 class Peak(NamedTuple):
@@ -1163,6 +1164,61 @@ def create_marked_figure(
         )
 
     return marked_fig
+
+
+def annotate_resonator_assignments(
+    fig: go.Figure,
+    *,
+    mux_index: int,
+    sorted_slots: Sequence[int | None],
+    frequencies: Sequence[float],
+    peak_positions: dict[int, int],
+    assignment_mode: str,
+) -> go.Figure:
+    """Label each assigned resonance with its qubit and sorted slot.
+
+    Each resonance with a sorted slot gets a ``Qnn / sK`` label above the plot,
+    and a partial assignment mode is noted in the top-left corner.
+
+    Args:
+        fig: Marked figure to annotate in place.
+        mux_index: Index of the MUX (``qid // NUM_RESONATORS``).
+        sorted_slots: Sorted resonator slot per detected frequency, as returned by
+            ``guess_sorted_slots_for_partial_mux``.
+        frequencies: Detected resonance frequencies (GHz).
+        peak_positions: Mapping from qubit offset in the MUX to its sorted slot.
+        assignment_mode: Assignment mode from ``guess_sorted_slots_for_partial_mux``.
+
+    Returns:
+        The annotated ``fig``.
+    """
+    assigned_slots = set(peak_positions.values())
+    for sorted_slot, frequency in zip(sorted_slots, frequencies, strict=False):
+        # Extra resonances beyond the MUX's slots have no qubit to label.
+        if sorted_slot is None or sorted_slot not in assigned_slots:
+            continue
+        qubit = qid_for_sorted_slot(mux_index, sorted_slot, peak_positions)
+        fig.add_annotation(
+            x=frequency,
+            y=1.02,
+            yref="paper",
+            text=f"Q{qubit:02d} / s{sorted_slot}",
+            showarrow=False,
+            font={"color": "red", "size": 11},
+            align="center",
+        )
+    if assignment_mode != "full":
+        fig.add_annotation(
+            xref="paper",
+            yref="paper",
+            x=0.01,
+            y=1.08,
+            text=assignment_mode,
+            showarrow=False,
+            font={"color": "red", "size": 11},
+            align="left",
+        )
+    return fig
 
 
 def estimate_and_mark_figure(

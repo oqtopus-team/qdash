@@ -3,6 +3,7 @@ import logging
 import math
 from typing import TYPE_CHECKING, Any, ClassVar
 
+import numpy as np
 from qubex.experiment.experiment_constants import DEFAULT_SHOTS
 
 from qdash.common.visualization.figure_metadata import set_figure_role
@@ -10,6 +11,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -17,7 +19,9 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.analysis import (
     EstimateQubitFrequencyConfig,
+    compute_coarse_control_amplitude,
     estimate_and_mark_qubit_figure,
+    mark_coarse_control_amplitude,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
@@ -41,11 +45,28 @@ class CheckQubitSpectroscopy(QubexTask):
 
     name: str = "CheckQubitSpectroscopy"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "2D drive frequency and power spectroscopy read out dispersively. It estimates f01 "
+            "on a 5 MHz grid, published as coarse_qubit_frequency and control_frequency, and a "
+            "coarse_control_amplitude seed from the power at which the f01 line appears. An f12"
+            " estimate is reported only in logs and figures."
+        ),
+        when_to_use=(
+            "Run it after resonator spectroscopy when the qubit frequency is unknown. Its "
+            "outputs are seeds: CheckControlAmplitude and CheckAdaptiveChevron refine them."
+        ),
+        prerequisites=(
+            "readout_frequency (or resonator_frequency) and readout_amplitude are stored.",
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "readout_frequency": InputParameterSpec.required_database(
             fallback_parameter_names=("resonator_frequency",)
         ),
         "readout_amplitude": InputParameterSpec.required_database(),
+        "qubit_frequency_window_min": InputParameterSpec.database_optional(),
+        "qubit_frequency_window_max": InputParameterSpec.database_optional(),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "simultaneous_drive": RunParameterSpec(
@@ -93,6 +114,12 @@ class CheckQubitSpectroscopy(QubexTask):
     _retry_with_trim: ClassVar[bool] = True
     _seed_amplitude_headroom_db: ClassVar[float] = 10.0
     _max_coarse_control_amplitude: ClassVar[float] = 1.0
+
+    def __init__(self, params: dict[str, Any] | None = None) -> None:
+        super().__init__(params)
+        self._auto_resolved_frequency_range: bool = False
+        self._resolved_frequency_ranges: dict[str, tuple[float, float, float]] = {}
+
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "coarse_qubit_frequency": OutputParameterSpec(
             unit="GHz",
@@ -134,13 +161,11 @@ class CheckQubitSpectroscopy(QubexTask):
     }
 
     def _compute_coarse_control_amplitude(self, repr_db: float) -> tuple[float, float]:
-        raw_amplitude = float(10 ** (repr_db / 20))
-        headroom_db = self._seed_amplitude_headroom_db
-        max_amplitude = self._max_coarse_control_amplitude
-        uplifted_amplitude = raw_amplitude * (10 ** (headroom_db / 20))
-        coarse_control_amplitude = min(uplifted_amplitude, max_amplitude)
-        marker_db = float(20 * math.log10(coarse_control_amplitude))
-        return coarse_control_amplitude, marker_db
+        return compute_coarse_control_amplitude(
+            repr_db,
+            headroom_db=self._seed_amplitude_headroom_db,
+            max_amplitude=self._max_coarse_control_amplitude,
+        )
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
@@ -226,14 +251,8 @@ class CheckQubitSpectroscopy(QubexTask):
             )
             output_params_copy["coarse_control_amplitude"].value = coarse_control_amplitude
             if marked_fig is not None:
-                marked_fig.add_hline(
-                    y=coarse_control_marker_db,
-                    line_width=1,
-                    line_color="red",
-                    line_dash="dash",
-                    annotation_text=f"coarse A = {coarse_control_amplitude:.4f} a.u.",
-                    annotation_position="top left",
-                    annotation_font_color="red",
+                mark_coarse_control_amplitude(
+                    marked_fig, coarse_control_amplitude, coarse_control_marker_db
                 )
             print(
                 f"Coarse control amplitude for qid={qid}: "
@@ -270,17 +289,49 @@ class CheckQubitSpectroscopy(QubexTask):
         parameter = self.run_parameters["frequency_range"]
         return None if parameter.value is None else parameter.get_value()
 
+    def _frequency_range_for(self, qid: str) -> Any:
+        """Return the per-qid auto-resolved sweep when present, else the shared range."""
+        resolved = self._resolved_frequency_ranges.get(qid)
+        if resolved is not None:
+            return np.arange(*resolved)
+        return self._frequency_range()
+
+    def _optional_input_float(self, name: str) -> float | None:
+        parameter = self.input_parameters.get(name)
+        if parameter is None or parameter.value is None:
+            return None
+        try:
+            value = float(parameter.value)
+        except (TypeError, ValueError):
+            return None
+        return value if math.isfinite(value) else None
+
     def resolve_run_parameters(self, backend: QubexBackend, qid: str) -> None:
         """Populate the effective device-specific sweep before it is recorded."""
         super().resolve_run_parameters(backend, qid)
         parameter = self.run_parameters["frequency_range"]
-        if parameter.value is not None:
+        if parameter.value is not None and not self._auto_resolved_frequency_range:
             return
 
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
         box = exp.ctx.experiment_system.get_control_box_for_qubit(label)
-        parameter.value = tuple(box.traits.default_control_frequency_range)
+        box_start, box_stop, box_step = (
+            float(v) for v in box.traits.default_control_frequency_range
+        )
+
+        resolved_range = (box_start, box_stop, box_step)
+        win_min = self._optional_input_float("qubit_frequency_window_min")
+        win_max = self._optional_input_float("qubit_frequency_window_max")
+        if win_min is not None and win_max is not None and win_max > win_min and box_step > 0:
+            snapped_start = round(math.floor(win_min / box_step) * box_step, 6)
+            snapped_stop = round(math.ceil(win_max / box_step) * box_step, 6)
+            if snapped_stop > snapped_start + box_step:
+                resolved_range = (snapped_start, snapped_stop, box_step)
+
+        self._auto_resolved_frequency_range = True
+        self._resolved_frequency_ranges[qid] = resolved_range
+        parameter.value = resolved_range
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         """Run the task."""
@@ -319,14 +370,13 @@ class CheckQubitSpectroscopy(QubexTask):
         """
         exp = self.get_experiment(backend)
         labels = [self.get_qubit_label(backend, qid) for qid in qids]
-        frequency_range = self._frequency_range()
         readout_amplitude = self._get_readout_amplitude_value()
         results = {}
-        for label in labels:
+        for qid, label in zip(qids, labels, strict=True):
             result = exp.qubit_spectroscopy(
                 label,
                 simultaneous_drive=self.run_parameters["simultaneous_drive"].get_value(),
-                frequency_range=frequency_range,
+                frequency_range=self._frequency_range_for(qid),
                 power_range=self.run_parameters["power_range"].get_value(),
                 readout_amplitude=readout_amplitude,
                 n_shots=self.run_parameters["shots"].get_value(),

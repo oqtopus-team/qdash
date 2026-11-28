@@ -1,5 +1,5 @@
 /**
- * The registry one chat session runs with: QDash's tools, the copilot's own
+ * The registry one chat session runs with: QDash's tools, the agent's own
  * tools and prompt, the user's preferences, the open page, the workspace
  * tools, and Code Mode with the tool policy. SharedRuntime builds the parts
  * that are the same for every chat once; this assembles them per session, so
@@ -14,7 +14,8 @@ import {
   type Extension,
   type ToolRegistration,
 } from "@earendil-works/pi-durable";
-import { createCodingTools } from "@earendil-works/pi-durable/tools";
+import { createFitImagesExtension } from "@earendil-works/pi-durable/images/fit";
+import { createCodingTools, type ImageProcessor } from "@earendil-works/pi-durable/tools";
 
 import type { QDashConnection } from "./auth.ts";
 import { buildCodemodeExtensions, createCodemodeSandbox, modelOnlyTools, type InternalCalls } from "./codemode.ts";
@@ -26,15 +27,15 @@ import { buildUserInstructionsSection } from "./prompt.ts";
 export const USER_PREFERENCES_SECTION = "user-preferences";
 
 /**
- * The copilot's own tools with QDash's system prompt. They render in the chat
+ * The agent's own tools with QDash's system prompt. They render in the chat
  * or end the turn, so they are model-only, except an internal tool that
  * already names its callers (present_results' classifier).
  */
-export function buildCopilotExtension(systemPrompt: string, tools: readonly ToolRegistration[]): Extension {
+export function buildAgentExtension(systemPrompt: string, tools: readonly ToolRegistration[]): Extension {
   return modelOnlyTools(
     defineExtension({
-      name: "qdash-copilot",
-      sections: [section("qdash-copilot", () => systemPrompt, { tag: false })],
+      name: "qdash-agent",
+      sections: [section("qdash-agent", () => systemPrompt, { tag: false })],
       tools: [...tools],
     }),
   );
@@ -45,17 +46,18 @@ export interface ChatRegistryParts {
   extensions: ReadonlyArray<{ path?: string; tools?: Map<string, { definition: CodingAgentTool }> }>;
   modelRuntime: ModelRuntime;
   workDir: string;
-  /** Trusted local checkouts and packages, as `buildQDashExtension` takes them. */
+  /** Bundled roots trusted as a whole, as `buildQDashExtension` takes them. */
   extensionPaths: readonly string[];
-  trustedPackages: readonly string[];
-  /** From `buildCopilotExtension`. */
-  copilot: Extension;
-  /** Internal tools of `copilot` with the tools that may call them. */
+  /** From `buildAgentExtension`. */
+  agent: Extension;
+  /** Internal tools of `agent` with the tools that may call them. */
   internalCalls: InternalCalls;
   /** The workspace's read/write/edit/bash, when there is a workspace. */
   codingTools: boolean;
   /** From `buildCompactionExtension`: the summarizer chats compact with. */
   compaction?: Extension;
+  /** Validates, orients, converts, and resizes images returned by tools so oversized or damaged images never poison a conversation. */
+  imageProcessor?: ImageProcessor;
 }
 
 export interface ChatRegistry {
@@ -79,10 +81,9 @@ export function buildChatRegistry(
     parts.workDir,
     connection,
     parts.extensionPaths,
-    parts.trustedPackages,
   );
   registry.install(qdash.extension);
-  registry.install(parts.copilot);
+  registry.install(parts.agent);
   if (parts.compaction) registry.install(parts.compaction);
   // After QDash's own rules, so they come first and the user's preferences
   // read as adjustments to them.
@@ -114,7 +115,11 @@ export function buildChatRegistry(
   // The workspace's read/write/edit/bash, which run in the agent-exec
   // container through the environment `openSession` gives the harness.
   // The model calls them; Code Mode scripts do not.
-  if (parts.codingTools) registry.install(modelOnlyTools(createCodingTools()));
+  if (parts.codingTools) {
+    registry.install(
+      modelOnlyTools(createCodingTools(parts.imageProcessor ? { images: parts.imageProcessor } : undefined)),
+    );
+  }
   // Code Mode, tool_search, and the hooks that keep scripts to the audited
   // read-only tools and internal tools to their callers. One sandbox per
   // open session.
@@ -125,5 +130,8 @@ export function buildChatRegistry(
     internalCalls: parts.internalCalls,
   };
   for (const extension of buildCodemodeExtensions(sandbox, policy)) registry.install(extension);
+  // Installed last so earlier hooks see unfitted results while every top-level
+  // tool output committed for the model respects its image limits.
+  if (parts.imageProcessor) registry.install(createFitImagesExtension(parts.imageProcessor));
   return { registry, writeTools: qdash.writeTools, close: () => sandbox.close() };
 }

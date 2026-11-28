@@ -2,10 +2,19 @@
 
 import { useState } from "react";
 import { Check, CircleHelp, FileDiff, PenLine, X } from "lucide-react";
+import {
+  AgentSessionPolicyPreview,
+  isAgentSessionPolicy,
+} from "@/components/features/chat/AgentSessionPolicyPreview";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
-import { PipelinePreview, isPipelineSpec } from "@/components/features/chat/PipelinePreview";
+import {
+  PipelinePreview,
+  StoredPlanPreview,
+  isPipelineSpec,
+  isPlanApprovalPreview,
+} from "@/components/features/chat/PipelinePreview";
 import { PierreDiffViewer } from "@/components/ui/PierreDiffViewer";
-import type { ApprovalRequest, AskRequest, EditProposal } from "@/types/copilotChat";
+import type { ApprovalRequest, AskRequest, EditProposal } from "@/types/agentChat";
 
 /** How a card behaves: open for an answer, or showing the answer it got. */
 export interface InteractionState {
@@ -195,6 +204,8 @@ export function ApprovalCard({
       : state.answer === declinedText(approval)
         ? "declined"
         : null;
+  // A stored plan shows the preview frozen with the request, never a live check.
+  const storedPlan = isPlanApprovalPreview(approval.preview) ? approval.preview : null;
   // A pipeline spec gets its own preview; the other arguments stay in the list.
   const pipelineSpec = isPipelineSpec(approval.args.spec) ? approval.args.spec : null;
   const chipId = stringArg(approval.args, "chipId") ?? stringArg(approval.args, "chip_id");
@@ -203,13 +214,23 @@ export function ApprovalCard({
   // A metric script save shows its source the same way.
   const scriptSave =
     approval.tool === "qdash_save_metric_script" && typeof approval.args.source === "string";
+  // A new agent session states what it grants before its exact policy.
+  const sessionPolicy =
+    approval.tool === "qdash_create_agent_session" && isAgentSessionPolicy(approval.args.policy)
+      ? approval.args.policy
+      : null;
   const entries = Object.entries(approval.args).filter(
     ([key]) =>
       !(pipelineSpec && key === "spec") &&
       !(flowSave && FLOW_PREVIEW_KEYS.has(key)) &&
       !(scriptSave && METRIC_SCRIPT_PREVIEW_KEYS.has(key)),
   );
-  const hasPreview = Boolean(pipelineSpec) || flowSave || scriptSave;
+  const hasPreview =
+    Boolean(storedPlan) ||
+    Boolean(pipelineSpec) ||
+    flowSave ||
+    scriptSave ||
+    Boolean(sessionPolicy);
 
   return (
     <div
@@ -226,9 +247,16 @@ export function ApprovalCard({
       </div>
 
       <div className="flex flex-col gap-3 px-3.5 pt-3 pb-3.5">
-        {pipelineSpec && <PipelinePreview chipId={chipId} spec={pipelineSpec} />}
+        {storedPlan && <StoredPlanPreview preview={storedPlan} />}
+        {!storedPlan && pipelineSpec && <PipelinePreview chipId={chipId} spec={pipelineSpec} />}
         {flowSave && <FlowSavePreview args={approval.args} />}
         {scriptSave && <MetricScriptSavePreview args={approval.args} />}
+        {sessionPolicy && (
+          <AgentSessionPolicyPreview
+            policy={sessionPolicy}
+            expiresInSeconds={approval.args.expiresInSeconds}
+          />
+        )}
         {entries.length > 0 ? (
           <dl
             className="m-0 grid grid-cols-[fit-content(40%)_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs"

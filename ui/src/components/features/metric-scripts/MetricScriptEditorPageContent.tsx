@@ -30,7 +30,7 @@ import {
   useValidateMetricScript,
 } from "@/client/metric-script/metric-script";
 import type { MetricInfo, MetricScriptResponseVisibility, ScriptDiagnostic } from "@/schemas";
-import { VisibilityLabel } from "@/components/features/dashboards/VisibilityLabel";
+import { VisibilityLabel } from "@/components/ui/VisibilityLabel";
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { useToast } from "@/components/ui/Toast";
@@ -45,7 +45,7 @@ import {
   type FormatRun,
   type FormatterEditor,
 } from "@/lib/pythonFormatter";
-import type { MetricScriptEditorContext } from "@/types/copilotChat";
+import type { MetricScriptEditorContext } from "@/types/agentChat";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 import { describeMetricError } from "./errors";

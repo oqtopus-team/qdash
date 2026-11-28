@@ -46,6 +46,7 @@ import { AdminPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDate } from "@/lib/utils/datetime";
+import { saveBlob } from "@/lib/utils/download";
 
 /** Admin page with tabs for managing users, projects, and system settings. */
 export function AdminPageContent() {
@@ -651,14 +652,7 @@ function buildBulkImportResultCsv(result: BulkUserImportResponse): string {
 function downloadBulkImportResult(result: BulkUserImportResponse) {
   const csv = buildBulkImportResultCsv(result);
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `qdash-user-import-${formatDate(new Date().toISOString())}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  saveBlob(blob, `qdash-user-import-${formatDate(new Date().toISOString())}.csv`);
 }
 
 function BulkImportUsersModal({

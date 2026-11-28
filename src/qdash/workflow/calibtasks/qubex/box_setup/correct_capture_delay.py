@@ -25,6 +25,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from qdash.analysis.capture_delay import (
+    MARGIN_NS,
     QUEL1_RESOLUTION_NS,
     QUEL3_RESOLUTION_NS,
     WORD_STEP,
@@ -39,7 +40,12 @@ from qdash.analysis.capture_delay import (
     total_delay_ns,
 )
 from qdash.common.visualization.figure_metadata import set_figure_role
-from qdash.datamodel.task import InputParameterSpec, OutputParameterSpec, RunParameterSpec
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+    TaskDocumentation,
+)
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import QubexTask, readout_duration_run_parameter
 
@@ -96,6 +102,25 @@ class CorrectCaptureDelay(QubexTask):
 
     name: str = "CorrectCaptureDelay"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "MUX-level task that sweeps the readout capture delay with a fixed readout tone and"
+            " picks a delay that centers the readout pulse in the capture window. It writes "
+            "capture_delay (and capture_delay_word on QuEL-1) for every qubit of the MUX and "
+            "updates the Qubex params files."
+        ),
+        when_to_use=(
+            "Run it first during box setup, before resonator spectroscopy, on QuEL-1 or QuEL-3 "
+            "hardware; it does not need calibrated readout parameters. Later sessions reload "
+            "the corrected delays."
+        ),
+        prerequisites=(
+            (
+                "None from calibration storage. The default tone sits 0.25 GHz above the "
+                "readout box's default resonator spectroscopy range, away from the resonators."
+            ),
+        ),
+    )
     is_mux_level: bool = True
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
@@ -285,6 +310,59 @@ class CorrectCaptureDelay(QubexTask):
         result.final = finalize_delay(
             result.verification, selection, center=center, resolution_ns=resolution
         )
+        if result.final.final_total_ns is None:
+            # If the rounded delay clips a leading/trailing ringing lobe, fall
+            # back to the nearest sweep delay whose rise and fall were both
+            # captured with at least MARGIN_NS on each side.
+            fallback_totals = sorted(
+                {
+                    edge.waveform.total_delay_ns
+                    for edge in (*result.fine, *result.coarse)
+                    if edge.success
+                    and edge.rise_ns is not None
+                    and edge.fall_ns is not None
+                    and edge.rise_ns - edge.time_start_ns >= MARGIN_NS
+                    and edge.time_stop_ns - edge.fall_ns >= MARGIN_NS
+                    and not math.isclose(edge.waveform.total_delay_ns, selected_total)
+                },
+                key=lambda total: abs(total - selected_total),
+            )
+            for candidate_total in fallback_totals:
+                candidate_verif = measure_and_analyze([setting(candidate_total)])
+                candidate_selection = SelectionReport(
+                    mux=selection.mux,
+                    reason=selection.reason,
+                    center_ns=selection.center_ns,
+                    selected_total_ns=candidate_total,
+                    estimated_midpoint_ns=selection.estimated_midpoint_ns,
+                    supporting_targets=selection.supporting_targets,
+                    support_points=selection.support_points,
+                )
+                candidate_final = finalize_delay(
+                    candidate_verif, candidate_selection, center=center, resolution_ns=resolution
+                )
+                if candidate_final.final_total_ns is None:
+                    continue
+                if math.isclose(candidate_final.final_total_ns, selected_total):
+                    # Keep the verified fallback delay rather than bouncing back
+                    # to the delay that just failed verification.
+                    verif_edge = candidate_verif[0]
+                    assert verif_edge.rise_ns is not None and verif_edge.fall_ns is not None
+                    pre_margin = verif_edge.rise_ns - verif_edge.time_start_ns
+                    post_margin = verif_edge.time_stop_ns - verif_edge.fall_ns
+                    if pre_margin < MARGIN_NS or post_margin < MARGIN_NS:
+                        continue
+                    candidate_final = FinalReport(
+                        mux=candidate_final.mux,
+                        reason="ready",
+                        final_total_ns=candidate_total,
+                        predicted_midpoint_ns=(verif_edge.rise_ns + verif_edge.fall_ns) / 2,
+                        predicted_pre_margin_ns=pre_margin,
+                        predicted_post_margin_ns=post_margin,
+                    )
+                result.verification = candidate_verif
+                result.final = candidate_final
+                break
         if result.final.final_total_ns is None:
             result.error = f"verification: {result.final.reason}"
             return RunResult(raw_result=result)

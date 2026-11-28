@@ -410,3 +410,61 @@ class TestSelectParamYamlFiles:
 
         with pytest.raises(ValueError, match="Invalid params file name"):
             integration._select_param_yaml_files(tmp_path, ["params.yml"])
+
+
+class TestPushHelpers:
+    """Tests for the clone URL and commit helpers shared by both push tasks."""
+
+    def test_authenticated_repo_url_embeds_credentials(self, monkeypatch: pytest.MonkeyPatch):
+        from qdash.workflow.worker.tasks.push_github import _authenticated_repo_url
+
+        monkeypatch.setenv("GITHUB_USER", "bot")
+        monkeypatch.setenv("GITHUB_TOKEN", "token")
+        monkeypatch.setenv("CONFIG_REPO_URL", "https://github.com/org/config.git")
+
+        assert _authenticated_repo_url() == "https://bot:token@github.com/org/config.git"
+
+    def test_authenticated_repo_url_requires_all_variables(self, monkeypatch: pytest.MonkeyPatch):
+        from qdash.workflow.worker.tasks.push_github import _authenticated_repo_url
+
+        monkeypatch.setenv("GITHUB_USER", "bot")
+        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+        monkeypatch.setenv("CONFIG_REPO_URL", "https://github.com/org/config.git")
+
+        with pytest.raises(RuntimeError, match="Missing required environment variables"):
+            _authenticated_repo_url()
+
+    def test_commit_and_push_skips_unchanged_index(self):
+        from qdash.workflow.worker.tasks.push_github import NO_CHANGES, _commit_and_push
+
+        repo = MagicMock()
+        repo.index.diff.return_value = []
+        logger = MagicMock(spec=logging.Logger)
+
+        with patch("qdash.workflow.worker.tasks.push_github._sync_local_repo") as sync:
+            assert _commit_and_push(repo, "msg", "main", True, logger) == NO_CHANGES
+
+        repo.index.commit.assert_not_called()
+        repo.remotes.origin.push.assert_not_called()
+        sync.assert_not_called()
+
+    @pytest.mark.parametrize("sync_local", [True, False])
+    def test_commit_and_push_commits_pushes_and_syncs(self, sync_local: bool):
+        from qdash.workflow.worker.tasks.push_github import _commit_and_push
+
+        repo = MagicMock()
+        repo.index.diff.return_value = ["changed"]
+        repo.head.commit.hexsha = "0123456789abcdef"
+        logger = MagicMock(spec=logging.Logger)
+
+        with patch("qdash.workflow.worker.tasks.push_github._sync_local_repo") as sync:
+            sha = _commit_and_push(repo, "msg", "develop", sync_local, logger)
+
+        assert sha == "01234567"
+        repo.git.config.assert_any_call("user.name", "github-actions[bot]")
+        repo.index.commit.assert_called_once()
+        repo.remotes.origin.push.assert_called_once()
+        if sync_local:
+            sync.assert_called_once_with("develop", logger)
+        else:
+            sync.assert_not_called()

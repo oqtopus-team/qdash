@@ -148,3 +148,114 @@ def test_quel3_pipeline_selects_on_the_readout_sampling_grid():
     # The pulse midpoint lands on the window center within one grid step.
     midpoint = arrival_ns - final.final_total_ns + DURATION_NS / 2
     assert midpoint == pytest.approx(center, abs=QUEL3_RESOLUTION_NS)
+
+
+def test_long_pulse_in_narrow_1152ns_quel1_window_calibrates_cleanly():
+    """A 1024 ns pulse in a 144-sample (1152 ns) window leaves only ~11% baseline."""
+    samples = 144
+    center = samples * SAMPLING_NS / 2
+    arrival_ns = 1165.0  # centered near delay=8, word=12 (1120 ns)
+
+    def capture(delay: int, word: int) -> Waveform:
+        return _capture_at(
+            total_delay_ns(delay, word),
+            arrival_ns=arrival_ns,
+            target="Q48",
+            samples=samples,
+        )
+
+    coarse = analyze_waveforms([capture(d, 0) for d in range(19)])
+    coarse_selection = select_delay(coarse, mux=0, center=center)
+    assert coarse_selection.selected_total_ns is not None
+    delay, _ = split_total_delay(coarse_selection.selected_total_ns)
+
+    fine = analyze_waveforms([capture(delay, w) for w in (0, 4, 8, 12)])
+    fine_selection = select_delay(fine, mux=0, center=center)
+    assert fine_selection.selected_total_ns is not None
+
+    verification = analyze_waveforms(
+        [
+            _capture_at(
+                fine_selection.selected_total_ns,
+                arrival_ns=arrival_ns,
+                target="Q48",
+                samples=samples,
+            )
+        ]
+    )
+    final = finalize_delay(verification, fine_selection, center=center)
+
+    assert final.reason == "ready"
+    assert final.final_total_ns is not None
+    assert final.predicted_pre_margin_ns is not None
+    assert final.predicted_pre_margin_ns >= 32
+    assert final.predicted_post_margin_ns is not None
+    assert final.predicted_post_margin_ns >= 32
+
+
+def test_select_delay_uses_observed_duration_when_ringdown_broadens_pulse():
+    """Observed rise-to-fall width avoids picking a delay that clips a broadened fall."""
+    samples = 144
+    center = samples * SAMPLING_NS / 2
+    arrival_ns = 1165.0
+    effective_duration_ns = 1044.0  # nominal 1024 ns + ~20 ns ring-down
+
+    def broadened(delay: int, word: int) -> Waveform:
+        total = total_delay_ns(delay, word)
+        rng = np.random.default_rng(round(total * 10))
+        time = np.arange(samples) * SAMPLING_NS
+        start = arrival_ns - total
+        envelope = 0.5 * (
+            np.tanh((time - start) / 6) - np.tanh((time - start - effective_duration_ns) / 6)
+        )
+        noise = rng.normal(size=samples) + 1j * rng.normal(size=samples)
+        return Waveform(0, "Q48", total, time, envelope * (0.2 + 0j) + 0.002 * noise, DURATION_NS)
+
+    fine = analyze_waveforms([broadened(8, w) for w in (0, 4, 8, 12)])
+    selection = select_delay(fine, mux=0, center=center)
+
+    assert selection.selected_total_ns == total_delay_ns(8, 12)
+    verification = analyze_waveforms([broadened(8, 12)])
+    final = finalize_delay(verification, selection, center=center)
+    assert final.reason == "ready"
+    assert final.final_total_ns == total_delay_ns(8, 12)
+
+
+def test_analyze_waveform_handles_phase_rotation_during_pulse():
+    """Dispersive phase rotation across the pulse must not reject valid amplitude edges."""
+    rng = np.random.default_rng(7)
+    time = np.arange(SAMPLES) * SAMPLING_NS
+    start = 1400.0 - total_delay_ns(9, 0)
+    envelope = 0.5 * (np.tanh((time - start) / 6) - np.tanh((time - start - DURATION_NS) / 6))
+    # Rotate complex phase by 2*pi across the pulse (e.g. off-resonant filter dispersion).
+    phase = 2 * np.pi * (time - start) / DURATION_NS
+    noise = rng.normal(size=SAMPLES) + 1j * rng.normal(size=SAMPLES)
+    iq = envelope * 0.3 * np.exp(1j * phase) + 0.005 * noise
+    wf = Waveform(0, "Q48", total_delay_ns(9, 0), time, iq, DURATION_NS)
+
+    result = analyze_waveform(wf, snr_threshold=5.0, smoothing=5)
+
+    assert result.success
+    assert result.edge_kind == "both"
+    assert result.rise_ns == pytest.approx(start, abs=2)
+    assert result.fall_ns == pytest.approx(start + DURATION_NS, abs=2)
+
+
+def test_analyze_waveform_fits_falling_edge_with_slow_ringdown_near_window_end():
+    """Slow ring-down pushing the 50% crossing to sample n-4 must still fit fall_ns."""
+    samples = 144
+    time = np.arange(samples) * SAMPLING_NS
+    # Rising edge at 45 ns; falling edge begins at 1060 ns with an exponential
+    # ring-down tail so the smoothed 50% crossing sits around sample 140 (n - 4).
+    amp = np.where(time < 45.0, 0.002, 0.20)
+    tail = time >= 1060.0
+    amp = np.where(tail, 0.20 * np.exp(-(time - 1060.0) / 70.0), amp)
+    wf = Waveform(12, "Q48", total_delay_ns(8, 12), time, amp.astype(complex), DURATION_NS)
+
+    result = analyze_waveform(wf, snr_threshold=5.0, smoothing=5)
+
+    assert result.success
+    assert result.edge_kind == "both"
+    assert result.rise_ns is not None
+    assert result.fall_ns is not None
+    assert result.time_stop_ns - result.fall_ns >= 32.0

@@ -1,8 +1,9 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { QDashClient } from "@oqtopus-team/qdash-client";
+import type { QDashConnection } from "../lib/qdash-connection.js";
 import { Type } from "typebox";
 
 import { toTextToolResult } from "../lib/results.js";
+import { CONFIG_PATH_DESCRIPTION, PROFILE_DESCRIPTION } from "../lib/connection.js";
 
 type ConnectionParams = {
   profile?: string;
@@ -60,12 +61,12 @@ type SourceFile = {
 };
 
 export type SourceCodeDependencies = {
-  makeClient(params: ConnectionParams): Promise<QDashClient>;
+  makeClient(params: ConnectionParams): Promise<QDashConnection>;
 };
 
 const connectionParams = {
-  profile: Type.Optional(Type.String({ description: "QDash profile name. Defaults to env when QDASH_BASE_URL is set, otherwise 'default'." })),
-  configPath: Type.Optional(Type.String({ description: "Optional path to qdash config.ini." })),
+  profile: Type.Optional(Type.String({ description: PROFILE_DESCRIPTION })),
+  configPath: Type.Optional(Type.String({ description: CONFIG_PATH_DESCRIPTION })),
   useEnv: Type.Optional(Type.Boolean({ description: "Force QDASH_* environment variables instead of a profile." })),
 };
 
@@ -124,7 +125,7 @@ function sourceRefusal(error: unknown): string | undefined {
   const message = String(value.message ?? `HTTP ${status}`);
   // A bare FastAPI-style 404 can indicate an unavailable route or proxy mismatch.
   if (status === 404 && /:\s*Not Found$/.test(message)) {
-    return `${message}. The /copilot/source endpoint may be unavailable. Check API routing/proxy configuration and update the API image if it predates source access.`;
+    return `${message}. The /agent/source endpoint may be unavailable. Check API routing/proxy configuration and update the API image if it predates source access.`;
   }
   return message;
 }

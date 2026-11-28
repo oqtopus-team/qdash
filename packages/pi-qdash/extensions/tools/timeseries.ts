@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { QDashClient } from "@oqtopus-team/qdash-client";
+import type { QDashConnection } from "../lib/qdash-connection.js";
 import { Type } from "typebox";
 
 import {
@@ -15,6 +15,7 @@ import {
 import type { TimeseriesInvestigationContext } from "../lib/investigation-context.js";
 import { toTextToolResult } from "../lib/results.js";
 import { timeseriesPoints } from "../lib/timeseries-points.js";
+import { CONFIG_PATH_DESCRIPTION, PROFILE_DESCRIPTION } from "../lib/connection.js";
 
 type ComparisonToolParams = {
   profile?: string;
@@ -37,8 +38,8 @@ type ComparisonToolParams = {
 };
 
 export type TimeseriesToolDependencies = {
-  makeClient: (params: { profile?: string; configPath?: string; useEnv?: boolean }) => Promise<QDashClient>;
-  defaultChipId: (client: QDashClient, chipId?: string) => Promise<string>;
+  makeClient: (params: { profile?: string; configPath?: string; useEnv?: boolean }) => Promise<QDashConnection>;
+  defaultChipId: (client: QDashConnection, chipId?: string) => Promise<string>;
   investigationContext?: () => TimeseriesInvestigationContext | undefined;
 };
 
@@ -89,8 +90,8 @@ export function registerTimeseriesComparisonTool(pi: ExtensionAPI, dependencies:
       "Treat qdash_compare_timeseries correlations and shared periods as evidence of association, not proof of causality.",
     ],
     parameters: Type.Object({
-      profile: Type.Optional(Type.String({ description: "QDash profile name. Defaults to env when QDASH_BASE_URL is set, otherwise 'default'." })),
-      configPath: Type.Optional(Type.String({ description: "Optional path to qdash config.ini." })),
+      profile: Type.Optional(Type.String({ description: PROFILE_DESCRIPTION })),
+      configPath: Type.Optional(Type.String({ description: CONFIG_PATH_DESCRIPTION })),
       useEnv: Type.Optional(Type.Boolean({ description: "Force QDASH_* environment variables instead of a profile." })),
       chipId: Type.Optional(Type.String({ description: "Chip ID. Defaults to the active/default chip when omitted." })),
       startAt: Type.Optional(Type.String({ description: "Optional common start timestamp as an ISO timestamp with timezone." })),

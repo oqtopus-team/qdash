@@ -21,10 +21,11 @@ from qdash.workflow.service.steps import (
 )
 from qdash.workflow.service.steps.pipeline import StepContext
 from qdash.workflow.service.targets import MuxTargets
+from tests.qdash.workflow.calibration_session_fake import install_fake_session
 
 if TYPE_CHECKING:
     from qdash.datamodel.one_qubit_execution_mode import OneQubitExecutionMode
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
 
 # Names used before the rename; they are no longer accepted anywhere.
 REMOVED = ["synchronized", "scheduled", "serial"]
@@ -123,7 +124,7 @@ def test_execute_dispatches_the_strategy_of_its_mode(
     session = SimpleNamespace(chip_id="64Qv3", plan_digest=None)
 
     OneQubitCheck(tasks=RABI, execution_mode=mode).execute(
-        cast("CalibSession", session), MuxTargets(mux_ids=[0]), StepContext()
+        cast("ExecutionRuntime", session), MuxTargets(mux_ids=[0]), StepContext()
     )
 
     assert requested == [mode]
@@ -143,23 +144,17 @@ TEMPLATES = {
 }
 
 
-class FakeCalibService:
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        pass
-
-    @classmethod
-    def from_context(cls, *args: Any, **kwargs: Any) -> FakeCalibService:
-        return cls()
-
-    def run(self, targets: Any, *, steps: list[Any]) -> list[Any]:
-        return steps
-
-
 def _flow(monkeypatch: pytest.MonkeyPatch, name: str) -> Any:
     module = importlib.import_module(f"qdash.workflow.templates.{name}")
-    monkeypatch.setattr(module, "CalibService", FakeCalibService)
-    if hasattr(module, "resolve_calib_context"):
-        monkeypatch.setattr(module, "resolve_calib_context", lambda *a, **k: None)
+    fake = install_fake_session(monkeypatch, module)
+    original_run = fake.run
+
+    def run_steps(self: Any, *args: Any, **kwargs: Any) -> list[Any]:
+        # The runtime steps the worker builds from the template's definitions.
+        steps: list[Any] = original_run(self, *args, **kwargs)["steps"]
+        return steps
+
+    monkeypatch.setattr(fake, "run", run_steps)
     return getattr(module, TEMPLATES[name][0])
 
 
@@ -187,7 +182,8 @@ def test_template_rejects_removed_names_and_the_mode_parameter(
     monkeypatch: pytest.MonkeyPatch, name: str
 ) -> None:
     run = _template(monkeypatch, name)
-    with pytest.raises(ValueError, match="Unknown execution_mode 'scheduled'"):
+    # The step definitions reject it as the pipeline spec does.
+    with pytest.raises(ValueError, match="execution_mode"):
         run(execution_mode="scheduled")
     with pytest.raises(TypeError, match="mode"):
         run(mode="parallel_by_mux")

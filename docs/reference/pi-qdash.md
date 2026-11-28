@@ -1,38 +1,119 @@
 # pi-qdash
 
-pi-qdash tools reuse the session's profile and chip when callers omit those parameters.
+pi-qdash gives pi CLI and QDash Agent tools for calibration data and approved operations.
+Omitted profile and chip arguments use the session selection.
 
 ## Configuration
 
-| Tool | Result |
-| --- | --- |
-| `qdash_config_info` | Profiles and non-secret connection settings. |
+For standalone use, install pi and the extension:
+
+```bash
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+pi install npm:@oqtopus-team/pi-qdash
+```
+
+If you already use a Python or TypeScript SDK profile, reuse its `config.toml`. For a new
+profile, follow the [SDK setup](./clients/typescript.md#connect-to-a-deployment) to run
+`qdash config init`, set your project ID, and supply your API token.
+
+Start `pi` and run `/qdash-setup local <chip_id>`, replacing `local` with your profile name
+and `<chip_id>` with your chip. Check the selected chip on the dashboard. Use `/qdash-config`
+to inspect the connection without displaying credentials. QDash web Agent includes the
+extension and supplies its own connection settings.
+
+Standalone pi looks for `config.toml` in `$XDG_CONFIG_HOME/qdash/` (default
+`~/.config/qdash/`). When that file is absent, it reads the existing `config.ini`.
+If both exist, tools can select the INI explicitly with `configPath`. If the selected
+TOML is invalid or lacks the requested profile, correct the file or profile name.
+With no selected profile or explicit path, `QDASH_BASE_URL` selects environment configuration.
+For file-based connections, omitting the profile selects TOML’s `default_profile`, or
+`default` when unset. Standalone pi requires TLS verification and does not support a
+profile-level `proxy`. Use a separate profile if your SDK uses custom transport settings.
+For legacy INI profiles, set `retry_max_attempts` to a positive integer. The SDK manages
+read backoff and ignores legacy backoff settings. In `qdash_config_info`, `active.readAttempts`
+shows the total read-attempt limit. A profile needs credentials before it can connect.
+Set `QDASH_WEB_URL` if the web UI is not the API base URL without `/api`.
+
+If a launch reports an unknown outcome, do not repeat it. Use `qdash_get_execution` with
+the reported execution ID. If no ID is available, use `qdash_list_executions` with the
+launch's chip and check subsequent pages before reconciling its state. The pipeline and
+saved-workflow tools do not report such responses as successfully started.
 
 ## Read-only query tools
 
 | Tools | Result |
 | --- | --- |
+| `qdash_current_time` | Current UTC time, and the local time and offset in an IANA time zone when one is named. Needs no QDash connection or approval. |
 | `qdash_list_chips`, `qdash_get_default_chip` | Chip list and default chip. |
 | `qdash_get_chip_metrics`, `qdash_list_chip_qubits`, `qdash_list_chip_couplings` | Chip metrics and targets. |
 | `qdash_list_cryostats`, `qdash_list_cooldowns` | Cryostats and cooldowns. |
 | `qdash_get_cooldown_wiring`, `qdash_wiring_insights`, `qdash_list_cooldown_wiring_events` | Wiring, attenuation insights, and event history. |
 | `qdash_get_timeseries`, `qdash_inspect_timeseries_csv`, `qdash_compare_timeseries` | Timeseries retrieval, local CSV inspection, and comparison. |
 | `qdash_list_task_results`, `qdash_get_task_result`, `qdash_get_task_knowledge` | Task results and full or summarized task knowledge. |
+| `qdash_summarize_task_results` | SDK-backed counts by stored status, task, and day, with completeness diagnostics. |
+| `qdash_get_task_result_evidence` | One result with execution, current target values, and optional named cooldown checks; accepts `taskId` and optional `cooldownId`. Deferred, read-only, and available in scripts. |
 | `qdash_list_flows`, `qdash_get_flow` | Saved flows. |
 | `qdash_list_executions`, `qdash_get_execution`, `qdash_wait_execution`, `qdash_compare_executions` | Execution history, status, and comparison. |
 | `qdash_get_provenance_stats` | Provenance statistics. |
 | `qdash_list_forum_posts`, `qdash_get_forum_post`, `qdash_list_forum_replies` | Forum posts and replies. |
 | `qdash_list_source_roots`, `qdash_search_source`, `qdash_read_source` | Source trees the server serves with their revisions, literal search of contents or paths, and up to 400 numbered lines of one file. A traceback path such as `/app/qdash/workflow/x.py` is mapped onto its root. |
 | `qdash_get_figure`, `qdash_get_task_figures`, `qdash_recent_calibration_figure`, `qdash_analyze_figure_json`, `qdash_build_qcal_evidence` | Figure retrieval, analysis, and evaluation evidence. |
+| `qdash_reanalyze_resonator_spectroscopy`, `qdash_reanalyze_qubit_spectroscopy` | A preview of a stored spectroscopy result analyzed again with the overrides in `parameters`: the re-estimated seed outputs and, unless `includeImage` is false, the marked figure as a PNG. Accepts `qid`, optional `chipId`, either `sourceTaskId` or an inline raw Plotly `figure`, and an optional frequency window, `frequencyMin` and `frequencyMax` in GHz. Deferred, read-only, and available in scripts. |
 
-| Tool | Return or limit |
-| --- | --- |
-| Figure tools | PNG figures return image content with text; JSON figures remain text. The TUI renders images and chat shows figure paths. |
-| `qdash_get_cooldown_wiring` | Active or newest cooldown wiring for a cryostat or current chip; attenuation insights and raw blocks are optional. |
-| `qdash_wiring_insights` | Control/readout attenuation totals, unusual totals, and MUX×4 qubit mapping for control-port anomalies. |
-| `qdash_inspect_timeseries_csv` | Local CSV headers, row count, numeric ranges, and optional timestamp profile; no upload or timezone guess. |
-| `qdash_compare_timeseries` | QDash and local CSV series on a bounded grid, with correlations and optional smoothing, detrending, normalization, and shared-period fit. Each CSV is limited to 10 MB and is never uploaded. |
-| Timeseries comparison context | `/qdash-investigation-setup` fills omitted comparison arguments; explicit arguments win. Set `useInvestigationContext: false` to disable it for a call. |
+Lists are paginated: task results and executions accept `skip` and `limit` (1–100).
+Executions require one chip and support `date` (`YYYYMMDD`) and `timezone`, not flow/status filters.
+Execution history includes filter and schedule steps without task results or figures. Pipeline
+progress exposes their `transform` outcome and occurrence `key`; `not_recorded` means an older
+run did not record that transform, not that it failed. `skipped` means the run never reached it.
+Task history has no date filter; use task results with `startFrom` and `startTo` for a period.
+See [client contracts](./clients/typescript.md#high-level-client) for response shapes.
+
+`qdash_summarize_task_results` accepts `chipId`, `taskName`, `qid` or `couplingId`,
+`executionId`, `username`, `status`, `messageContains`, `startFrom`/`startTo` (aliases `startAt`/`endAt`),
+`timezone` (default UTC), and `maxRows` (default 1000, maximum 5000). It reads at most 50
+pages of 100 rows. Use the list tool when you need individual result rows.
+Inspect `complete` and `diagnostics` before reporting task/day aggregates as full counts.
+`total` and `statusCounts` are the first page's totals; `statusCounts` excludes the status
+filter. Offset reads are not a snapshot. See the [SDK summary contract](./clients/typescript.md#summarize-task-results)
+for partial results and recovery.
+
+`qdash_get_task_result_evidence` reports each context part as `ok`, `failed`, `not_applicable`,
+or `not_associated`. A failed result read fails the tool; a failed context read leaves the other
+parts available. Target values are current and may come from a later result. The API does not
+expose the result's cooldown association: without `cooldownId`, cooldown is `not_associated`.
+A supplied cooldown is checked for chip membership and time compatibility, not proven provenance.
+The same reads are available through the [SDK](./clients/typescript.md#read-a-result-with-context).
+
+The reanalysis tools call `POST /chips/{chip_id}/qubits/{qid}/reanalyze/resonator-spectroscopy`
+or `.../qubit-spectroscopy`. QDash reads the stored raw figure, or the request's `figure`, stores
+nothing, and uses no hardware. An inline `figure` must have a raw `heatmap` as its first trace, with
+plain lists of finite numbers on a grid of at least 2 x 2, must not be labeled as marked, and is
+at most 20 MiB as JSON. QDash keeps only that heatmap and plain-text titles, so other traces and
+layout content such as images are dropped before analysis and rendering; stored run parameters do not apply
+to it, and the response's `source_task_id` is null. Passing both `sourceTaskId` and `figure`
+fails. `frequencyMin` and `frequencyMax` are sent as the `frequency_min` and `frequency_max`
+parameters and take precedence over them: QDash drops the heatmap columns outside the window
+before the analysis, so a spur or edge noise can be excluded without measuring again, and the
+returned figure shows only the window. A merged window whose minimum is not below its maximum,
+or a bound that is not a finite number, fails before any request; a window that leaves fewer
+than 2 frequency points fails with HTTP 422. When the resonator tool's window cuts the sweep and
+fewer than 4 resonances remain, no qubit is assigned a resonance (`readout_frequency` is 0 and
+the figure is labeled `unassigned-partial-mux-in-frequency-window`), because the window may
+have dropped any of the missing ones; a window that keeps all 4 assigns them as usual. For the
+qubit tool, power rows at or above
+`top_power` are dropped before the analysis, and a `top_power` that leaves fewer than 2 rows
+fails with HTTP 422. The resonator tool returns `readout_frequency`, `optimal_power` (dB), and
+`readout_amplitude` (a.u.); the qubit tool returns `coarse_qubit_frequency` (also as
+`qubit_frequency`), `coarse_control_amplitude`, `f01_repr_db`, `f01_quality_level`, and
+`qubit_anharmonicity` when f12 is found. The image is recorded under the source task's name, so
+`qcal_evaluate` for that task evaluates it. When the server cannot render a PNG, the result
+says so with a fixed message, still returns the outputs, and tells the model not to evaluate an
+older stored figure in its place; the cause is in the API server log. A script receives the
+outputs, never the image.
+
+Timeseries parameters use exact stored names. Local CSV comparison never uploads files; each file
+is limited to 10 MB. `qdash_current_time` reads the tool host's clock, not hardware time; give an
+IANA zone explicitly for local time. Source reads return at most 400 numbered lines.
 
 ## Overview and insight tools
 
@@ -44,112 +125,166 @@ pi-qdash tools reuse the session's profile and chip when callers omit those para
 | `qdash_plan_calibration`, `qdash_validate_calibration` | Dry-run plan and read-only validation gates. |
 | `qdash_degradation_report` | Provenance drift, changes, locks, and downstream recommendations. |
 
-| Tool | Return or limit |
+These are read-only summaries. The dashboard tools above do not change custom dashboards.
+`qdash_compare_calibration` follows [compareLatest](./clients/typescript.md#compare-a-target-s-latest-results).
+
+## Agent calibration loop tools
+
+| Tool | Purpose |
 | --- | --- |
-| `qdash_dashboard`, `qdash_triage_overview` | Compact boxed text in non-interactive runs and custom TUI renderers. |
-| `qdash_target_report` | One target's recent results, failures, Forum posts, and a conservative next action; read-only. |
-| `qdash_plan_calibration` | Dry-run runbook with safety gates. `color: true` adds ANSI colors for terminal output. |
+| `qdash_list_agent_sessions` | List sessions; defaults to your active or paused sessions |
+| `qdash_get_agent_session_context` | Read scope, budget, candidates, intervention, and permitted next step |
+| `qdash_run_agent_session_step` | Run one authorized task on one qubit; record its decision before dispatch |
+| `qdash_request_agent_human` | Pause and ask an expert; consumes no action budget |
+| `qdash_commit_agent_session_update` | Commit an accepted candidate under the session's parameter-update grant |
+| `qdash_record_agent_decision` | Append audit reasoning; changes no session state |
+| `qdash_end_agent_session` | Request completion or stop, with per-call confirmation |
+| `qdash_get_agent_session_audit` | Read an audit snapshot; default 50 events, maximum 200 per page |
+| `qdash_wait_agent_intervention` | Wait for an answer; timeout defaults to 900 seconds, maximum 3600 |
+
+Session-granted execution requires the signed-in creator's approved `auto` session, remaining
+budget, and no work in flight. Commits additionally require a matching `parameter_updates` grant;
+backend application requires `apply_backend`. Missing grants or unconfirmed decisions block the
+write. Replayed calls reuse their records.
+
+A timeout leaves the session paused. Ending a session does not cancel work already admitted.
+No pi-qdash tool answers or resumes an intervention; the expert does that in QDash.
+See [Agent Calibration](../user-guide/agent-calibration.md).
 
 ## Agent calibration workflow tools
 
-| Tools | Result or limit |
+| Tools | Purpose |
 | --- | --- |
-| `qdash_create_agent_session`, `qdash_get_agent_session` | Create or inspect a session. The `policy` object passes through to QDash; `autonomy: auto` and `max_rounds_per_target` allow an approved plan to run without per-step confirmation. |
-| `qdash_submit_agent_action`, `qdash_get_agent_action`, `qdash_list_agent_actions`, `qdash_wait_agent_action` | Submit, inspect, list, and wait for actions. |
-| `qdash_list_agent_action_candidates` | List candidates produced by an action. |
-| `qdash_execute_agent_action` | Run an action using current calibration inputs; outputs stay staged until commit. `sourceExecutionId` records the source of a decision. |
-| `qdash_commit_agent_candidate`, `qdash_commit_agent_candidate_set` | Commit one candidate or a set. |
-| `qdash_get_agent_candidate_commit`, `qdash_apply_agent_candidate_commit`, `qdash_wait_agent_candidate_apply` | Inspect, apply, and wait for candidate commits. |
+| `qdash_create_agent_session`, `qdash_get_agent_session` | Create an approved scope or inspect it |
+| `qdash_submit_agent_action`, `qdash_get_agent_action`, `qdash_list_agent_actions`, `qdash_wait_agent_action` | Propose and track actions |
+| `qdash_list_agent_interventions` | Read expert questions and answers |
+| `qdash_list_agent_action_candidates` | Inspect staged outputs |
+| `qdash_execute_agent_action` | Measure using current inputs; leave outputs staged |
+| `qdash_commit_agent_candidate`, `qdash_commit_agent_candidate_set` | Commit reviewed candidates |
+| `qdash_get_agent_candidate_commit`, `qdash_apply_agent_candidate_commit`, `qdash_wait_agent_candidate_apply` | Inspect and apply a commit |
 
-## Forum and figure tools
+The creation tool accepts no numeric override bounds or quality gates. Its approved task checks
+determine candidate acceptance; `evaluation` can be `off` or `required`. The confirmation shows
+the full grant. Ordinary write tools require per-call review.
 
-| Tool | Return or limit |
+## Calibration session tools
+
+A calibration session groups work toward an objective; it grants no execution permission.
+
+| Tool | Purpose |
 | --- | --- |
-| Forum read tools | Compact boxed list, detail, and reply summaries. |
-| `qdash_analyze_figure_json` | Numeric summaries of Plotly scatter and heatmap traces. |
-| `qdash_build_qcal_evidence` | Task, target, sweep, and run settings as evaluation context plus the figure as image content. `includeMetrics` and `includeInputs` add fitted outputs and inputs to text; details retain all records. |
-| `qdash_preview_forum_evidence_reply`, `qdash_preview_forum_image_reply` | Read-only previews of evidence or locally generated analysis images. |
-| `qdash_create_forum_evidence_reply`, `qdash_create_forum_image_reply` | Confirmation-gated replies. Image replies accept up to eight PNG, JPEG, GIF, or WebP images of at most 5 MB each. |
-| `qdash_create_forum_post`, `qdash_update_forum_post` | Confirmation-gated Forum writes. |
+| `qdash_create_calibration_session` | Create an objective on a chip, after confirmation |
+| `qdash_get_calibration_session` | Read runs, experiments, recommendation, and outcomes |
+| `qdash_record_calibration_decision` | Append the creator's decision and evidence |
+| `qdash_get_calibration_session_audit` | Read an audit snapshot; default 100, maximum 500 events per page |
+| `qdash_list_calibration_sessions` | List objectives; default 20, maximum 100 |
 
-Set `QDASH_WEB_URL` when the web UI is not at the API base URL minus `/api`.
-
-## Fallback tools
-
-| Tool | Result |
-| --- | --- |
-| `qdash_query` | Read-only queries without a dedicated tool. `files_tree` and `file_content` cover only the calibration config directory. `files_tree` takes no `path`; supplying one returns source-tool guidance. `file_content` preserves successful config reads and returns guidance only for source-looking paths that produce HTTP 400 or 404. Other errors, including HTTP 403 and server errors, propagate. |
-| `qdash_raw_get` | Read-only GET endpoints through qdash-client. |
+Use `calibrationSessionId` to associate a run with your open session on the same chip.
+Otherwise QDash creates an automatic session and closes it when its work ends. Closed sessions
+refuse new work; create a manual objective session for multiple trials. Audit records distinguish measured evidence from
+reported reasoning; they do not establish the current hardware state.
 
 ## Pipeline and flow operations
 
-| Tool | Operation |
+| Tool | Purpose |
 | --- | --- |
-| `qdash_get_pipeline_catalog` | List supported pipeline steps, dependencies, default task calls, step metrics, backend tasks, and the accepted spec version. |
-| `qdash_plan_pipeline` | Validate a version 2 pipeline spec and return problems with paths, warnings, and the calls each step will run with their call ids and effective settings; for a version 1 spec it points to the converted spec. Does not execute. |
-| `qdash_run_pipeline` (confirmation-gated) | Start a validated spec as one QDash execution and return its execution ID without waiting. A 422 with problems is returned as text. Completed tasks persist parameters directly, without an agent candidate gate. |
-| `qdash_save_flow` (confirmation-gated) | Validate, format, save, and register a Prefect `@flow` workflow. |
-| `qdash_execute_flow` (confirmation-gated) | Run a saved flow with parameters and return its execution ID without waiting. The name is letters, digits and underscores. |
+| `qdash_get_pipeline_catalog` | Get step types, task documentation, and spec schema |
+| `qdash_plan_pipeline` | Validate a version 2 spec without running it |
+| `qdash_create_pipeline_plan` | Validate and persist an expiring proposal; available in scripts, starts nothing |
+| `qdash_run_pipeline` | Start a spec or stored `planId` after confirmation; supply exactly one |
+| `qdash_save_flow` | Validate, save, and register a workflow after confirmation |
+| `qdash_execute_flow` | Run a saved workflow after confirmation |
+
+Launch tools return an execution ID without waiting. Pipelines save accepted outputs directly;
+they do not use agent candidate gates. An overlapping session waiting for an expert blocks a
+launch, as does an inability to check sessions. Replayed launch calls reuse their run; an unknown
+launch outcome must be investigated, never retried blindly.
 
 ## Metric scripts and dashboards
 
-These tools are deferred. Validation and previews execute the script on the QDash server within its time and memory limits but save nothing, so they are direct tools, not script-callable reads. The `qdash-metric-scripts` skill describes the authoring workflow and the `qdash_metrics` API.
-
-| Tool | Operation |
+| Tool | Purpose |
 | --- | --- |
-| `qdash_validate_metric_script` | Compile `source` in the worker and return its metrics (id, title, unit, target, result kind, hops, parameters) or diagnostics with line numbers. |
-| `qdash_preview_metric_script` | Evaluate one metric of draft `source`, or of a saved `scriptId` (optionally a `revision`), on a chip (default: the session chip) over a `period` (`{kind: "relative", days}` or `{kind: "absolute", start, end}`, default the last 14 days) with `params`. A series metric needs `targets` (1 to 16 qubit IDs or directed pairs such as `"0>1"`) and is evaluated for those only. The text gives the metric, resolved period, status counts, legend, up to 12 sample cells with labels and counts, the first five errors with script lines, and truncation and log notices; for a series metric it gives each target's point counts by status, value range, points resting on one observation, and its first and last points. `details.data` holds the full response. HTTP 422 details (`message`, `diagnostics`, `log`), 429 (queue full) and 503 (metric script runner not available) are returned as text. |
-| `qdash_save_metric_script` (confirmation-gated) | Create a script, or save a new revision of `scriptId` guarded by `expectedRevision` (409 on a concurrent save). Validates first and refuses source that would not validate without asking for confirmation. Reports the revision, status, active revision, diagnostics, and the editor page URL. |
-| `qdash_save_dashboard` (confirmation-gated) | Create a dashboard (optionally from a `templateId`; the confirmation and the result name any project-visible starter script that creation adds), or update `dashboardId` guarded by `expectedVersion` (409 when the dashboard changed); `panels` replaces the whole list. Local checks reject missing names, grid overflow, and `metric_script` panels without an integer `script_revision`, with an unknown `view`, or with `targets` that do not fit the view (a `timeseries` view needs 1 to 16, `map` and `table` take none) before confirmation. Reports pins with newer active revisions and the dashboard page URL. |
+| `qdash_validate_metric_script` | Compile draft source and return metrics or diagnostics |
+| `qdash_preview_metric_script` | Evaluate a draft or saved metric without saving |
+| `qdash_save_metric_script` | Save after validation and confirmation; `expectedRevision` guards edits |
+| `qdash_save_dashboard` | Save after confirmation; `expectedVersion` guards edits |
 
-`qdash_query` reads them with the actions `metric_script_catalog`, `metric_script_templates` (without source), `metric_script_template` (`templateId`), `metric_scripts`, `metric_script` (`scriptId`), `dashboards`, `dashboard` (`dashboardId`), `dashboard_templates`, and `dashboard_template` (`templateId`: the panels a starter template would create now and the shared scripts creation would add, without writing). A single script or dashboard (`metric_script`, `dashboard`) carries `_links` to its web page.
+Validation and preview execute code on the server, so call them directly, not inside scripts.
+Series previews need 1–16 targets. Dashboard panels pin a script revision; updating `panels`
+replaces the entire list. HTTP 409 means a concurrent save: reload before editing again.
+`qdash_query` reads script and dashboard catalogs, templates, and saved records.
+
+## Forum and figure tools
+
+| Tool | Purpose |
+| --- | --- |
+| `qdash_analyze_figure_json` | Summarize Plotly scatter and heatmap data |
+| `qdash_build_qcal_evidence` | Assemble task context and figures for evaluation |
+| `qdash_preview_forum_evidence_reply`, `qdash_preview_forum_image_reply` | Preview a reply without publishing |
+| `qdash_create_forum_evidence_reply`, `qdash_create_forum_image_reply` | Publish after confirmation |
+| `qdash_create_forum_post`, `qdash_update_forum_post` | Create or update a post after confirmation |
+
+Image replies accept at most eight PNG, JPEG, GIF, or WebP files, at most 5 MB each.
+
+## Fallback tools
+
+`qdash_query` provides other reads. Its file actions cover calibration configuration only;
+use source tools for code. In standalone pi, use `qdash_raw_get` only when neither a
+dedicated tool nor a `qdash_query` action covers the read.
 
 ## Safety
 
-| Contract | Behavior |
-| --- | --- |
-| Secret output | API tokens, passwords, and Cloudflare Access secrets are redacted. |
-| Write tools | Interactive pi asks for confirmation; non-interactive calls require `confirmWrite: true`. |
-| Saved profile and chip | The profile and chip selection outside a session is saved in `qdash-context.json` in pi's agent directory: `PI_CODING_AGENT_DIR` when set, otherwise `~/.pi/agent`. |
-| Investigation guidance | While a `qdash_*` tool is selected, the system prompt has a `qdash_guidance` section with evidence rules and the `qdash` skill's tool routing for the tools the model can call directly or load with `tool_search`. While `codemode` or `tool_search` is active, the section also gives QDash chat's script and deferred-tool rules. |
+Credentials are redacted. Reviewed writes show all arguments and require confirmation; without
+a UI they are refused. A model's `confirmWrite` argument grants nothing. Changed arguments or a
+cancelled turn invalidate approval. Session-granted writes remain limited to their approved scope.
 
 ## Scripts and deferred tools
 
-pi-qdash applies the tool policy QDash chat uses (`extensions/lib/tool-policy.ts`) to pi's built-in `codemode` and `tool_search` tools.
+`tool_search` loads specialist tools. `codemode` batches audited reads as JSON and can persist
+pipeline proposals with `qdash_create_pipeline_plan`. Execution, other writes, figures, shell
+tools, and unaudited calls are blocked. Call them directly. A script result is limited to
+512 KiB; the default timeout is 120 seconds, capped at 300.
 
-| Contract | Behavior |
-| --- | --- |
-| Activation | For a new user, pi-qdash activates pi's `tool_search` when it has deferred tools, and `codemode`, if pi registered them and neither is `hidden`. `PI_QDASH_CODEMODE=off` skips `codemode` by default. |
-| Selection | A selection the user makes is kept across reloads, new sessions, forks, and resumes, in the order below. |
-| Without `tool_search` | When no `tool_search` tool is registered or it is inactive, deferred tools are registered again as direct tools, so the model can still call them without loading. |
-| Deferred tools | Tools in `DEFERRED_TOOL_NAMES` (cryostat and wiring, forum, pipelines, agent workflow state, metric scripts and dashboards, source code, configuration, and similar) use `exposure: "deferred"`. The model loads them with `tool_search`; the routing guide marks them with `*`. |
-| Script data | In a `codemode` script, the audited reads in `NESTED_READ_TOOL_NAMES` resolve to their redacted response data as JSON. A call returning more than 512 KiB of JSON fails with a request to narrow it. |
-| Script limits | Scripts without `timeout_ms` get 120 seconds; longer deadlines are cut to 300 seconds. |
-| Namespace | Every `qdash_*` tool pi-qdash registers belongs to the `qdash` tool namespace (`QDASH_TOOL_NAMESPACE`), unless it states its own. pi's `codemode` lists it under `## qdash` with a one-line description when it lists QDash tools, `describeNamespace("qdash")` returns its instructions and the tools scripts can call, and `searchTools()` searches both. QDash chat declares the same namespace. |
-| Blocked from scripts | Write tools, figure tools, `qdash_raw_get`, and other unaudited QDash tools are model-only or blocked. While pi-qdash is loaded, a script may call another extension's tool only when it declares `readOnlyHint` and is not destructive; `bash`, `powershell`, `write`, and `edit` are always blocked. Call these tools directly. |
-| Name collisions | A tool another extension registers under a `qdash_*` or reviewed write name is blocked from scripts, whatever its annotations. A QDash name keeps script access only while pi's `getAllTools()` reports the `parameters` object pi-qdash registered, from pi-qdash's extension entry file (`extensions/lib/extension-identity.ts`). |
-| Missing identity | Without pi's registry or a file source for a tool, scripts reach no QDash tool. A second loaded copy of pi-qdash sees the first copy's tools as foreign, so load one copy. |
+Scripts can build calibration specs with `qdash.calibration`, the same pure builders as the
+[TypeScript SDK](./clients/typescript.md#define-a-calibration). Load `qdash_create_pipeline_plan` with
+`tool_search` first. Replace the chip and targets with values from your deployment:
 
-At each session start, pi-qdash decides `codemode` and `tool_search` separately; the first rule that applies wins:
+```js
+const c = qdash.calibration;
+const spec = c.calibrationSpec(c.qubitTargets(["0", "1"]), [
+  c.customOneQubit({ step_name: "t1", tasks: [c.taskCall("CheckT1")] }),
+  c.filterByStatus({ step: "t1" }),
+]);
+const plan = await tools.qdash_create_pipeline_plan({ chipId: "64Qv3", spec });
+text(plan);
+```
 
-1. A reload keeps the active tools.
-2. The session's branch: pi's own tool loadout records, which pi restores itself, or the latest `pi-qdash-tool-selection` entry, which pi-qdash appends when a run starts or the session ends with a selection the branch does not record.
-3. For a new session or fork whose branch records nothing, the selection the replaced session had when it ended. Persisted sessions pair by session file and in-memory forks by session manager. A new in-memory session with no matching session file or manager uses its own settings and defaults.
-4. A `defaultTools` setting entry: `codemode` or `+codemode` activates, `-codemode` leaves it inactive; the same for `tool_search`.
-5. The default activation above.
+Resolve any validation problems, then use the returned `plan_id` as `planId` in a direct
+`qdash_run_pipeline({ chipId: "64Qv3", planId })` call. The host retrieves the stored content for
+approval; the model does not copy its spec or supply an approval digest. Plans expire after
+24 hours. If expired or changed state invalidates the proposal, build and approve a new plan.
+For validation without storage, use `qdash_plan_pipeline`; its valid spec can still be passed
+directly to `qdash_run_pipeline`.
+
+This runs an ordinary pipeline; agent-session measurements must use the session's own step
+tools. Proposal storage does not enable measurements, other writes, or waits inside scripts.
+Use the literal `qdash.calibration` reference;
+helpers are installed when the source names `qdash`, not through dynamically assembled names.
+
+Classified deferred tools include a `Request type` line in their searchable descriptions.
+Search with purpose words such as `diagnosis task result evidence` or `measurement preparation`,
+or use an exact tool name. The shared guide covers stored values, diagnosis, measurement
+preparation, and writes; it does not restrict access when the request changes or combines purposes.
+
+Tool selections persist across sessions. `PI_QDASH_CODEMODE=off` disables default activation.
+Without `tool_search`, deferred tools become directly available. Load only one copy of pi-qdash;
+script access fails closed when tool identity cannot be verified.
 
 ## Evaluation hydration
 
-When pi-qcaleval is installed, pi-qdash fills each `qcal_evaluate` call the model makes before it runs, with the rules QDash chat uses (`extensions/lib/qcal-hydration.ts`).
-
-| Argument | Source |
-| --- | --- |
-| `images` | Newest figure of the session's active branch that belongs to `task_name`. A figure recorded for another task is skipped, and so is an unlabeled figure older than it. Placeholders and base64 that is not a PNG, JPEG, GIF, or WebP image are dropped. |
-| `knowledge`, `criteria` | Missing `knowledge` is filled from the task's QDash reference. Valid explicit `criteria` are preserved; otherwise the reference supplies them. |
-| `examples` | The task's labeled examples when `use_examples` is `true` and the call passes none. |
-| Record | `details.hydration` lists the figure origin and count, the figure's task result, the reference source, and the example count; it holds no bytes or text. |
-
-The reference and examples come from one knowledge request as the configured QDash user. Figure tools record `taskId` and `taskName` in their details so the figure can be matched.
+With pi-qcaleval installed, pi-qdash supplies missing task knowledge, matching figures, and requested
+examples to `qcal_evaluate`. It skips figures belonging to other tasks. Explicit valid criteria
+are preserved; `details.hydration` records origins without image bytes or knowledge text.
 
 ## Commands
 
@@ -176,8 +311,13 @@ The reference and examples come from one knowledge request as the configured QDa
 
 | Skill | Purpose |
 | --- | --- |
-| `/skill:qdash` | Choose QDash tools and avoid exposing secrets. |
-| `/skill:qdash-calibration-agent` | Confirmation-gated calibration workflows. |
-| `/skill:qdash-two-qubit-calibration-diagnosis` | Diagnose two-qubit calibration from read-only evidence. |
-| `/skill:qdash-timeseries-diagnosis` | Investigate multi-metric drift and local sensor series. |
-| `/skill:qdash-metric-scripts` | Write, validate, preview, and save metric scripts and put them on dashboards; `references/api.md` documents the `qdash_metrics` API. |
+| `/skill:qdash` | Select tools and protect credentials |
+| `/skill:qdash-agent-calibration` | Work within an approved agent session |
+| `/skill:qdash-chip-bringup` | Prepare capture delay and spectroscopy |
+| `/skill:qdash-one-qubit-calibration` | Calibrate and recover one-qubit tasks |
+| `/skill:qdash-two-qubit-calibration` | Calibrate directed pairs |
+| `/skill:qdash-zx90-optimization` | Search within approved bounds; each pipeline needs approval |
+| `/skill:qdash-characterization` | Measure coherence, transitions, noise, and coupling |
+| `/skill:qdash-rabi-after-configure` | Check the Rabi prerequisite and trace inputs |
+| `/skill:qdash-timeseries-diagnosis` | Investigate drift and sensor data |
+| `/skill:qdash-metric-scripts` | Author metrics and dashboards |

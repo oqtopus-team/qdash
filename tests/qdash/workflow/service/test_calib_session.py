@@ -1,4 +1,4 @@
-"""Tests for the internal CalibSession lifecycle, reservation and worker policy."""
+"""Tests for the internal ExecutionRuntime lifecycle, reservation and worker policy."""
 
 import asyncio
 import re
@@ -19,7 +19,7 @@ from qdash.workflow.service._internal.lifecycle import (
     is_external_termination as _is_external_termination,
 )
 from qdash.workflow.service._internal.session import (
-    CalibSession,
+    ExecutionRuntime,
     SessionRepositories,
     borrowed_session,
 )
@@ -226,6 +226,15 @@ class FakeExecutionCounterRepository:
         return []
 
 
+class IncrementingExecutionCounterRepository(FakeExecutionCounterRepository):
+    """Counter handing out consecutive indices, so every minted execution ID is distinct."""
+
+    def get_next_index(self, date: str, username: str, chip_id: str, project_id: str | None) -> int:
+        index = self.next_index
+        self.next_index += 1
+        return index
+
+
 def _settings(**overrides: Any) -> SessionSettings:
     """Session settings with test defaults; GitHub is off unless a test enables it."""
     values: dict[str, Any] = {
@@ -246,9 +255,9 @@ def _session(
     lock_repo: Any = None,
     counter_repo: Any = None,
     **overrides: Any,
-) -> CalibSession:
+) -> ExecutionRuntime:
     """An owner session; ``qids`` initializes it the way a step's Execution opens."""
-    session = CalibSession(
+    session = ExecutionRuntime(
         _settings(**overrides),
         repositories=SessionRepositories(lock_repo=lock_repo, counter_repo=counter_repo),
     )
@@ -264,9 +273,9 @@ def _worker(
     execution_id: str = "20240101-001",
     reservation: Any = None,
     **overrides: Any,
-) -> CalibSession:
+) -> ExecutionRuntime:
     """A worker session borrowing ``execution_id``, initialized for ``qids``."""
-    session = CalibSession(
+    session = ExecutionRuntime(
         _settings(**overrides).for_worker(),
         lease=WorkerLease(
             execution_id=execution_id,
@@ -376,7 +385,7 @@ def mock_user_repo():
 
 @pytest.fixture
 def mock_flow_session_deps(monkeypatch):
-    """Fixture to mock CalibSession dependencies."""
+    """Fixture to mock ExecutionRuntime dependencies."""
     monkeypatch.setattr(
         "qdash.workflow.service._internal.session.CalibOrchestrator",
         MockCalibOrchestrator,
@@ -385,7 +394,7 @@ def mock_flow_session_deps(monkeypatch):
         "qdash.workflow.service._internal.session.GitHubIntegration",
         MockGitHubIntegration,
     )
-    # Patch the repository imports where they are lazily imported in CalibSession
+    # Patch the repository imports where they are lazily imported in ExecutionRuntime
     monkeypatch.setattr(
         "qdash.repository.MongoExecutionLockRepository",
         MockExecutionLockRepository,
@@ -462,7 +471,7 @@ class TestCalibSessionInitialization:
 
     def test_unknown_task_default_is_rejected_before_any_session(self):
         with pytest.raises(ValueError, match="CheckRabbi"):
-            CalibSession(_settings(task_defaults={"CheckRabbi": {"run": {"shots": 1}}}))
+            ExecutionRuntime(_settings(task_defaults={"CheckRabbi": {"run": {"shots": 1}}}))
 
     def test_session_tags_reach_the_execution(self, mock_flow_session_deps, mock_lock_repo):
         session = _session(
@@ -633,7 +642,7 @@ class TestCalibSessionInitialization:
             staticmethod(lambda: True),
         )
         monkeypatch.setattr(
-            CalibSession,
+            ExecutionRuntime,
             "_sync_backend_params_before_push",
             lambda self, logger: self.github_push_config,
         )
@@ -745,7 +754,7 @@ class TestCalibSessionParameterManagement:
         }
         orchestrator._backend = MagicMock()
 
-        session = CalibSession(
+        session = ExecutionRuntime(
             _settings(
                 github=GitHubPolicy(
                     push=GitHubPushConfig(params_file_names=["t1.yaml", "t2_echo.yaml"])
@@ -779,7 +788,7 @@ class TestCalibSessionParameterManagement:
         orchestrator._execution_service = MockExecutionService()
         orchestrator._backend = MagicMock()
 
-        session = CalibSession(
+        session = ExecutionRuntime(
             _settings(
                 github=GitHubPolicy(
                     push=GitHubPushConfig(params_file_names=["capture_delay.yaml", "t1.yaml"])
@@ -822,7 +831,7 @@ class TestCalibSessionParameterManagement:
         }
         orchestrator._backend = MagicMock()
 
-        session = CalibSession(
+        session = ExecutionRuntime(
             _settings(
                 github=GitHubPolicy(
                     push=GitHubPushConfig(params_file_names=["t1.yaml", "t2_echo.yaml"])
@@ -880,7 +889,7 @@ class TestCalibSessionParameterManagement:
         orchestrator._execution_service.calib_data = state_manager.calib_data
         orchestrator._backend = MagicMock()
 
-        session = CalibSession(
+        session = ExecutionRuntime(
             _settings(
                 github=GitHubPolicy(
                     push=GitHubPushConfig(
@@ -980,7 +989,7 @@ class TestCalibSessionParameterManagement:
         orchestrator = MagicMock()
         orchestrator._execution_service = MockExecutionService()
 
-        session = CalibSession(_settings())
+        session = ExecutionRuntime(_settings())
         session.execution_id = "exec-1"
         session._orchestrator = orchestrator
 
@@ -1065,7 +1074,7 @@ class TestCalibSessionParameterManagement:
             "old_alias": ParameterModel(value=4.2),
             "shared_alias": ParameterModel(value=5.0),
         }
-        session = CalibSession(_settings())
+        session = ExecutionRuntime(_settings())
         session.execution_id = "exec-1"
         orchestrator = MagicMock()
         orchestrator._execution_service = execution_service
@@ -1157,7 +1166,8 @@ def pipeline_execution_env(mock_flow_session_deps, monkeypatch):
     """Exercise real pipeline/strategy lifecycle without hardware or database I/O."""
     records = []
     lock = MockExecutionLockRepository(locked=True, owner="exec-reserved")
-    claims = MagicMock(side_effect=["exec-reserved", None])
+    # Only the first claim adopts the API reservation; later steps mint their own IDs.
+    claims = MagicMock(side_effect=["exec-reserved", *[None] * 9])
     monkeypatch.setattr(
         "qdash.workflow.service._internal.session.read_flow_run_id_from_context",
         lambda: "flow-1",
@@ -1188,6 +1198,63 @@ def pipeline_execution_env(mock_flow_session_deps, monkeypatch):
     monkeypatch.setattr(
         "qdash.workflow.service._internal.session.CalibOrchestrator", RecordingOrchestrator
     )
+
+    class RecordingTransformExecution:
+        """A transform step's Execution: recorded like a step, with no orchestrator."""
+
+        note: Any
+        record: Any
+
+        @classmethod
+        def create(cls, **kwargs):
+            service = cls()
+            from qdash.workflow.engine.execution.models import ExecutionNote
+
+            service.note = ExecutionNote.from_dict(kwargs["note"])
+            service.record = SimpleNamespace(
+                config=SimpleNamespace(
+                    execution_id=kwargs["execution_id"],
+                    flow_name=kwargs["name"],
+                    note=kwargs["note"],
+                    tags=kwargs["tags"],
+                    skip_execution=False,
+                    connect_backend=False,
+                ),
+                status="scheduled",
+                service=service,
+            )
+            records.append(service.record)
+            return service
+
+        def save(self):
+            return self
+
+        def start(self):
+            self.record.status = "running"
+            return self
+
+        def reload(self):
+            return self
+
+        def _close(self, status):
+            assert lock.locked  # A transform never releases the pipeline lock.
+            self.record.status = status
+            self.record.persisted_note = self.note.to_dict()
+            return self
+
+        def complete(self):
+            return self._close("completed")
+
+        def fail(self, error_message=""):
+            self.record.message = error_message
+            return self._close("failed")
+
+        def cancel(self):
+            return self._close("cancelled")
+
+    monkeypatch.setattr(
+        "qdash.workflow.service._internal.session.ExecutionService", RecordingTransformExecution
+    )
     for method in (
         "record_stage_result",
         "_finalize_stale_running_tasks",
@@ -1195,7 +1262,7 @@ def pipeline_execution_env(mock_flow_session_deps, monkeypatch):
         "_update_chip_history",
         "_push_to_github_if_configured",
     ):
-        monkeypatch.setattr(CalibSession, method, MagicMock())
+        monkeypatch.setattr(ExecutionRuntime, method, MagicMock())
     schedule = SimpleNamespace(
         stages=[SimpleNamespace(box_type="A", parallel_groups=[["0", "1"]])],
         rounds=[SimpleNamespace(box_type="A", parallel_qids=["0", "1"], round_index=0)],
@@ -1243,7 +1310,7 @@ def test_pipeline_owns_one_execution_per_calibration_step(
         run_workers(plan=SimpleNamespace(step_id=invocation.step_id))
         return {qid: {"status": "success", "task_id": f"{name}-{qid}"} for qid in qids}
 
-    monkeypatch.setattr(CalibSession, "execute_task_batch", run_batch)
+    monkeypatch.setattr(ExecutionRuntime, "execute_task_batch", run_batch)
     # The batch path runs only tasks that implement batch_run.
     check_task, fine_task = (
         ("CheckQubitSpectroscopy", "CheckResonatorSpectroscopy")
@@ -1256,7 +1323,7 @@ def test_pipeline_owns_one_execution_per_calibration_step(
         project_id="project-1",
         flow_name="one",
         lock_repo=env.lock,
-        counter_repo=FakeExecutionCounterRepository(2),
+        counter_repo=IncrementingExecutionCounterRepository(2),
     )
 
     session.run_pipeline(
@@ -1268,17 +1335,25 @@ def test_pipeline_owns_one_execution_per_calibration_step(
         ],
     )
 
-    assert len(env.records) == 2
-    first, second = env.records
+    assert len(env.records) == 3
+    first, transform, second = env.records
     assert first.config.execution_id == "exec-reserved"
-    assert second.config.execution_id != first.config.execution_id
+    assert len({record.config.execution_id for record in env.records}) == 3
     assert worker_ids == [first.config.execution_id, second.config.execution_id]
-    assert [record.status for record in env.records] == ["completed", "completed"]
+    assert [record.status for record in env.records] == ["completed"] * 3
     assert [record.config.flow_name for record in env.records] == [
         "one_one_qubit_check",
+        "one_filter_by_status",
         "one_one_qubit_fine_tune",
     ]
-    assert [record.config.note["step_index"] for record in env.records] == [1, 3]
+    assert [record.config.note["step_index"] for record in env.records] == [1, 2, 3]
+    assert [record.config.note["step_kind"] for record in env.records] == [
+        "calibration",
+        "transform",
+        "calibration",
+    ]
+    assert transform.persisted_note["transform_result"]["output_qids"] == ["0", "1"]
+    assert session.run_execution_ids == [r.config.execution_id for r in env.records]
     assert all(record.config.note["flow_run_id"] == "flow-1" for record in env.records)
     assert all(record.config.skip_execution is False for record in env.records)
     assert env.lock.try_lock_calls == ["exec-reserved"]
@@ -1329,9 +1404,8 @@ def test_pipeline_failure_preserves_completed_steps(
                 FailureTransform() if transform_failure else FailureStep(),
             ],
         )
-    expected = (
-        ["completed"] if transform_failure else ["completed", "cancelled" if cancel else "failed"]
-    )
+    # A failing transform step closes its own Execution like a calibration step.
+    expected = ["completed", "cancelled" if cancel else "failed"]
     assert [record.status for record in env.records] == expected
     assert env.lock.locked is False
 
@@ -1570,9 +1644,9 @@ def test_pipeline_rejects_unplanned_targets_before_later_hardware_step(
     assert not pipeline_execution_env.lock.locked
 
 
-def _borrowing_worker(scope: Any, **overrides: Any) -> CalibSession:
+def _borrowing_worker(scope: Any, **overrides: Any) -> ExecutionRuntime:
     """A worker session of the reservation ``scope`` that has not opened a backend."""
-    return CalibSession(
+    return ExecutionRuntime(
         _settings(username="alice", chip_id="chip-1", project_id="project-1", **overrides),
         lease=WorkerLease(execution_id="child", reservation=ReservationScope.of(scope)),
         mux_mapping=MuxMapping.legacy(),
@@ -1708,8 +1782,8 @@ class TestAbortClassification:
         assert _is_external_termination(exc) is False
 
 
-def _build_abort_handling_session(mock_lock_repo, mock_user_repo) -> CalibSession:
-    """Build a CalibSession the same way TestRunPipelineFailureLogging does."""
+def _build_abort_handling_session(mock_lock_repo, mock_user_repo) -> ExecutionRuntime:
+    """Build a ExecutionRuntime the same way TestRunPipelineFailureLogging does."""
     return _session(
         execution_id="20240101-001",
         qids=["0"],
@@ -1718,7 +1792,7 @@ def _build_abort_handling_session(mock_lock_repo, mock_user_repo) -> CalibSessio
 
 
 def _mock_terminal_handlers(
-    session: CalibSession, monkeypatch: pytest.MonkeyPatch
+    session: ExecutionRuntime, monkeypatch: pytest.MonkeyPatch
 ) -> tuple[MagicMock, MagicMock, MagicMock]:
     """Replace the three terminal handlers so the abort branch can be observed."""
     fail, cancel, abandon = MagicMock(), MagicMock(), MagicMock()
@@ -1850,7 +1924,7 @@ def test_worker_spec_inherits_every_measurement_setting(mock_flow_session_deps, 
 
     from qdash.common.execution_resources import resolve_execution_resource_scope
 
-    owner = CalibSession(
+    owner = ExecutionRuntime(
         _rerun_settings(), repositories=SessionRepositories(lock_repo=mock_lock_repo)
     )
     owner.execution_id = "exec-step"
@@ -1930,7 +2004,7 @@ def test_pipeline_steps_share_settings_except_their_metadata(pipeline_execution_
 
     monkeypatch.setattr(CustomOneQubit, "execute", capture)
     base = _rerun_settings(github=GitHubPolicy.disabled())
-    session = CalibSession(
+    session = ExecutionRuntime(
         base,
         repositories=SessionRepositories(
             lock_repo=pipeline_execution_env.lock,

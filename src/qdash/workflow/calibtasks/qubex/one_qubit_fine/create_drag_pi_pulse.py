@@ -9,6 +9,7 @@ from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
     RunParameterSpec,
+    TaskDocumentation,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -28,6 +29,27 @@ class CreateDRAGPIPulse(QubexTask):
 
     name: str = "CreateDRAGPIPulse"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Calibrates a 24 ns DRAG pi pulse: two iterations of amplitude calibration and a "
+            "DRAG beta sweep over repeated X180 and -X180 pairs. It writes drag_pi_amplitude, "
+            "drag_pi_beta, and drag_pi_duration."
+        ),
+        when_to_use=(
+            "Run it after CheckRabi. CreateZX90 and the other cross-resonance tasks use it as "
+            "the control-qubit echo pulse, and Qubex prefers it for state preparation."
+        ),
+        prerequisites=(
+            (
+                "Rabi parameters from a CheckRabi run under the current readout_duration, with "
+                "rabi_r2 at or above the R² threshold; they normalize the IQ data."
+            ),
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # RabiParam calibrates the pulse and normalizes IQ; validate its readout context.
         **required_rabi_normalization_inputs(),

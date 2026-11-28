@@ -1,19 +1,29 @@
 from typing import Any
 
+from qdash.dbmodel.agent_chat_session import AgentChatSessionDocument
+from qdash.dbmodel.agent_chat_share import AgentChatShareDocument
+from qdash.dbmodel.agent_chat_turn import AgentChatTurnDocument
 from qdash.dbmodel.agent_session import (
     AgentActionDocument,
+    AgentBackendApplyLockDocument,
     AgentCandidateCommitDocument,
     AgentCandidateSetCommitDocument,
+    AgentDecisionDocument,
+    AgentInterventionDocument,
     AgentSessionDocument,
 )
 from qdash.dbmodel.backend import BackendDocument
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
+from qdash.dbmodel.calibration_pipeline_plan import CalibrationPipelinePlanDocument
+from qdash.dbmodel.calibration_session import (
+    CalibrationDecisionDocument,
+    CalibrationSessionDocument,
+)
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.chip_note import ChipNoteDocument
 from qdash.dbmodel.cooldown import CooldownDocument
 from qdash.dbmodel.cooldown_wiring_event import CooldownWiringEventDocument
-from qdash.dbmodel.copilot_chat_session import CopilotChatSessionDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.coupling_history import CouplingHistoryDocument
 from qdash.dbmodel.cryostat import CryostatDocument
@@ -35,6 +45,7 @@ from qdash.dbmodel.metric_note import MetricNoteDocument
 from qdash.dbmodel.metric_script import MetricScriptDocument
 from qdash.dbmodel.note_event import NoteEventDocument
 from qdash.dbmodel.notification import NotificationDocument
+from qdash.dbmodel.pipeline_launch import PipelineLaunchDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_execution_counter import ProjectExecutionCounterDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
@@ -45,6 +56,7 @@ from qdash.dbmodel.provenance import (
 )
 from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.qubit_history import QubitHistoryDocument
+from qdash.dbmodel.run import RunDocument
 from qdash.dbmodel.slack_forum_thread import SlackForumThreadDocument
 from qdash.dbmodel.tag import TagDocument
 from qdash.dbmodel.target_note import TargetNoteDocument
@@ -60,7 +72,15 @@ def document_models() -> list[Any]:
         AgentSessionDocument,
         AgentActionDocument,
         AgentCandidateCommitDocument,
+        AgentBackendApplyLockDocument,
         AgentCandidateSetCommitDocument,
+        AgentDecisionDocument,
+        AgentInterventionDocument,
+        CalibrationSessionDocument,
+        RunDocument,
+        CalibrationDecisionDocument,
+        PipelineLaunchDocument,
+        CalibrationPipelinePlanDocument,
         ExecutionHistoryDocument,
         TaskResultHistoryDocument,
         QubitDocument,
@@ -99,7 +119,9 @@ def document_models() -> list[Any]:
         MetricScriptDocument,
         CooldownDocument,
         CooldownWiringEventDocument,
-        CopilotChatSessionDocument,
+        AgentChatSessionDocument,
+        AgentChatTurnDocument,
+        AgentChatShareDocument,
         # Provenance tracking
         ParameterVersionDocument,
         ProvenanceRelationDocument,

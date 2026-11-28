@@ -7,6 +7,7 @@
  */
 import type { PipelineCatalogResponseExample } from './pipelineCatalogResponseExample';
 import type { PipelineCatalogResponseSpecSchema } from './pipelineCatalogResponseSpecSchema';
+import type { PipelineCatalogResponseTaskDocumentation } from './pipelineCatalogResponseTaskDocumentation';
 import type { PipelineCatalogResponseTasks } from './pipelineCatalogResponseTasks';
 import type { PipelineStepTypeInfo } from './pipelineStepTypeInfo';
 
@@ -22,6 +23,8 @@ export interface PipelineCatalogResponse {
   two_qubit_execution_modes: string[];
   /** Available task names by task_type ("qubit", "coupling", ...). */
   tasks: PipelineCatalogResponseTasks;
+  /** Guidance declared by available tasks, keyed by task name. Tasks that declare no documentation are omitted. */
+  task_documentation?: PipelineCatalogResponseTaskDocumentation;
   /** The spec version this QDash accepts. */
   spec_version: number;
   /** JSON schema of CalibrationPipelineSpec. */

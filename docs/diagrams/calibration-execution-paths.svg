@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 580" role="img" aria-label="Two execution paths have different write semantics. An ordinary approved pipeline runs predetermined tasks and filters and may write outputs directly. A bounded agent session measures without writeback, assesses staged candidates, and commits only accepted authorized values. The agent chooses the next step from recorded evidence.">
+<style>
+.cd-paths { font-family: var(--vp-font-family-base, -apple-system, "Segoe UI", sans-serif); }
+.cd-paths .box { fill: var(--vp-c-bg-soft, #f6f6f7); stroke: var(--vp-c-divider, #c2c2c4); stroke-width: 1.5; }
+.cd-paths .accent { fill: var(--vp-c-brand-soft, #e8efff); stroke: var(--vp-c-brand-1, #3451b2); stroke-width: 1.5; }
+.cd-paths text { fill: var(--vp-c-text-1, #202127); text-anchor: middle; font-size: 18px; }
+.cd-paths .title { font-weight: 650; font-size: 21px; }
+.cd-paths .note { fill: var(--vp-c-text-2, #5b5b66); font-size: 16px; }
+.cd-paths .edge { fill: none; stroke: var(--vp-c-text-2, #5b5b66); stroke-width: 1.6; marker-end: url(#cd-paths-arrow); }
+</style>
+<defs><marker id="cd-paths-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10Z" fill="var(--vp-c-text-2, #5b5b66)"/></marker></defs>
+<g class="cd-paths">
+<text x="250" y="32" class="title">Predetermined processing</text>
+<text x="710" y="32" class="title">Adaptive experiment loop</text>
+<rect x="50" y="55" width="400" height="84" rx="10" class="box"/>
+<text x="250.0" y="86" class="title">Ordinary pipeline</text>
+<text x="250.0" y="113" class="">Execution approval for the spec</text>
+<rect x="510" y="55" width="400" height="84" rx="10" class="box"/>
+<text x="710.0" y="86" class="title">Agent session</text>
+<text x="710.0" y="113" class="">Approved targets, tasks, budget, expiry</text>
+<path d="M250 139 V182" class="edge"/>
+<path d="M710 172 V182" class="edge"/>
+<rect x="50" y="182" width="400" height="108" rx="10" class="box"/>
+<text x="250.0" y="213" class="title">Tasks and result filters</text>
+<text x="250.0" y="240" class="">Engine follows the declared steps</text>
+<text x="250.0" y="264" class="">Task outputs may update saved values</text>
+<rect x="510" y="182" width="400" height="108" rx="10" class="box"/>
+<text x="710.0" y="213" class="title">Measurement</text>
+<text x="710.0" y="240" class="">No parameter writeback</text>
+<text x="710.0" y="264" class="">Results become staged candidates</text>
+<path d="M710 290 V332" class="edge"/>
+<rect x="510" y="332" width="400" height="108" rx="10" class="accent"/>
+<text x="710.0" y="363" class="title">Assessment; commit if needed</text>
+<text x="710.0" y="390" class="">Accept evidence within the grant</text>
+<text x="710.0" y="414" class="">Commit requires authority and gates</text>
+<path d="M250 290 V472" class="edge"/>
+<path d="M710 440 V472" class="edge"/>
+<rect x="50" y="472" width="860" height="80" rx="10" class="accent"/>
+<text x="480.0" y="503" class="title">Recorded results and calibration state</text>
+<text x="480.0" y="530" class="">Backend application and hardware configuration remain separate operations.</text>
+<path d="M910 385 H940 V235 H910" class="edge"/>
+<text x="710" y="161" class="note">Agent selects each measurement</text>
+</g>
+</svg>

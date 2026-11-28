@@ -429,3 +429,55 @@ async def test_set_schedule_handles_empty_created_list(
     response = await deployment_service.set_schedule(request)
 
     assert response.schedule_id is None
+
+
+@pytest.mark.asyncio
+async def test_register_deployment_records_the_parameter_schema(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The deployment records the flow's parameter schema, without enforcing it."""
+    client = _FullFakeClient(deployment=None, new_deployment_id=uuid.uuid4())
+    flow_file = _make_flow_file(tmp_path)
+    _patch_register_deps(monkeypatch, client, tmp_path)
+    schema: dict[str, object] = {
+        "type": "object",
+        "properties": {"approved_plan": {"x-contract": 1}},
+    }
+    built: list[tuple[object, str]] = []
+
+    def fake_schema(flow_obj: object, name: str) -> dict[str, object]:
+        built.append((flow_obj, name))
+        return schema
+
+    monkeypatch.setattr(deployment_service, "_parameter_openapi_schema", fake_schema)
+
+    await deployment_service.register_deployment(
+        deployment_service.RegisterDeploymentRequest(
+            file_path=str(flow_file), flow_function_name="my_flow"
+        )
+    )
+
+    assert [name for _flow, name in built] == ["my_flow"]
+    assert client.create_deployment_kwargs is not None
+    assert client.create_deployment_kwargs["parameter_openapi_schema"] == schema
+    assert client.create_deployment_kwargs["enforce_parameter_schema"] is False
+
+
+@pytest.mark.asyncio
+async def test_register_deployment_without_a_schema_records_none(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A schema Prefect cannot build is recorded as none; registration still succeeds."""
+    client = _FullFakeClient(deployment=None, new_deployment_id=uuid.uuid4())
+    flow_file = _make_flow_file(tmp_path)
+    _patch_register_deps(monkeypatch, client, tmp_path)
+
+    # Under the test suite's mocked Prefect, building the schema itself fails.
+    await deployment_service.register_deployment(
+        deployment_service.RegisterDeploymentRequest(
+            file_path=str(flow_file), flow_function_name="my_flow"
+        )
+    )
+
+    assert client.create_deployment_kwargs is not None
+    assert client.create_deployment_kwargs["parameter_openapi_schema"] is None

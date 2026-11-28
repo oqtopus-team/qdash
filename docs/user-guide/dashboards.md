@@ -1,173 +1,65 @@
 # Dashboards
 
-Use **Dashboards** to arrange metric maps, the results of your own metric scripts, and notes on
-one page, keep that arrangement, and share it with the other members of your project.
-
-**Overview** shows every configured metric for one chip in a fixed order. A dashboard shows only
-the panels you add, in the layout you choose, so a team can agree on one view for a recurring
-question such as "what is the median ZX90 fidelity of each coupling over the last two weeks" or
-"which couplers are close to a Type1A collision after this cool-down".
-
-**Dashboards** has two tabs. **Dashboards** lists the dashboards you own and those shared with
-the project. **Scripts** lists metric scripts: Python files that compute one value per qubit or
-per coupling that a metric panel can show. Writing a script is covered in
-[Metric Scripts](./metric-scripts.md); this page covers dashboards and their panels.
+Use **Dashboards** to save and share a layout of metrics and notes. Use [Overview](./overview.md)
+when you want all configured metrics without building a layout. Creating or editing dashboards
+requires Editor or Owner access. Agent-assisted creation also needs [AI setup](./setup/ai.md).
 
 ## Create a Dashboard with the Agent
 
-Project editors and owners can create dashboards; viewers can open the dashboards shared with
-them. The quickest start is to describe the dashboard to the [Agent](./ai-chat.md) and review
-the draft it proposes.
+1. Select **Create with Agent** and describe the view you need.
+2. Review the proposed diff and select **Apply to draft**.
+3. Check the panels and chip, then select **Save**.
 
-1. Open **Dashboards** and select **Create with Agent**. A new, unsaved dashboard opens with the
-   **Ask Agent** sidebar beside it. Nothing is sent until you ask.
-2. Describe what you need, or pick a suggested request such as "Build a frequency collision map
-   from the starter template" or "Show the median ZX90 fidelity per coupling over the last 14
-   days". The Agent reads the available metrics, scripts, and templates and proposes a draft as
-   a diff in the chat.
-3. Select **Apply to draft**. The panels appear on the page, and the name the Agent chose
-   appears in the name field; change it if you like. When the draft starts from a template, the
-   page shows the template's panels as a preview, with data from the selected chip, and copies
-   them into the dashboard when you save. If the project does not have the template's shared
-   metric script yet, the page says that **Save** also adds it, shared with the project; until
-   then the script panels run the template's code without storing anything. **Discard** in the
-   chat leaves the draft as it was.
-4. Adjust the draft yourself if needed: **Add panel**, the panel menus, and the **Chip** work as
-   in [edit mode](#add-panels). Ask for further changes; each proposal is a diff against the
-   draft as it is now, including your own edits.
-5. Select **Save**. QDash creates the dashboard as **Private** and opens it. Share it later from
-   the dashboard's actions menu.
-
-The draft lives only in your browser until you save it. If QDash refuses it, for example because
-a panel names a script revision that does not exist, the error is shown and the draft stays so
-you can fix it. To keep a metric the Agent computes, it first saves a metric script, which asks
-for your approval; see [Write a Script with the Agent](./metric-scripts.md#write-a-script-with-the-agent).
+Nothing is stored until Save. The new dashboard is private. A template may also create a shared
+metric script; the draft tells you before saving.
 
 ## Create a Dashboard Yourself
 
-1. Open **Dashboards** and select **New dashboard**.
-2. Under **Start from**, keep the **Frequency Collision Map** template, which is preselected, or
-   choose **Blank dashboard**. The template adds a qubit frequency map, the Type0A, Type0B,
-   Type1A, Type3A, Type1C, and Type2C collision checks, ready to read on your chip, and a short
-   note on reading their colours. Its collision panels use the project's shared **Frequency collision checks** script;
-   when the project has none yet, QDash creates it and shares it with the project. The dashboard
-   is yours: later changes to the template do not alter it. When the templates cannot be
-   loaded, the dialog says so, offers **try again**, and selects **Blank dashboard**.
-3. The **Name** follows the chosen template until you type your own.
-4. Choose the **Chip**. The newest active chip is preselected. Viewers can switch to another
-   chip while they look at the dashboard without changing the saved default.
-5. Under **Sharing**, keep **Private** or choose **Shared with project** to show it to every
-   project member. You can change this later.
-6. Select **Add a description** to add an optional description.
-7. Select **Create dashboard**. The new dashboard opens with its panels on the chosen chip;
-   select **Edit** to add, remove, or reconfigure panels.
+1. Select **New dashboard**.
+2. Choose a template or **Blank dashboard**.
+3. Set the **Name**, **Chip**, and **Sharing**.
+4. Select **Create dashboard**, then **Edit** to change its panels.
 
-Change the name, description, sharing, or default chip later under **Dashboard settings**
-in the dashboard's actions menu, next to **Edit**.
+The **Frequency Collision Map** template creates the project's shared collision script if needed.
+Use **Dashboard settings** later to change the name, sharing, or default chip.
 
 ## Add Panels
 
-In edit mode, select **Add panel** and choose **Metric** or **Note** under **Panel**. A note
-holds Markdown text, for example the purpose of the dashboard or the decision rule the team
-applies. A metric panel shows one metric on the chip topology or in a table:
+1. In edit mode, select **Add panel**, then **Metric** or **Note**.
+2. For a metric, choose **Show**, then its value selection or script period and view.
+3. For a pair metric, check **Direction** and **Pair distance**. For a time series, enter up to
+   16 qubits or directed pairs to chart.
+4. Adjust script **Parameters** under **Advanced** if needed, then **Apply**.
+5. Move or resize panels, then **Save**.
 
-1. Under **Show**, choose the metric. The list groups **Qubit metrics** and **Coupling metrics**,
-   which read the latest calibration like **Overview**, and then each metric a saved script
-   computes, under the script's name, with its unit and whether it is per qubit or per pair.
-   Scripts without a valid revision are not listed; a private script is marked **(private)**.
-   The full name of the chosen metric and its source appear below the list.
-2. The **Title** follows the metric until you type your own.
-3. For a qubit or coupling metric, choose the **Value selection**: **Latest**, **Best**, or
-   **Average**.
-4. For a script metric, set the **Period** and the **View**. **Last days** always shows the
-   most recent number of days, measured when the panel loads; **Fixed range** shows the same
-   start and end every time. For a metric computed per pair, choose the **Direction** to draw
-   and the **Pair distance**: **1 hop** for neighbouring qubits, **2 hops** for qubits two
-   steps apart, among the distances the metric supports. A metric that returns a trend over
-   time, marked **time series**, is always a **Chart**: type up to 16 **Qubits** or **Directed
-   pairs** to draw instead, such as `0>1, 1>0`. Only those are evaluated; see
-   [Chart a Trend Over Time](./metric-scripts.md#chart-a-trend-over-time).
-5. Open **Advanced** to adjust the metric's **Parameters**, if it has any, and to see which
-   script and revision the panel uses. Only parameter values that differ from the default are
-   kept. The section opens by itself when the panel already has parameter values.
-6. Select **Apply** (or **Add panel**).
+Drag a header to move a panel or a bottom corner to resize it. The panel menu offers the same
+actions. **Discard** restores the saved layout. **Edit with Agent** can propose changes to the
+draft; you still select **Save** to keep them.
 
-Each panel sits on a 12-column grid. In edit mode, drag a panel by its header to move it, and
-drag a bottom corner to resize it; panels in the way move down, and the outline shows where the
-panel lands. From the keyboard, focus the grip at the left of the header (**Move** and the panel
-title) and use the arrow keys to move the panel one cell, or Shift and the arrow keys to resize
-it. The panel menu also moves and resizes a panel, duplicates it, or removes it. A panel is at
-most 12 rows tall. When the dashboard area is narrow, for example on a phone or with the
-**Ask Agent** sidebar wide open, panels stack at full width in reading order; dragging is
-unavailable there, but the panel menu still works, and the stored layout changes only when you
-move or resize a panel.
-
-On your own dashboard, select **Edit with Agent** to open the **Ask Agent** sidebar with the dashboard,
-the chip it shows, and its current panels, unsaved changes included. On a dashboard without
-panels, **Ask Agent** comes first, next to **Add panel**. The Agent proposes a new panel list as a
-diff; **Apply to draft** enters edit mode with the proposed panels, and nothing is stored until
-you select **Save**. The Agent does not change sharing, and it keeps each panel's script
-revision unless you ask it to move one.
-
-Changes stay local until you select **Save**; **Discard** returns to the saved layout and **Done**
-leaves edit mode. If someone else saved the dashboard after you selected **Edit**, **Save** fails
-with a message to reload, and your changes stay on screen so you can note them before reloading. The dashboard stores the layout, the chip, and the panel settings, not measured
-values: every time someone opens it, the panels read the current data of the selected chip.
+The dashboard stores settings, not measurements: panels read current data whenever they load.
 
 ## Keep Panels on a Known Script Revision
 
-Every save of a metric script creates a numbered revision, shown as **r1**, **r2**, and so on.
-A panel that shows a script metric is pinned to the revision that was current when you added
-it, so nobody's edit to a script changes what your dashboard shows without your knowledge.
-
-When the script has a newer valid revision, the panel shows **Update available**. In edit
-mode, select **Use updated definition** on the panel, or in the panel's **Advanced** section,
-which shows the pinned and the active revision numbers; check the result, then **Save** the
-dashboard to move the pin. Nothing moves until you do. A saved revision that a dashboard pins
-is kept even when the script has many later revisions. A script keeps at most 50 revisions, so
-when dashboards pin 50 of them, saving new code is refused until some panels are updated to a
-newer revision or removed.
+A script panel stays on the revision used when it was added. When **Update available** appears,
+select **Use updated definition** in edit mode, review the result, and **Save** to adopt it.
+A script retains at most 50 revisions; if all are pinned, update or remove old panel pins before
+saving more revisions.
 
 ## Read a Metric Script Panel
 
-A map shows qubits on the chip layout. A metric computed per coupling is drawn on the edges
-between qubits: a solid edge connects neighbouring qubits, a dashed edge qubits two steps apart.
-Each direction of a pair is its own edge, because results such as a ZX90 gate fidelity belong to
-a control and a target qubit. Switch between **Both**, **Forward** (from the lower to the higher
-qubit number), and **Reverse** to show one direction at a time. The legend explains the colours
-and counts the targets in each.
+Select a qubit or directed edge to inspect its value, sample count, checks, estimates, and input
+measurements. A grey target can mean missing data or an error; open it for the reason.
+**Table** supports sorting and CSV copying. The footer shows the period and parameters used.
 
-A grey or empty target has no value. Select it to see why: no data in the period, too few
-observations for the script's threshold, or an error in the script, with the line it occurred on.
-The other targets are still valid when one target fails.
-
-Select a qubit or an edge to open its details: the value and label, the **Checks** the script
-reported (for example the number of samples, the minimum and the maximum), **Defaults and
-estimates** it used, and the **Inputs** it read, with the task and time of each measurement. Use
-**Copy all** to paste these into a note or a forum post.
-
-The **Table** view lists every target with its value, status, sample count and label; sort it by
-any column and copy it as CSV. The panel footer shows the period that was actually used and the
-parameter values in effect.
+Pair directions are separate: **Forward** runs from lower to higher qubit number, **Reverse**
+the opposite way. Solid edges join neighbours; dashed edges join targets two hops apart.
 
 ## Share and Reuse
 
-A dashboard set to **Shared with project** appears under **Shared with project** on
-**Dashboards** for every member of the project. Members can open it, switch its chip for
-themselves, and use **Copy link** to send the page to a colleague, who needs access to the same
-project to open it.
+Select **Share with project** to let every project member open the dashboard. Its scripts must
+also be shared; QDash asks their owners to share them rather than doing so automatically.
 
-A shared dashboard can only use scripts that are also shared with the project. When you select
-**Share with project** and a panel uses a private script, QDash lists those scripts instead of
-sharing: select **Open script settings** for a script you own and share it from its
-**Settings** in the script editor, or ask the owner named in the list, or replace the panel.
-QDash never shares a script on your behalf. The panel editor warns in the same way when you add
-a private script's metric to a shared dashboard.
+Only the dashboard owner and project owners can edit or delete it. Any editor can **Duplicate**
+it into a private copy. Share **Copy link** with members of the same project.
 
-Only the owner and project owners can edit, re-share, or delete a dashboard; **Share with
-project**, **Make private**, and **Delete dashboard** are in the dashboard's actions menu. Any
-editor can select **Duplicate** to get a private copy to change independently; the copy keeps the
-pinned script revisions. Dashboards and scripts belong to the project in which they were created and are
-not visible from other projects; see [Projects and Data Sharing](./projects-and-data-sharing.md).
-
-How this works: [Dashboards architecture](../developer-guide/architecture/dashboards.md).
+For custom calculations, see [Metric Scripts](./metric-scripts.md).

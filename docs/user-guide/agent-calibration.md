@@ -1,235 +1,192 @@
 # Agent Calibration
 
-Agent calibration lets an AI agent you operate run calibration steps one at a time, inside a
-scope you approve first, while QDash executes the measurements, checks the results against
-fixed gates, and records every decision. It is an experimental single-qubit path inspired by
-[Vibe Calibration](https://arxiv.org/abs/2606.22376).
+Agent calibration runs one measurement at a time within a scope you approve. QDash records the
+steps, checks candidate values, and pauses for expert help when needed. This is an experimental
+single-qubit workflow.
 
-You drive it from the `qdash-agent` command of the Python client. How this works:
-[Agent platform](../developer-guide/copilot/agent-platform.md).
+## Before you start
 
-## Install and configure
+Use the web **Agent** or [configure standalone pi-qdash](../reference/pi-qdash.md#configuration). Match the extension to
+your deployment. Approvals and expert answers require project edit permission.
 
-Install the client, then configure a named profile as described in the
-[Python client](../reference/clients/python.md#connect-to-a-deployment). The command reads credentials
-from that profile and never prints them. In a secret-managed environment, set the documented
-`QDASH_*` variables and replace `--profile local` below with `--from-env`.
+## Ask for a calibration
 
-```bash
-pip install qdash-client
-```
+1. State the goal, chip, and qubit: “Calibrate Q00 on chip-001 step by step; ask an expert if stuck.”
+2. Review the proposed session: targets, allowed tasks, measurement budget, retry limit, expiry,
+   evaluation policy, and **Parameter updates**.
+3. Approve the scope. The agent can then measure within it without asking for every step.
+4. Follow the results and review the final report of measured candidates and saved values.
 
-Agent instructions (skills) are distributed separately from
-[oqtopus-team/skills](https://github.com/oqtopus-team/skills).
+Parameter-update grants allow the agent to save only named values after a passing assessment
+and task checks. Without a grant, saving requires separate approval. Measurements themselves
+never write calibration values. Ungranted outputs are reference-only, not failed measurements.
 
-You need to be a member of the project; creating sessions and running steps needs editor
-permission. Writing accepted values back to the Qubex configuration files also needs the
-GitHub configuration credentials of the deployment and a parameter-to-file mapping in the
-application configuration (`workflow.params_updater.parameter_file_map`).
+Each measurement uses saved calibration values. If the next task needs a candidate, the agent
+must commit it first; declining that commit stops the sequence. Failed or uncertain results
+pause for an expert. The assistant cannot set numeric bounds for you; use the CLI below when
+you need them. New targets, tasks, or exhausted budgets require a new session.
 
-## Create a bounded session
+## When the agent stops for an expert
 
-A session fixes the chip, qubits, allowed tasks, parameter bounds, quality gates, action budget,
-expiry, skill/model identity, and hardware-reconfiguration permission. Later actions must stay
-within that scope.
+New expert requests also appear in **Forum**, posted by **qdash**, with the question,
+summary, and available evidence links. The thread uses **agent**, **calibration**, and
+**question** labels when those labels have not been deleted. Discuss the request there,
+then follow its intervention link to record the expert's decision. Forum replies do not
+answer the intervention or resume the agent.
+
+Open the intervention link from the agent or configured [Slack notifications](./setup.md#notify-experts-of-agent-interventions-in-slack).
+Review the attempts and evidence, enter **Guidance**, then choose **Reactivate session** or
+**Stop session**. Guidance does not expand the approved scope.
+
+No new step starts while paused; an already dispatched measurement may finish. Expired,
+exhausted, or stopped sessions cannot reactivate. An unknown measurement-start outcome must be
+investigated; the session can only be stopped. Slack links open QDash; replies in Slack do not
+answer the intervention.
+
+Forum threads are created even without Slack. If creation fails, QDash retries automatically
+without changing the session's state. If every Forum category is archived, restore a category so
+creation can succeed. Archiving a created thread does not create a replacement. Requests
+recorded before this feature was enabled are not added to Forum automatically.
+
+## Continue after the expert answers
+
+Ask the agent to continue, in the same chat or a new one. It reads the saved session and guidance.
+An expert answer or page reload does not start the agent automatically. **Continue session**
+sends the continuation request; an active session alone does not mean the agent is working.
+
+You can ask the agent to wait for the expert, for at most an hour. Stopping that answer ends the
+wait, so ask again afterward.
+
+## Stop a session
+
+Open the session and select **Stop session**, give a reason, and confirm. This permanently blocks
+new measurements, commits, and backend applies. It does not cancel a measurement already sent
+to hardware; that result is recorded but cannot be committed from the stopped session.
+
+## Review and export the audit
+
+Open **Experiment audit** on the session page. It distinguishes **QDash record**, **Agent
+statement**, **Expert statement**, and **Evaluator output**. Missing evidence is **Not recorded**;
+reported model identity is not verified by QDash.
+
+Use **Refresh** for new entries, **Load more** for older entries, and **Export JSON** for the
+whole audit. Follow result links for figures and raw data. The audit does not automatically
+change task knowledge or skills.
+
+## Follow a session on the Execution page
+
+Expand its row on **Execution**, or select **Open session graph**. The graph shows measurements,
+rejected proposals, decisions, and expert requests. Dashed lines show start order, solid lines
+recorded relationships, and dotted lines declared repeats. Use **Policy and audit** for the
+complete history and approved limits.
+
+## Run a fixed plan from the command line
+
+Use `qdash-agent` when you want an explicit plan rather than chat-selected steps.
+
+### Install and configure
+
+Install `qdash-client` and configure its [INI profile](../reference/clients/python.md#configure-the-existing-client).
+Commands below use `local`; replace it with your profile. For environment-managed credentials,
+use `--from-env` instead.
+
+### Create a bounded session
+
+Choose bounds and quality gates appropriate to your task; the numbers below are examples,
+not recommended hardware limits.
 
 ```bash
 qdash-agent --profile local start-session \
-  --chip-id chip-001 \
-  --qid Q00 \
-  --task CheckT1 \
+  --chip-id chip-001 --qid Q00 --task CheckT1 \
   --allowed-overrides '{"t1":{"minimum":1,"maximum":500}}' \
-  --quality-gates '{"r2":{"minimum":0.9}}' \
-  --max-actions 20 \
-  --allow-reconfigure \
-  --skill-name qdash-agent-calibrator \
-  --skill-version 1 \
-  --skill-hash sha256:replace-with-skill-hash \
-  --model-name local-agent-model
+  --task-quality-gates '{"CheckT1":{"r2":{"minimum":0.9}}}' \
+  --max-actions 20
 ```
 
-Keep the returned `session_id`. Review the whole scope before authorising a plan on
-hardware. Leave out `--allow-reconfigure` when the plan must not reconfigure the device.
-The action budget counts proposed measurements; checking and committing a result do not use
-actions.
+Keep the returned `session_id`. The scope cannot change. Quality gates currently use task fit
+`r2`; output-value bounds belong in `--allowed-overrides`. `--evaluation required` adds a
+supporting evaluator requirement for commits; the default is `off`. Add `--allow-reconfigure`
+only when hardware reconfiguration is authorized.
 
-## Run one step
-
-One step runs a task, extracts the candidate value from the result, checks it against the
-session's bounds and quality gates, and, when asked, commits it to QDash and applies it to the
-backend configuration files.
+### Run one step
 
 ```bash
 qdash-agent --profile local run-step \
-  --session-id SESSION_ID \
-  --task CheckT1 \
-  --qid Q00 \
-  --source-execution-id SOURCE_EXECUTION_ID \
-  --candidate-parameter t1 \
-  --reconfigure-before-task \
-  --commit \
-  --apply-backend
+  --session-id SESSION_ID --task CheckT1 --qid Q00 \
+  --candidate-parameter t1
 ```
+
+This measures and checks a candidate without saving it. Additional options:
 
 | Option | Effect |
 | --- | --- |
-| `--source-execution-id` | Records which execution the step was decided from. The step does not restore that execution's state; it measures from the current calibration state, the way the Task Workbench does. |
-| `--candidate-parameter` | The output parameter to extract and judge. A result that lacks a required quality metric is rejected. |
-| `--reconfigure-before-task` | Reconfigure the hardware before measuring. Only accepted when the session allows it. |
-| `--commit` | Write the accepted value to the calibration state. Nothing is written without it. |
-| `--apply-backend` | After the commit, have a worker update the mapped Qubex configuration files from the committed value, read them back, and push the changed files. The response records the configuration versions before and after. |
-| `--github-push` | Also version the changed files in GitHub. |
+| `--source-execution-id` | Record decision provenance; does not restore old inputs |
+| `--reconfigure-before-task` | Apply configuration before measuring, if the session permits |
+| `--commit` | Save an accepted candidate |
+| `--apply-backend` | Apply a committed value and verify mapped backend files |
+| `--github-push` | Version the changed backend files |
 
-The run appears on the **Execution** page as `agent:<task>`, tagged with the session, so it is
-told apart from a workbench quick run or a manual re-execution. The measurement itself never
-writes parameters; only the gated commit does.
+Backend writes need the deployment's parameter-file mappings and configuration credentials.
+File verification does not prove the hardware has loaded the value.
 
-The command ends with one of four transitions. An agent must branch on this transition and
-never substitute a number of its own.
+### Run a plan
 
-| Transition | Meaning |
+The plan must fit the session's targets, tasks, bounds, and remaining budget:
+
+```bash
+qdash-agent --profile local run-plan \
+  --session-id SESSION_ID --qid Q00 \
+  --commit-on-success --idempotency-prefix approved-t1-plan-001 \
+  --plan '[{"task_name":"CheckT1","candidate_parameter":"t1"}]'
+```
+
+| Transition | Next action |
 | --- | --- |
-| `pass` | Every requested stage passed. With `--apply-backend`, the files were verified too. |
-| `retry` | The measurement did not reach a result within the time budget. |
-| `rollback` | The bounds or quality gates rejected the candidate. |
-| `human_escalation` | Policy, persistence, backend verification, or versioning failed. Inspect before continuing. |
+| `pass` | Requested stages succeeded |
+| `retry` | Check the existing measurement; do not blindly launch another |
+| `rollback` | Candidate failed bounds or gates |
+| `human_escalation` | Inspect policy, persistence, or backend failure before continuing |
 
-## Run a plan
+Non-pass plan endings normally record an intervention and pause the session.
+`--no-record-intervention` leaves it active instead. Accepted values carry to later nodes;
+explicit overrides take priority and must fit session bounds.
 
-`run-plan` runs an ordered plan of steps inside one approved session. Before the first
-measurement it checks the qubit, the tasks, the candidate parameters, the reconfiguration
-permission, and the remaining action budget against the session. A `rollback` or
-`human_escalation` stops the plan at once.
+#### Recovery branches
 
-```bash
-qdash-agent --profile local run-plan \
-  --session-id SESSION_ID \
-  --qid Q00 \
-  --source-execution-id SOURCE_EXECUTION_ID \
-  --commit-on-success \
-  --idempotency-prefix operator-approved-plan-001 \
-  --plan '[
-    {"task_name":"CheckRabi","candidate_parameter":"control_amplitude"},
-    {"task_name":"CreateHPIPulse","candidate_parameter":"hpi_amplitude"},
-    {"task_name":"CheckT1","candidate_parameter":"t1"}
-  ]'
-```
+Nodes can use `id`, `on_pass`, and `on_rollback`; `$complete` ends successfully. Without
+`on_pass`, the next node runs; without `on_rollback`, rejection stops the plan. Use
+`--max-node-executions` to bound all visits, including loops, within the session budget.
 
-Each node measures from the current calibration state, so a value committed by an earlier node
-feeds the later ones. A value a node accepted is also carried into later nodes as an input, even
-when it was not committed; an explicit `parameter_overrides` on a node wins over a carried
-value, and every override is checked against the session bounds first.
+#### Committing
 
-### Recovery branches
+`--commit-on-success` saves the final accepted parameter set only after the whole plan passes.
+It cannot combine with per-node commit, apply, or push options. Backend application of the
+whole set is separate. A timeout after a measurement starts returns `retry`, not a new run.
 
-Nodes may carry an `id`, `on_pass`, and `on_rollback` to form a small decision graph. Without
-`on_pass` the next node follows; `$complete` ends the plan successfully; without
-`on_rollback` a rejected candidate stops the plan. A rejected candidate is not carried into
-the recovery node.
+#### Autonomous plan
+
+Create a session with `--autonomy auto` and run the plan with `--planner evaluation` to select
+among its approved nodes using task knowledge. Unknown statuses, unreliable evaluations,
+out-of-bounds suggestions, or exhausted budgets stop for review. Use `--commit-on-success`;
+per-node writes are refused. See [Agentic Calibration](../developer-guide/agent/agentic-calibration.md).
+
+### Resume a stopped plan
+
+An expert selects **Authorize resume** and a permitted node on the intervention page. Then run
+its displayed command on the original runner's machine:
 
 ```bash
-qdash-agent --profile local run-plan \
-  --session-id SESSION_ID \
-  --qid Q00 \
-  --source-execution-id SOURCE_EXECUTION_ID \
-  --max-node-executions 3 \
-  --plan '[
-    {
-      "id":"calibrate-rabi",
-      "task_name":"CheckRabi",
-      "candidate_parameter":"control_amplitude",
-      "on_pass":"$complete",
-      "on_rollback":"recover-rabi"
-    },
-    {
-      "id":"recover-rabi",
-      "task_name":"CheckRabi",
-      "candidate_parameter":"control_amplitude",
-      "parameter_overrides":{"control_amplitude":0.084},
-      "on_pass":"$complete",
-      "on_rollback":"calibrate-rabi"
-    }
-  ]'
+qdash-agent --profile local resume-plan \
+  --session-id SESSION_ID --intervention-id INTERVENTION_ID
 ```
 
-`--max-node-executions` bounds every visit, loops included, and must fit in the session's
-remaining action budget. A graph that does not finish within the bound ends in
-`human_escalation`. The output's `node_path` lists every node visited.
-
-### Committing
-
-With `--commit-on-success`, nothing is written until the plan ends in `pass`; QDash then
-re-checks the latest accepted value of each parameter and saves the set in one step with one
-audit record. Any other ending leaves the values uncommitted. This option cannot be combined
-with per-node `commit_candidate`, `apply_backend`, or `push_to_github`; without it, a node may set
-those itself (`apply_backend` needs `commit_candidate`, and `push_to_github` needs both). A
-candidate set commit updates the calibration state only; applying the whole set to the backend files
-is a separate operation.
-
-The runner retries by itself only failures that happen before a measurement has started, reusing
-the same request so nothing runs twice. Once a measurement exists, a timeout returns `retry` to
-you rather than measuring again. The result lists every step, execution, candidate, commit,
-and planner decision, and the final set of carried parameters.
-
-### Autonomous plan
-
-With `--planner evaluation`, each result's AI evaluation selects the next node through the
-task knowledge's `next_actions` table; see [Knowledge Layout](../developer-guide/copilot/knowledge-layout.md).
-The planner can only choose nodes already in the approved plan:
-
-| Action | Effect |
-| --- | --- |
-| `continue` | Follow the plan |
-| `retry` | Run the same node again |
-| `run_task` | Jump to the node for the named task |
-| `request_human` or an unlisted status | Stop for review |
-
-The session must grant it. Create the session with `--autonomy auto`; the policy then records
-that a person approved the plan, the bounds, and the budget once, and the command refuses any
-other session. `--max-rounds-per-target` (default 3) caps how often one node may run on the
-target. The plan also stops for a person when the same status comes back three times, when
-the fit was judged unreliable twice in a row, when an evaluation does not complete, when a
-suggested range falls outside the session's override bounds, or when the node budget runs out.
-
-```bash
-qdash-agent --profile local start-session \
-  --chip-id chip-001 --qid Q00 \
-  --task CheckRabi --task CheckChevron \
-  --allowed-overrides '{"control_amplitude":{"minimum":0.01,"maximum":0.08},"qubit_frequency":{"minimum":7.4,"maximum":7.6}}' \
-  --allow-reconfigure --autonomy auto --max-rounds-per-target 3 \
-  --max-actions 12 ...
-
-qdash-agent --profile local run-plan \
-  --session-id SESSION_ID --qid Q00 --planner evaluation \
-  --plan '[
-    {"id":"rabi","task_name":"CheckRabi","candidate_parameter":"control_amplitude","on_pass":"$complete"},
-    {"id":"chevron","task_name":"CheckChevron","candidate_parameter":"qubit_frequency","on_pass":"rabi-reconfigured"},
-    {"id":"rabi-reconfigured","task_name":"CheckRabi","candidate_parameter":"control_amplitude","reconfigure_before_task":true,"on_pass":"$complete"}
-  ]'
-```
-
-With CheckRabi's knowledge, `SUCCESS` completes the plan and `NO_SIGNAL` runs the
-`chevron` node; its accepted `qubit_frequency` is carried into `rabi-reconfigured`, which
-reconfigures the hardware and measures again. Every other CheckRabi status stops for a person.
-The session's round budget (`--max-rounds-per-target` at `start-session`) bounds every node
-on its own, whichever rule led back to it; a node past the budget stops the plan for a person.
-Without `--max-node-executions` the whole plan is bounded by the plan length times that
-budget. Per-node `commit_candidate`, `apply_backend`, and `push_to_github` are refused with
-`--planner evaluation`, because the planner may stop the plan after a node whose value is
-already written; use `--commit-on-success`. The output adds `evaluations`: for each decision, the evaluation id, the status, the suggested
-range, the fit assessment, the chosen node, and the overrides it carried, so a reviewer can
-retrace the run and record a verdict on each evaluation.
-
-Any other planner, backed by a model, is injected through the
-[Python API](../reference/clients/python.md#agent-calibration); without `--planner` the command
-runs the plan as written. How this works:
-[Agentic Calibration](../developer-guide/copilot/agentic-calibration.md).
+The original scope, expiry, budget, and visit counts still apply. Guidance is printed for the
+operator, not interpreted by the runner. If interrupted, reuse the printed `--claim-key`.
+If the command exits with status 3, run its printed `--record-outcome` command instead of
+restarting the measurement. A rejected checkpoint requires a newly authorized session.
 
 ## Before the first run on hardware
 
-Backend verification proves that the Qubex configuration files match the committed value; the
-next step builds the backend from those files, connects to the hardware, and reconfigures it only
-when the session allows. Run a single-qubit canary under supervision first, and confirm the
-chip, qubit, task, source execution, bounds, quality gates, action budget, reconfiguration
-permission, commit behaviour, and Git branch before starting it. Unattended multi-qubit
-plans are not supported.
+Run one supervised single-qubit canary. Confirm the target, tasks, bounds, gates, budget,
+reconfiguration permission, commit policy, and configuration branch. Unattended multi-qubit
+calibration is not supported.

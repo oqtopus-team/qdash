@@ -7,7 +7,8 @@
  *
  * - whether it writes to QDash, so every call needs the user's approval;
  * - whether a code mode script may call it: only audited read-only tools,
- *   which read the QDash API as the user and return data, not images;
+ *   which read the QDash API as the user and return data, not images, and
+ *   the audited proposal tools, which store a proposal that grants nothing;
  * - whether it is deferred: not offered to the model until it is loaded with
  *   `tool_search`, because it covers a narrower workflow.
  *
@@ -22,8 +23,10 @@
  * user's approval; none may run from a script, where no approval exists.
  */
 export const REVIEWED_WRITE_TOOL_NAMES = [
+  "qdash_create_calibration_session",
   "qdash_create_agent_session",
   "qdash_submit_agent_action",
+  "qdash_end_agent_session",
   "qdash_commit_agent_candidate",
   "qdash_execute_agent_action",
   "qdash_commit_agent_candidate_set",
@@ -40,11 +43,56 @@ export const REVIEWED_WRITE_TOOL_NAMES = [
 ] as const;
 
 /**
+ * pi-qdash tools that write to QDash without a per-call approval, because the
+ * user already approved the bounded agent session they act in.
+ *
+ * A session created with `autonomy: "auto"` records that a person approved its
+ * qubits, tasks, override bounds, action budget, and expiry once (creating it
+ * is a reviewed write). These tools act only inside such a session: each call
+ * re-reads it from QDash and refuses when it is not active, not `auto`, out
+ * of budget, busy, or the step leaves its scope, and QDash checks the scope
+ * again.
+ *
+ * `qdash_commit_agent_session_update` commits (and, when granted, applies) a
+ * candidate only in a session whose approval also granted
+ * `policy.parameter_updates`: the parameters, the tasks that may supply them,
+ * and whether backend apply is included. It records the agent's pass
+ * assessment first and sends the write as `autonomous`, so QDash checks the
+ * grant, the creator, the assessment, the gates, and the current state itself.
+ * Without that grant, and for every other session, commits and applies stay
+ * the reviewed writes above; no flag a model sets turns one into the other.
+ * Like reviewed writes, no code mode script may call them; each call's
+ * idempotency key derives from its tool call id, so a replayed call reuses
+ * what it created instead of measuring again.
+ *
+ * `qdash_record_agent_decision` only appends the agent's own reading of a
+ * result to the audit of a session the signed-in user created; it changes no
+ * session state, so it needs neither autonomy `auto` nor an active session.
+ *
+ * `qdash_record_calibration_decision` is its counterpart for a calibration
+ * session: it only appends a decision to the audit of a calibration session the
+ * signed-in user created (QDash checks the creator and every cited record). It
+ * starts no run and changes no calibration; each pipeline run stays a reviewed
+ * `qdash_run_pipeline` call.
+ */
+export const SESSION_GRANTED_WRITE_TOOL_NAMES = [
+  "qdash_run_agent_session_step",
+  "qdash_request_agent_human",
+  "qdash_record_agent_decision",
+  "qdash_commit_agent_session_update",
+  "qdash_record_calibration_decision",
+] as const;
+
+/**
  * Read-only pi-qdash tools that code mode scripts may call.
  *
- * Each was audited to only read the QDash API as the signed-in user: no
- * write, no local files, no long polling, and no image output (a script
- * receives JSON, so a figure would be lost). Every other tool, including
+ * Each was audited to only read the QDash API as the signed-in user
+ * (`qdash_current_time` reads only the host clock): no write, no local files,
+ * no long polling, and no image output (a script receives JSON, so a figure
+ * would be lost). The spectroscopy reanalysis tools are the exception: their
+ * POST only previews an analysis (QDash stores nothing and uses no hardware),
+ * and a script receives their structured outputs while the optional image
+ * stays model-visible content. Every other tool, including
  * write tools, figure tools, raw API access, and another extension's tool
  * that reuses one of these names, can only be called by the model directly,
  * where approval and the host's own rendering apply.
@@ -53,12 +101,17 @@ export const NESTED_READ_TOOL_NAMES = [
   "qdash_analyze_figure_json",
   "qdash_compare_calibration",
   "qdash_compare_executions",
+  "qdash_current_time",
   "qdash_dashboard",
   "qdash_dashboard_insights",
   "qdash_degradation_report",
   "qdash_get_agent_action",
   "qdash_get_agent_candidate_commit",
   "qdash_get_agent_session",
+  "qdash_get_agent_session_audit",
+  "qdash_get_agent_session_context",
+  "qdash_get_calibration_session",
+  "qdash_get_calibration_session_audit",
   "qdash_get_chip_metrics",
   "qdash_get_cooldown_wiring",
   "qdash_get_default_chip",
@@ -69,10 +122,14 @@ export const NESTED_READ_TOOL_NAMES = [
   "qdash_get_provenance_stats",
   "qdash_get_task_knowledge",
   "qdash_get_task_result",
+  "qdash_get_task_result_evidence",
   "qdash_get_timeseries",
   "qdash_investigate",
   "qdash_list_agent_action_candidates",
   "qdash_list_agent_actions",
+  "qdash_list_agent_interventions",
+  "qdash_list_agent_sessions",
+  "qdash_list_calibration_sessions",
   "qdash_list_chip_couplings",
   "qdash_list_chip_qubits",
   "qdash_list_chips",
@@ -87,13 +144,31 @@ export const NESTED_READ_TOOL_NAMES = [
   "qdash_plan_calibration",
   "qdash_plan_pipeline",
   "qdash_query",
+  "qdash_reanalyze_qubit_spectroscopy",
+  "qdash_reanalyze_resonator_spectroscopy",
   "qdash_recent_calibration_summary",
   "qdash_recommend_next_action",
+  "qdash_summarize_task_results",
   "qdash_target_report",
   "qdash_triage_overview",
   "qdash_validate_calibration",
   "qdash_wiring_insights",
 ] as const;
+
+/**
+ * pi-qdash tools that persist a proposal and nothing else, which code mode
+ * scripts may call.
+ *
+ * `qdash_create_pipeline_plan` stores a validated calibration pipeline spec
+ * as an immutable, expiring plan of the signed-in user. It is not a read (it
+ * writes a record, so it is never `readOnlyHint`), but it has no operational
+ * authority: it starts no run, reserves no hardware, joins no calibration
+ * session, and approves nothing. Running a plan stays a direct, reviewed
+ * `qdash_run_pipeline` call whose approval shows the plan the host fetched.
+ * Each call's idempotency key derives from its tool call id, so a replayed
+ * call returns the plan it stored instead of storing another.
+ */
+export const NESTED_PROPOSAL_TOOL_NAMES = ["qdash_create_pipeline_plan"] as const;
 
 /**
  * pi-qdash tools the model is not offered until it loads them with
@@ -114,6 +189,7 @@ export const DEFERRED_TOOL_NAMES = [
   // Pipelines, execution comparison and waiting, provenance.
   "qdash_get_pipeline_catalog",
   "qdash_plan_pipeline",
+  "qdash_create_pipeline_plan",
   "qdash_run_pipeline",
   "qdash_wait_execution",
   "qdash_compare_executions",
@@ -128,22 +204,43 @@ export const DEFERRED_TOOL_NAMES = [
   "qdash_update_forum_post",
   "qdash_create_forum_evidence_reply",
   "qdash_create_forum_image_reply",
+  // Task result diagnosis: one result joined with its execution, target, and a named cooldown.
+  "qdash_get_task_result_evidence",
   // Figure evidence packaging and numeric figure analysis.
   "qdash_analyze_figure_json",
   "qdash_build_qcal_evidence",
+  // Offline spectroscopy reanalysis: a preview with adjusted analysis parameters, no hardware.
+  "qdash_reanalyze_resonator_spectroscopy",
+  "qdash_reanalyze_qubit_spectroscopy",
   // Calibration planning and validation.
   "qdash_compare_calibration",
   "qdash_recommend_next_action",
   "qdash_degradation_report",
   "qdash_plan_calibration",
   "qdash_validate_calibration",
+  // Calibration sessions: one objective and the runs started for it.
+  "qdash_create_calibration_session",
+  "qdash_get_calibration_session",
+  "qdash_get_calibration_session_audit",
+  "qdash_record_calibration_decision",
+  "qdash_list_calibration_sessions",
   // Scoped agent workflow state and actions.
   "qdash_create_agent_session",
   "qdash_get_agent_session",
   "qdash_submit_agent_action",
+  "qdash_end_agent_session",
   "qdash_execute_agent_action",
   "qdash_get_agent_action",
   "qdash_list_agent_actions",
+  "qdash_list_agent_interventions",
+  "qdash_list_agent_sessions",
+  "qdash_get_agent_session_context",
+  "qdash_run_agent_session_step",
+  "qdash_request_agent_human",
+  "qdash_record_agent_decision",
+  "qdash_commit_agent_session_update",
+  "qdash_get_agent_session_audit",
+  "qdash_wait_agent_intervention",
   "qdash_wait_agent_action",
   "qdash_list_agent_action_candidates",
   "qdash_commit_agent_candidate",
@@ -167,7 +264,9 @@ export const DEFERRED_TOOL_NAMES = [
 export const EVALUATION_TOOL_NAMES = ["qcal_evaluate"] as const;
 
 const WRITE_TOOLS = new Set<string>(REVIEWED_WRITE_TOOL_NAMES);
+const SESSION_GRANTED_WRITE_TOOLS = new Set<string>(SESSION_GRANTED_WRITE_TOOL_NAMES);
 const NESTED_READ_TOOLS = new Set<string>(NESTED_READ_TOOL_NAMES);
+const NESTED_PROPOSAL_TOOLS = new Set<string>(NESTED_PROPOSAL_TOOL_NAMES);
 const DEFERRED_TOOLS = new Set<string>(DEFERRED_TOOL_NAMES);
 const EVALUATION_TOOLS = new Set<string>(EVALUATION_TOOL_NAMES);
 
@@ -175,8 +274,22 @@ export function isReviewedWriteTool(name: string): boolean {
   return WRITE_TOOLS.has(name);
 }
 
+export function isSessionGrantedWriteTool(name: string): boolean {
+  return SESSION_GRANTED_WRITE_TOOLS.has(name);
+}
+
 export function isNestedReadTool(name: string): boolean {
   return NESTED_READ_TOOLS.has(name);
+}
+
+/** Whether `name` only persists a proposal (see `NESTED_PROPOSAL_TOOL_NAMES`). */
+export function isNestedProposalTool(name: string): boolean {
+  return NESTED_PROPOSAL_TOOLS.has(name);
+}
+
+/** Whether a code mode script may call `name`: an audited read or proposal tool. */
+export function isScriptCallableTool(name: string): boolean {
+  return NESTED_READ_TOOLS.has(name) || NESTED_PROPOSAL_TOOLS.has(name);
 }
 
 export function isDeferredTool(name: string): boolean {
@@ -196,8 +309,15 @@ export const MAX_NESTED_DATA_BYTES = 512 * 1024;
 
 /** What the model reads when a script tried a tool it may not call. */
 export function nestedBlockMessage(name: string): string {
-  return `${name} cannot be called from a code mode script: scripts may only call QDash's read-only tools. Call ${name} directly instead; write tools then ask the user for approval.`;
+  return `${name} cannot be called from a code mode script: scripts may only call QDash's read-only tools and qdash_create_pipeline_plan. Call ${name} directly instead; write tools then ask the user for approval.`;
 }
+
+/**
+ * Description of the data a script receives from an audited read tool without
+ * its own output schema, shared by both hosts' declarations.
+ */
+export const SCRIPT_DATA_DESCRIPTION =
+  "The tool's redacted QDash response data, already parsed into a JavaScript value (not a JSON string; do not JSON.parse it): the data its text answer summarizes, not truncated.";
 
 /**
  * The code mode namespace of the pi-qdash tools, the same in both hosts: the
@@ -210,12 +330,13 @@ export function nestedBlockMessage(name: string): string {
 export const QDASH_TOOL_NAMESPACE = {
   name: "qdash",
   description:
-    "QDash calibration data read as the signed-in user: chips, qubits, couplings, executions, task results, metrics, time series, flows, forum posts, and source. Each tool resolves to its redacted response data as JSON.",
+    "QDash calibration data read as the signed-in user: chips, qubits, couplings, executions, task results, metrics, time series, flows, forum posts, and source. Each tool resolves to its redacted response data as an already parsed JavaScript value.",
   instructions: [
-    "Scripts can call only QDash's audited read-only tools. Write tools, figures, charts, and evaluation tools are called directly, outside a script; write tools then ask the user for approval.",
-    "A tool resolves to the response data its text answer summarizes, as JSON and not truncated; print a small sample first when you do not know its shape.",
+    "Scripts can call only QDash's audited read-only tools and qdash_create_pipeline_plan, which stores a validated pipeline spec as an expiring plan and returns it with its plan_id; it runs nothing and approves nothing. Write tools (qdash_run_pipeline included), waits, figures, charts, and evaluation tools are called directly, outside a script; write tools then ask the user for approval.",
+    "A tool resolves to the response data its text answer summarizes, not truncated, as a JavaScript value (an object or array, already parsed): read its fields directly and do not call JSON.parse on it. Print a small sample with JSON.stringify first when you do not know its shape.",
     `One call may hand a script at most ${MAX_NESTED_DATA_BYTES} bytes of JSON; a larger response fails the call. Narrow it with a chip, qubit, task, time range, or limit, or split it into several calls.`,
     "Deferred read tools can be called from a script without loading them with tool_search first.",
+    "qdash.calibration holds pure builders for calibration pipeline specs, the same as @oqtopus-team/qdash-sdk/calibration: taskCall, qubitTargets, muxTargets, couplingTargets, one builder per step type (configureAll, bringUp, oneQubitCheck, oneQubitFineTune, customOneQubit, filterByStatus, filterByMetric, generateCRSchedule, twoQubitCalibration, customTwoQubit), calibrationStep(type, fields), sweep.{values, linspace, logspace, arange, range}, and calibrationSpec(targets, steps, { name, default_run_parameters, tags }). Fields use the spec's snake_case names; a field left undefined is left out. They call no tool: validate the result with tools.qdash_plan_pipeline({ spec }), store it with tools.qdash_create_pipeline_plan({ spec }), and print its plan_id so a direct qdash_run_pipeline({ chipId, planId }) runs it after the user approves the plan the host shows.",
   ].join("\n"),
 } as const;
 

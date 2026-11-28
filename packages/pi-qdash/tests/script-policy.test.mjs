@@ -17,9 +17,11 @@ import {
   DEFERRED_TOOL_NAMES,
   MAX_NESTED_DATA_BYTES,
   MAX_SCRIPT_TIMEOUT_MS,
+  NESTED_PROPOSAL_TOOL_NAMES,
   NESTED_READ_TOOL_NAMES,
   QDASH_TOOL_NAMESPACE,
   REVIEWED_WRITE_TOOL_NAMES,
+  SCRIPT_DATA_DESCRIPTION,
   boundScriptData,
   jsonByteLength,
   scriptDataOf,
@@ -107,14 +109,29 @@ test("the shared lists name real pi-qdash tools and agree with each other", () =
   for (const [name, definition] of byName) {
     if (!name.startsWith("qdash_")) continue;
     const read = NESTED_READ_TOOL_NAMES.includes(name);
+    const proposal = NESTED_PROPOSAL_TOOL_NAMES.includes(name);
     const deferred = DEFERRED_TOOL_NAMES.includes(name);
-    assert.equal(definition.exposure, deferred ? "deferred" : read ? undefined : "model-only", name);
-    assert.equal(definition.outputSchema === SCRIPT_DATA_SCHEMA, read, name);
+    assert.equal(definition.exposure, deferred ? "deferred" : read || proposal ? undefined : "model-only", name);
+    // A read with a checked response contract or its own output shape declares that shape; the others the generic data schema.
+    const contracted = ["qdash_list_task_results", "qdash_get_chip_metrics", "qdash_get_timeseries", "qdash_summarize_task_results"].includes(name);
+    assert.equal(definition.outputSchema !== undefined && (definition.outputSchema === SCRIPT_DATA_SCHEMA) !== contracted, read || proposal, name);
     if (read) assert.equal(definition.annotations?.readOnlyHint, true, name);
+    // A proposal tool persists a record: never labelled a read, never destructive.
+    if (proposal) {
+      assert.equal(definition.annotations?.readOnlyHint, false, name);
+      assert.equal(definition.annotations?.destructiveHint, false, name);
+      assert.equal(definition.annotations?.idempotentHint, true, name);
+      assert.ok(!REVIEWED_WRITE_TOOL_NAMES.includes(name) && !NESTED_READ_TOOL_NAMES.includes(name), name);
+    }
     if (REVIEWED_WRITE_TOOL_NAMES.includes(name)) assert.equal(definition.annotations?.destructiveHint, true, name);
     // The same code mode namespace QDash chat declares on its qdash extension.
     assert.equal(definition.namespace, QDASH_TOOL_NAMESPACE, name);
   }
+});
+
+test("the generic script data schema says the value is already parsed", () => {
+  assert.equal(SCRIPT_DATA_SCHEMA.description, SCRIPT_DATA_DESCRIPTION);
+  assert.match(SCRIPT_DATA_DESCRIPTION, /already parsed into a JavaScript value \(not a JSON string; do not JSON\.parse it\)/);
 });
 
 test("applyToolPolicy keeps other extensions' tools and an exposure or namespace a tool states", () => {
@@ -132,9 +149,12 @@ test("scripts reach only pi-qdash's audited reads and declared read-only tools",
   assert.equal(block("qdash_list_chips"), undefined);
   // Another extension's tool that took an audited name is not audited.
   assert.match(block("qdash_list_chips", { ownTool: false }), /read-only tools/);
-  for (const name of ["qdash_create_forum_post", "qdash_save_flow", "qdash_raw_get", "qdash_get_figure", "qdash_build_qcal_evidence"]) {
+  for (const name of ["qdash_create_forum_post", "qdash_save_flow", "qdash_raw_get", "qdash_get_figure", "qdash_build_qcal_evidence", "qdash_run_pipeline", "qdash_wait_execution", "qdash_run_agent_session_step", "qdash_record_calibration_decision"]) {
     assert.match(block(name), /cannot be called from a code mode script/, name);
   }
+  // The pinned plan store is the one proposal tool a script may call; a replacement is not.
+  assert.equal(block("qdash_create_pipeline_plan"), undefined);
+  assert.match(block("qdash_create_pipeline_plan", { ownTool: false }), /cannot be called from a code mode script/);
   for (const name of ["bash", "write", "edit", "powershell"]) {
     assert.match(block(name, { annotations: { readOnlyHint: true } }), /Call .* directly/, name);
   }

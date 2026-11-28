@@ -7,6 +7,7 @@ import pytest
 from fastapi import HTTPException
 
 from qdash.api.services.flow_service.execution import (
+    EXECUTION_IN_PROGRESS_DETAIL,
     ExecutionCoordinator,
     FlowDispatchError,
 )
@@ -95,6 +96,115 @@ class TestExecutionCoordinatorAvailability:
             )
 
         assert exc_info.value.status_code == 503
+
+
+class TestExecutionCoordinatorEnsureAvailable:
+    """ensure_available() refuses a run an existing claim would refuse, claiming nothing."""
+
+    def test_passes_when_the_hardware_is_free(self):
+        lock = _lock()
+
+        _coordinator(lock=lock).ensure_available(
+            project_id="proj-1", chip_id="chip-1", parameters={"qid": "0"}, workflow=False
+        )
+
+        lock.has_conflict.assert_called_once()
+        lock.try_lock.assert_not_called()
+
+    def test_refuses_a_conflict_with_the_claims_409(self):
+        lock = _lock(conflict=True)
+
+        with pytest.raises(HTTPException) as exc_info:
+            _coordinator(lock=lock).ensure_available(
+                project_id="proj-1", chip_id="chip-1", parameters={}, workflow=True
+            )
+
+        assert exc_info.value.status_code == 409
+        assert exc_info.value.detail == EXECUTION_IN_PROGRESS_DETAIL
+        lock.try_lock.assert_not_called()
+
+    def test_checks_the_scope_the_claim_would_take(self):
+        lock = _lock()
+        scope = ExecutionResourceScope("chip-1", ("mux:0",), exclusive=False)
+        with patch(
+            "qdash.api.services.flow_service.execution.resolve_execution_resource_scope",
+            return_value=scope,
+        ) as resolve_scope:
+            _coordinator(lock=lock).ensure_available(
+                project_id="proj-1", chip_id="chip-1", parameters={"qid": "0"}, workflow=False
+            )
+
+        resolve_scope.assert_called_once_with("chip-1", {"qid": "0"}, project_id="proj-1")
+        lock.has_conflict.assert_called_once_with("proj-1", scope)
+
+    def test_a_workflow_checks_the_whole_chip(self):
+        lock = _lock()
+
+        _coordinator(lock=lock).ensure_available(
+            project_id="proj-1", chip_id="chip-1", parameters={"qid": "0"}, workflow=True
+        )
+
+        lock.has_conflict.assert_called_once_with(
+            "proj-1", ExecutionResourceScope("chip-1", (), exclusive=True)
+        )
+
+    def test_skips_where_the_claim_skips(self):
+        # Without a lock repository or a chip the claim takes no lock either.
+        _coordinator(lock=None).ensure_available(
+            project_id="proj-1", chip_id="chip-1", parameters={}, workflow=True
+        )
+        lock = _lock(conflict=True)
+        _coordinator(lock=lock).ensure_available(
+            project_id="proj-1", chip_id="", parameters={}, workflow=True
+        )
+        lock.has_conflict.assert_not_called()
+
+    def test_a_lock_store_failure_is_raised_not_ignored(self):
+        lock = _lock()
+        lock.has_conflict.side_effect = RuntimeError("mongo down")
+
+        with pytest.raises(RuntimeError, match="mongo down"):
+            _coordinator(lock=lock).ensure_available(
+                project_id="proj-1", chip_id="chip-1", parameters={}, workflow=True
+            )
+
+    def test_disjoint_targets_pass_and_overlapping_ones_are_refused(self, init_db):
+        locks = MongoExecutionLockRepository()
+        assert locks.try_lock(
+            project_id="proj-1",
+            execution_id="running",
+            chip_id="chip-1",
+            resources=("mux:0", "channel:Q00"),
+            exclusive=False,
+        )
+        coordinator = _coordinator(lock=locks)
+
+        def check(resources: tuple[str, ...]) -> None:
+            with patch(
+                "qdash.api.services.flow_service.execution.resolve_execution_resource_scope",
+                return_value=ExecutionResourceScope("chip-1", resources, exclusive=False),
+            ):
+                coordinator.ensure_available(
+                    project_id="proj-1", chip_id="chip-1", parameters={}, workflow=False
+                )
+
+        check(("mux:1", "channel:Q04"))
+        with pytest.raises(HTTPException) as exc_info:
+            check(("mux:0", "channel:Q01"))
+        assert exc_info.value.status_code == 409
+        # Unknown hardware is the whole chip, and the whole chip overlaps every claim.
+        with pytest.raises(HTTPException):
+            coordinator.ensure_available(
+                project_id="proj-1", chip_id="chip-1", parameters={}, workflow=True
+            )
+        # Checking claimed nothing: only the running execution holds the lock.
+        assert locks.try_lock(
+            project_id="proj-1",
+            execution_id="next",
+            chip_id="chip-1",
+            resources=("mux:1",),
+            exclusive=False,
+        )
 
 
 class TestExecutionCoordinatorClaim:

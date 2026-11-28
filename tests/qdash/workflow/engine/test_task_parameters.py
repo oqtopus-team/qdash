@@ -22,7 +22,7 @@ from qdash.workflow.engine.task_parameters import (
     task_settings_from_task_details,
     validate_task_names,
 )
-from qdash.workflow.service._internal.session import CalibSession
+from qdash.workflow.service._internal.session import ExecutionRuntime
 from qdash.workflow.service._internal.settings import SessionSettings
 from qdash.workflow.service.calib_service import CalibService
 
@@ -407,7 +407,7 @@ class TestPerTaskDefaultsAreInternal:
             task_defaults={"CheckRabi": {"run": {"shots": 256}}},
         )
 
-        assert CalibSession(settings).task_parameters == {
+        assert ExecutionRuntime(settings).task_parameters == {
             "CheckRabi": {"run": {"shots": {"value": 256}}, "input": {}}
         }
         assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]
@@ -481,7 +481,7 @@ class TestValidateTaskNames:
 
     def test_session_rejects_misspelled_task_before_starting(self) -> None:
         with pytest.raises(ValueError, match="did you mean 'CheckRabi'"):
-            CalibSession(
+            ExecutionRuntime(
                 SessionSettings(
                     username="alice",
                     chip_id="chip-1",

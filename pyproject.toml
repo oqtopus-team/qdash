@@ -15,6 +15,9 @@ dependencies = [
     "pydantic>=2.8.0",
     "pymongo>=4.18.3",
     "qdash-api",
+    # Ships qdash.calibration, the calibration definitions the datamodel and worker share
+    # with SDK users.
+    "qdash-sdk",
 ]
 
 [build-system]
@@ -28,7 +31,8 @@ packages = [
 
 [tool.ruff]
 line-length = 100
-exclude = ["tools", "scripts", "postgres_data"]
+# The SDK's generated package is checked by scripts/generate_python_sdk.py --check, not linted.
+exclude = ["tools", "scripts", "postgres_data", "sdks/python/src/qdash/sdk/_generated"]
 src = ["src", "clients/python/src", "sdks/python/src"]
 target-version = "py310"
 lint.unfixable = ["F401"]
@@ -122,6 +126,15 @@ explicit_package_bases = true
 mypy_path = ["src", "clients/python/src", "sdks/python/src"]
 plugins = ["pydantic.mypy"]
 
+# Fern's generated client is type checked, without the strict rules its output does not follow:
+# it leaves some helpers unannotated and carries ignores for other Pydantic versions.
+[[tool.mypy.overrides]]
+module = ["qdash.sdk._generated", "qdash.sdk._generated.*"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+warn_unused_ignores = false
+warn_return_any = false
+
 [[tool.mypy.overrides]]
 module = ["tests.*", "clients.python.tests.*", "sdks.python.tests.*"]
 disallow_untyped_defs = false
@@ -150,6 +163,7 @@ omit = [
     "src/qdash/repository/protocols.py",
     # Auto-generated client code
     "clients/python/src/qdash/client/*",
+    "sdks/python/src/qdash/sdk/_generated/*",
     # Internal service modules
     "src/qdash/workflow/service/_internal/*",
     # Worker tasks
@@ -199,4 +213,5 @@ members = [
 [tool.uv.sources]
 qdash-api = { workspace = true }
 qdash-client = { workspace = true }
+qdash-sdk = { workspace = true }
 qubex = { git = "https://github.com/amachino/qubex.git", branch = "develop" }

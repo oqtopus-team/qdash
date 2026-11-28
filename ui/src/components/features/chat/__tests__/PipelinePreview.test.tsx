@@ -269,3 +269,166 @@ describe("ApprovalCard with a pipeline spec", () => {
     expect(onDecide).toHaveBeenCalledWith("call-9", true, "Approved: Run calibration pipeline");
   });
 });
+
+const DIGEST = `sha256:v1:${"e".repeat(64)}`;
+const STORED = {
+  kind: "calibration_pipeline_plan" as const,
+  planId: "cpp-1",
+  reviewDigest: DIGEST,
+  chipId: "64Qv3",
+  backendName: "qubex",
+  expiresAt: "2026-11-27T00:00:00Z",
+  targetQids: ["0", "1", "2", "3"],
+  plan: {
+    plan_id: "cpp-1",
+    spec: { name: "nightly" },
+    task_run_count: 2,
+    default_run_parameters: { shots: 1024 },
+    warnings: [{ path: "steps[1]", message: "probably unintended" }],
+    steps: [
+      {
+        index: 1,
+        type: "CustomOneQubit",
+        name: "coherence",
+        kind: "calibration",
+        tasks: ["CheckT1", "CheckT1"],
+        calls: [
+          {
+            call_id: "t1_short",
+            name: "CheckT1",
+            on_failure: "stop",
+            settings: { run: { shots: 2048 } },
+          },
+          {
+            call_id: "t1_long",
+            name: "CheckT1",
+            on_failure: "continue",
+            settings: { run: {}, input: {} },
+          },
+        ],
+      },
+      {
+        index: 2,
+        type: "FilterByStatus",
+        name: "filter_by_status",
+        kind: "transform",
+        tasks: [],
+        calls: [],
+        reference: { step: "coherence", call_id: "t1_short" },
+      },
+    ],
+  },
+};
+
+describe("ApprovalCard with a stored plan", () => {
+  it("renders the frozen plan preview and never validates live", () => {
+    wrap(
+      <ApprovalCard
+        approval={{
+          id: "call-p",
+          tool: "qdash_run_pipeline",
+          label: "Run calibration pipeline",
+          args: { chipId: "64Qv3", planId: "cpp-1" },
+          preview: STORED,
+        }}
+        state={{ active: true, onAnswer: vi.fn(), onDecide: vi.fn(), onOther: vi.fn() }}
+      />,
+    );
+    const preview = screen.getByTestId("stored-plan-preview");
+    expect(preview.textContent).toContain("Stored plan · nightly");
+    expect(preview.textContent).toContain("0, 1, 2, 3");
+    expect(preview.textContent).toContain(DIGEST);
+    expect(preview.textContent).toContain('{"run":{"shots":2048}}');
+    expect(preview.textContent).toContain("on_failure=continue");
+    expect(preview.textContent).toContain('{"shots":1024}');
+    expect(preview.textContent).toContain("reads coherence.t1_short");
+    expect(screen.getByLabelText("Warnings").textContent).toContain("probably unintended");
+    // The plan's arguments stay listed; nothing asks QDash.
+    expect(screen.getByText("planId")).toBeTruthy();
+    expect(screen.queryByTestId("pipeline-preview")).toBeNull();
+    expect(validate).not.toHaveBeenCalled();
+  });
+
+  it("shows manual rounds, filter thresholds, and the full approved spec", () => {
+    const spec = {
+      spec_version: 2,
+      name: "manual",
+      targets: { qids: ["0", "1"] },
+      steps: [
+        {
+          type: "OneQubitCheck",
+          step_id: "check",
+          execution_mode: "manual",
+          rounds: [["0"], ["1"]],
+          tasks: [{ name: "CheckRabi", call_id: "CheckRabi" }],
+        },
+        { type: "FilterByMetric", step: "check", metric: "t1", threshold: 12.5, inverse: true },
+      ],
+    };
+    const frozen = JSON.parse(JSON.stringify(spec));
+    const preview = {
+      ...STORED,
+      plan: {
+        ...STORED.plan,
+        spec,
+        steps: [
+          {
+            index: 1,
+            type: "OneQubitCheck",
+            name: "check",
+            kind: "calibration",
+            tasks: ["CheckRabi"],
+            calls: [{ call_id: "CheckRabi", name: "CheckRabi", on_failure: "stop", settings: {} }],
+          },
+          {
+            index: 2,
+            type: "FilterByMetric",
+            name: "filter_by_metric",
+            kind: "transform",
+            tasks: [],
+            calls: [],
+            reference: { step: "check", call_id: null },
+          },
+        ],
+      },
+    };
+    wrap(
+      <ApprovalCard
+        approval={{
+          id: "call-m",
+          tool: "qdash_run_pipeline",
+          label: "Run calibration pipeline",
+          args: { chipId: "64Qv3", planId: "cpp-1" },
+          preview,
+        }}
+        state={{ active: true, onAnswer: vi.fn(), onDecide: vi.fn(), onOther: vi.fn() }}
+      />,
+    );
+    const [manual, filter] = screen
+      .getAllByTestId("stored-plan-step-settings")
+      .map((node) => node.textContent);
+    expect(manual).toBe('{"step_id":"check","execution_mode":"manual","rounds":[["0"],["1"]]}');
+    expect(filter).toBe('{"step":"check","metric":"t1","threshold":12.5,"inverse":true}');
+    expect(JSON.parse(screen.getByTestId("stored-plan-spec").textContent ?? "")).toEqual(frozen);
+    // Rendering never changes the stored preview.
+    expect(preview.plan.spec).toEqual(frozen);
+  });
+
+  it("falls back to the argument list for a preview it does not know", () => {
+    wrap(
+      <ApprovalCard
+        approval={{
+          id: "call-q",
+          tool: "qdash_run_pipeline",
+          label: "Run calibration pipeline",
+          args: { chipId: "64Qv3", planId: "cpp-1" },
+          preview: { ...STORED, kind: "other" } as unknown as typeof STORED,
+        }}
+        state={{ active: true, onAnswer: vi.fn(), onDecide: vi.fn(), onOther: vi.fn() }}
+      />,
+    );
+    expect(screen.queryByTestId("stored-plan-preview")).toBeNull();
+    expect(screen.getByText("planId")).toBeTruthy();
+    expect(validate).not.toHaveBeenCalled();
+  });
+});

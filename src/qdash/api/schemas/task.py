@@ -1,20 +1,19 @@
 """Schema definitions for task router."""
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    field_serializer,
-    field_validator,
     model_validator,
 )
 
-from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
+from qdash.api.schemas.flow import CALIBRATION_SESSION_FIELD, IDEMPOTENCY_KEY_FIELD
 from qdash.datamodel.evaluation import EvaluationExampleModel
+from qdash.datamodel.field_types import ElapsedTime
 from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
 from qdash.datamodel.task_invocation import TaskInvocation
 from qdash.datamodel.task_settings import (
@@ -82,6 +81,12 @@ class QuickRunTaskRequest(BaseModel):
         ),
     )
     update_params: bool = False
+    calibration_session_id: str | None = Field(
+        default=None, min_length=1, max_length=200, description=CALIBRATION_SESSION_FIELD
+    )
+    idempotency_key: str | None = Field(
+        default=None, min_length=1, max_length=128, description=IDEMPOTENCY_KEY_FIELD
+    )
     persist_output_parameters: bool | None = Field(
         default=None,
         deprecated=True,
@@ -353,18 +358,6 @@ class TaskResultResponse(BaseModel):
     re_executions: list[ReExecutionEntry] = []
     start_at: datetime | None = None
     end_at: datetime | None = None
-    elapsed_time: timedelta | None = None
+    elapsed_time: ElapsedTime = None
 
     model_config = ConfigDict(from_attributes=True)
-
-    @field_validator("elapsed_time", mode="before")
-    @classmethod
-    def _parse_elapsed_time(cls, v: Any) -> timedelta | None:
-        """Parse elapsed_time from various formats."""
-        return parse_elapsed_time(v)
-
-    @field_serializer("elapsed_time")
-    @classmethod
-    def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
-        """Serialize elapsed_time to H:MM:SS format."""
-        return format_elapsed_time(v) if v else None

@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { CommitAgentCandidateRequestDecisionId } from './commitAgentCandidateRequestDecisionId';
 
 /**
  * Commit one server-derived candidate into authoritative calibration state.
@@ -22,4 +23,8 @@ export interface CommitAgentCandidateRequest {
      * @maxLength 200
      */
   task_id: string;
+  /** Commit under the session's parameter_updates authority instead of a per-call approval. QDash then also requires that the signed-in user created the auto session, that its approval granted updates of this parameter from this task, that decision_id is the agent's latest pass assessment of exactly this measurement, that the measurement is the newest finished one of its task and qubit and nothing else of the session is running, that no assessment of it was fail or inconclusive, and that the stored value did not change since it was measured. */
+  autonomous?: boolean;
+  /** The recorded pass decision an autonomous commit rests on */
+  decision_id?: CommitAgentCandidateRequestDecisionId;
 }

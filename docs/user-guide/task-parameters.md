@@ -1,68 +1,46 @@
 # Task Parameters
 
-Review task parameters before a run to control the experiment without accidentally replacing the
-project's current calibration values.
+Review inputs and output-saving settings before a run changes shared calibration state.
 
 ## Recognize the Parameter Types
 
-| Type | What it controls | Example |
+| Type | Controls | Example |
 | --- | --- | --- |
-| Input parameter | An existing calibration value consumed by the task | `qubit_frequency` |
-| Run parameter | How this experiment runs | `shots` |
-| Output parameter | A value calculated by the task | `t1` |
+| Input | Calibration value consumed by a task | `qubit_frequency` |
+| Run | Experiment settings | `shots` |
+| Output | Value calculated by a task | `t1` |
 
 ## Use the Current Calibration Values
 
-Use the default resolution when you want a task to start from the current state:
-
-1. Open **Tasks** and select a task.
-2. Select **Chip** and enter a **Qubit or coupling**.
-3. Leave fields under **Input parameter overrides** blank.
-4. Select **Reload** to preview the current values and check hardware availability.
-5. Review the resolved values before selecting **Run task**.
-
-An empty input override means “resolve this value for me”; it does not send an empty value to the
-task. Selecting **Reload** copies the current values into the fields. Those populated fields are
-explicit overrides for the run, but **Reload** does not change the calibration database.
+On **Tasks**, select the task, chip, and target, then select **Reload** to check availability and
+preview current inputs. Reload fills the fields; those filled values become explicit overrides.
+Leave an input field blank to resolve it from current calibration values at run time.
 
 ## Override a Value for One Run
 
-Enter an input value when this run must use a value other than the current calibration state.
-Enter experiment settings such as shots or sweep limits under **Run parameters**.
+Enter calibration inputs under **Input parameter overrides** and experiment settings under
+**Run parameters**. An explicit input wins over current values and task fallbacks. A required
+missing value stops the task.
 
-For sweep parameters, choose the default form or **np.linspace**, **np.logspace**, **np.arange**,
-**range**, or **list**. Linear forms and **list** preserve the points; conversions to or from
-**np.logspace** preserve the endpoints and point count.
-
-Check the preview below the field for the point count and endpoints. If the new form cannot
-express the sweep, such as **range** with a fractional step, QDash keeps the typed arguments
-and reports the problem. An invalid sweep blocks the run. Results record the selected form,
-and re-running a result restores it.
-
-QDash uses an entered input value before a current calibration value or a task fallback. A task
-that requires a missing value stops with the parameter name instead of silently using zero.
+For a sweep, choose a range form or **list**, then check the preview's points and endpoints.
+Invalid sweeps block the run.
 
 ## Decide Whether to Update Calibration Values
 
-Leave **Update calibration values** off for an exploratory run. QDash still saves the run in task
-history with its result, effective parameters, figures, and raw data, but does not replace current
-calibration values.
+Keep **Update calibration values** off for exploration. Results and artifacts are still saved.
+Enable it when successful outputs should become current values for later tasks; mapped backend
+configuration is also updated when enabled in the deployment.
 
-Enable it only when successful output parameters should become the current values for later
-tasks. The warning below the setting confirms that the run can change shared state. Mapped backend
-configuration is also updated when that integration is enabled.
+For Qubex **CheckCrossResonance** and **CreateZX90**, an accepted fit still updates the
+Qubex calibration note with this setting off. Take that write into account before an
+exploratory run.
 
 ## Re-run Previous Work
 
-Re-running an execution restores its task and run context, then resolves calibration inputs from
-the current state. Use this route to repeat a flow while intentionally picking up newer
-calibration values.
-
-Re-running one task result opens the current task definition with compatible values from the
-source result. Review any skipped historical fields, then edit the restored values before
-selecting **Run task**. Values entered in the form take priority.
-
-Always check **Update calibration values** again on a re-run; reproducing a measurement and
-accepting its outputs are separate decisions.
+Re-running an execution uses current calibration inputs. To repeat one measurement, open its
+full page from **Task Results** and select **Run again**. This opens **Tasks** with compatible
+values restored; review skipped fields and overrides, then check **Update calibration values**
+before **Run task**. Use **Reload** only when you want current calibration inputs to replace
+the restored ones.
 
 How this works: [Parameter Resolution](../developer-guide/workflow/parameter-resolution.md).

@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response, status
 
 from qdash.api.dependencies import (
+    get_agent_intervention_forum_service,
+    get_agent_intervention_service,
+    get_agent_session_audit_service,
     get_agent_session_service,
     get_flow_service,
     get_task_file_service,
@@ -20,23 +23,55 @@ from qdash.api.schemas.agent_session import (
     AgentActionResponse,
     AgentCandidateCommitResponse,
     AgentCandidateSetCommitResponse,
+    AgentDecisionResponse,
+    AgentInterventionResponse,
+    AgentSessionAuditResponse,
     AgentSessionResponse,
     ApplyAgentCandidateRequest,
     CandidateGateResponse,
+    ClaimAgentResumeRequest,
     CommitAgentCandidateRequest,
     CommitAgentCandidateSetRequest,
+    CreateAgentInterventionRequest,
     CreateAgentSessionRequest,
     EvaluateCandidateGateRequest,
     ExecuteAgentActionRequest,
     ListAgentActionsResponse,
     ListAgentCandidatesResponse,
+    ListAgentDecisionsResponse,
+    ListAgentInterventionsResponse,
+    ListAgentSessionsResponse,
+    RecordAgentDecisionRequest,
+    RecordAgentResumeOutcomeRequest,
+    RespondAgentInterventionRequest,
+    StopAgentSessionRequest,
+    StopAgentSessionResponse,
     SubmitAgentActionRequest,
 )
+from qdash.api.services.agent_intervention_forum import AgentInterventionForumService
+from qdash.api.services.agent_intervention_service import AgentInterventionService
+from qdash.api.services.agent_session_audit import (
+    DEFAULT_PAGE_SIZE,
+    MAX_PAGE_SIZE,
+    AgentSessionAuditService,
+)
+from qdash.api.services.agent_session_notifications import AgentSessionNotificationService
 from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.api.services.flow_service import FlowService
 from qdash.api.services.task_file_service import TaskFileService
+from qdash.datamodel.agent_session import (
+    AgentActionDecision,
+    AgentActionType,
+    AgentSessionStatus,
+)
 
 router = APIRouter(prefix="/agent-sessions")
+
+
+InterventionService = Annotated[AgentInterventionService, Depends(get_agent_intervention_service)]
+ForumThreadService = Annotated[
+    AgentInterventionForumService, Depends(get_agent_intervention_forum_service)
+]
 
 
 @router.post(
@@ -48,14 +83,50 @@ router = APIRouter(prefix="/agent-sessions")
 )
 def create_agent_session(
     body: CreateAgentSessionRequest,
+    background_tasks: BackgroundTasks,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[AgentSessionService, Depends(get_agent_session_service)],
 ) -> AgentSessionResponse:
-    """Create a bounded authorization scope for a user-operated local agent."""
-    return service.create_session(
+    """Create a bounded authorization scope for a user-operated local agent.
+
+    The new session's Slack start message, when agent notifications are on, is sent after
+    the response; the notification sweeper retries it.
+    """
+    session = service.create_session(
         project_id=ctx.project_id,
         username=ctx.user.username,
         body=body,
+    )
+    background_tasks.add_task(
+        service.notifications.deliver, session.session_id, "start_notification"
+    )
+    return session
+
+
+@router.get(
+    "",
+    response_model=ListAgentSessionsResponse,
+    summary="List agent sessions",
+    operation_id="listAgentSessions",
+)
+def list_agent_sessions(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[AgentSessionService, Depends(get_agent_session_service)],
+    chip_id: Annotated[str | None, Query(max_length=200)] = None,
+    status_filter: Annotated[
+        list[AgentSessionStatus] | None,
+        Query(alias="status", description="Only sessions in these statuses"),
+    ] = None,
+    mine: Annotated[bool, Query(description="Only sessions the signed-in user created")] = False,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> ListAgentSessionsResponse:
+    """List the project's agent sessions, newest first, with their settled status."""
+    return service.list_sessions(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        created_by=ctx.user.username if mine else None,
+        statuses=status_filter,
+        limit=limit,
     )
 
 
@@ -104,15 +175,69 @@ def evaluate_agent_candidate_gate(
 def submit_agent_action(
     session_id: str,
     body: SubmitAgentActionRequest,
+    background_tasks: BackgroundTasks,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[AgentSessionService, Depends(get_agent_session_service)],
+    forum_threads: ForumThreadService,
 ) -> AgentActionResponse:
-    """Authorize and audit an action proposal without executing it."""
-    return service.submit_action(
+    """Authorize and audit an action proposal without executing it.
+
+    An authorized ``request_human`` also records an intervention, pauses the session on it,
+    and queues its Slack message and its Forum thread.
+    """
+    action = service.submit_action(
         project_id=ctx.project_id,
         session_id=session_id,
         body=body,
+        username=ctx.user.username,
     )
+    if action.intervention_id:
+        background_tasks.add_task(
+            service.interventions.deliver_notification, action.intervention_id
+        )
+        background_tasks.add_task(forum_threads.ensure_thread, action.intervention_id)
+    if (
+        action.action_type == AgentActionType.COMPLETE_SESSION
+        and action.decision == AgentActionDecision.AUTHORIZED
+    ):
+        background_tasks.add_task(service.notifications.deliver, session_id, "end_notification")
+    return action
+
+
+@router.post(
+    "/{session_id}/stop",
+    response_model=StopAgentSessionResponse,
+    summary="Stop an agent session",
+    operation_id="stopAgentSession",
+)
+def stop_agent_session(
+    session_id: str,
+    body: StopAgentSessionRequest,
+    background_tasks: BackgroundTasks,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[AgentSessionService, Depends(get_agent_session_service)],
+) -> StopAgentSessionResponse:
+    """End an active or paused session's authority on a person's request.
+
+    Any editor of the project may stop it, as an expert may stop it from an intervention.
+    The session becomes ``cancelled`` and nothing new is dispatched, committed, applied, or
+    resumed in it. A measurement, commit, or backend apply that passed the session gate
+    before the stop is not cancelled; ``in_flight`` lists those still unsettled. A session
+    that already ended is returned unchanged (``already_ended``).
+    """
+    result = service.stop_session(
+        project_id=ctx.project_id,
+        session_id=session_id,
+        username=ctx.user.username,
+        body=body,
+    )
+    if result.outcome != "already_ended":
+        # The stop stored its end message; send it now (a no-op once sent).
+        background_tasks.add_task(service.notifications.deliver, session_id, "end_notification")
+    text = f"{result.session.stop.stopped_by} stopped the session." if result.session.stop else ""
+    for intervention_id in result.closed_intervention_ids:
+        background_tasks.add_task(service.interventions.post_update, intervention_id, text)
+    return result
 
 
 @router.get(
@@ -259,6 +384,7 @@ async def apply_agent_candidate_commit(
         commit_id=commit_id,
         body=body,
         flow_service=flow_service,
+        username=ctx.user.username,
     )
 
 
@@ -305,4 +431,274 @@ async def execute_agent_action(
         body=body,
         flow_service=flow_service,
         task_file_service=task_file_service,
+        username=ctx.user.username,
     )
+
+
+@router.post(
+    "/{session_id}/interventions",
+    response_model=AgentInterventionResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Record an agent intervention",
+    operation_id="createAgentIntervention",
+)
+def create_agent_intervention(
+    session_id: str,
+    body: CreateAgentInterventionRequest,
+    background_tasks: BackgroundTasks,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: InterventionService,
+    forum_threads: ForumThreadService,
+) -> AgentInterventionResponse:
+    """Record that the agent needs a person and pause the session if it is active.
+
+    The record is saved before any Slack message or Forum thread is attempted, and it is
+    saved even when the session has no actions left or has expired.
+    """
+    intervention = service.create_intervention(
+        project_id=ctx.project_id,
+        session_id=session_id,
+        username=ctx.user.username,
+        body=body,
+    )
+    background_tasks.add_task(service.deliver_notification, intervention.intervention_id)
+    background_tasks.add_task(forum_threads.ensure_thread, intervention.intervention_id)
+    return intervention
+
+
+@router.get(
+    "/{session_id}/interventions",
+    response_model=ListAgentInterventionsResponse,
+    summary="List agent interventions",
+    operation_id="listAgentInterventions",
+)
+def list_agent_interventions(
+    session_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: InterventionService,
+) -> ListAgentInterventionsResponse:
+    """List a session's interventions, newest first."""
+    return service.list_interventions(project_id=ctx.project_id, session_id=session_id)
+
+
+@router.get(
+    "/{session_id}/interventions/{intervention_id}",
+    response_model=AgentInterventionResponse,
+    summary="Get an agent intervention",
+    operation_id="getAgentIntervention",
+)
+def get_agent_intervention(
+    session_id: str,
+    intervention_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: InterventionService,
+) -> AgentInterventionResponse:
+    """Get an intervention with the session state needed to answer it."""
+    return service.get_intervention(
+        project_id=ctx.project_id, session_id=session_id, intervention_id=intervention_id
+    )
+
+
+@router.post(
+    "/{session_id}/interventions/{intervention_id}/respond",
+    response_model=AgentInterventionResponse,
+    summary="Respond to an agent intervention",
+    operation_id="respondAgentIntervention",
+)
+def respond_agent_intervention(
+    session_id: str,
+    intervention_id: str,
+    body: RespondAgentInterventionRequest,
+    background_tasks: BackgroundTasks,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: InterventionService,
+) -> AgentInterventionResponse:
+    """Record an expert's guidance and either stop the session or authorize a resume.
+
+    A plan with a checkpoint stays paused until its runner claims the resume.
+    """
+    result = service.respond(
+        project_id=ctx.project_id,
+        session_id=session_id,
+        intervention_id=intervention_id,
+        username=ctx.user.username,
+        body=body,
+    )
+    text = {
+        "stopped": f"{ctx.user.username} stopped the session.",
+        "resumed": f"{ctx.user.username} reactivated the session for the agent.",
+        "resume_authorized": (
+            f"{ctx.user.username} authorized a resume; the plan continues when its runner "
+            "claims it."
+        ),
+    }.get(result.status.value)
+    if text:
+        background_tasks.add_task(service.post_update, intervention_id, text)
+    if result.status.value == "stopped":
+        # A stop that ended the session stored its end message; send it now.
+        background_tasks.add_task(
+            AgentSessionNotificationService(service.notifier).deliver,
+            session_id,
+            "end_notification",
+        )
+    return result
+
+
+@router.post(
+    "/{session_id}/interventions/{intervention_id}/claim-resume",
+    response_model=AgentInterventionResponse,
+    summary="Claim an authorized agent resume",
+    operation_id="claimAgentInterventionResume",
+)
+def claim_agent_intervention_resume(
+    session_id: str,
+    intervention_id: str,
+    body: ClaimAgentResumeRequest,
+    background_tasks: BackgroundTasks,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: InterventionService,
+) -> AgentInterventionResponse:
+    """Reactivate the paused session for the one runner that holds the claim key."""
+    result = service.claim_resume(
+        project_id=ctx.project_id,
+        session_id=session_id,
+        intervention_id=intervention_id,
+        username=ctx.user.username,
+        body=body,
+    )
+    background_tasks.add_task(
+        service.post_update, intervention_id, f"The runner of {ctx.user.username} resumed the plan."
+    )
+    return result
+
+
+@router.post(
+    "/{session_id}/interventions/{intervention_id}/resume-outcome",
+    response_model=AgentInterventionResponse,
+    summary="Record the outcome of a resumed agent plan",
+    operation_id="recordAgentResumeOutcome",
+)
+def record_agent_resume_outcome(
+    session_id: str,
+    intervention_id: str,
+    body: RecordAgentResumeOutcomeRequest,
+    background_tasks: BackgroundTasks,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: InterventionService,
+) -> AgentInterventionResponse:
+    """Record how the resumed run ended."""
+    result = service.record_resume_outcome(
+        project_id=ctx.project_id,
+        session_id=session_id,
+        intervention_id=intervention_id,
+        username=ctx.user.username,
+        body=body,
+    )
+    background_tasks.add_task(
+        service.post_update, intervention_id, f"The resumed plan ended: {body.transition}."
+    )
+    return result
+
+
+@router.post(
+    "/{session_id}/interventions/{intervention_id}/notification/retry",
+    response_model=AgentInterventionResponse,
+    summary="Retry an agent intervention Slack message",
+    operation_id="retryAgentInterventionNotification",
+)
+def retry_agent_intervention_notification(
+    session_id: str,
+    intervention_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: InterventionService,
+) -> AgentInterventionResponse:
+    """Try once more to send an unsent Slack message; a sent message is never posted again."""
+    return service.retry_notification(
+        project_id=ctx.project_id,
+        session_id=session_id,
+        intervention_id=intervention_id,
+        username=ctx.user.username,
+    )
+
+
+AuditService = Annotated[AgentSessionAuditService, Depends(get_agent_session_audit_service)]
+
+
+@router.post(
+    "/{session_id}/decisions",
+    response_model=AgentDecisionResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Record an agent decision",
+    operation_id="recordAgentDecision",
+)
+def record_agent_decision(
+    session_id: str,
+    body: RecordAgentDecisionRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: AuditService,
+) -> AgentDecisionResponse:
+    """Append the agent's reading of a result and its next step to the session's audit.
+
+    Only the session's creator records decisions. Recording changes no session state, so it
+    is allowed in every session status; it never dispatches, commits, or applies anything.
+    """
+    return service.record_decision(
+        project_id=ctx.project_id,
+        session_id=session_id,
+        username=ctx.user.username,
+        body=body,
+    )
+
+
+@router.get(
+    "/{session_id}/decisions",
+    response_model=ListAgentDecisionsResponse,
+    summary="List agent decisions",
+    operation_id="listAgentDecisions",
+)
+def list_agent_decisions(
+    session_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: AuditService,
+) -> ListAgentDecisionsResponse:
+    """List a session's recorded decisions, oldest first."""
+    return service.list_decisions(project_id=ctx.project_id, session_id=session_id)
+
+
+@router.get(
+    "/{session_id}/audit",
+    response_model=AgentSessionAuditResponse,
+    summary="Read an agent session's audit timeline",
+    operation_id="getAgentSessionAudit",
+)
+def get_agent_session_audit(
+    session_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: AuditService,
+    cursor: Annotated[str | None, Query(max_length=1000)] = None,
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE,
+) -> AgentSessionAuditResponse:
+    """Read the session's chronological experiment audit, a page at a time, oldest first."""
+    return service.read_audit(
+        project_id=ctx.project_id, session_id=session_id, cursor=cursor, limit=limit
+    )
+
+
+@router.get(
+    "/{session_id}/audit/export",
+    response_model=AgentSessionAuditResponse,
+    summary="Export an agent session's audit timeline",
+    operation_id="exportAgentSessionAudit",
+)
+def export_agent_session_audit(
+    session_id: str,
+    response: Response,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: AuditService,
+) -> AgentSessionAuditResponse:
+    """Export the whole audit as versioned JSON; refused rather than cut short when too long."""
+    audit = service.export_audit(project_id=ctx.project_id, session_id=session_id)
+    response.headers["Content-Disposition"] = (
+        f'attachment; filename="agent-session-{session_id}-audit.json"'
+    )
+    return audit

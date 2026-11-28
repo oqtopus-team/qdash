@@ -1,6 +1,6 @@
 """The qdash.sdk calibration and pipeline examples against the real calibration pipeline routes.
 
-The SDK's QDashClient sends its requests through FastAPI's TestClient, so the spec it builds
+The SDK session sends its requests through FastAPI's TestClient, so the spec it builds
 is parsed by the server's CalibrationPipelineSpec and checked by the same preflight as any
 other request. Prefect dispatch is patched; nothing runs.
 """
@@ -14,8 +14,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from qdash.client import QDashClient, QDashConfig
-from qdash.client.services.models import CustomTwoQubitStep, TwoQubitCalibrationStep
 from qdash.datamodel import sweep as server_sweep
 from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec as ServerSpec
 from qdash.datamodel.project import ProjectRole
@@ -23,9 +21,20 @@ from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-from qdash.sdk import QDash, QDashApiError, QDashValidationError
+from qdash.sdk import QDash, QDashApiError, QDashConfig, QDashValidationError
+from qdash.sdk._generated._authoring import TaskCall as WireTaskCall
 from qdash.sdk.calibration import MuxTargets, QubitTargets
-from qdash.sdk.pipeline import CustomOneQubit, Pipeline, Qubits, TaskCall, sweep, to_spec
+from qdash.sdk.pipeline import (
+    CustomOneQubit,
+    CustomTwoQubitStep,
+    Pipeline,
+    PipelineTargets,
+    Qubits,
+    TaskCall,
+    TwoQubitCalibrationStep,
+    sweep,
+    to_spec,
+)
 from tests.qdash.api.routers.test_calibration_pipeline import (  # noqa: F401 - pytest fixtures
     CHIP,
     chip,
@@ -144,8 +153,7 @@ def qdash(test_client: Any, chip: None) -> Iterator[QDash]:  # noqa: F811
         api_token="test_token",
         project_id="test_project",
     )
-    client = QDashClient(config, http_client=test_client)
-    with QDash(client) as session:
+    with QDash(config, http_client=test_client) as session:
         yield session
 
 
@@ -165,7 +173,10 @@ def test_sdk_spec_is_accepted_by_the_server_model() -> None:
 MANUAL = {"execution_mode": "manual", "rounds": [[["0", "1"]]]}
 TWO_QUBIT_STEPS = {
     "CustomTwoQubit": lambda **fields: CustomTwoQubitStep(
-        type="CustomTwoQubit", tasks=[TaskCall(name="CheckCrossResonance")], **fields
+        # A generated wire model takes the generated call model.
+        type="CustomTwoQubit",
+        tasks=[WireTaskCall(name="CheckCrossResonance")],
+        **fields,
     ),
     "TwoQubitCalibration": lambda **fields: TwoQubitCalibrationStep(
         type="TwoQubitCalibration", **fields
@@ -249,7 +260,7 @@ def test_validate_reports_missing_calibration_data(qdash: QDash) -> None:
 
 def test_validate_reports_server_problems_as_data(qdash: QDash) -> None:
     pipeline = coherence_pipeline()
-    pipeline.targets = Qubits(["99"])
+    pipeline.targets = PipelineTargets(qids=["99"])
 
     result = qdash.pipelines.validate(pipeline, chip_id=CHIP)
 
@@ -285,7 +296,7 @@ def test_execute_dispatches_the_validated_spec(qdash: QDash) -> None:
 
 def test_execute_rejects_an_invalid_spec_before_dispatch(qdash: QDash) -> None:
     pipeline = coherence_pipeline()
-    pipeline.targets = Qubits(["99"])
+    pipeline.targets = PipelineTargets(qids=["99"])
     create_flow_run = AsyncMock(return_value="flow-run-1")
     with (
         patch(
@@ -400,3 +411,57 @@ def test_calibrate_without_editor_role_is_refused(qdash: QDash) -> None:
         qdash.chip(CHIP).calibrate(QubitTargets(["0", "1"]), coherence_steps())
 
     assert raised.value.status_code == 403
+
+
+@pytest.mark.usefixtures("calibrated_chip")
+def test_a_calibration_session_groups_repeated_submissions_on_the_real_api(qdash: QDash) -> None:
+    from qdash.calibration import QubitTargets as SharedQubitTargets
+    from qdash.dbmodel.calibration_session import (
+        CalibrationPipelineRunDocument,
+        CalibrationSessionDocument,
+    )
+    from qdash.sdk import CalibrationSession, CalibrationSessionClosedError, QDashConflictError
+
+    session = CalibrationSession.create(qdash, chip_id=CHIP, name="Coherence check")
+    [stored] = CalibrationSessionDocument.find_all().to_list()
+    assert (stored.calibration_session_id, stored.objective, stored.origin) == (
+        session.session_id,
+        "Coherence check",
+        "manual",
+    )
+    create_flow_run, dispatch = patched_dispatch()
+    with dispatch:
+        first = session.submit(
+            SharedQubitTargets(["0", "1"]),
+            coherence_steps(),
+            default_run_parameters=RUN_PARAMETERS,
+            idempotency_key="trial-1",
+        )
+        replay = session.submit(
+            SharedQubitTargets(["0", "1"]),
+            coherence_steps(),
+            default_run_parameters=RUN_PARAMETERS,
+            idempotency_key="trial-1",
+        )
+    assert replay.run_id == first.run_id
+    assert first.calibration_session_id == session.session_id
+    create_flow_run.assert_awaited_once()
+    runs = CalibrationPipelineRunDocument.find(
+        {"calibration_session_id": session.session_id}
+    ).to_list()
+    assert [run.run_id for run in runs] == [first.run_id]
+    # Still the one manual session: no automatic session was created for the run.
+    assert CalibrationSessionDocument.find_all().count() == 1
+
+    # Closing cancels nothing: a run that may still run makes the server refuse it.
+    with pytest.raises(QDashConflictError):
+        session.close()
+
+    empty = CalibrationSession.create(qdash, chip_id=CHIP, name="Nothing to do")
+    empty.close(note="not needed")
+    reopened = CalibrationSession.open(qdash, session_id=empty.session_id)
+    assert reopened.closed and reopened.name == "Nothing to do"
+    with pytest.raises(CalibrationSessionClosedError):
+        reopened.submit(SharedQubitTargets(["0"]), coherence_steps())
+    # The client stays usable after sessions close.
+    assert qdash.chips.list()

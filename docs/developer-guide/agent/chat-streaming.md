@@ -1,0 +1,111 @@
+# Chat Streaming
+
+The runtime prepares chat presentation events; the API validates and relays them as
+Server-Sent Events (SSE) while saving each turn independently of the browser connection.
+
+## Responsibility Boundary
+
+| Layer | Responsibility |
+| --- | --- |
+| Agent Runtime | Durable model and tool execution, presentation events, and answer blocks |
+| `pi_chat_service.py` | Authenticated HTTP bridge and contract negotiation |
+| `runtime_presentation.py` | Envelope validation, SSE relay, and evaluation recording |
+| `chat_turn_runs.py` | Background stream and server-side chat recording |
+| Chat UI | Live rendering, reconnecting, and explicit stop requests |
+
+## Event Translation
+
+Text, reasoning, tool arguments, tool results, and rendered blocks stream as they become available.
+`ViewEventTranslator` reads durable conversation revisions, including result entries, so skipped
+intermediate updates do not lose tool output. Preserve event identity and ordering when changing
+translation; the final response must agree with the streamed blocks.
+
+`agent-runtime/src/presentation.ts` owns tool labels, display fields, and answer-block assembly.
+The API requests version 1 with `Accept: application/vnd.qdash.agent-presentation+x-ndjson; version=1`.
+Each NDJSON envelope has `v`, `event`, and `data`; optional `internal` fields carry evaluation
+records and answer text for API recording and never reach the browser. The API adds evaluation
+IDs, an error's `step`, and task-chat result metadata. Authentication and project checks remain
+on the existing request and tool-call paths.
+
+`src/qdash/agent/contracts/presentation.py` validates the envelope and event payload before relay.
+Unsupported versions, unknown events, malformed payloads, and lines over 16 Mi characters end
+the stream with an explicit error. New event shapes require contract validation and UI support;
+display mapping belongs in the runtime. Shared cases in
+`agent-runtime/testdata/presentation-v1.json` check runtime output, API relay, and UI folding.
+
+Each subscriber rebuilds presentation state from the turn's replay, preserving segment order
+on reattach. Older runtimes returning plain NDJSON use `pi_runtime_legacy.py`; retain this adapter
+until deployed runtimes all support the presentation contract. Existing saved message formats
+and the API/UI transcript reducers are unchanged.
+
+Text before or between tool calls becomes work history; text after the last tool call becomes
+the final answer. `agent-runtime/src/prompt.ts` requests concise progress updates at meaningful
+milestones, separately from thinking. These updates use the existing text events, so their
+frequency depends on the model. Keep the answer boundary consistent between
+`ui/src/lib/agentChatStream.ts` and `src/qdash/api/services/chat_transcript.py`.
+
+On failure, both layers retain streamed content as an assistant message marked `interrupted`
+before the separate `Error: …` message. The last message remains the error for retry and status
+detection. Preserve this ordering and the partial content when changing recovery behavior.
+
+## Durable Turns and Cancellation
+
+Closing a browser stream does not cancel a turn. Stop sends `turn_request_id` through
+`POST /agent/chat/stop` to the runtime's abort route. A late request cannot stop a different turn.
+The API records progress and completion even when no browser watches.
+
+## Reattaching to a Turn
+
+Reconnect with the same request ID and `reattach: true`; never resubmit the prompt to recover a
+stream. The UI stores bounded per-user turn pointers in session storage. Other windows discover
+an active turn and follow it without submitting or saving another turn.
+
+A restart or unavailable turn must produce an explicit recovery state, not silently dispatch the
+same tools again. Keep cancellation, transport loss, and completion distinct.
+
+## Branches
+
+A branch forks a Pi conversation at a selected answer in the same SQLite store. It does not copy
+the database or reconstruct a transcript. Branches share the current workspace files, not a file
+snapshot from the fork point. Deleting a chat removes shared state only when no remaining chat
+uses it.
+
+## Project Sharing
+
+`agent_chat_share_service.py` copies persisted chat messages into `agent_chat_share` for
+read-only project access. It projects text, chart, and composed UI blocks, excluding tool
+traces, runtime identifiers, attachments, and interactive cards. Publishing again replaces
+the snapshot while preserving its link; it never subscribes to the original chat's stream.
+
+Only the chat owner with an Editor or Owner role can publish. Every read checks project
+membership and scope. The chat owner or a project Owner can revoke a snapshot; deleting the
+source chat removes its snapshots. Recorded turns from another project and running answers
+prevent publication. Legacy messages without turn records rely on the owner's review.
+
+`SharedChatPageContent` renders snapshots without the live session provider's editing or
+runtime controls. Dashboard and chat share `VisibilitySelector`, `VisibilityLabel`, and
+`CopyLinkButton` from `components/ui/`. Test authorization, snapshot independence, revocation,
+and excluded blocks in `tests/qdash/api/routers/test_agent_chat_share.py`, plus the chat sharing
+UI tests. For the procedure, see [Agent](../../user-guide/ai-chat.md#share-a-conversation-with-the-project).
+
+## Calibration Session State in the Chat
+
+Session links come from the chat's successful or running session-scoped tool calls, not model
+text or failed calls. Read the linked session through the active project's API before displaying
+its current status. Notifications describe chat events; they do not authorize calibration work.
+
+## Change and Test Streaming
+
+Start with these files:
+
+| File | Responsibility |
+| --- | --- |
+| `agent-runtime/src/server.ts` | Runtime stream and abort routes |
+| `agent-runtime/src/view-events.ts` | Durable-view translation |
+| `agent-runtime/src/presentation.ts` | Runtime-owned presentation mapping |
+| `src/qdash/api/services/runtime_presentation.py` | Validated runtime-to-SSE relay |
+| `src/qdash/api/services/chat_turn_runs.py` | Server recording |
+| `ui/src/lib/agentTurnStore.ts` | Reload recovery pointers |
+
+Run `task ci-agent-runtime` and the affected API/UI chat tests. Cover disconnect, reattach,
+late cancellation, reload, branch sharing, tool arguments, and final-response parity.

@@ -85,6 +85,7 @@ test("branch over HTTP: fork, branch chat, one writer per store, exact steer and
       BACKGROUND_CONTEXT,
       SharedRuntime: { create: async () => ({
         listToolNames: () => [],
+        expandSkillCommand: (message) => message,
         storePath: pathOf,
         steerReceipt: (owner, session, project, requestId, target = {}) =>
           readSteerReceipt(pathOf(owner, target.storeSessionId ?? session), project, requestId, BACKGROUND_CONTEXT, target.conversationId ?? ROOT_CONVERSATION_ID),

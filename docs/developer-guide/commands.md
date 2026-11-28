@@ -1,6 +1,7 @@
 # Developer Commands
 
-Run commands from the repository root unless noted.
+Run commands from the repository root. On the host, run checks and commits inside Nix
+(`nix develop -c task check`); in the DevContainer, run them directly.
 
 ## Setup and Services
 
@@ -24,7 +25,7 @@ task test-workflow       # workflow tests
 task test-client         # Python client tests
 task test-sdk            # Python SDK tests
 task test-client-ts      # TypeScript client checks
-task test-sdk-ts         # TypeScript SDK checks against the built client
+task test-sdk-ts         # TypeScript SDK generation check, typecheck, and tests
 task ci-pi-packages      # pi extension and release-script checks
 task ci-agent-runtime    # runtime tests and typecheck
 task test-ui             # UI tests
@@ -36,7 +37,7 @@ task check               # required before every push; Python, UI, workspace pac
 ## Build and Generation
 
 ```bash
-task generate            # OpenAPI + generated UI, TypeScript, and Python clients
+task generate            # task catalog, OpenAPI, clients, and both SDKs
 task generate-task-catalog # workflow task metadata catalog
 task build               # UI production build
 task build-client-ts     # build the local TypeScript client for pi CLI development

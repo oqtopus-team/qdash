@@ -99,7 +99,7 @@ for (const mode of ["content", "path"]) {
 
 test("an API without the source routes is reported as outdated, not as a missing file", async () => {
   const tool = registeredTools({
-    async getSourceFile() { const error = new Error("404 /copilot/source/file: Not Found"); error.statusCode = 404; throw error; },
+    async getSourceFile() { const error = new Error("404 /agent/source/file: Not Found"); error.statusCode = 404; throw error; },
   }).get("qdash_read_source");
   const text = (await tool.execute("t", { path: "qdash/workflow/engine/task/executor.py" })).content[0].text;
   assert.match(text, /endpoint may be unavailable.*routing\/proxy configuration.*update the API image/);

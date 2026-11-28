@@ -1,7 +1,7 @@
 {
   "name": "@oqtopus-team/pi-qdash",
   "version": "0.1.10",
-  "description": "Pi extension for querying QDash via @oqtopus-team/qdash-client",
+  "description": "Pi extension for querying QDash via @oqtopus-team/qdash-sdk",
   "type": "module",
   "license": "Apache-2.0",
   "author": "OQTOPUS Team <oqtopus-team@googlegroups.com>",
@@ -28,8 +28,8 @@
     "access": "public"
   },
   "dependencies": {
-    "@oqtopus-team/qdash-client": "workspace:*",
-    "@oqtopus-team/qdash-sdk": "workspace:*"
+    "@oqtopus-team/qdash-sdk": "workspace:*",
+    "smol-toml": "^1.9.1"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
@@ -49,9 +49,9 @@
     "test": "rm -rf .test-dist && tsc --noEmit false --outDir .test-dist && node --test tests/*.test.mjs; status=$?; rm -rf .test-dist; exit $status"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "1.6.0",
+    "@earendil-works/pi-coding-agent": "1.7.0",
     "typebox": "^1.0.55",
     "typescript": "^5.8.0",
-    "@earendil-works/pi-tui": "1.6.0"
+    "@earendil-works/pi-tui": "1.7.0"
   }
 }

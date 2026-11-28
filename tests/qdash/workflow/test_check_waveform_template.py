@@ -1,29 +1,23 @@
 from __future__ import annotations
 
 import importlib
-from typing import Any
 
 import pytest
 
+from tests.qdash.workflow.calibration_session_fake import (
+    fake_session_class,
+    install_fake_session,
+)
 from tests.qdash.workflow.task_call_helpers import names
 
 check_waveform_module = importlib.import_module("qdash.workflow.templates.check_waveform")
 
 
-class FakeCalibService:
-    last_kwargs: dict[str, Any] | None = None
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.args = args
-        self.kwargs = kwargs
-        FakeCalibService.last_kwargs = kwargs
-
-    def run(self, targets: Any, *, steps: list[Any]) -> dict[str, Any]:
-        return {"targets": targets, "steps": steps}
+FakeCalibService = fake_session_class()
 
 
 def test_check_waveform_template_runs_check_waveform_step(monkeypatch) -> None:
-    monkeypatch.setattr(check_waveform_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, check_waveform_module, FakeCalibService)
 
     result = check_waveform_module.check_waveform(
         username="alice",
@@ -38,7 +32,7 @@ def test_check_waveform_template_runs_check_waveform_step(monkeypatch) -> None:
 
 
 def test_check_waveform_template_sets_default_interval(monkeypatch) -> None:
-    monkeypatch.setattr(check_waveform_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, check_waveform_module, FakeCalibService)
 
     check_waveform_module.check_waveform(
         username="alice",
@@ -54,7 +48,7 @@ def test_check_waveform_template_sets_default_interval(monkeypatch) -> None:
 
 
 def test_check_waveform_template_requires_explicit_targets(monkeypatch) -> None:
-    monkeypatch.setattr(check_waveform_module, "CalibService", FakeCalibService)
+    install_fake_session(monkeypatch, check_waveform_module, FakeCalibService)
 
     with pytest.raises(ValueError, match="mux_ids or qids is required"):
         check_waveform_module.check_waveform(username="alice", chip_id="16Q-test")

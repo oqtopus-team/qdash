@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { buildForumThreadZip } from "@/lib/forum/exportThreadZip";
 import type { ForumPostResponse } from "@/schemas";
+import { saveBlob } from "@/lib/utils/download";
 
 interface ForumThreadDownloadButtonProps {
   post: ForumPostResponse;
@@ -26,14 +27,7 @@ export function ForumThreadDownloadButton({
     try {
       const { filename, blob } = await buildForumThreadZip(post, replies);
 
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      saveBlob(blob, filename);
     } catch {
       toast.error("Failed to export thread");
     } finally {

@@ -702,8 +702,8 @@ async def test_execute_single_task_reports_a_dispatch_failure(tmp_path: Path) ->
 
 
 @pytest.mark.asyncio
-async def test_execute_calibration_pipeline_adds_the_pipeline_tag(tmp_path: Path) -> None:
-    """Pipeline runs merge their own tags, request tags and the pipeline marker."""
+async def test_execute_calibration_pipeline_merges_only_the_given_tags(tmp_path: Path) -> None:
+    """Pipeline runs merge their own tags and request tags, adding no marker of their own."""
     coordinator = _StubCoordinator()
     service = _service(tmp_path, coordinator=coordinator)
     spec = {"name": "pipe", "steps": [{"task": "CheckRabi"}], "tags": ["auto"]}
@@ -718,10 +718,71 @@ async def test_execute_calibration_pipeline_adds_the_pipeline_tag(tmp_path: Path
 
     call = coordinator.run_calls[0]
     assert call["name"] == "pipe"
-    assert call["tags"] == ["auto", "manual", "pipeline"]
+    assert call["parameters"]["flow_name"] == "pipe"
+    assert call["tags"] == ["auto", "manual"]
+    assert call["parameters"]["tags"] == ["auto", "manual"]
     assert call["parameters"]["spec"] == spec
     assert call["workflow"] is True
     assert response.message == "Calibration pipeline 'pipe' started"
+
+
+def _unnamed_pipeline_spec(**extra: Any) -> dict[str, Any]:
+    return {
+        "spec_version": 2,
+        "targets": {"qids": ["0"]},
+        "steps": [
+            {"type": "CustomOneQubit", "step_name": "t1", "tasks": [{"name": "CheckT1"}]},
+            {"type": "CustomOneQubit", "step_name": "t2", "tasks": [{"name": "CheckT2Echo"}]},
+        ],
+        **extra,
+    }
+
+
+@pytest.mark.asyncio
+async def test_execute_calibration_pipeline_leaves_an_unnamed_run_unnamed(
+    tmp_path: Path,
+) -> None:
+    """An unnamed run reaches the worker without a name and adds no pipeline tag.
+
+    The scheduled row carries the first step's name, the name the worker gives
+    that step's execution when it adopts the row.
+    """
+    coordinator = _StubCoordinator()
+    service = _service(tmp_path, coordinator=coordinator)
+
+    await service.execute_calibration_pipeline(
+        spec=_unnamed_pipeline_spec(),
+        chip_id="chip-1",
+        username="operator",
+        project_id="project-1",
+    )
+
+    call = coordinator.run_calls[0]
+    assert call["name"] == "t1"
+    assert call["parameters"]["flow_name"] is None
+    assert call["tags"] == []
+    assert call["parameters"]["tags"] == []
+
+
+@pytest.mark.asyncio
+async def test_execute_calibration_pipeline_keeps_an_explicit_pipeline_name_and_tag(
+    tmp_path: Path,
+) -> None:
+    """A caller's own 'pipeline' name and tag are kept as given."""
+    coordinator = _StubCoordinator()
+    service = _service(tmp_path, coordinator=coordinator)
+
+    await service.execute_calibration_pipeline(
+        spec=_unnamed_pipeline_spec(name="pipeline", tags=["pipeline", "nightly"]),
+        chip_id="chip-1",
+        username="operator",
+        project_id="project-1",
+    )
+
+    call = coordinator.run_calls[0]
+    assert call["name"] == "pipeline"
+    assert call["parameters"]["flow_name"] == "pipeline"
+    assert call["tags"] == ["nightly", "pipeline"]
 
 
 @pytest.mark.asyncio

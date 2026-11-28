@@ -31,7 +31,7 @@ from qdash.workflow.service._internal.scheduling_tasks import (
 
 if TYPE_CHECKING:
     from qdash.datamodel.task_call import StepCalls
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
 
 
 # =============================================================================
@@ -74,13 +74,13 @@ class OneQubitStrategy(ABC):
     @abstractmethod
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute the 1-qubit calibration strategy.
 
         Args:
-            session: CalibSession instance with username, chip_id, etc.
+            session: ExecutionRuntime instance with username, chip_id, etc.
             config: Configuration for the calibration
 
         Returns:
@@ -91,6 +91,14 @@ class OneQubitStrategy(ABC):
     def _get_wiring_config_path(self, chip_id: str) -> str:
         """Get the wiring config path for a chip."""
         return str(get_qubex_paths().wiring_yaml(chip_id))
+
+    def _scheduler(self, session: ExecutionRuntime) -> OneQubitScheduler:
+        """One-qubit scheduler on the chip wiring and the session's pinned MUX mapping."""
+        return OneQubitScheduler(
+            chip_id=session.chip_id,
+            wiring_config_path=self._get_wiring_config_path(session.chip_id),
+            mux_mapping=session.mux_mapping,
+        )
 
     def _filter_qids(self, qids: list[str], allowed_qids: list[str] | None) -> list[str]:
         """Filter qids to only include those in allowed_qids.
@@ -131,16 +139,11 @@ class OneQubitParallelByMuxStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Run the MUX groups of each stage in parallel, stages one after another."""
-        wiring_config_path = self._get_wiring_config_path(session.chip_id)
-        scheduler = OneQubitScheduler(
-            chip_id=session.chip_id,
-            wiring_config_path=wiring_config_path,
-            mux_mapping=session.mux_mapping,
-        )
+        scheduler = self._scheduler(session)
         schedule = scheduler.generate_from_mux(
             mux_ids=config.mux_ids,
             exclude_qids=config.exclude_qids,
@@ -231,18 +234,13 @@ class OneQubitParallelByRoundStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute the rounds one after another, the qubits of a round in parallel."""
         logger = get_run_logger()
 
-        wiring_config_path = self._get_wiring_config_path(session.chip_id)
-        scheduler = OneQubitScheduler(
-            chip_id=session.chip_id,
-            wiring_config_path=wiring_config_path,
-            mux_mapping=session.mux_mapping,
-        )
+        scheduler = self._scheduler(session)
         schedule = scheduler.generate_rounds_from_mux(
             mux_ids=config.mux_ids,
             exclude_qids=config.exclude_qids,
@@ -296,18 +294,13 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute local-index spectroscopy steps as hardware-aware batches."""
         from qdash.workflow.service.one_qubit_stage_runner import OneQubitStageRunner
 
-        wiring_config_path = self._get_wiring_config_path(session.chip_id)
-        scheduler = OneQubitScheduler(
-            chip_id=session.chip_id,
-            wiring_config_path=wiring_config_path,
-            mux_mapping=session.mux_mapping,
-        )
+        scheduler = self._scheduler(session)
         schedule = scheduler.generate_simultaneous_spectroscopy_batches_from_mux(
             mux_ids=config.mux_ids,
             exclude_qids=config.exclude_qids,
@@ -344,16 +337,11 @@ class OneQubitSequentialStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Run the MUX groups one after another in the parent session."""
-        wiring_config_path = self._get_wiring_config_path(session.chip_id)
-        scheduler = OneQubitScheduler(
-            chip_id=session.chip_id,
-            wiring_config_path=wiring_config_path,
-            mux_mapping=session.mux_mapping,
-        )
+        scheduler = self._scheduler(session)
         schedule = scheduler.generate_from_mux(
             mux_ids=config.mux_ids,
             exclude_qids=config.exclude_qids,

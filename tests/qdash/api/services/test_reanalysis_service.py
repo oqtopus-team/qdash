@@ -1,0 +1,1383 @@
+"""Tests for ReanalysisService: figure selection, seed outputs, and PNG previews."""
+
+from __future__ import annotations
+
+import base64
+import http.server
+import json
+import threading
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any
+
+import numpy as np
+import plotly.graph_objs as go
+import pytest
+from fastapi import HTTPException
+from pydantic import ValidationError
+
+from qdash.analysis.spectroscopy import (
+    compute_coarse_control_amplitude,
+    guess_sorted_slots_for_partial_mux,
+)
+from qdash.analysis.spectroscopy.estimate_resonator_frequency import Peak, Resonance
+from qdash.api.schemas import reanalysis as reanalysis_schema
+from qdash.api.schemas.reanalysis import (
+    ReanalyzeQubitSpectroscopyParams,
+    ReanalyzeQubitSpectroscopyRequest,
+    ReanalyzeRequest,
+    ReanalyzeResonatorSpectroscopyParams,
+    ReanalyzeResonatorSpectroscopyRequest,
+    ReanalyzeResponse,
+)
+from qdash.api.services import reanalysis_service as module
+from qdash.api.services.reanalysis_service import ReanalysisService
+from qdash.common.visualization.figure_metadata import set_figure_role
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+
+
+def _heatmap(z_value: float = 0.0) -> go.Figure:
+    return go.Figure(
+        data=[
+            go.Heatmap(
+                x=[6.0, 6.1, 6.2, 6.3],
+                y=[-60.0, -55.0, -50.0, -45.0, -40.0, -35.0, -30.0, -25.0],
+                z=[[z_value] * 4 for _ in range(8)],
+            )
+        ]
+    )
+
+
+def _raw_figure() -> go.Figure:
+    return set_figure_role(_heatmap(1.0), "raw")
+
+
+def _unlabeled_marked_figure() -> go.Figure:
+    fig = _heatmap(2.0)
+    fig.add_trace(go.Scatter(x=[6.1], y=[-30.0], mode="markers"))
+    return fig
+
+
+def _marked_figure() -> go.Figure:
+    return set_figure_role(_unlabeled_marked_figure(), "marked")
+
+
+def _write(path: Path, fig: go.Figure) -> str:
+    path.write_text(fig.to_json(), encoding="utf-8")
+    return str(path)
+
+
+def _doc(paths: list[str], *, name: str, run_parameters: dict[str, Any] | None = None) -> Any:
+    return SimpleNamespace(
+        task_id="task-1",
+        name=name,
+        chip_id="chip",
+        qid="1",
+        run_parameters=run_parameters or {},
+        json_figure_path=paths,
+    )
+
+
+def _is_raw(fig: go.Figure) -> bool:
+    return len(fig.data) == 1 and fig.data[0].z[0][0] == 1.0
+
+
+def _outputs(response: ReanalyzeResponse) -> dict[str, tuple[float, str]]:
+    return {p.name: (p.value, p.unit) for p in response.output_parameters}
+
+
+def _assert_output(response: ReanalyzeResponse, name: str, value: float, unit: str) -> None:
+    actual_value, actual_unit = _outputs(response)[name]
+    assert actual_value == pytest.approx(value)
+    assert actual_unit == unit
+
+
+# ── Raw figure selection ────────────────────────────────────────────────────
+
+
+def test_load_raw_figure_prefers_raw_suffix_when_marked_comes_first(tmp_path: Path) -> None:
+    # Unlabeled figures: the filename alone identifies the raw one.
+    paths = [
+        _write(tmp_path / "CheckQubitSpectroscopy_1_marked_0.json", _unlabeled_marked_figure()),
+        _write(tmp_path / "CheckQubitSpectroscopy_1_raw_1.json", _heatmap(1.0)),
+    ]
+
+    fig = ReanalysisService._load_raw_figure(_doc(paths, name="CheckQubitSpectroscopy"))
+
+    assert _is_raw(fig)
+
+
+def test_load_raw_figure_prefers_raw_suffix_when_raw_comes_first(tmp_path: Path) -> None:
+    # Unlabeled figures: the filename alone identifies the raw one.
+    paths = [
+        _write(tmp_path / "CheckQubitSpectroscopy_1_raw_0.json", _heatmap(1.0)),
+        _write(tmp_path / "CheckQubitSpectroscopy_1_marked_1.json", _unlabeled_marked_figure()),
+    ]
+
+    fig = ReanalysisService._load_raw_figure(_doc(paths, name="CheckQubitSpectroscopy"))
+
+    assert _is_raw(fig)
+
+
+def test_load_raw_figure_skips_raw_filename_whose_role_is_marked(tmp_path: Path) -> None:
+    paths = [
+        _write(tmp_path / "CheckQubitSpectroscopy_1_raw_0.json", _marked_figure()),
+        _write(tmp_path / "CheckQubitSpectroscopy_1_1.json", _raw_figure()),
+    ]
+
+    fig = ReanalysisService._load_raw_figure(_doc(paths, name="CheckQubitSpectroscopy"))
+
+    assert _is_raw(fig)
+
+
+def test_load_raw_figure_rejects_raw_filename_whose_role_is_marked(tmp_path: Path) -> None:
+    paths = [_write(tmp_path / "CheckQubitSpectroscopy_1_raw_0.json", _marked_figure())]
+
+    with pytest.raises(HTTPException) as excinfo:
+        ReanalysisService._load_raw_figure(_doc(paths, name="CheckQubitSpectroscopy"))
+
+    assert excinfo.value.status_code == 409
+
+
+def test_load_raw_figure_uses_figure_role_when_filenames_have_no_suffix(tmp_path: Path) -> None:
+    paths = [
+        _write(tmp_path / "CheckQubitSpectroscopy_1_0.json", _marked_figure()),
+        _write(tmp_path / "CheckQubitSpectroscopy_1_1.json", _raw_figure()),
+    ]
+
+    fig = ReanalysisService._load_raw_figure(_doc(paths, name="CheckQubitSpectroscopy"))
+
+    assert _is_raw(fig)
+
+
+def test_load_raw_figure_falls_back_to_single_legacy_figure(tmp_path: Path) -> None:
+    legacy = _heatmap(3.0)  # no role metadata, no suffix
+    paths = [_write(tmp_path / "CheckQubitSpectroscopy_1.json", legacy)]
+
+    fig = ReanalysisService._load_raw_figure(_doc(paths, name="CheckQubitSpectroscopy"))
+
+    assert fig.data[0].z[0][0] == 3.0
+
+
+def test_load_raw_figure_uses_first_of_unlabeled_legacy_pair(tmp_path: Path) -> None:
+    # Records without role metadata predate the marked-first order: raw came first.
+    legacy_raw = _heatmap(1.0)
+    legacy_marked = _heatmap(2.0)
+    legacy_marked.add_trace(go.Scatter(x=[6.1], y=[-30.0], mode="markers"))
+    paths = [
+        _write(tmp_path / "CheckQubitSpectroscopy_1_0.json", legacy_raw),
+        _write(tmp_path / "CheckQubitSpectroscopy_1_1.json", legacy_marked),
+    ]
+
+    fig = ReanalysisService._load_raw_figure(_doc(paths, name="CheckQubitSpectroscopy"))
+
+    assert _is_raw(fig)
+
+
+def test_load_raw_figure_rejects_marked_with_missing_raw(tmp_path: Path) -> None:
+    paths = [
+        _write(tmp_path / "CheckQubitSpectroscopy_1_0.json", _marked_figure()),
+        str(tmp_path / "CheckQubitSpectroscopy_1_1.json"),
+    ]
+
+    with pytest.raises(HTTPException) as excinfo:
+        ReanalysisService._load_raw_figure(_doc(paths, name="CheckQubitSpectroscopy"))
+
+    assert excinfo.value.status_code == 410
+
+
+def test_load_raw_figure_rejects_marked_with_malformed_raw(tmp_path: Path) -> None:
+    malformed = tmp_path / "CheckQubitSpectroscopy_1_1.json"
+    malformed.write_text("{not json", encoding="utf-8")
+    paths = [
+        _write(tmp_path / "CheckQubitSpectroscopy_1_0.json", _marked_figure()),
+        str(malformed),
+    ]
+
+    with pytest.raises(HTTPException) as excinfo:
+        ReanalysisService._load_raw_figure(_doc(paths, name="CheckQubitSpectroscopy"))
+
+    assert excinfo.value.status_code == 500
+
+
+def test_load_raw_figure_rejects_single_marked_figure(tmp_path: Path) -> None:
+    paths = [_write(tmp_path / "CheckQubitSpectroscopy_1_0.json", _marked_figure())]
+
+    with pytest.raises(HTTPException) as excinfo:
+        ReanalysisService._load_raw_figure(_doc(paths, name="CheckQubitSpectroscopy"))
+
+    assert excinfo.value.status_code == 409
+
+
+def test_load_raw_figure_reports_missing_file(tmp_path: Path) -> None:
+    paths = [str(tmp_path / "CheckQubitSpectroscopy_1_raw_1.json")]
+
+    with pytest.raises(HTTPException) as excinfo:
+        ReanalysisService._load_raw_figure(_doc(paths, name="CheckQubitSpectroscopy"))
+
+    assert excinfo.value.status_code == 410
+
+
+def test_load_raw_figure_requires_a_json_figure() -> None:
+    with pytest.raises(HTTPException) as excinfo:
+        ReanalysisService._load_raw_figure(_doc([], name="CheckQubitSpectroscopy"))
+
+    assert excinfo.value.status_code == 409
+
+
+# ── Qubit spectroscopy seeds ────────────────────────────────────────────────
+
+
+def _qubit_service(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, repr_db: float
+) -> tuple[ReanalysisService, dict[str, go.Figure]]:
+    paths = [
+        _write(tmp_path / "CheckQubitSpectroscopy_1_marked_0.json", _marked_figure()),
+        _write(tmp_path / "CheckQubitSpectroscopy_1_raw_1.json", _raw_figure()),
+    ]
+    doc = _doc(paths, name="CheckQubitSpectroscopy")
+    service = ReanalysisService()
+    monkeypatch.setattr(service, "_load_source_doc", lambda **_: doc)
+    seen: dict[str, go.Figure] = {}
+
+    def fake_estimate(fig: go.Figure, _config: Any, retry_with_trim: bool) -> Any:
+        seen["input"] = fig
+        f01 = SimpleNamespace(frequency=7.123, repr_db=repr_db, quality_level=4)
+        result = SimpleNamespace(f01=f01, f12=None, anharmonicity=None)
+        return go.Figure(fig), result
+
+    monkeypatch.setattr(module, "estimate_and_mark_qubit_figure", fake_estimate)
+    return service, seen
+
+
+def test_qubit_reanalysis_returns_coarse_seeds_and_marks_amplitude(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    service, seen = _qubit_service(monkeypatch, tmp_path, repr_db=-30.0)
+
+    response = service.reanalyze_qubit_spectroscopy(
+        project_id="p",
+        chip_id="chip",
+        qid="1",
+        params=ReanalyzeQubitSpectroscopyParams(),
+    )
+
+    assert _is_raw(seen["input"])
+    outputs = _outputs(response)
+    expected_amplitude = min(10 ** (-30.0 / 20) * 10 ** (10.0 / 20), 1.0)
+    assert outputs["coarse_qubit_frequency"] == (7.123, "GHz")
+    assert outputs["qubit_frequency"] == (7.123, "GHz")
+    assert outputs["coarse_control_amplitude"][0] == pytest.approx(expected_amplitude)
+    assert outputs["coarse_control_amplitude"][1] == "a.u."
+    assert outputs["f01_repr_db"] == (-30.0, "dB")
+    assert outputs["f01_quality_level"] == (4.0, "a.u.")
+    annotations = [a["text"] for a in response.figure["layout"].get("annotations", [])]
+    assert f"coarse A = {expected_amplitude:.4f} a.u." in annotations
+    assert response.image_base64 is None
+    assert response.image_media_type is None
+
+
+def test_qubit_reanalysis_caps_coarse_amplitude(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    service, _ = _qubit_service(monkeypatch, tmp_path, repr_db=0.0)
+
+    response = service.reanalyze_qubit_spectroscopy(
+        project_id="p",
+        chip_id="chip",
+        qid="1",
+        params=ReanalyzeQubitSpectroscopyParams(),
+    )
+
+    assert _outputs(response)["coarse_control_amplitude"][0] == 1.0
+
+
+def test_coarse_amplitude_matches_workflow_formula() -> None:
+    amplitude, marker_db = compute_coarse_control_amplitude(-25.0)
+
+    assert amplitude == pytest.approx(min(10 ** (-25.0 / 20) * 10 ** (10.0 / 20), 1.0))
+    assert marker_db == pytest.approx(-15.0)
+
+
+# ── Resonator spectroscopy seeds ────────────────────────────────────────────
+
+
+def _resonator_service(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, resonance_count: int = 4
+) -> ReanalysisService:
+    paths = [
+        _write(tmp_path / "CheckResonatorSpectroscopy_1_marked_0.json", _marked_figure()),
+        _write(tmp_path / "CheckResonatorSpectroscopy_1_raw_1.json", _raw_figure()),
+    ]
+    doc = _doc(paths, name="CheckResonatorSpectroscopy")
+    service = ReanalysisService()
+    monkeypatch.setattr(service, "_load_source_doc", lambda **_: doc)
+    # Each slot's peak sits on its own power row, so each slot has its own optimal power:
+    # -55, -50, -45, and -35 dB for slots 0 to 3 (5 dB below each row, at least -60 dB).
+    rows = [2, 3, 4, 6]
+    resonances = [
+        Resonance(high_power_peaks=None, low_power_peak=Peak(x=i, y=rows[i], prominence=1.0))
+        for i in range(resonance_count)
+    ]
+    frequencies = [6.0, 6.1, 6.2, 6.3][:resonance_count]
+
+    def fake_estimate(fig: go.Figure, _config: Any) -> Any:
+        assert _is_raw(fig)
+        return resonances, [], frequencies
+
+    monkeypatch.setattr(module, "estimate_resonator_frequency_from_figure", fake_estimate)
+    monkeypatch.setattr(module, "estimate_minimum_usable_power", lambda *_a, **_k: -60.0)
+    return service
+
+
+def test_resonator_reanalysis_returns_optimal_power_and_readout_amplitude(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    service = _resonator_service(monkeypatch, tmp_path)
+
+    response = service.reanalyze_resonator_spectroscopy(
+        project_id="p",
+        chip_id="chip",
+        qid="1",
+        params=ReanalyzeResonatorSpectroscopyParams(bare_shift_estimator_type="config"),
+    )
+
+    # Q01 is assigned to slot 3: it takes slot 3's frequency and power, not slot 0's
+    # (6.0 GHz, -55 dB).
+    outputs = _outputs(response)
+    assert outputs["readout_frequency"] == (6.3, "GHz")
+    assert outputs["optimal_power"] == (-35.0, "dB")
+    assert outputs["readout_amplitude"][0] == pytest.approx(10 ** (-35.0 / 20))
+    assert outputs["readout_amplitude"][1] == "a.u."
+    stars = [
+        trace
+        for trace in response.figure["data"]
+        if trace.get("marker", {}).get("symbol") == "star"
+    ]
+    assert len(stars) == 4
+    labels = {a["text"] for a in response.figure["layout"].get("annotations", [])}
+    assert "Q01 / s3" in labels
+
+
+def test_resonator_reanalysis_omits_power_outputs_when_qid_is_unassigned(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    service = _resonator_service(monkeypatch, tmp_path, resonance_count=2)
+
+    response = service.reanalyze_resonator_spectroscopy(
+        project_id="p",
+        chip_id="chip",
+        qid="1",
+        params=ReanalyzeResonatorSpectroscopyParams(bare_shift_estimator_type="config"),
+    )
+
+    assert _outputs(response) == {"readout_frequency": (0.0, "GHz")}
+
+
+def test_resonator_reanalysis_keeps_frequency_when_power_analysis_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    service = _resonator_service(monkeypatch, tmp_path)
+
+    def broken(*_a: Any, **_k: Any) -> float:
+        raise ValueError("no correlated rows")
+
+    monkeypatch.setattr(module, "estimate_minimum_usable_power", broken)
+
+    response = service.reanalyze_resonator_spectroscopy(
+        project_id="p",
+        chip_id="chip",
+        qid="1",
+        params=ReanalyzeResonatorSpectroscopyParams(bare_shift_estimator_type="config"),
+    )
+
+    assert _outputs(response) == {"readout_frequency": (6.3, "GHz")}
+
+
+# ── PNG preview ─────────────────────────────────────────────────────────────
+
+
+def test_include_image_defaults_to_false() -> None:
+    assert ReanalyzeRequest().include_image is False
+
+
+def test_include_image_returns_base64_png(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    service, _ = _qubit_service(monkeypatch, tmp_path, repr_db=-30.0)
+    monkeypatch.setattr(ReanalysisService, "_render_png", staticmethod(lambda _fig: PNG_BYTES))
+
+    response = service.reanalyze_qubit_spectroscopy(
+        project_id="p",
+        chip_id="chip",
+        qid="1",
+        params=ReanalyzeQubitSpectroscopyParams(),
+        include_image=True,
+    )
+
+    assert response.image_media_type == "image/png"
+    assert response.image_base64 is not None
+    assert base64.b64decode(response.image_base64) == PNG_BYTES
+    assert response.image_error is None
+
+
+def test_include_image_reports_renderer_failure_without_failing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    service = _resonator_service(monkeypatch, tmp_path)
+    internal_path = "/private/service/chrome/bin/chrome"
+
+    def no_renderer(_fig: go.Figure) -> bytes:
+        raise RuntimeError(f"Kaleido subprocess {internal_path} exited with code 1")
+
+    monkeypatch.setattr(ReanalysisService, "_render_png", staticmethod(no_renderer))
+
+    response = service.reanalyze_resonator_spectroscopy(
+        project_id="p",
+        chip_id="chip",
+        qid="1",
+        params=ReanalyzeResonatorSpectroscopyParams(bare_shift_estimator_type="config"),
+        include_image=True,
+    )
+
+    assert response.image_base64 is None
+    assert response.image_media_type is None
+    assert response.image_error == "Preview image rendering failed."
+    assert internal_path not in response.model_dump_json()
+    assert "RuntimeError" not in response.model_dump_json()
+    # The cause is kept for operators in the server log.
+    assert any(
+        record.exc_info and internal_path in str(record.exc_info[1]) for record in caplog.records
+    )
+    assert _outputs(response)["readout_frequency"] == (6.3, "GHz")
+
+
+def test_render_png_produces_png_with_kaleido() -> None:
+    pytest.importorskip("kaleido")
+
+    png = ReanalysisService._render_png(_heatmap(1.0))
+
+    assert png.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+# ── Inline figure ───────────────────────────────────────────────────────────
+
+
+def _figure_json(fig: go.Figure) -> dict[str, Any]:
+    result: dict[str, Any] = json.loads(fig.to_json())
+    return result
+
+
+def _no_stored_lookup(**_: Any) -> Any:
+    raise AssertionError("an inline figure must not read stored task results")
+
+
+def test_qubit_reanalysis_of_inline_figure_skips_stored_results(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    service, seen = _qubit_service(monkeypatch, tmp_path, repr_db=-30.0)
+    monkeypatch.setattr(service, "_load_source_doc", _no_stored_lookup)
+    monkeypatch.setattr(ReanalysisService, "_render_png", staticmethod(lambda _fig: PNG_BYTES))
+
+    response = service.reanalyze_qubit_spectroscopy(
+        project_id="p",
+        chip_id="chip",
+        qid="1",
+        params=ReanalyzeQubitSpectroscopyParams(),
+        figure=_figure_json(_heatmap(1.0)),
+        include_image=True,
+    )
+
+    assert _is_raw(seen["input"])
+    assert response.source_task_id is None
+    assert response.source_task_name == "CheckQubitSpectroscopy"
+    assert _outputs(response)["coarse_qubit_frequency"] == (7.123, "GHz")
+    assert response.image_media_type == "image/png"
+
+
+def test_resonator_reanalysis_of_inline_figure_uses_analysis_defaults(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    service = _resonator_service(monkeypatch, tmp_path)
+    monkeypatch.setattr(service, "_load_source_doc", _no_stored_lookup)
+    configs: list[Any] = []
+    original = module.ReanalysisService._build_resonator_config
+
+    def record_config(params: Any, stored: dict[str, Any]) -> Any:
+        configs.append(stored)
+        return original(params, stored)
+
+    monkeypatch.setattr(ReanalysisService, "_build_resonator_config", staticmethod(record_config))
+
+    response = service.reanalyze_resonator_spectroscopy(
+        project_id="p",
+        chip_id="chip",
+        qid="1",
+        params=ReanalyzeResonatorSpectroscopyParams(bare_shift_estimator_type="config"),
+        figure=_figure_json(_raw_figure()),
+    )
+
+    assert configs == [{}]
+    assert response.source_task_id is None
+    assert response.source_task_name == "CheckResonatorSpectroscopy"
+    outputs = _outputs(response)
+    assert outputs["readout_frequency"] == (6.3, "GHz")
+    assert outputs["optimal_power"] == (-35.0, "dB")
+
+
+def test_request_rejects_source_task_id_with_figure() -> None:
+    with pytest.raises(ValidationError, match="either source_task_id or figure"):
+        ReanalyzeQubitSpectroscopyRequest(
+            source_task_id="task-1", figure=_figure_json(_heatmap(1.0))
+        )
+
+
+def test_request_accepts_figure_with_null_source_task_id() -> None:
+    request = ReanalyzeQubitSpectroscopyRequest(
+        source_task_id=None, figure=_figure_json(_heatmap(1.0))
+    )
+
+    assert request.figure is not None
+
+
+def test_service_rejects_source_task_id_with_figure() -> None:
+    with pytest.raises(HTTPException) as excinfo:
+        ReanalysisService().reanalyze_qubit_spectroscopy(
+            project_id="p",
+            chip_id="chip",
+            qid="1",
+            params=ReanalyzeQubitSpectroscopyParams(),
+            source_task_id="task-1",
+            figure=_figure_json(_heatmap(1.0)),
+        )
+
+    assert excinfo.value.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("figure", "message"),
+    [
+        ({"layout": {}}, "non-empty 'data'"),
+        ({"data": []}, "non-empty 'data'"),
+        ({"data": [{"type": "scatter", "x": [1], "y": [2]}]}, "heatmap"),
+        ({"data": ["heatmap"]}, "heatmap"),
+    ],
+)
+def test_request_rejects_figure_without_heatmap(figure: dict[str, Any], message: str) -> None:
+    with pytest.raises(ValidationError, match=message):
+        ReanalyzeResonatorSpectroscopyRequest(figure=figure)
+
+
+def test_request_rejects_oversized_figure(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(reanalysis_schema, "MAX_INLINE_FIGURE_BYTES", 1024)
+    big = _figure_json(_heatmap(1.0))
+    big["layout"]["title"] = {"text": "x" * 2048}
+
+    with pytest.raises(ValidationError, match="at most 1024"):
+        ReanalyzeResonatorSpectroscopyRequest(figure=big)
+
+
+_GRID = {"type": "heatmap", "x": [6.0, 6.1], "y": [-60.0, -55.0], "z": [[1.0, 2.0], [3.0, 4.0]]}
+
+
+def _trace(**overrides: Any) -> dict[str, Any]:
+    return {"data": [{**_GRID, **overrides}], "layout": {}}
+
+
+@pytest.mark.parametrize(
+    ("figure", "message"),
+    [
+        (_trace(type="surface"), "type 'heatmap'"),
+        (_trace(type=None), "type 'heatmap'"),
+        ({"data": [{k: v for k, v in _GRID.items() if k != "type"}]}, "type 'heatmap'"),
+        (_trace(z=["ab", "cd"]), "one value per x"),
+        (_trace(z=[["a", "b"], ["c", "d"]]), "finite numbers"),
+        (_trace(z=[[1.0, float("nan")], [3.0, 4.0]]), "finite numbers"),
+        (_trace(z=[[True, False], [3.0, 4.0]]), "finite numbers"),
+        (_trace(z=[[1.0, 2.0]]), "one row per y"),
+        (_trace(z=[[1.0], [3.0]]), "one value per x"),
+        (_trace(x=["6.0 GHz", "6.1 GHz"]), "finite numbers"),
+        (_trace(y="ab"), "list of numbers"),
+        (_trace(x=None), "list of numbers"),
+        (_trace(x=[6.0], y=[-60.0], z=[[1.0]]), "at least 2 values"),
+        (_trace(x=[6.0, float("inf")]), "finite numbers"),
+        (_trace(x=[6.0, 10**309]), "finite numbers"),
+        (_trace(z=[[1.0, 10**309], [3.0, 4.0]]), "finite numbers"),
+        (_trace(z={"dtype": "f8", "bdata": "AAAA"}), "typed array"),
+        ({"data": ["heatmap"]}, "non-empty list of traces"),
+    ],
+)
+def test_service_rejects_malformed_inline_figure(figure: dict[str, Any], message: str) -> None:
+    with pytest.raises(HTTPException) as excinfo:
+        ReanalysisService._parse_inline_figure(figure)
+
+    assert excinfo.value.status_code == 422
+    assert message in str(excinfo.value.detail)
+
+
+def test_inline_figure_keeps_only_the_heatmap_and_plain_labels() -> None:
+    probe = "http://127.0.0.1:9/internal-probe"
+    figure = {
+        "data": [
+            {
+                **_GRID,
+                "colorscale": "Viridis",
+                "colorbar": {"title": {"text": "<b>signal</b>"}},
+                "customdata": [[probe]],
+                "hovertemplate": f"<a href='{probe}'>x</a>",
+            },
+            {"type": "scatter", "x": [6.0], "y": [-60.0]},
+        ],
+        "layout": {
+            "title": {"text": f"<img src='{probe}'>Resonator"},
+            "xaxis": {"title": {"text": "Frequency (GHz)"}, "range": [0, 1]},
+            "yaxis": {"title": "Power (dB)"},
+            "width": 800,
+            "height": 10**9,
+            "images": [{"source": probe, "xref": "paper", "yref": "paper", "x": 0, "y": 1}],
+            "template": {"layout": {"images": [{"source": probe}]}},
+            "shapes": [{"type": "line", "x0": 0, "x1": 1, "y0": 0, "y1": 1}],
+            "annotations": [{"text": probe}],
+            "meta": {"note": probe},
+        },
+    }
+
+    fig = ReanalysisService._parse_inline_figure(figure)
+
+    assert len(fig.data) == 1
+    trace = fig.data[0]
+    assert trace.type == "heatmap"
+    assert list(trace.x) == [6.0, 6.1]
+    assert [list(row) for row in trace.z] == [[1.0, 2.0], [3.0, 4.0]]
+    assert trace.colorscale is not None
+    assert trace.colorbar.title.text == "signal"
+    assert trace.customdata is None
+    assert trace.hovertemplate is None
+    assert fig.layout.images == ()
+    assert fig.layout.shapes == ()
+    assert fig.layout.annotations == ()
+    assert fig.layout.meta is None
+    assert fig.layout.title.text == "Resonator"
+    assert fig.layout.xaxis.title.text == "Frequency (GHz)"
+    assert fig.layout.yaxis.title.text == "Power (dB)"
+    assert fig.layout.width == 800
+    assert fig.layout.height is None
+    assert probe not in fig.to_json()
+
+
+def test_inline_figure_render_fetches_nothing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pytest.importorskip("kaleido")
+    hits: list[str] = []
+
+    class Probe(http.server.BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            hits.append(self.path)
+            self.send_response(404)
+            self.end_headers()
+
+        def log_message(self, *_args: Any) -> None:
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Probe)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        probe = f"http://127.0.0.1:{server.server_address[1]}/internal-probe"
+        service, _ = _qubit_service(monkeypatch, tmp_path, repr_db=-30.0)
+        monkeypatch.setattr(service, "_load_source_doc", _no_stored_lookup)
+        figure = {
+            "data": [dict(_GRID)],
+            "layout": {
+                "images": [{"source": probe, "xref": "paper", "yref": "paper", "x": 0, "y": 1}]
+            },
+        }
+
+        response = service.reanalyze_qubit_spectroscopy(
+            project_id="p",
+            chip_id="chip",
+            qid="1",
+            params=ReanalyzeQubitSpectroscopyParams(),
+            figure=figure,
+            include_image=True,
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    assert response.image_media_type == "image/png"
+    assert hits == []
+    assert probe not in json.dumps(response.figure)
+
+
+def test_inline_figure_analysis_failure_is_a_sanitized_422(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = ReanalysisService()
+    monkeypatch.setattr(service, "_load_source_doc", _no_stored_lookup)
+
+    def degenerate(*_args: Any, **_kwargs: Any) -> Any:
+        raise ValueError("xs/ys too short at /srv/internal/estimate.py")
+
+    monkeypatch.setattr(module, "estimate_and_mark_qubit_figure", degenerate)
+
+    with pytest.raises(HTTPException) as excinfo:
+        service.reanalyze_qubit_spectroscopy(
+            project_id="p",
+            chip_id="chip",
+            qid="1",
+            params=ReanalyzeQubitSpectroscopyParams(),
+            figure=_trace(),
+        )
+
+    assert excinfo.value.status_code == 422
+    assert "/srv/internal" not in str(excinfo.value.detail)
+    assert "too short" not in str(excinfo.value.detail)
+
+
+def test_stored_result_analysis_failure_still_propagates(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    service, _ = _qubit_service(monkeypatch, tmp_path, repr_db=-30.0)
+
+    def degenerate(*_args: Any, **_kwargs: Any) -> Any:
+        raise ValueError("degenerate")
+
+    monkeypatch.setattr(module, "estimate_and_mark_qubit_figure", degenerate)
+
+    with pytest.raises(ValueError, match="degenerate"):
+        service.reanalyze_qubit_spectroscopy(
+            project_id="p",
+            chip_id="chip",
+            qid="1",
+            params=ReanalyzeQubitSpectroscopyParams(),
+        )
+
+
+def test_service_rejects_inline_marked_figure() -> None:
+    with pytest.raises(HTTPException) as excinfo:
+        ReanalysisService._parse_inline_figure(_figure_json(_marked_figure()))
+
+    assert excinfo.value.status_code == 422
+    assert "marked" in str(excinfo.value.detail)
+
+
+def test_inline_figure_drops_an_oversized_integer_dimension() -> None:
+    fig = ReanalysisService._parse_inline_figure(
+        {"data": [dict(_GRID)], "layout": {"width": 10**309, "height": 600}}
+    )
+
+    assert fig.layout.width is None
+    assert fig.layout.height == 600
+
+
+@pytest.mark.parametrize("name", ["Viridis", "Viridis_r", "viridis_R", "RdBu"])
+def test_inline_figure_keeps_a_named_plotly_colorscale(name: str) -> None:
+    fig = ReanalysisService._parse_inline_figure(
+        {"data": [{**_GRID, "colorscale": name}], "layout": {}}
+    )
+
+    assert fig.data[0].colorscale == go.Heatmap(colorscale=name).colorscale
+
+
+@pytest.mark.parametrize("name", ["NotAColorscale", "Viridis_rr", "_r", "", 3])
+def test_inline_figure_drops_an_unknown_colorscale(name: Any) -> None:
+    fig = ReanalysisService._parse_inline_figure(
+        {"data": [{**_GRID, "colorscale": name}], "layout": {}}
+    )
+
+    assert fig.data[0].colorscale is None
+
+
+def test_inline_figure_puts_a_descending_sweep_in_increasing_order() -> None:
+    figure = {
+        "data": [{**_GRID, "x": [6.1, 6.0], "z": [[1.0, 2.0], [3.0, 4.0]]}],
+        "layout": {},
+    }
+
+    fig = ReanalysisService._parse_inline_figure(figure)
+
+    assert list(fig.data[0].x) == [6.0, 6.1]
+    assert [list(row) for row in fig.data[0].z] == [[2.0, 1.0], [4.0, 3.0]]
+
+
+def _resonator_sweep(*, descending: bool) -> dict[str, Any]:
+    """Four resonances at 6.0-6.3 GHz, each column peaking on its own power row."""
+    xs = [6.0, 6.1, 6.2, 6.3]
+    ys = [-60.0, -55.0, -50.0, -45.0, -40.0, -35.0, -30.0, -25.0]
+    peak_rows = [2, 3, 4, 6]
+    zs = [[1.0 if peak_rows[column] == row else 0.0 for column in range(4)] for row in range(8)]
+    if descending:
+        xs = xs[::-1]
+        zs = [row[::-1] for row in zs]
+    return {"data": [{"type": "heatmap", "x": xs, "y": ys, "z": zs}], "layout": {}}
+
+
+def test_descending_inline_sweep_assigns_resonators_as_the_ascending_sweep(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = ReanalysisService()
+    monkeypatch.setattr(service, "_load_source_doc", _no_stored_lookup)
+
+    def column_peaks(fig: go.Figure, _config: Any) -> Any:
+        # One resonance per column, at its peak row, in the figure's x order.
+        trace = fig.data[0]
+        xs = list(trace.x)
+        zs = [list(row) for row in trace.z]
+        resonances = []
+        for column in range(len(xs)):
+            values = [row[column] for row in zs]
+            peak = Peak(x=column, y=values.index(max(values)), prominence=1.0)
+            resonances.append(Resonance(high_power_peaks=None, low_power_peak=peak))
+        return resonances, [], xs
+
+    monkeypatch.setattr(module, "estimate_resonator_frequency_from_figure", column_peaks)
+    monkeypatch.setattr(module, "estimate_minimum_usable_power", lambda *_a, **_k: -60.0)
+
+    def outputs(figure: dict[str, Any]) -> dict[str, tuple[float, str]]:
+        return _outputs(
+            service.reanalyze_resonator_spectroscopy(
+                project_id="p",
+                chip_id="chip",
+                qid="1",
+                params=ReanalyzeResonatorSpectroscopyParams(bare_shift_estimator_type="config"),
+                figure=figure,
+            )
+        )
+
+    ascending = outputs(_resonator_sweep(descending=False))
+    descending = outputs(_resonator_sweep(descending=True))
+
+    assert ascending["readout_frequency"] == (6.3, "GHz")
+    assert ascending["optimal_power"] == (-35.0, "dB")
+    assert descending["readout_frequency"] == ascending["readout_frequency"]
+    assert descending["optimal_power"] == ascending["optimal_power"]
+
+
+# ── top_power inside the sweep ──────────────────────────────────────────────
+
+_QUBIT_XS = [round(7.0 + 0.01 * i, 2) for i in range(101)]
+_SPUR_X = 7.1
+_F01_X = 7.6
+
+
+def _qubit_sweep(
+    *, ys: list[float] | None = None, spur: bool = False, descending: bool = False
+) -> dict[str, Any]:
+    """A qubit sweep with an f01 line at 7.6 GHz in the six highest-power rows.
+
+    With ``spur``, a taller line at 7.1 GHz spans every row, so the estimator picks
+    it as f01 unless a frequency window excludes it.
+    """
+    ys = ys or [-40.0, -35.0, -30.0, -25.0, -20.0, -15.0, -10.0, -5.0]
+    xs = list(_QUBIT_XS)
+    rng = np.random.default_rng(7)
+    zs = rng.normal(0.0, 0.02, (len(ys), len(xs)))
+    zs[len(ys) - 6 :, xs.index(_F01_X)] = 1.0
+    if spur:
+        zs[:, xs.index(_SPUR_X)] = 1.5
+    rows = zs.tolist()
+    if descending:
+        xs = xs[::-1]
+        rows = [row[::-1] for row in rows]
+    return {"data": [{"type": "heatmap", "x": xs, "y": ys, "z": rows}], "layout": {}}
+
+
+def _stored_qubit_service(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, figure: dict[str, Any]
+) -> ReanalysisService:
+    raw = set_figure_role(go.Figure(figure), "raw")
+    paths = [_write(tmp_path / "CheckQubitSpectroscopy_80_raw_1.json", raw)]
+    doc = _doc(paths, name="CheckQubitSpectroscopy")
+    service = ReanalysisService()
+    monkeypatch.setattr(service, "_load_source_doc", lambda **_: doc)
+    return service
+
+
+def _reanalyze_qubit(
+    service: ReanalysisService,
+    *,
+    figure: dict[str, Any] | None = None,
+    **parameters: Any,
+) -> ReanalyzeResponse:
+    return service.reanalyze_qubit_spectroscopy(
+        project_id="p",
+        chip_id="chip",
+        qid="80",
+        params=ReanalyzeQubitSpectroscopyParams(**parameters),
+        figure=figure,
+    )
+
+
+@pytest.mark.parametrize(
+    "ys",
+    [
+        [-40.0, -35.0, -30.0, -25.0, -20.0, -15.0, -10.0, -5.0],
+        [-60.0, -55.0, -50.0, -45.0, -40.0, -35.0, -30.0, -25.0, -20.0, -15.0, -10.0, -5.0],
+    ],
+)
+def test_stored_qubit_reanalysis_with_top_power_at_the_highest_row(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ys: list[float]
+) -> None:
+    # Regression: top_power equal to the sweep's highest row (-5 dB) made the estimator
+    # raise ValueError("`top_power` must be greater than ..."), which a stored result
+    # propagated as HTTP 500 before retry_with_trim could run.
+    service = _stored_qubit_service(monkeypatch, tmp_path, _qubit_sweep(ys=ys))
+
+    response = _reanalyze_qubit(service, top_power=-5.0, f01_height_min=8.0, retry_with_trim=True)
+
+    _assert_output(response, "coarse_qubit_frequency", _F01_X, "GHz")
+    # The -5 dB row is the ceiling now, so the analyzed figure stops below it.
+    assert max(response.figure["data"][0]["y"]) == -10.0
+
+
+def test_top_power_inside_the_sweep_drops_the_rows_at_or_above_it(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    service = _stored_qubit_service(monkeypatch, tmp_path, _qubit_sweep())
+
+    response = _reanalyze_qubit(service, top_power=-12.0, f01_height_min=8.0)
+
+    assert response.figure["data"][0]["y"] == [-40.0, -35.0, -30.0, -25.0, -20.0, -15.0]
+    _assert_output(response, "coarse_qubit_frequency", _F01_X, "GHz")
+
+
+@pytest.mark.parametrize("inline", [False, True])
+@pytest.mark.parametrize("top_power", [-35.0, -40.0, -80.0])
+def test_top_power_leaving_fewer_than_two_rows_is_a_422(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, top_power: float, inline: bool
+) -> None:
+    figure = _qubit_sweep()
+    service = _stored_qubit_service(monkeypatch, tmp_path, figure)
+
+    with pytest.raises(HTTPException) as excinfo:
+        _reanalyze_qubit(
+            service, figure=figure if inline else None, top_power=top_power, retry_with_trim=True
+        )
+
+    assert excinfo.value.status_code == 422
+    assert "fewer than 2 power rows" in str(excinfo.value.detail)
+
+
+def test_invalid_qubit_analysis_parameter_on_a_stored_result_is_a_422(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    service = _stored_qubit_service(monkeypatch, tmp_path, _qubit_sweep())
+
+    with pytest.raises(HTTPException) as excinfo:
+        _reanalyze_qubit(service, binarize_threshold_sigma_plus=-1.0)
+
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.detail == "Invalid analysis configuration parameters."
+
+
+@pytest.mark.parametrize("top_power", [float("inf"), float("nan")])
+def test_top_power_must_be_finite(top_power: float) -> None:
+    with pytest.raises(ValidationError, match="finite number"):
+        ReanalyzeQubitSpectroscopyParams(top_power=top_power)
+
+
+# ── Frequency window ────────────────────────────────────────────────────────
+
+
+def test_qubit_frequency_window_excludes_a_spur_on_a_stored_result(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    service = _stored_qubit_service(monkeypatch, tmp_path, _qubit_sweep(spur=True))
+
+    unwindowed = _reanalyze_qubit(service)
+    windowed = _reanalyze_qubit(service, frequency_min=7.3, frequency_max=7.9)
+
+    _assert_output(unwindowed, "coarse_qubit_frequency", _SPUR_X, "GHz")
+    _assert_output(windowed, "coarse_qubit_frequency", _F01_X, "GHz")
+    # The marked figure shows only the analyzed window, with its markers.
+    heatmap = windowed.figure["data"][0]
+    assert heatmap["x"][0] == pytest.approx(7.3)
+    assert heatmap["x"][-1] == pytest.approx(7.9)
+    assert all(len(row) == len(heatmap["x"]) for row in heatmap["z"])
+    markers = [trace for trace in windowed.figure["data"][1:] if trace.get("mode") == "markers"]
+    assert markers[0]["x"] == [pytest.approx(_F01_X)]
+
+
+@pytest.mark.parametrize("descending", [False, True])
+def test_qubit_frequency_window_on_an_inline_figure(descending: bool) -> None:
+    service = ReanalysisService()
+
+    response = _reanalyze_qubit(
+        service, figure=_qubit_sweep(spur=True, descending=descending), frequency_min=7.3
+    )
+
+    _assert_output(response, "coarse_qubit_frequency", _F01_X, "GHz")
+    xs = response.figure["data"][0]["x"]
+    assert xs == sorted(xs)
+    assert xs[0] == pytest.approx(7.3)
+    assert xs[-1] == pytest.approx(8.0)
+
+
+def test_frequency_window_keeps_edges_despite_float_rounding() -> None:
+    fig = go.Figure(go.Heatmap(x=[7.0, 7.1, 7.2, 7.3], y=[-20.0, -10.0], z=[[0.0] * 4] * 2))
+
+    windowed = module._apply_frequency_window(fig, 0.1 + 7.0, 7.2)
+
+    assert list(windowed.data[0].x) == [7.1, 7.2]
+
+
+def test_frequency_window_resets_a_fixed_x_range() -> None:
+    fig = go.Figure(go.Heatmap(x=[7.0, 7.1, 7.2, 7.3], y=[-20.0, -10.0], z=[[0.0] * 4] * 2))
+    fig.update_xaxes(range=[7.0, 7.3])
+
+    windowed = module._apply_frequency_window(fig, 7.1, None)
+
+    assert list(windowed.layout.xaxis.range) == [7.1, 7.3]
+    # The source figure is left as it was.
+    assert list(fig.data[0].x) == [7.0, 7.1, 7.2, 7.3]
+
+
+def _resonator_sweep_with_spur() -> dict[str, Any]:
+    """Four resonances at 6.0-6.3 GHz and a stronger spur at 5.8 GHz."""
+    sweep = _resonator_sweep(descending=False)
+    trace = sweep["data"][0]
+    trace["x"] = [5.8, *trace["x"]]
+    trace["z"] = [[3.0 if index == 7 else 0.0, *row] for index, row in enumerate(trace["z"])]
+    return sweep
+
+
+def _strongest_columns(fig: go.Figure, config: Any) -> Any:
+    """Fake estimator: one resonance per strongest column, num_resonators of them."""
+    trace = fig.data[0]
+    xs = list(trace.x)
+    zs = [list(row) for row in trace.z]
+    strengths = [max(row[column] for row in zs) for column in range(len(xs))]
+    columns = sorted(
+        sorted(range(len(xs)), key=lambda column: -strengths[column])[: config.num_resonators]
+    )
+    resonances = []
+    for column in columns:
+        values = [row[column] for row in zs]
+        peak = Peak(x=column, y=values.index(max(values)), prominence=1.0)
+        resonances.append(Resonance(high_power_peaks=None, low_power_peak=peak))
+    return resonances, [], [xs[column] for column in columns]
+
+
+@pytest.mark.parametrize("inline", [False, True])
+def test_resonator_frequency_window_excludes_a_spur(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, inline: bool
+) -> None:
+    sweep = _resonator_sweep_with_spur()
+    raw = set_figure_role(go.Figure(sweep), "raw")
+    doc = _doc(
+        [_write(tmp_path / "CheckResonatorSpectroscopy_1_raw_1.json", raw)],
+        name="CheckResonatorSpectroscopy",
+    )
+    service = ReanalysisService()
+    monkeypatch.setattr(service, "_load_source_doc", lambda **_: doc)
+    monkeypatch.setattr(module, "estimate_resonator_frequency_from_figure", _strongest_columns)
+    monkeypatch.setattr(module, "estimate_minimum_usable_power", lambda *_a, **_k: -60.0)
+
+    def reanalyze(
+        *, frequency_min: float | None = None, frequency_max: float | None = None
+    ) -> ReanalyzeResponse:
+        return service.reanalyze_resonator_spectroscopy(
+            project_id="p",
+            chip_id="chip",
+            qid="1",
+            params=ReanalyzeResonatorSpectroscopyParams(
+                bare_shift_estimator_type="config",
+                frequency_min=frequency_min,
+                frequency_max=frequency_max,
+            ),
+            figure=sweep if inline else None,
+        )
+
+    unwindowed = reanalyze()
+    windowed = reanalyze(frequency_min=5.9, frequency_max=6.35)
+
+    assert _outputs(unwindowed)["readout_frequency"] != (6.3, "GHz")
+    outputs = _outputs(windowed)
+    assert outputs["readout_frequency"] == (6.3, "GHz")
+    assert outputs["optimal_power"] == (-35.0, "dB")
+    assert windowed.figure["data"][0]["x"] == [6.0, 6.1, 6.2, 6.3]
+
+
+@pytest.mark.parametrize(
+    ("frequency_min", "frequency_max"),
+    [(6.3, 6.3), (6.4, 6.0)],
+)
+def test_frequency_min_must_be_below_frequency_max(
+    frequency_min: float, frequency_max: float
+) -> None:
+    for params in (ReanalyzeQubitSpectroscopyParams, ReanalyzeResonatorSpectroscopyParams):
+        with pytest.raises(ValidationError, match="frequency_min must be less than"):
+            params(frequency_min=frequency_min, frequency_max=frequency_max)
+
+
+@pytest.mark.parametrize("value", [float("inf"), float("-inf"), float("nan"), 10**309])
+def test_frequency_window_must_be_finite(value: Any) -> None:
+    for params in (ReanalyzeQubitSpectroscopyParams, ReanalyzeResonatorSpectroscopyParams):
+        with pytest.raises(ValidationError):
+            params(frequency_min=value)
+        with pytest.raises(ValidationError):
+            params(frequency_max=value)
+
+
+def test_frequency_window_is_validated_in_the_request_body() -> None:
+    with pytest.raises(ValidationError, match="frequency_min must be less than"):
+        ReanalyzeResonatorSpectroscopyRequest.model_validate(
+            {"parameters": {"frequency_min": 6.2, "frequency_max": 6.1}}
+        )
+
+
+@pytest.mark.parametrize("inline", [False, True])
+@pytest.mark.parametrize(
+    "window",
+    [
+        {"frequency_min": 9.0},
+        {"frequency_max": 6.5},
+        {"frequency_min": 7.505, "frequency_max": 7.515},
+    ],
+)
+def test_frequency_window_with_fewer_than_two_points_is_a_422(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, window: dict[str, float], inline: bool
+) -> None:
+    figure = _qubit_sweep()
+    service = _stored_qubit_service(monkeypatch, tmp_path, figure)
+
+    with pytest.raises(HTTPException) as excinfo:
+        _reanalyze_qubit(service, figure=figure if inline else None, **window)
+
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.detail == (
+        "Frequency window leaves fewer than 2 frequency points to analyze."
+    )
+
+
+def test_resonator_frequency_window_with_fewer_than_two_points_is_a_422() -> None:
+    with pytest.raises(HTTPException) as excinfo:
+        ReanalysisService().reanalyze_resonator_spectroscopy(
+            project_id="p",
+            chip_id="chip",
+            qid="1",
+            params=ReanalyzeResonatorSpectroscopyParams(frequency_min=6.25),
+            figure=_resonator_sweep(descending=True),
+        )
+
+    assert excinfo.value.status_code == 422
+    assert "fewer than 2 frequency points" in str(excinfo.value.detail)
+
+
+SENSITIVE_PATH = "/private/server/calibration.json"
+
+
+def test_invalid_stored_qubit_parameter_is_a_422_without_its_value(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    raw = set_figure_role(go.Figure(_qubit_sweep()), "raw")
+    doc = _doc(
+        [_write(tmp_path / "CheckQubitSpectroscopy_80_raw_1.json", raw)],
+        name="CheckQubitSpectroscopy",
+        run_parameters={"top_power": {"value": SENSITIVE_PATH, "value_type": "str"}},
+    )
+    service = ReanalysisService()
+    monkeypatch.setattr(service, "_load_source_doc", lambda **_: doc)
+
+    with pytest.raises(HTTPException) as excinfo:
+        _reanalyze_qubit(service)
+
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.detail == "Invalid analysis configuration parameters."
+    assert SENSITIVE_PATH not in str(excinfo.value.detail)
+    # The cause stays in the server log.
+    assert any(
+        record.exc_info and SENSITIVE_PATH in str(record.exc_info[1]) for record in caplog.records
+    )
+
+
+def test_invalid_stored_resonator_parameter_is_a_422_without_its_value(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    raw = set_figure_role(go.Figure(_resonator_sweep(descending=False)), "raw")
+    doc = _doc(
+        [_write(tmp_path / "CheckResonatorSpectroscopy_1_raw_1.json", raw)],
+        name="CheckResonatorSpectroscopy",
+        run_parameters={"num_resonators": {"value": SENSITIVE_PATH, "value_type": "str"}},
+    )
+    service = ReanalysisService()
+    monkeypatch.setattr(service, "_load_source_doc", lambda **_: doc)
+
+    with pytest.raises(HTTPException) as excinfo:
+        service.reanalyze_resonator_spectroscopy(
+            project_id="p",
+            chip_id="chip",
+            qid="1",
+            params=ReanalyzeResonatorSpectroscopyParams(bare_shift_estimator_type="config"),
+        )
+
+    assert excinfo.value.status_code == 422
+    assert SENSITIVE_PATH not in str(excinfo.value.detail)
+
+
+def _mux_sweep(xs: list[float], resonances: list[float]) -> dict[str, Any]:
+    """A sweep over ``xs`` with one resonance per frequency in ``resonances``.
+
+    Each resonance peaks on its own power row, so each has its own optimal power.
+    """
+    ys = [-60.0, -55.0, -50.0, -45.0, -40.0, -35.0, -30.0, -25.0]
+    peak_rows = {xs.index(frequency): 2 + index for index, frequency in enumerate(resonances)}
+    zs = [
+        [1.0 if peak_rows.get(column) == row else 0.0 for column in range(len(xs))]
+        for row in range(len(ys))
+    ]
+    return {"data": [{"type": "heatmap", "x": xs, "y": ys, "z": zs}], "layout": {}}
+
+
+def _nonzero_columns(fig: go.Figure, _config: Any) -> Any:
+    """Fake estimator: one resonance per column that has any signal."""
+    trace = fig.data[0]
+    xs = list(trace.x)
+    zs = [list(row) for row in trace.z]
+    resonances = []
+    frequencies = []
+    for column in range(len(xs)):
+        values = [row[column] for row in zs]
+        if max(values) > 0:
+            peak = Peak(x=column, y=values.index(max(values)), prominence=1.0)
+            resonances.append(Resonance(high_power_peaks=None, low_power_peak=peak))
+            frequencies.append(xs[column])
+    return resonances, [], frequencies
+
+
+_QIDS = ("0", "1", "2", "3")
+
+
+def _mux_service(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, sweep: dict[str, Any], *, inline: bool
+) -> tuple[Any, list[str]]:
+    """A reanalysis function of (qid, window) on ``sweep``, and the assignment modes seen."""
+    raw = set_figure_role(go.Figure(sweep), "raw")
+    doc = _doc(
+        [_write(tmp_path / "CheckResonatorSpectroscopy_1_raw_1.json", raw)],
+        name="CheckResonatorSpectroscopy",
+    )
+    service = ReanalysisService()
+    monkeypatch.setattr(service, "_load_source_doc", lambda **_: doc)
+    monkeypatch.setattr(module, "estimate_resonator_frequency_from_figure", _nonzero_columns)
+    monkeypatch.setattr(module, "estimate_minimum_usable_power", lambda *_a, **_k: -60.0)
+    modes: list[str] = []
+    original_guess = guess_sorted_slots_for_partial_mux
+
+    def record_guess(xs: list[float], frequencies: list[float]) -> Any:
+        slots, mode = original_guess(xs, frequencies)
+        modes.append(mode)
+        return slots, mode
+
+    monkeypatch.setattr(module, "guess_sorted_slots_for_partial_mux", record_guess)
+
+    def reanalyze(
+        qid: str, *, frequency_min: float | None = None, frequency_max: float | None = None
+    ) -> ReanalyzeResponse:
+        return service.reanalyze_resonator_spectroscopy(
+            project_id="p",
+            chip_id="chip",
+            qid=qid,
+            params=ReanalyzeResonatorSpectroscopyParams(
+                bare_shift_estimator_type="config",
+                frequency_min=frequency_min,
+                frequency_max=frequency_max,
+            ),
+            figure=sweep if inline else None,
+        )
+
+    return reanalyze, modes
+
+
+def _labels(response: ReanalyzeResponse) -> set[str]:
+    return {a["text"] for a in response.figure["layout"].get("annotations", [])}
+
+
+def _stars(response: ReanalyzeResponse) -> int:
+    return sum(
+        1 for trace in response.figure["data"] if trace.get("marker", {}).get("symbol") == "star"
+    )
+
+
+@pytest.mark.parametrize("inline", [False, True])
+def test_frequency_window_that_drops_a_resonance_leaves_the_mux_unassigned(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, inline: bool
+) -> None:
+    # Regression: cropping 6.0 GHz out of a full MUX left 6.1-6.2-6.3 GHz, which the
+    # partial-MUX guess put in slots 0-2, so qubit 0 got its neighbor's 6.1 GHz.
+    sweep = _mux_sweep([5.9, 6.0, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6], [6.0, 6.1, 6.2, 6.3])
+    reanalyze, modes = _mux_service(monkeypatch, tmp_path, sweep, inline=inline)
+
+    whole = {qid: _outputs(reanalyze(qid))["readout_frequency"][0] for qid in _QIDS}
+    assert sorted(whole.values()) == [6.0, 6.1, 6.2, 6.3]
+    assert set(modes) == {"full"}
+
+    modes.clear()
+    for qid in _QIDS:
+        cropped = reanalyze(qid, frequency_min=6.05)
+
+        assert cropped.figure["data"][0]["x"] == [6.1, 6.2, 6.3, 6.4, 6.5, 6.6]
+        # No qubit takes a resonance: the window may have dropped any slot's.
+        assert _outputs(cropped) == {"readout_frequency": (0.0, "GHz")}, qid
+        assert not any(label.startswith("Q") for label in _labels(cropped)), qid
+        assert module.WINDOWED_PARTIAL_MUX_MODE in _labels(cropped)
+        # The detected resonances are still marked for inspection.
+        assert _stars(cropped) == 3
+    assert modes == []
+
+
+@pytest.mark.parametrize("inline", [False, True])
+def test_frequency_window_that_keeps_every_resonance_assigns_them_all(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, inline: bool
+) -> None:
+    sweep = _mux_sweep([5.9, 6.0, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6], [6.0, 6.1, 6.2, 6.3])
+    reanalyze, modes = _mux_service(monkeypatch, tmp_path, sweep, inline=inline)
+
+    for qid in _QIDS:
+        whole = reanalyze(qid)
+        cropped = reanalyze(qid, frequency_min=5.95, frequency_max=6.35)
+
+        assert cropped.figure["data"][0]["x"] == [6.0, 6.1, 6.2, 6.3]
+        assert _outputs(cropped) == _outputs(whole), qid
+        assert _labels(cropped) == _labels(whole), qid
+    assert set(modes) == {"full"}
+
+
+@pytest.mark.parametrize("inline", [False, True])
+def test_frequency_window_on_a_partial_mux_leaves_it_unassigned(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, inline: bool
+) -> None:
+    # Three resonances at 6.0-6.2 GHz in a 5.9-6.4 GHz sweep take slots 0-2. Cropped to
+    # 6.0-6.2 GHz, the cropped center put them in slots 1-3; now they stay unassigned.
+    sweep = _mux_sweep([5.9, 6.0, 6.1, 6.2, 6.3, 6.4], [6.0, 6.1, 6.2])
+    reanalyze, modes = _mux_service(monkeypatch, tmp_path, sweep, inline=inline)
+
+    whole = [_outputs(reanalyze(qid))["readout_frequency"][0] for qid in _QIDS]
+    assert sorted(value for value in whole if value) == [6.0, 6.1, 6.2]
+    assert set(modes) == {"right-edge-missing-cluster-left"}
+
+    for qid in _QIDS:
+        cropped = reanalyze(qid, frequency_min=6.0, frequency_max=6.2)
+
+        assert cropped.figure["data"][0]["x"] == [6.0, 6.1, 6.2]
+        assert _outputs(cropped) == {"readout_frequency": (0.0, "GHz")}, qid
+        assert module.WINDOWED_PARTIAL_MUX_MODE in _labels(cropped)
+
+
+@pytest.mark.parametrize("inline", [False, True])
+def test_frequency_window_that_trims_nothing_keeps_the_partial_mux_guess(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, inline: bool
+) -> None:
+    sweep = _mux_sweep([5.9, 6.0, 6.1, 6.2, 6.3, 6.4], [6.0, 6.1, 6.2])
+    reanalyze, modes = _mux_service(monkeypatch, tmp_path, sweep, inline=inline)
+
+    for qid in _QIDS:
+        whole = reanalyze(qid)
+        windowed = reanalyze(qid, frequency_min=5.0, frequency_max=7.0)
+
+        assert _outputs(windowed) == _outputs(whole), qid
+        assert _labels(windowed) == _labels(whole), qid
+    assert set(modes) == {"right-edge-missing-cluster-left"}

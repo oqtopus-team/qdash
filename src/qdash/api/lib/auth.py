@@ -71,52 +71,21 @@ def get_password_hash(password: str) -> str:
     return cast("str", bcrypt.hashpw(_password_bytes(password), salt).decode("utf-8"))
 
 
+def _user_in_db(user: UserDocument | None) -> UserInDB | None:
+    logger.debug(f"Database lookup result: {user is not None}")
+    return UserInDB.model_validate(user, from_attributes=True) if user else None
+
+
 def get_user(username: str) -> UserInDB | None:
     """Retrieve a user from the database by username."""
     logger.debug(f"Looking up user in database: {username}")
-    query = UserDocument.find_one({"username": username}).run()
-    user = query
-    logger.debug(f"Database lookup result: {user is not None}")
-
-    if user:
-        return UserInDB(
-            user_id=user.user_id,
-            username=user.username,
-            display_name=user.display_name,
-            organization=user.organization,
-            avatar_key=user.avatar_key,
-            disabled=user.disabled,
-            default_project_id=user.default_project_id,
-            must_change_password=user.must_change_password,
-            system_role=user.system_role,
-            hashed_password=user.hashed_password,
-            access_token=user.access_token,
-        )
-    return None
+    return _user_in_db(UserDocument.find_one({"username": username}).run())
 
 
 def get_user_by_token(access_token: str) -> UserInDB | None:
     """Retrieve a user from the database by access token."""
     logger.debug("Looking up user by access token")
-    query = UserDocument.find_one({"access_token": access_token}).run()
-    user = query
-    logger.debug(f"Database lookup result: {user is not None}")
-
-    if user:
-        return UserInDB(
-            user_id=user.user_id,
-            username=user.username,
-            display_name=user.display_name,
-            organization=user.organization,
-            avatar_key=user.avatar_key,
-            disabled=user.disabled,
-            default_project_id=user.default_project_id,
-            must_change_password=user.must_change_password,
-            system_role=user.system_role,
-            hashed_password=user.hashed_password,
-            access_token=user.access_token,
-        )
-    return None
+    return _user_in_db(UserDocument.find_one({"access_token": access_token}).run())
 
 
 def authenticate_user(username: str, password: str) -> UserInDB | None:
@@ -133,36 +102,18 @@ def authenticate_user(username: str, password: str) -> UserInDB | None:
     return user
 
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+def _authenticated_user(
+    credentials: HTTPAuthorizationCredentials | None, *, missing_detail: str
 ) -> User:
-    """Get user from Bearer token.
-
-    Parameters
-    ----------
-    credentials : HTTPAuthorizationCredentials
-        Bearer token credentials from Authorization header
-
-    Returns
-    -------
-    User
-        User information
-
-    Raises
-    ------
-    HTTPException
-        If token is not provided or invalid
-
-    """
+    """Resolve an enabled user from Bearer token credentials, or raise 401/403."""
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header is required",
+            detail=missing_detail,
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token = credentials.credentials
-    user = get_user_by_token(token)
+    user = get_user_by_token(credentials.credentials)
 
     if not user:
         raise HTTPException(
@@ -177,17 +128,21 @@ def get_current_user(
             detail="User account is disabled",
         )
 
-    return User(
-        user_id=user.user_id,
-        username=user.username,
-        display_name=user.display_name,
-        organization=user.organization,
-        avatar_key=user.avatar_key,
-        disabled=user.disabled,
-        default_project_id=user.default_project_id,
-        must_change_password=user.must_change_password,
-        system_role=user.system_role,
-    )
+    return User.model_validate(user.model_dump(include=set(User.model_fields)))
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> User:
+    """Get user from Bearer token.
+
+    Raises
+    ------
+    HTTPException
+        If token is not provided or invalid, or the user is disabled
+
+    """
+    return _authenticated_user(credentials, missing_detail="Authorization header is required")
 
 
 def get_current_active_user(
@@ -195,55 +150,14 @@ def get_current_active_user(
 ) -> User:
     """Get the currently active user from Bearer token.
 
-    Parameters
-    ----------
-    credentials : HTTPAuthorizationCredentials
-        Bearer token credentials from Authorization header
-
-    Returns
-    -------
-    User
-        User information
-
     Raises
     ------
     HTTPException
-        If token is not provided or invalid
+        If token is not provided or invalid, or the user is disabled
 
     """
-    if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header with Bearer token is required",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    token = credentials.credentials
-    user = get_user_by_token(token)
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid access token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    if user.disabled:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is disabled",
-        )
-
-    return User(
-        user_id=user.user_id,
-        username=user.username,
-        display_name=user.display_name,
-        organization=user.organization,
-        avatar_key=user.avatar_key,
-        disabled=user.disabled,
-        default_project_id=user.default_project_id,
-        must_change_password=user.must_change_password,
-        system_role=user.system_role,
+    return _authenticated_user(
+        credentials, missing_detail="Authorization header with Bearer token is required"
     )
 
 

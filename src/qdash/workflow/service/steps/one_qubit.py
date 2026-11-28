@@ -48,13 +48,13 @@ from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.tasks import CHECK_1Q_TASKS, FULL_1Q_TASKS_AFTER_CHECK
 
 if TYPE_CHECKING:
-    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.session import ExecutionRuntime
     from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
 
 
 def _execute_direct_one_qubit(
-    session: CalibSession,
+    session: ExecutionRuntime,
     *,
     qids: list[str],
     plan: StepCalls,
@@ -79,7 +79,7 @@ def _execute_direct_one_qubit(
 
 
 def _execute_scheduled_one_qubit(
-    session: CalibSession,
+    session: ExecutionRuntime,
     *,
     qids: list[str],
     plan: StepCalls,
@@ -107,7 +107,7 @@ def _execute_scheduled_one_qubit(
 
 
 def _execute_mux_one_qubit(
-    session: CalibSession,
+    session: ExecutionRuntime,
     *,
     targets: Any,
     plan: StepCalls,
@@ -143,7 +143,7 @@ def _scheduled_mode(step: Any) -> OneQubitExecutionMode:
     return validate_one_qubit_execution_mode(step.execution_mode)
 
 
-def _preflight_manual(step: Any, session: CalibSession) -> None:
+def _preflight_manual(step: Any, session: ExecutionRuntime) -> None:
     """Check manual rounds against the chip before any step of the pipeline runs."""
     if step._rounds is not None:
         from qdash.workflow.service.manual_rounds import check_qubit_rounds
@@ -152,7 +152,7 @@ def _preflight_manual(step: Any, session: CalibSession) -> None:
 
 
 def _execute_manual_one_qubit(
-    step: Any, session: CalibSession, candidates: list[str], plan: StepCalls
+    step: Any, session: ExecutionRuntime, candidates: list[str], plan: StepCalls
 ) -> dict[str, Any]:
     """Run the step's manual rounds after checking them against its current qubits."""
     from qdash.workflow.service.manual_rounds import run_qubit_rounds
@@ -161,8 +161,48 @@ def _execute_manual_one_qubit(
     return run_qubit_rounds(session, step._rounds, plan=plan, candidates=candidates, step=step.name)
 
 
+class _OneQubitStep(CalibrationStep):
+    """Run and result helpers shared by the one-qubit steps."""
+
+    def _execute_scheduled(
+        self,
+        session: ExecutionRuntime,
+        qids: list[str],
+        plan: StepCalls | None = None,
+    ) -> dict[str, Any]:
+        """Execute explicit qubit IDs through hardware-aware scheduling."""
+        return _execute_scheduled_one_qubit(
+            session,
+            qids=qids,
+            plan=plan or self.step_calls(session),
+            stage_name=self.name,
+            execution_mode=_scheduled_mode(self),
+        )
+
+    def _execute_direct(
+        self,
+        session: ExecutionRuntime,
+        qids: list[str],
+    ) -> dict[str, Any]:
+        """Direct execution for tests and callers that explicitly need unscheduled qid parallelism."""
+        return _execute_direct_one_qubit(
+            session,
+            qids=qids,
+            plan=self.step_calls(session),
+            stage_name=self.name,
+        )
+
+    def _build_result(self, raw_results: dict[str, Any]) -> OneQubitResult:
+        """Build typed result from raw backend data."""
+        return build_one_qubit_result(raw_results, self.resolved_step_id, self._extract_metrics)
+
+    def _extract_metrics(self, raw: dict[str, Any]) -> dict[str, float]:
+        """Extract step-level metrics from one qubit's raw call results."""
+        raise NotImplementedError
+
+
 @dataclass
-class CustomOneQubit(CalibrationStep):
+class CustomOneQubit(_OneQubitStep):
     """Custom 1-qubit calibration step with user-defined task calls.
 
     This is the most flexible 1-qubit step: you specify exactly which calls to
@@ -217,7 +257,7 @@ class CustomOneQubit(CalibrationStep):
         """parallel_by_round and manual qubit tasks connect in isolated workers."""
         return self.execution_mode not in ("parallel_by_round", "manual")
 
-    def preflight(self, session: CalibSession) -> None:
+    def preflight(self, session: ExecutionRuntime) -> None:
         """Check manual rounds against the chip before the pipeline starts."""
         _preflight_manual(self, session)
 
@@ -226,7 +266,7 @@ class CustomOneQubit(CalibrationStep):
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -283,38 +323,6 @@ class CustomOneQubit(CalibrationStep):
         )
         return ctx
 
-    def _execute_scheduled(
-        self,
-        session: CalibSession,
-        qids: list[str],
-        plan: StepCalls | None = None,
-    ) -> dict[str, Any]:
-        """Execute explicit QubitTargets through hardware-aware scheduling."""
-        return _execute_scheduled_one_qubit(
-            session,
-            qids=qids,
-            plan=plan or self.step_calls(session),
-            stage_name=self.step_name,
-            execution_mode=_scheduled_mode(self),
-        )
-
-    def _execute_direct(
-        self,
-        session: CalibSession,
-        qids: list[str],
-    ) -> dict[str, Any]:
-        """Direct execution for tests and callers that explicitly need unscheduled qid parallelism."""
-        return _execute_direct_one_qubit(
-            session,
-            qids=qids,
-            plan=self.step_calls(session),
-            stage_name=self.step_name,
-        )
-
-    def _build_result(self, raw_results: dict[str, Any]) -> OneQubitResult:
-        """Build typed result from raw backend data."""
-        return build_one_qubit_result(raw_results, self.resolved_step_id, self._extract_metrics)
-
     def _extract_metrics(self, raw: dict[str, Any]) -> dict[str, float]:
         """Extract metrics from raw result.
 
@@ -326,7 +334,7 @@ class CustomOneQubit(CalibrationStep):
 
 
 @dataclass
-class OneQubitCheck(CalibrationStep):
+class OneQubitCheck(_OneQubitStep):
     """Basic 1-qubit characterization step.
 
     Executes CHECK_1Q_TASKS by default: Rabi, then the HPI and PI pulse
@@ -358,7 +366,7 @@ class OneQubitCheck(CalibrationStep):
     def provides(self) -> set[str]:
         return {"one_qubit_check", "candidate_qids"}
 
-    def preflight(self, session: CalibSession) -> None:
+    def preflight(self, session: ExecutionRuntime) -> None:
         """Check manual rounds against the chip before the pipeline starts."""
         _preflight_manual(self, session)
 
@@ -367,7 +375,7 @@ class OneQubitCheck(CalibrationStep):
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -412,38 +420,6 @@ class OneQubitCheck(CalibrationStep):
         )
         return ctx
 
-    def _execute_scheduled(
-        self,
-        session: CalibSession,
-        qids: list[str],
-        plan: StepCalls | None = None,
-    ) -> dict[str, Any]:
-        """Execute explicit QubitTargets through hardware-aware scheduling."""
-        return _execute_scheduled_one_qubit(
-            session,
-            qids=qids,
-            plan=plan or self.step_calls(session),
-            stage_name=self.name,
-            execution_mode=_scheduled_mode(self),
-        )
-
-    def _execute_direct(
-        self,
-        session: CalibSession,
-        qids: list[str],
-    ) -> dict[str, Any]:
-        """Direct execution for tests and callers that explicitly need unscheduled qid parallelism."""
-        return _execute_direct_one_qubit(
-            session,
-            qids=qids,
-            plan=self.step_calls(session),
-            stage_name=self.name,
-        )
-
-    def _build_result(self, raw_results: dict[str, Any]) -> OneQubitResult:
-        """Build typed result from raw backend data."""
-        return build_one_qubit_result(raw_results, self.resolved_step_id, self._extract_metrics)
-
     def _extract_metrics(self, raw: dict[str, Any]) -> dict[str, float]:
         """Extract metrics from the latest call of each task in the step."""
         metrics = {}
@@ -455,7 +431,7 @@ class OneQubitCheck(CalibrationStep):
 
 
 @dataclass
-class OneQubitFineTune(CalibrationStep):
+class OneQubitFineTune(_OneQubitStep):
     """Advanced 1-qubit calibration step.
 
     Executes FULL_1Q_TASKS_AFTER_CHECK: DRAG pulses, ReadoutClassification,
@@ -487,7 +463,7 @@ class OneQubitFineTune(CalibrationStep):
     def provides(self) -> set[str]:
         return {"one_qubit_fine_tune", "candidate_qids"}
 
-    def preflight(self, session: CalibSession) -> None:
+    def preflight(self, session: ExecutionRuntime) -> None:
         """Check manual rounds against the chip before the pipeline starts."""
         _preflight_manual(self, session)
 
@@ -496,7 +472,7 @@ class OneQubitFineTune(CalibrationStep):
 
     def execute(
         self,
-        session: CalibSession,
+        session: ExecutionRuntime,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -534,7 +510,7 @@ class OneQubitFineTune(CalibrationStep):
             ctx.record_step_result(self.resolved_step_id, ctx.one_qubit_fine_tune)
             return ctx
 
-        raw_results = self._execute_with_qids(session, qids, plan)
+        raw_results = self._execute_scheduled(session, qids, plan)
 
         result = self._build_result(raw_results)
         ctx.one_qubit_fine_tune = result
@@ -545,38 +521,6 @@ class OneQubitFineTune(CalibrationStep):
             f"{len(result.successful_qids())}/{len(result.qubits)} successful"
         )
         return ctx
-
-    def _execute_with_qids(
-        self,
-        session: CalibSession,
-        qids: list[str],
-        plan: StepCalls | None = None,
-    ) -> dict[str, Any]:
-        """Execute calibration for specific qubit IDs."""
-        return _execute_scheduled_one_qubit(
-            session,
-            qids=qids,
-            plan=plan or self.step_calls(session),
-            stage_name=self.name,
-            execution_mode=_scheduled_mode(self),
-        )
-
-    def _execute_direct(
-        self,
-        session: CalibSession,
-        qids: list[str],
-    ) -> dict[str, Any]:
-        """Direct execution for QubitTargets using multiprocess parallelism."""
-        return _execute_direct_one_qubit(
-            session,
-            qids=qids,
-            plan=self.step_calls(session),
-            stage_name=self.name,
-        )
-
-    def _build_result(self, raw_results: dict[str, Any]) -> OneQubitResult:
-        """Build typed result from raw backend data."""
-        return build_one_qubit_result(raw_results, self.resolved_step_id, self._extract_metrics)
 
     def _extract_metrics(self, raw: dict[str, Any]) -> dict[str, float]:
         """Extract metrics from the latest call of each task in the step."""

@@ -1,15 +1,14 @@
 # dbmodel/execution_history.py
-from datetime import datetime, timedelta
 from typing import Any, ClassVar
 
 from bunnet import Document
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
 
-from qdash.common.utils.datetime import ensure_timezone, parse_elapsed_time
 from qdash.datamodel.execution import ExecutionModel
+from qdash.datamodel.field_types import ElapsedSeconds, TimezoneAwareDatetime
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.dbmodel.user import UserDocument
+from qdash.dbmodel.lookups import user_id_for_username
 
 
 class ExecutionHistoryDocument(Document):
@@ -45,35 +44,11 @@ class ExecutionHistoryDocument(Document):
     status: str = Field(..., description="The status of the execution")
     tags: list[str] = Field(..., description="The tags")
     chip_id: str = Field(..., description="The chip ID")
-    start_at: datetime | None = Field(None, description="The time when the execution started")
-    end_at: datetime | None = Field(None, description="The time when the execution ended")
-    elapsed_time: float | None = Field(None, description="The elapsed time in seconds")
+    start_at: TimezoneAwareDatetime = Field(None, description="The time when the execution started")
+    end_at: TimezoneAwareDatetime = Field(None, description="The time when the execution ended")
+    elapsed_time: ElapsedSeconds = Field(None, description="The elapsed time in seconds")
     message: str = Field(..., description="The message")
     system_info: SystemInfoModel = Field(..., description="The system information")
-
-    @field_validator("start_at", "end_at", mode="before")
-    @classmethod
-    def _ensure_timezone(cls, v: Any) -> datetime | Any:
-        """Ensure datetime fields are timezone-aware."""
-        if v is None:
-            return None
-        if isinstance(v, datetime):
-            return ensure_timezone(v)
-        # For other inputs (e.g., strings), let pydantic handle the conversion
-        return v
-
-    @field_validator("elapsed_time", mode="before")
-    @classmethod
-    def _parse_elapsed_time(cls, v: Any) -> float | None:
-        """Parse elapsed_time from various formats and return seconds."""
-        if v is None:
-            return None
-        if isinstance(v, (int, float)):
-            return float(v)
-        if isinstance(v, timedelta):
-            return v.total_seconds()
-        td = parse_elapsed_time(v)
-        return td.total_seconds() if td else None
 
     class Settings:
         """Settings for the document."""
@@ -85,6 +60,11 @@ class ExecutionHistoryDocument(Document):
                 [("project_id", ASCENDING), ("chip_id", ASCENDING), ("start_at", DESCENDING)]
             ),
             IndexModel([("project_id", ASCENDING), ("chip_id", ASCENDING)]),
+            # The step executions of a calibration run, which the worker stamps in the note.
+            IndexModel(
+                [("project_id", ASCENDING), ("note.calibration_run_id", ASCENDING)],
+                sparse=True,
+            ),
             IndexModel(
                 [("project_id", ASCENDING), ("username", ASCENDING), ("start_at", DESCENDING)]
             ),
@@ -94,15 +74,10 @@ class ExecutionHistoryDocument(Document):
         ]
 
     @classmethod
-    def _user_id_for_username(cls, username: str) -> str | None:
-        user = UserDocument.find_one({"username": username}).run()
-        return user.user_id if user else None
-
-    @classmethod
     def from_execution_model(cls, execution_model: ExecutionModel) -> "ExecutionHistoryDocument":
         return cls(
             project_id=execution_model.project_id,
-            user_id=cls._user_id_for_username(execution_model.username),
+            user_id=user_id_for_username(execution_model.username),
             username=execution_model.username,
             name=execution_model.name,
             execution_id=execution_model.execution_id,
@@ -129,7 +104,7 @@ class ExecutionHistoryDocument(Document):
             return doc
 
         doc.project_id = execution_model.project_id
-        doc.user_id = cls._user_id_for_username(execution_model.username)
+        doc.user_id = user_id_for_username(execution_model.username)
         doc.username = execution_model.username
         doc.name = execution_model.name
         doc.calib_data_path = execution_model.calib_data_path

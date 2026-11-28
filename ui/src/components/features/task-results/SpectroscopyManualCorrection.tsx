@@ -3,11 +3,14 @@
 import { CalibrationGitHubSyncNotice } from "@/components/features/task-results/CalibrationGitHubSyncNotice";
 import type { ManualParameterUpdateResponse } from "@/schemas";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Crosshair, Pencil, RotateCcw, X } from "lucide-react";
 import type { PlotMouseEvent } from "plotly.js";
+import { useForm, useWatch } from "react-hook-form";
+import { z } from "zod";
 
 import { useUpdateCalibrationParameters } from "@/client/calibration/calibration";
 import { getGetChipQubitQueryKey, useGetChipQubit } from "@/client/chip/chip";
@@ -15,6 +18,7 @@ import { getGetTaskResultQueryKey } from "@/client/task/task";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { PlotlyRenderer } from "@/components/charts/PlotlyRenderer";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
+import { executionFigureUrl } from "@/lib/utils/executionFiles";
 
 const PARAMETER_UNITS: Record<string, string> = {
   readout_frequency: "GHz",
@@ -57,6 +61,12 @@ interface PickedPoint {
   y: number;
 }
 
+type CorrectionFormInput = Record<string, string>;
+type CorrectionFormOutput = Record<string, number>;
+
+const INVALID_NUMBER_ERROR = "Enter a finite number";
+const NO_CHANGE_ERROR = "Change one or more values to continue.";
+
 /** Manually correct spectroscopy outputs while retaining the source Task Result. */
 export function SpectroscopyManualCorrection({
   chipId,
@@ -66,99 +76,38 @@ export function SpectroscopyManualCorrection({
   outputParameters,
   jsonFigurePaths,
 }: SpectroscopyManualCorrectionProps) {
-  const [editing, setEditing] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [baselines, setBaselines] = useState<Record<string, number | null>>({});
-  const [picking, setPicking] = useState(false);
-  const [pendingPoint, setPendingPoint] = useState<PickedPoint | null>(null);
-  const [selectedPoint, setSelectedPoint] = useState<PickedPoint | null>(null);
+  const [baselines, setBaselines] = useState<Record<string, number | null> | null>(null);
   const [createdTaskId, setCreatedTaskId] = useState<string | null>(null);
   const [githubResult, setGithubResult] = useState<ManualParameterUpdateResponse | null>(null);
   const queryClient = useQueryClient();
-  const mutation = useUpdateCalibrationParameters();
   const { data: qubitResponse } = useGetChipQubit(chipId, qid);
 
   const names = useMemo(() => spectroscopyCorrectionParameterNames(taskName), [taskName]);
   const currentData = (qubitResponse?.data?.data ?? {}) as Record<string, unknown>;
   const measuredOutput = (name: string) => outputParameters[sourceOutputName(taskName, name)];
 
+  /** Captures the comparison baselines and opens the correction form. */
   const beginEditing = () => {
-    const nextBaselines = Object.fromEntries(
-      names.map((name) => [
-        name,
-        parameterValue(currentData[name]) ?? parameterValue(measuredOutput(name)),
-      ]),
-    );
-    setBaselines(nextBaselines);
-    setValues(Object.fromEntries(names.map((name) => [name, formatValue(nextBaselines[name])])));
-    setEditing(true);
-  };
-
-  const changedNames = names.filter((name) => {
-    return parseFinite(values[name]) !== baselines[name];
-  });
-  const valid =
-    changedNames.length > 0 && changedNames.every((name) => parseFinite(values[name]) !== null);
-
-  const save = () => {
-    if (!valid) return;
-    mutation.mutate(
-      {
-        data: {
-          chip_id: chipId,
-          qid,
-          source_task_id: taskId,
-          correction_point: selectedPoint ?? undefined,
-          parameters: Object.fromEntries(
-            changedNames.map((name) => [
-              name,
-              {
-                value: parseFinite(values[name]),
-                unit: parameterUnit(measuredOutput(name), name),
-              },
-            ]),
-          ),
-        },
-      },
-      {
-        onSuccess: (response) => {
-          setGithubResult(response.data);
-          setConfirming(false);
-          setEditing(false);
-          setCreatedTaskId(response.data.task_id);
-          void queryClient.invalidateQueries({ queryKey: getGetChipQubitQueryKey(chipId, qid) });
-          void queryClient.invalidateQueries({ queryKey: getGetTaskResultQueryKey(taskId) });
-        },
-      },
+    setBaselines(
+      Object.fromEntries(
+        names.map((name) => [
+          name,
+          parameterValue(currentData[name]) ?? parameterValue(measuredOutput(name)),
+        ]),
+      ),
     );
   };
 
-  const handlePlotClick = (event: PlotMouseEvent) => {
-    const point = event.points?.[0];
-    if (!point) return;
-    const x = Number(point.x);
-    const y = Number(point.y);
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-
-    setPendingPoint({ x, y });
+  /** Shows the saved correction and refreshes the qubit and source result. */
+  const handleSaved = (response: ManualParameterUpdateResponse) => {
+    setGithubResult(response);
+    setBaselines(null);
+    setCreatedTaskId(response.task_id);
+    void queryClient.invalidateQueries({ queryKey: getGetChipQubitQueryKey(chipId, qid) });
+    void queryClient.invalidateQueries({ queryKey: getGetTaskResultQueryKey(taskId) });
   };
 
-  const useSelectedPoint = () => {
-    if (!pendingPoint) return;
-    const { x, y } = pendingPoint;
-    setValues((old) => ({ ...old, ...correctionValuesFromPoint(taskName, { x, y }) }));
-    setSelectedPoint(pendingPoint);
-    setPendingPoint(null);
-    setPicking(false);
-  };
-
-  const openPicker = () => {
-    setPendingPoint(selectedPoint);
-    setPicking(true);
-  };
-
-  if (!editing) {
+  if (!baselines) {
     return (
       <div className="rounded-[var(--radius-box)] border border-base-300 bg-base-100 p-4 shadow-sm">
         {createdTaskId && (
@@ -195,6 +144,141 @@ export function SpectroscopyManualCorrection({
   }
 
   return (
+    <SpectroscopyCorrectionEditor
+      chipId={chipId}
+      qid={qid}
+      taskId={taskId}
+      taskName={taskName}
+      names={names}
+      baselines={baselines}
+      currentData={currentData}
+      measuredOutput={measuredOutput}
+      jsonFigurePaths={jsonFigurePaths}
+      onClose={() => setBaselines(null)}
+      onSaved={handleSaved}
+    />
+  );
+}
+
+interface SpectroscopyCorrectionEditorProps {
+  chipId: string;
+  qid: string;
+  taskId: string;
+  taskName: string;
+  names: string[];
+  baselines: Record<string, number | null>;
+  currentData: Record<string, unknown>;
+  measuredOutput: (name: string) => unknown;
+  jsonFigurePaths: string[];
+  onClose: () => void;
+  onSaved: (response: ManualParameterUpdateResponse) => void;
+}
+
+/** Correction table, review dialog, and plot picker for one editing session. */
+function SpectroscopyCorrectionEditor({
+  chipId,
+  qid,
+  taskId,
+  taskName,
+  names,
+  baselines,
+  currentData,
+  measuredOutput,
+  jsonFigurePaths,
+  onClose,
+  onSaved,
+}: SpectroscopyCorrectionEditorProps) {
+  const fieldId = useId();
+  const [confirming, setConfirming] = useState(false);
+  const [reviewed, setReviewed] = useState<CorrectionFormOutput>({});
+  const [picking, setPicking] = useState(false);
+  const [pendingPoint, setPendingPoint] = useState<PickedPoint | null>(null);
+  const [selectedPoint, setSelectedPoint] = useState<PickedPoint | null>(null);
+  const mutation = useUpdateCalibrationParameters();
+
+  const schema = useMemo(() => spectroscopyCorrectionSchema(names, baselines), [names, baselines]);
+  const {
+    register,
+    control,
+    handleSubmit,
+    setValue,
+    formState: { errors, isValid },
+  } = useForm<CorrectionFormInput, unknown, CorrectionFormOutput>({
+    resolver: zodResolver(schema),
+    mode: "onChange",
+    defaultValues: Object.fromEntries(names.map((name) => [name, formatValue(baselines[name])])),
+  });
+  const values = useWatch({ control }) as Partial<CorrectionFormInput>;
+  const changedNames = names.filter((name) =>
+    isCorrectionChanged(values[name], baselines[name] ?? null),
+  );
+
+  /** Holds the validated values and opens the confirmation step. */
+  const review = (parameters: CorrectionFormOutput) => {
+    setReviewed(parameters);
+    setConfirming(true);
+  };
+
+  /** Sends the reviewed values as a linked manual parameter edit. */
+  const save = () => {
+    mutation.mutate(
+      {
+        data: {
+          chip_id: chipId,
+          qid,
+          source_task_id: taskId,
+          correction_point: selectedPoint ?? undefined,
+          parameters: Object.fromEntries(
+            Object.entries(reviewed).map(([name, value]) => [
+              name,
+              { value, unit: parameterUnit(measuredOutput(name), name) },
+            ]),
+          ),
+        },
+      },
+      {
+        onSuccess: (response) => {
+          setConfirming(false);
+          onSaved(response.data);
+        },
+      },
+    );
+  };
+
+  /** Writes a value into the form and revalidates it. */
+  const setCorrection = (name: string, value: string) => {
+    setValue(name, value, { shouldDirty: true, shouldValidate: true });
+  };
+
+  /** Stages the clicked data point as the pending correction point. */
+  const handlePlotClick = (event: PlotMouseEvent) => {
+    const point = event.points?.[0];
+    if (!point) return;
+    const x = Number(point.x);
+    const y = Number(point.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+
+    setPendingPoint({ x, y });
+  };
+
+  /** Applies the pending point to the form and closes the picker. */
+  const useSelectedPoint = () => {
+    if (!pendingPoint) return;
+    for (const [name, value] of Object.entries(correctionValuesFromPoint(taskName, pendingPoint))) {
+      if (names.includes(name)) setCorrection(name, value);
+    }
+    setSelectedPoint(pendingPoint);
+    setPendingPoint(null);
+    setPicking(false);
+  };
+
+  /** Opens the plot picker with the current selection staged. */
+  const openPicker = () => {
+    setPendingPoint(selectedPoint);
+    setPicking(true);
+  };
+
+  return (
     <div className="overflow-hidden rounded-[var(--radius-box)] border border-base-300 bg-base-100 shadow-sm">
       <div className="flex flex-col gap-3 border-b border-base-300 bg-base-200/50 p-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
@@ -218,13 +302,13 @@ export function SpectroscopyManualCorrection({
           <button
             className="btn btn-sm btn-ghost btn-square"
             aria-label="Close manual correction"
-            onClick={() => setEditing(false)}
+            onClick={onClose}
           >
             <X size={16} />
           </button>
         </div>
       </div>
-      <div className="p-4">
+      <form className="p-4" noValidate onSubmit={handleSubmit(review)}>
         {selectedPoint && jsonFigurePaths[0] && (
           <div className="mb-3 flex flex-col gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2 text-xs">
@@ -234,7 +318,7 @@ export function SpectroscopyManualCorrection({
                 x={formatCoordinate(selectedPoint.x)}, y={formatCoordinate(selectedPoint.y)}
               </span>
             </div>
-            <button className="btn btn-xs btn-ghost" onClick={openPicker}>
+            <button type="button" className="btn btn-xs btn-ghost" onClick={openPicker}>
               View corrected figure
             </button>
           </div>
@@ -254,8 +338,10 @@ export function SpectroscopyManualCorrection({
               {names.map((name) => {
                 const measured = parameterValue(measuredOutput(name));
                 const current = parameterValue(currentData[name]);
-                const baseline = baselines[name];
-                const changed = parseFinite(values[name]) !== baseline;
+                const baseline = baselines[name] ?? null;
+                const changed = changedNames.includes(name);
+                const error = errors[name]?.message;
+                const inputId = `${fieldId}-${name}`;
                 return (
                   <tr key={name} className={changed ? "bg-warning/10" : ""}>
                     <td className="font-mono">{name}</td>
@@ -264,27 +350,31 @@ export function SpectroscopyManualCorrection({
                     <td>
                       <div className="flex items-center gap-1">
                         <input
+                          id={inputId}
                           aria-label={`Correct ${name}`}
-                          className={`input input-bordered input-sm w-40 font-mono ${parseFinite(values[name]) === null ? "input-error" : changed ? "input-warning" : ""}`}
+                          aria-invalid={Boolean(error)}
+                          aria-describedby={error ? `${inputId}-error` : undefined}
+                          className={`input input-bordered input-sm w-40 font-mono ${error ? "input-error" : changed ? "input-warning" : ""}`}
                           inputMode="decimal"
                           placeholder="Enter a value"
-                          value={values[name] ?? ""}
-                          onChange={(event) =>
-                            setValues((old) => ({ ...old, [name]: event.target.value }))
-                          }
+                          {...register(name)}
                         />
                         {changed && (
                           <button
+                            type="button"
                             className="btn btn-ghost btn-xs btn-square"
                             title="Reset"
-                            onClick={() =>
-                              setValues((old) => ({ ...old, [name]: formatValue(baseline) }))
-                            }
+                            onClick={() => setCorrection(name, formatValue(baseline))}
                           >
                             <RotateCcw className="h-3 w-3" />
                           </button>
                         )}
                       </div>
+                      {error && (
+                        <p id={`${inputId}-error`} className="mt-1 text-xs text-error">
+                          {error}
+                        </p>
+                      )}
                     </td>
                     <td>{parameterUnit(measuredOutput(name), name)}</td>
                   </tr>
@@ -301,18 +391,18 @@ export function SpectroscopyManualCorrection({
         <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-base-content/60">
             {changedNames.length === 0
-              ? "Change one or more values to continue."
+              ? NO_CHANGE_ERROR
               : `${changedNames.length} ${changedNames.length === 1 ? "value" : "values"} will be updated.`}
           </p>
           <button
+            type="submit"
             className="btn btn-warning btn-sm"
-            disabled={!valid || mutation.isPending}
-            onClick={() => setConfirming(true)}
+            disabled={!isValid || mutation.isPending}
           >
             Review changes
           </button>
         </div>
-      </div>
+      </form>
 
       <Dialog open={confirming} onOpenChange={(open) => !mutation.isPending && setConfirming(open)}>
         <DialogContent className="max-w-lg overflow-hidden p-0">
@@ -331,11 +421,11 @@ export function SpectroscopyManualCorrection({
           <div className="p-5">
             <div className="rounded-lg border border-base-300 bg-base-200/40">
               <ul className="divide-y divide-base-300 text-sm">
-                {changedNames.map((name) => (
+                {Object.entries(reviewed).map(([name, value]) => (
                   <li key={name} className="flex items-center justify-between gap-4 px-3 py-2.5">
                     <span className="min-w-0 truncate font-mono text-xs">{name}</span>
                     <span className="shrink-0 font-mono text-xs font-medium">
-                      {values[name]} {parameterUnit(measuredOutput(name), name)}
+                      {value} {parameterUnit(measuredOutput(name), name)}
                     </span>
                   </li>
                 ))}
@@ -390,7 +480,7 @@ export function SpectroscopyManualCorrection({
             {jsonFigurePaths[0] && (
               <div className="mx-auto w-fit max-w-full overflow-auto rounded-[var(--radius-box)] border border-base-300 bg-base-100 p-3 shadow-sm">
                 <PlotlyRenderer
-                  fullPath={`/api/executions/figure?path=${encodeURIComponent(jsonFigurePaths[0])}`}
+                  fullPath={executionFigureUrl(jsonFigurePaths[0])}
                   onClick={handlePlotClick}
                   highlightPoint={
                     pendingPoint
@@ -465,6 +555,43 @@ export function correctionValuesFromPoint(
     };
   }
   return {};
+}
+
+/**
+ * Zod schema for the correction form. Every changed value must be a finite number, at least
+ * one value must change, and the output holds only the changed values as numbers.
+ */
+export function spectroscopyCorrectionSchema(
+  names: string[],
+  baselines: Record<string, number | null>,
+): z.ZodType<CorrectionFormOutput, CorrectionFormInput> {
+  const changedNames = (values: CorrectionFormInput) =>
+    names.filter((name) => isCorrectionChanged(values[name], baselines[name] ?? null));
+  return z
+    .object(Object.fromEntries(names.map((name) => [name, z.string()])))
+    .superRefine((values, ctx) => {
+      const changed = changedNames(values);
+      for (const name of changed) {
+        if (parseFinite(values[name]) === null) {
+          ctx.addIssue({ code: "custom", path: [name], message: INVALID_NUMBER_ERROR });
+        }
+      }
+      if (changed.length === 0) {
+        ctx.addIssue({ code: "custom", path: [], message: NO_CHANGE_ERROR });
+      }
+    })
+    .transform((values) =>
+      Object.fromEntries(
+        changedNames(values).map((name) => [name, parseFinite(values[name]) as number]),
+      ),
+    );
+}
+
+/** Whether a field differs from its baseline; any non-empty value that is not a number does. */
+function isCorrectionChanged(value: string | undefined, baseline: number | null): boolean {
+  if (!value?.trim()) return baseline !== null;
+  const parsed = parseFinite(value);
+  return parsed === null || parsed !== baseline;
 }
 
 function parameterValue(raw: unknown): number | null {

@@ -1,20 +1,21 @@
 import { writeFileSync } from "node:fs";
 
+import { clampThinkingLevel, type Api, type Model } from "@earendil-works/pi-ai";
 import { parse } from "yaml";
 
 import { compactionBudget, type CompactionBudget } from "./budget.ts";
 import {
-  readCopilotModelYaml,
-  type CopilotModelFiles,
-  type CopilotModelYaml,
-} from "./copilot-profile.ts";
+  readAgentModelYaml,
+  type AgentModelFiles,
+  type AgentModelYaml,
+} from "./agent-profile.ts";
 
 /**
  * Build pi's models.json from QDash's chat.yaml and evaluation.yaml.
  *
  * Those two files are the single place model wiring is declared; this module is
  * the only translation into pi's schema. chat.yaml's `chat_models` back the
- * Copilot chat; evaluation.yaml's `evaluation_models` back the figure evaluation
+ * Agent chat; evaluation.yaml's `evaluation_models` back the figure evaluation
  * sidebar. See adr/0004 of the chat session.
  */
 
@@ -22,6 +23,81 @@ import {
 export const PROVIDER_ALIASES: Record<string, string> = { bedrock: "amazon-bedrock" };
 
 const OPENAI_COMPATIBLE_PROVIDER_PREFIX = "openai-compatible";
+
+/**
+ * Catalog providers whose models need an API key from the environment, and its variable. A
+ * chat on one of them without the key is refused before the turn starts, with what to set,
+ * instead of failing inside the model request or running on another model.
+ */
+export const NATIVE_API_KEY_ENV: Readonly<Record<string, string>> = {
+  openai: "OPENAI_API_KEY",
+  anthropic: "ANTHROPIC_API_KEY",
+};
+
+/** The thinking levels a chat turn may ask for (the chat's Thinking menu). */
+type ChatThinkingLevel = "off" | "minimal" | "low" | "medium" | "high";
+const CHAT_THINKING_LEVELS: ReadonlySet<string> = new Set(["off", "minimal", "low", "medium", "high"]);
+
+/**
+ * The level a turn on `model` runs at for the asked `level`: the asked one when the model supports
+ * it, else pi's nearest supported level. A model whose thinking is always on (Claude Opus 5.5:
+ * adaptive thinking, which Anthropic does not let a request disable) has no `off` or `minimal`:
+ * without this, pi would send such a turn no level and the model would think at pi's fallback
+ * effort, `high`. With it, `off` and `minimal` run at `low`, the least the model offers. Unset
+ * stays unset (the agent's own default).
+ */
+export function supportedThinkingLevel<L extends ChatThinkingLevel>(
+  model: Model<Api> | undefined,
+  level: L | undefined,
+): ChatThinkingLevel | undefined {
+  if (level === undefined || model === undefined) return level;
+  const clamped = clampThinkingLevel(model, level);
+  return CHAT_THINKING_LEVELS.has(clamped) ? (clamped as ChatThinkingLevel) : level;
+}
+
+/** Why a chat on `providerId/modelId` cannot run without a credential, or undefined when it can. */
+export function missingCredentialMessage(providerId: string, modelId: string, hasCredential: boolean): string | undefined {
+  const variable = NATIVE_API_KEY_ENV[providerId];
+  if (variable === undefined || hasCredential) return undefined;
+  return (
+    `${providerId}/${modelId} needs ${variable} in the agent runtime's environment, and it is not set. ` +
+    `Set ${variable} in .env and recreate the agent-runtime container, or choose another model.`
+  );
+}
+
+/** Whether one chat.yaml model can run, as the API and the chat's model menus see it. */
+export interface ChatModelAvailability {
+  /** The provider as chat.yaml names it (before aliases such as bedrock). */
+  provider: string;
+  name: string;
+  available: boolean;
+}
+
+/**
+ * chat.yaml's `chat_models` in their declared order, each marked by whether Pi has a
+ * credential for it. `available` holds the `providerId/modelId` of every model Pi
+ * reports as available (ModelRuntime.getAvailable), so this follows Pi's own rules:
+ * an unset, empty, or blank key leaves a model unavailable, and a keyless local
+ * endpoint is available once its placeholder key is set. Names only, never a value.
+ */
+export function chatModelAvailability(
+  chatYaml: string,
+  available: ReadonlySet<string>,
+): ChatModelAvailability[] {
+  const result: ChatModelAvailability[] = [];
+  const seen = new Set<string>();
+  for (const model of readModels(chatYaml, "chat_models")) {
+    const name = asString(model.name);
+    const provider = asString(model.provider);
+    if (!name || !provider) continue;
+    const key = `${provider}/${name}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const providerId = PROVIDER_ALIASES[provider] ?? provider;
+    result.push({ provider, name, available: available.has(`${providerId}/${name}`) });
+  }
+  return result;
+}
 
 /** Used for locally hosted models, whose context window chat.yaml does not state. */
 const DEFAULT_CONTEXT_WINDOW = 131072;
@@ -340,15 +416,15 @@ function isQwenModel(name: string): boolean {
 /**
  * Generate models.json next to the agent dir and return its path.
  *
- * `files` is the selection of copilot-profile.ts; a named profile's files are
+ * `files` is the selection of agent-profile.ts; a named profile's files are
  * validated, the default files are read as they always were.
  */
 export function writeModelsConfig(
-  files: CopilotModelFiles,
+  files: AgentModelFiles,
   outPath: string,
   env: NodeJS.ProcessEnv = process.env,
-): { path: string; yaml: CopilotModelYaml } {
-  const yaml = readCopilotModelYaml(files);
+): { path: string; yaml: AgentModelYaml } {
+  const yaml = readAgentModelYaml(files);
   const config = buildModelsConfig(yaml.chatYaml, yaml.evaluationYaml, env);
   writeFileSync(outPath, `${JSON.stringify(config, null, 2)}\n`);
   return { path: outPath, yaml };

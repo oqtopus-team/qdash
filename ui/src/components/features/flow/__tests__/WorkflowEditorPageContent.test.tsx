@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
   monaco: {
     KeyMod: { CtrlCmd: 2048, Alt: 512 },
     KeyCode: { KeyS: 49, KeyZ: 56 },
-    editor: { remeasureFonts: () => undefined },
+    editor: { remeasureFonts: () => undefined, EditorOption: { minimap: 81 } },
   },
   // Commands the mounted editor registered, such as Cmd/Ctrl+S, by keybinding.
   editorCommands: new Map<number, () => void>(),
@@ -202,6 +202,13 @@ vi.mock("@/client/flow/flow", () => ({
     Promise.resolve(mocks.formatSource(body)).then((data) => ({ data })),
 }));
 
+// An Axios error carrying an API error body, as the client rejects with.
+function serverError(data: unknown) {
+  return Object.assign(new Error("Request failed with status code 500"), {
+    response: { status: 500, data },
+  });
+}
+
 function renderEditor() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -261,6 +268,8 @@ describe("WorkflowEditorPageContent run callbacks", () => {
       "first_calibration",
       expect.objectContaining({
         parameters: expect.objectContaining({ chip_id: "chip-a" }),
+        // A run on a known chip is recorded under a key, so a resent request replays it.
+        idempotency_key: expect.any(String),
       }),
     );
     expect(storedJourney("project-1").executionId).toBe("20261105-001");
@@ -268,6 +277,24 @@ describe("WorkflowEditorPageContent run callbacks", () => {
     // The guide's run opens on its execution page, once, without a banner click.
     expect(mocks.push).toHaveBeenCalledTimes(1);
     expect(mocks.push).toHaveBeenCalledWith("/execution/chip-a/20261105-001");
+  });
+
+  it("sends no key for a run without a chip, which QDash cannot record before launch", async () => {
+    FLOW_CHIPS.first_calibration = "";
+    try {
+      mocks.executeFlow.mockResolvedValue({
+        data: { execution_id: "20261105-009", flow_run_id: "run-9" },
+      });
+      renderEditor();
+
+      await confirmExecute();
+
+      await waitFor(() => expect(mocks.executeFlow).toHaveBeenCalledTimes(1));
+      const [, body] = mocks.executeFlow.mock.calls[0];
+      expect(body).not.toHaveProperty("idempotency_key");
+    } finally {
+      FLOW_CHIPS.first_calibration = "chip-a";
+    }
   });
 
   it("marks Execute ready for the guide only while it can start a run", async () => {
@@ -821,6 +848,43 @@ describe("WorkflowEditorPageContent properties", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("Please enter a username")).toBeNull();
   });
+
+  it("shows the public message and error ID of an unexpected save failure", async () => {
+    vi.mocked(saveFlow).mockRejectedValue(
+      serverError({
+        detail: "Failed to save the flow file",
+        code: "flow_source_write_failed",
+        error_id: "5c0ffee5c0ffee5c0ffee5c0ffee5c0f",
+      }),
+    );
+    renderEditor();
+    await unlockEditor();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByText(
+        "Failed to save first_calibration: Failed to save the flow file (Error ID: 5c0ffee5c0ffee5c0ffee5c0ffee5c0f)",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/status code 500/)).toBeNull();
+  });
+
+  it("shows the public message and error ID when the flow cannot be read", async () => {
+    mocks.getFlow.mockRejectedValueOnce(
+      serverError({
+        detail: "Failed to read the flow file",
+        code: "flow_source_read_failed",
+        error_id: "0123456789abcdef0123456789abcdef",
+      }),
+    );
+    renderEditor();
+
+    expect(await screen.findByText("Failed to load flow")).toBeInTheDocument();
+    expect(
+      screen.getByText("Failed to read the flow file (Error ID: 0123456789abcdef0123456789abcdef)"),
+    ).toBeInTheDocument();
+  });
 });
 
 describe("WorkflowEditorPageContent formatting", () => {
@@ -936,5 +1000,56 @@ describe("WorkflowEditorPageContent formatting", () => {
     await waitFor(() => expect(screen.getByLabelText("Code")).toHaveValue(`${SAVED}\n# f\n`));
     expect(mocks.formatSource).toHaveBeenCalledWith({ source: SAVED });
     expect(saveFlow).not.toHaveBeenCalled();
+  });
+});
+
+describe("WorkflowEditorPageContent editor settings", () => {
+  beforeEach(() => {
+    mocks.projectId = "project-1";
+    mocks.disabledReason = null;
+    window.localStorage.setItem(PROJECT_STORAGE_KEY, "project-1");
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    window.localStorage.clear();
+    mocks.editorExtras = null;
+  });
+
+  it("applies zoom shortcuts to the editor and resets from the status bar", async () => {
+    const updateOptions = vi.fn();
+    mocks.editorExtras = () => ({ updateOptions });
+    renderEditor();
+    await screen.findByTestId("editor");
+
+    fireEvent.keyDown(window, { key: "=", metaKey: true });
+
+    await waitFor(() =>
+      expect(updateOptions).toHaveBeenLastCalledWith({ fontSize: 16, wordWrap: "on" }),
+    );
+    const reset = screen.getByTitle("Reset Zoom (⌘0)");
+    expect(reset).toHaveTextContent("114%");
+
+    fireEvent.click(reset);
+
+    await waitFor(() =>
+      expect(updateOptions).toHaveBeenLastCalledWith({ fontSize: 14, wordWrap: "on" }),
+    );
+    expect(screen.queryByTitle("Reset Zoom (⌘0)")).toBeNull();
+  });
+
+  it("toggles the active editor's minimap from the command palette", async () => {
+    const updateOptions = vi.fn();
+    const getOption = vi.fn(() => ({ enabled: true }));
+    mocks.editorExtras = () => ({ updateOptions, getOption });
+    renderEditor();
+    await screen.findByTestId("editor");
+
+    fireEvent.keyDown(window, { key: "p", ctrlKey: true, shiftKey: true });
+    fireEvent.click(await screen.findByRole("option", { name: /Toggle Minimap/ }));
+
+    expect(getOption).toHaveBeenCalledWith(mocks.monaco.editor.EditorOption.minimap);
+    expect(updateOptions).toHaveBeenLastCalledWith({ minimap: { enabled: false } });
   });
 });

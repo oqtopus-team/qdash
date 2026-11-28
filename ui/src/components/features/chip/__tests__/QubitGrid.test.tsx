@@ -83,7 +83,7 @@ describe("QubitGrid locked view", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Lock" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Lock" }));
 
     const grid = container.querySelector<HTMLElement>(".justify-center-safe > .grid");
     expect(grid?.style.gridTemplateColumns).toContain("repeat(12,");

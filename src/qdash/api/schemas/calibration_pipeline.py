@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+from datetime import datetime  # noqa: TC003 - pydantic field type
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from qdash.api.schemas.flow import ExecuteFlowResponse
+from qdash.api.schemas.flow import (
+    CALIBRATION_SESSION_FIELD,
+    IDEMPOTENCY_KEY_FIELD,
+    ExecuteFlowResponse,
+)
+from qdash.datamodel.launch_origin import ReportedLaunchOrigin  # noqa: TC001 - pydantic field
+from qdash.datamodel.task import TaskDocumentation  # noqa: TC001 - pydantic field type
 from qdash.datamodel.task_call import TaskCall  # noqa: TC001 - pydantic field type
 
 _SPEC_EXAMPLE: dict[str, Any] = {
@@ -58,6 +65,35 @@ class PipelineProblem(BaseModel):
     message: str
 
 
+class RequestFieldError(BaseModel):
+    """One field of the request body that failed schema validation."""
+
+    loc: list[str | int] = Field(description="Where in the request, e.g. ['body', 'chip_id'].")
+    msg: str
+    type: str
+
+    model_config = ConfigDict(extra="allow")
+
+
+class PipelineProblemsDetail(BaseModel):
+    """Why a calibration pipeline spec was refused, with every problem found."""
+
+    message: str
+    problems: list[PipelineProblem] = Field(default_factory=list)
+
+
+class PipelinePlanUnprocessableResponse(BaseModel):
+    """The 422 body of the stored-plan endpoints.
+
+    ``detail`` is a list when the request body does not match its schema, an object with
+    ``problems`` when the spec is not valid or its targets cannot be resolved, and a message
+    when the request does not match the plan (another chip or backend) or its calibration
+    session is on another chip.
+    """
+
+    detail: list[RequestFieldError] | PipelineProblemsDetail | str
+
+
 class ResolvedTaskCall(BaseModel):
     """One call as it will run: identity and settings after per-task defaults."""
 
@@ -100,9 +136,15 @@ class ResolvedPipelineStep(BaseModel):
 class ResolvedPipelineTargets(BaseModel):
     """The starting targets after chip lookup."""
 
-    qids: list[str] = Field(description="Explicit qids, or empty when targeting MUXes.")
+    qids: list[str] = Field(
+        description="Explicit qids, the qubits of the pairs, or empty when targeting MUXes."
+    )
     mux_ids: list[int] = Field(default_factory=list)
     exclude_qids: list[str] = Field(default_factory=list)
+    pairs: list[list[str]] = Field(
+        default_factory=list,
+        description="Directed [control, target] coupling pairs, or empty without pair targets.",
+    )
 
 
 class ValidatePipelineRequest(BaseModel):
@@ -161,8 +203,158 @@ class ValidatePipelineResponse(BaseModel):
     task_run_count: int = Field(default=0, description="Task calls per target qubit or coupling.")
 
 
+DECISION_ID_FIELD = (
+    "With calibration_session_id: the decision of that session this run carries out, "
+    "recorded before dispatch with an experiment. QDash checks it belongs to the "
+    "session and records the link on the run; it grants nothing."
+)
+
+
 class ExecutePipelineRequest(ValidatePipelineRequest):
-    """Validate, then dispatch the pipeline as one execution."""
+    """Dispatch one pipeline run with a separate execution for each step reached."""
+
+    calibration_session_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description=CALIBRATION_SESSION_FIELD,
+    )
+    idempotency_key: str | None = Field(
+        default=None, min_length=1, max_length=128, description=IDEMPOTENCY_KEY_FIELD
+    )
+
+    decision_id: str | None = Field(
+        default=None, min_length=1, max_length=200, description=DECISION_ID_FIELD
+    )
+
+    reported_origin: ReportedLaunchOrigin | None = Field(
+        default=None,
+        description=(
+            "How the caller says it started the run, such as an agent tool. QDash stores it as "
+            "given and shows it as reported: it is not verified, does not link the run to an "
+            "agent session, and grants nothing. The signed-in user stays responsible for the run."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_calibration_session(self) -> ExecutePipelineRequest:
+        """A decision belongs to a session the request names."""
+        if self.decision_id is not None and self.calibration_session_id is None:
+            raise ValueError("decision_id needs calibration_session_id")
+        return self
+
+
+class CreatePipelinePlanRequest(ValidatePipelineRequest):
+    """Store a validated spec as a plan that can be approved and run by reference."""
+
+    idempotency_key: str = Field(
+        min_length=1,
+        max_length=128,
+        description=(
+            "Identity of this creation, such as the tool call that asks for it. While the plan "
+            "it created is stored (until seven days after the plan expires), repeating it with "
+            "the same request returns that plan, or reports it expired, and repeating it with "
+            "another request is a conflict; it never changes or renews that plan. After the "
+            "plan is deleted the key is free again: the same key then creates a new plan with "
+            "a new plan_id and review_digest that needs its own approval."
+        ),
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"chip_id": "64Qv3", "spec": _SPEC_EXAMPLE, "idempotency_key": "plan-request-1"}
+            ]
+        }
+    )
+
+
+class PipelinePlanResponse(BaseModel):
+    """A stored plan and everything an approval of it covers.
+
+    A plan starts nothing and grants nothing. ``review_digest`` is a full, versioned SHA-256
+    of the review content: the normalized spec with every default task list written out,
+    the qubits its targets resolve to when the run starts, the resolved calls of every step,
+    and the run defaults. Running the plan names that digest, so the run is the plan that
+    was reviewed. Filters and CR schedules still select from results while the run goes;
+    calibration values, task code and hardware state are read when it runs.
+    """
+
+    plan_id: str = Field(description="Opaque ID of the plan.")
+    chip_id: str
+    backend_name: str
+    created_by: str
+    created_at: datetime
+    expires_at: datetime = Field(
+        description="After this the plan cannot be executed; create a new plan instead."
+    )
+    expired: bool
+    review_version: int
+    review_digest: str = Field(
+        description=(
+            "sha256:v<version>:<hex> of the review content; pass it as expected_review_digest. "
+            "Not the spec's plan_digest."
+        )
+    )
+    spec: dict[str, Any] = Field(description="The normalized spec with default task lists.")
+    spec_digest: str | None = Field(
+        default=None,
+        description="The short spec digest /validate reports as plan_digest, for history.",
+    )
+    targets: ResolvedPipelineTargets | None = None
+    target_qids: list[str] = Field(
+        description="The qubits the targets resolve to when the run starts (MUXes expanded)."
+    )
+    steps: list[ResolvedPipelineStep] = Field(default_factory=list)
+    warnings: list[PipelineProblem] = Field(default_factory=list)
+    task_run_count: int = 0
+    default_run_parameters: dict[str, Any] = Field(default_factory=dict)
+    task_parameters: dict[str, Any] = Field(default_factory=dict)
+    replayed: bool = Field(
+        default=False,
+        description="True when a repeated creation returned the plan it stored before.",
+    )
+
+
+class ExecutePipelinePlanRequest(BaseModel):
+    """Run a stored plan exactly as it was reviewed."""
+
+    chip_id: str = Field(min_length=1, description="Must be the plan's chip.")
+    expected_review_digest: str = Field(
+        pattern=r"^sha256:v[0-9]+:[0-9a-f]{64}$",
+        description=(
+            "The review digest the person approved. A plan with another digest, or one whose "
+            "revalidated content no longer has it, is refused."
+        ),
+    )
+    backend_name: str | None = Field(
+        default=None, description="Must be the plan's backend when given."
+    )
+    calibration_session_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description=CALIBRATION_SESSION_FIELD,
+    )
+    idempotency_key: str | None = Field(
+        default=None, min_length=1, max_length=128, description=IDEMPOTENCY_KEY_FIELD
+    )
+    # The same schema as ExecutePipelineRequest.decision_id, so generated clients share one
+    # type for both fields and an existing caller's typed value stays valid for either.
+    decision_id: str | None = Field(
+        default=None, min_length=1, max_length=200, description=DECISION_ID_FIELD
+    )
+    reported_origin: ReportedLaunchOrigin | None = Field(
+        default=None,
+        description="As for POST /calibration-pipelines/execute: stored as reported.",
+    )
+
+    @model_validator(mode="after")
+    def validate_calibration_session(self) -> ExecutePipelinePlanRequest:
+        """A decision belongs to a session the request names."""
+        if self.decision_id is not None and self.calibration_session_id is None:
+            raise ValueError("decision_id needs calibration_session_id")
+        return self
 
 
 class ExecutePipelineResponse(ExecuteFlowResponse):
@@ -170,6 +362,26 @@ class ExecutePipelineResponse(ExecuteFlowResponse):
 
     steps: list[ResolvedPipelineStep] = Field(default_factory=list)
     targets: ResolvedPipelineTargets | None = None
+    pipeline_run_id: str | None = Field(
+        default=None, description="The run QDash recorded for the launch (calibration_run_id)"
+    )
+    decision_id: str | None = Field(
+        default=None,
+        description=(
+            "The decision the recorded run carries out, as QDash linked it; null when the "
+            "request named none. A client that sent a decision checks it is echoed here"
+        ),
+    )
+    plan_id: str | None = Field(
+        default=None,
+        description=(
+            "For a run of a stored plan: the plan it carries out. A client that ran a plan "
+            "checks it and review_digest are echoed here"
+        ),
+    )
+    review_digest: str | None = Field(
+        default=None, description="For a run of a stored plan: the review digest it ran."
+    )
 
 
 class PipelineStepTypeInfo(BaseModel):
@@ -209,6 +421,13 @@ class PipelineCatalogResponse(BaseModel):
     )
     tasks: dict[str, list[str]] = Field(
         description='Available task names by task_type ("qubit", "coupling", ...).'
+    )
+    task_documentation: dict[str, TaskDocumentation] = Field(
+        default_factory=dict,
+        description=(
+            "Guidance declared by available tasks, keyed by task name. Tasks that "
+            "declare no documentation are omitted."
+        ),
     )
     spec_version: int = Field(description="The spec version this QDash accepts.")
     spec_schema: dict[str, Any] = Field(description="JSON schema of CalibrationPipelineSpec.")

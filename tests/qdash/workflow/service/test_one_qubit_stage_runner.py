@@ -5,7 +5,7 @@ import pytest
 
 from qdash.common.mux_mapping import MuxMapping, MuxMappingSnapshot
 from qdash.datamodel.task_call import StepCalls, TaskCall, normalize_calls
-from qdash.workflow.service._internal.session import CalibSession
+from qdash.workflow.service._internal.session import ExecutionRuntime
 from qdash.workflow.service._internal.settings import SessionSettings, WorkerLease, WorkerSpec
 from qdash.workflow.service.one_qubit_stage_runner import OneQubitStageRunner
 
@@ -14,9 +14,9 @@ def _plan(*calls: TaskCall) -> StepCalls:
     return StepCalls(step_id="spectroscopy", calls=normalize_calls(calls))
 
 
-def _session() -> CalibSession:
+def _session() -> ExecutionRuntime:
     return cast(
-        "CalibSession",
+        "ExecutionRuntime",
         SimpleNamespace(
             username="alice",
             chip_id="144Q-test",

@@ -6,13 +6,18 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { AgentCandidateCommitResponseAfterSnapshot } from './agentCandidateCommitResponseAfterSnapshot';
+import type { AgentCandidateCommitResponseAssessmentEvidence } from './agentCandidateCommitResponseAssessmentEvidence';
+import type { AgentCandidateCommitResponseAuthority } from './agentCandidateCommitResponseAuthority';
 import type { AgentCandidateCommitResponseBackendAppliedAt } from './agentCandidateCommitResponseBackendAppliedAt';
+import type { AgentCandidateCommitResponseBackendAuthority } from './agentCandidateCommitResponseBackendAuthority';
 import type { AgentCandidateCommitResponseBackendBaseGitCommit } from './agentCandidateCommitResponseBackendBaseGitCommit';
 import type { AgentCandidateCommitResponseBackendGitCommit } from './agentCandidateCommitResponseBackendGitCommit';
 import type { AgentCandidateCommitResponseBackendOperationId } from './agentCandidateCommitResponseBackendOperationId';
 import type { AgentCandidateCommitResponseBackendRequestedAt } from './agentCandidateCommitResponseBackendRequestedAt';
+import type { AgentCandidateCommitResponseBackendRequestedBy } from './agentCandidateCommitResponseBackendRequestedBy';
 import type { AgentCandidateCommitResponseBeforeSnapshot } from './agentCandidateCommitResponseBeforeSnapshot';
 import type { AgentCandidateCommitResponseCommittedAt } from './agentCandidateCommitResponseCommittedAt';
+import type { AgentCandidateCommitResponseDecisionId } from './agentCandidateCommitResponseDecisionId';
 
 /**
  * Audited result of committing a gated candidate.
@@ -48,4 +53,14 @@ export interface AgentCandidateCommitResponse {
   backend_error?: string;
   backend_requested_at?: AgentCandidateCommitResponseBackendRequestedAt;
   backend_applied_at?: AgentCandidateCommitResponseBackendAppliedAt;
+  /** reviewed: a per-call approved commit; session_policy: committed under the session's parameter_updates authority */
+  authority?: AgentCandidateCommitResponseAuthority;
+  /** The pass decision a session_policy commit rests on */
+  decision_id?: AgentCandidateCommitResponseDecisionId;
+  /** What QDash checked for a session_policy commit, frozen when it was reserved: the agent-reported assessment, the mechanical gates, and cited evaluations */
+  assessment_evidence?: AgentCandidateCommitResponseAssessmentEvidence;
+  /** Authority of the backend apply request, once requested */
+  backend_authority?: AgentCandidateCommitResponseBackendAuthority;
+  /** Who requested the backend apply, once requested */
+  backend_requested_by?: AgentCandidateCommitResponseBackendRequestedBy;
 }

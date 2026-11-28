@@ -1,35 +1,22 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
-import { ROOT_CONVERSATION_ID, UserEntry, type ConversationId, type EntryId, type Submission } from "@earendil-works/pi-durable";
+import { ROOT_CONVERSATION_ID, type ConversationId, type EntryId } from "@earendil-works/pi-durable";
 
 import { requestQDashAuth } from "./auth.ts";
-import { BRANCH_REFUSAL_STATUS, BranchError, parseDurableId, unfinishedWork } from "./branch.ts";
-import {
-  ActiveChat,
-  continueBlocker,
-  settleChat,
-  steerOutcomeOf,
-  submissionByRequest,
-  type ChatTarget,
-  type ContinueBlocker,
-  type SteerOutcome,
-} from "./chat-control.ts";
+import { BRANCH_REFUSAL_STATUS, BranchError, parseDurableId } from "./branch.ts";
+import { ActiveChat, type ChatTarget, type SteerOutcome } from "./chat-control.ts";
+import { runChatTurn, toImageContent, type ImageBody, type TurnResponse } from "./chat-turn.ts";
 import { parsePageContext } from "./page-context.ts";
-import { WRAP_UP_MESSAGE } from "./budget.ts";
-import { encodeLine, formatSettledDetail, toNdjsonEvents, type NdjsonEvent, type SessionEventLike } from "./events.ts";
+import { encodeLine, type NdjsonEvent } from "./events.ts";
+import { acceptsPresentation, PRESENTATION_CONTENT_TYPE, streamEncoder } from "./presentation.ts";
 import { hasBearerToken, readJsonBody, RequestError, runtimeToken } from "./http.ts";
-import { decisionMessage, type ApprovalRequest } from "./durable-tools.ts";
 import { EvaluationError } from "./evaluate.ts";
-import { COMPACTION_FAILED_MESSAGE, isCompactionFailure } from "./compaction.ts";
-import { ViewEventStream } from "./view-events.ts";
+import { TurnFeed } from "./turn-feed.ts";
 import { claimStore, fenceSteer, steerFenced } from "./store-identity.ts";
 import { stopStoredConversation } from "./stored-stop.ts";
 import {
-  answerText,
-  pendingApproval,
   BACKGROUND_CONTEXT,
   SharedRuntime,
-  type OpenDurableSession,
   type SessionRequest,
   type StoreTarget,
 } from "./runtime.ts";
@@ -50,11 +37,6 @@ const MAX_BODY_BYTES = Number(process.env.MAX_REQUEST_BODY_BYTES ?? 20 * 1024 * 
 // work to end, when it may start scheduling (see stored-stop.ts).
 const STORED_STOP_SETTLE_MS = Number(process.env.STORED_STOP_SETTLE_MS ?? 5_000);
 const RUNTIME_TOKEN = runtimeToken();
-
-interface ImageBody {
-  data: string;
-  mimeType: string;
-}
 
 /**
  * Where a request's chat lives, resolved by QDash's API from the chat session it
@@ -77,7 +59,13 @@ interface ChatBody extends StoreFields {
   conversation_id?: string;
   request_id?: string;
   message?: string;
+  /** Replaces `message` when the conversation is new: an opening QDash wrote in full (an investigation). */
   initial_message?: string;
+  /**
+   * Goes before `message` when the conversation is new: a task result's context. The runtime
+   * appends the user's message itself, after expanding a `/skill:name` command it starts with.
+   */
+  initial_context?: string;
   model?: { provider?: string; name?: string };
   thinking_level?: SessionRequest["thinkingLevel"];
   /** Figures attached to this turn's message. */
@@ -96,6 +84,14 @@ interface ChatBody extends StoreFields {
    * edit waits for the user.
    */
   continue?: boolean;
+  /**
+   * Reattach to the turn `request_id` started, after its stream dropped: never submit anything. While the turn runs,
+   * the request gets the turn's events from its start (see turn-feed.ts); after it ended, the turn's answer is read
+   * from the store. A request ID the store has never seen is `404` with `reason: "turn_not_found"`.
+   */
+  reattach?: boolean;
+  /** Where the turn starts in the transcript QDash saves (see TurnStart); reported, never interpreted. */
+  turn_start?: unknown;
 }
 
 interface SteerBody extends StoreFields {
@@ -119,6 +115,11 @@ interface AbortBody extends DeleteSessionBody {
    * deleted chat only, whose work no later turn would recover.
    */
   include_stored?: boolean;
+  /**
+   * Stop only the turn this request ID started: a stop that arrives after that turn
+   * ended never stops a newer turn of the chat.
+   */
+  turn_request_id?: string;
 }
 
 interface BranchBody {
@@ -207,15 +208,6 @@ async function handleEvaluationPrompts(req: IncomingMessage, res: ServerResponse
   }
 }
 
-/** Convert wire images into Pi image-content blocks. */
-function toImageContent(images: ImageBody[] | undefined) {
-  return (images ?? []).map((image) => ({
-    type: "image" as const,
-    data: image.data,
-    mimeType: image.mimeType,
-  }));
-}
-
 /**
  * What holds each store, by owner and store session: a chat turn, a branch being
  * forked, or a deletion. One open writer per SQLite store: a store holds a chat
@@ -223,8 +215,35 @@ function toImageContent(images: ImageBody[] | undefined) {
  * store wait for each other (`409`). A steer and a stop reach a turn through its
  * hold only when they name the turn's exact chat (`ActiveChat.runs`).
  */
-type StoreHold = { kind: "chat"; active: ActiveChat } | { kind: "branch" } | { kind: "delete" } | { kind: "stop" };
+type StoreHold =
+  | {
+      kind: "chat";
+      active: ActiveChat;
+      feed: TurnFeed;
+      /** The turn adds no message of its own: a continue. */
+      continuing: boolean;
+      startedAt: number;
+      /** Where the turn starts in the saved transcript, as its window sent it (see TurnStart). */
+      turnStart: TurnStart | null;
+    }
+  | { kind: "branch" } | { kind: "delete" } | { kind: "stop" };
 const stores = new Map<string, StoreHold>();
+
+/**
+ * Where a chat turn starts in the transcript QDash saves: how many messages precede it,
+ * and a fingerprint the window that sent the turn computed. Opaque here: it is kept with
+ * the running turn and reported to the user's other windows (`/chat/active`), which follow
+ * the turn only from a saved transcript holding that start.
+ */
+type TurnStart = { index: number; digest: string };
+
+function parseTurnStart(raw: unknown): TurnStart | null {
+  if (!raw || typeof raw !== "object") return null;
+  const { index, digest } = raw as { index?: unknown; digest?: unknown };
+  if (typeof index !== "number" || !Number.isInteger(index) || index < 0) return null;
+  if (typeof digest !== "string" || !/^[0-9a-f]{16}$/.test(digest)) return null;
+  return { index, digest };
+}
 
 function storeKey(ownerId: string, storeSessionId: string): string {
   return `${ownerId}\0${storeSessionId}`;
@@ -292,20 +311,6 @@ const STALE_STORE = {
   reason: "stale_store",
 } as const;
 
-/** Longest settled detail the log keeps: a provider can return a whole page. */
-const LOG_DETAIL_MAX_CHARS = 2_000;
-
-function truncateLog(text: string): string {
-  return text.length <= LOG_DETAIL_MAX_CHARS ? text : `${text.slice(0, LOG_DETAIL_MAX_CHARS)} [... truncated]`;
-}
-
-/** What a refused continue tells the user. */
-const CONTINUE_REFUSALS: Record<ContinueBlocker, string> = {
-  busy: "The conversation is still answering.",
-  nothing_to_continue: "There is nothing to continue: the last answer finished. Send a new message instead.",
-  awaiting_user: "The assistant is waiting for your answer, approval, or decision on its proposal; answer it instead.",
-};
-
 /** The wire form of a steer outcome. */
 function steerJson(outcome: SteerOutcome): Record<string, unknown> {
   switch (outcome.status) {
@@ -331,18 +336,15 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-/** Translate one committed durable event to the existing NDJSON bridge. */
-function writeAgentEvent(event: SessionEventLike, write: (event: NdjsonEvent) => void): void {
-  for (const line of toNdjsonEvents(event)) write(line);
-}
-
 /** Open or recover a durable conversation and wait for one idempotent input, or a continue. */
 async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const body = await readJsonBody<ChatBody>(req, MAX_BODY_BYTES);
   const ownerId = body.owner_id;
   const conversationId = body.conversation_id;
   const continuing = body.continue === true;
-  if (!ownerId || !conversationId || (!continuing && typeof body.message !== "string")) {
+  // A reattach sends nothing: it only names the turn by its request ID.
+  const reattach = body.reattach === true;
+  if (!ownerId || !conversationId || (!continuing && !reattach && typeof body.message !== "string")) {
     sendJson(res, 400, {
       error: "owner_id, conversation_id and message are required",
     });
@@ -366,7 +368,25 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
     sendJson(res, 400, { error: "store_conversation_id is not a conversation ID" });
     return;
   }
+  if (reattach && !body.request_id) {
+    sendJson(res, 400, { error: "a reattach needs the request_id of the turn" });
+    return;
+  }
   const hold = stores.get(target.key);
+  if (
+    reattach &&
+    hold?.kind === "chat" &&
+    hold.active.runs(target.chat) &&
+    hold.active.turnRequestId === body.request_id
+  ) {
+    // The same user's same chat; the project must match too, as for a steer.
+    if (hold.active.projectId !== auth.projectId) {
+      sendJson(res, 403, { error: "the running answer belongs to another project" });
+      return;
+    }
+    await attachTurn(res, hold.feed, acceptsPresentation(req.headers.accept));
+    return;
+  }
   if (hold) {
     sendJson(
       res,
@@ -380,7 +400,16 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
   const active = new ActiveChat(auth.projectId, BACKGROUND_CONTEXT, target.chat, body.request_id, (fenceKey) =>
     steerFenced(target.path, target.chat.conversation, fenceKey),
   );
-  stores.set(target.key, { kind: "chat", active });
+  // Every event the turn writes, for its own response and any request that reattaches.
+  const feed = new TurnFeed();
+  stores.set(target.key, {
+    kind: "chat",
+    active,
+    feed,
+    continuing,
+    startedAt: Date.now(),
+    turnStart: parseTurnStart(body.turn_start),
+  });
   const pageContext = parsePageContext(body.page_context);
 
   let opened;
@@ -389,6 +418,7 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
     if (claimStore(target.path, target.generation, true) === "stale") {
       active.failed();
       stores.delete(target.key);
+      feed.end();
       sendJson(res, 409, STALE_STORE);
       return;
     }
@@ -411,6 +441,8 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
   } catch (error) {
     active.failed();
     stores.delete(target.key);
+    // A request that reattached meanwhile learns the turn never started.
+    feed.end();
     if (error instanceof BranchError) {
       sendJson(res, BRANCH_REFUSAL_STATUS[error.reason], { error: error.message, reason: error.reason });
       return;
@@ -421,281 +453,132 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
     return;
   }
 
-  const { conversation, harness } = opened;
-  let settlement: Awaited<ReturnType<typeof settleChat>> | undefined;
-
-  try {
-    // The store's hold above is in memory only. After a restart, a run another
-    // conversation of this store left unfinished is known only to the store,
-    // and `harness.resume()` below would run it beside this turn in the
-    // shared workspace. Refuse until that conversation's own next request
-    // recovers it; this conversation's own unfinished work recovers here.
-    if ((await unfinishedWork(harness, BACKGROUND_CONTEXT, conversation.id)).length > 0) {
-      sendJson(res, 409, {
-        error:
-          "Another branch of this chat has unfinished work from before the assistant restarted. Open that branch and send a message there to let it finish, then try again.",
-        reason: "store_busy",
-      });
-      return;
-    }
-
-    let approval: ApprovalRequest | undefined;
-    if (body.approval) {
-      approval = body.approval.id
-        ? await pendingApproval(conversation, body.approval.id)
-        : undefined;
-      if (!approval) {
-        sendJson(res, 400, {
-          error: "This approval is no longer pending; ask the assistant again.",
-        });
-        return;
-      }
-    }
-
-    // A retried continue recovers the submission it made, before the gate below
-    // reads a state that submission itself has changed.
-    let own: Submission | undefined;
-    // The turn's own submission once its submit returned (undefined if it failed):
-    // the stream tells this turn's own message from any other by it, exactly.
-    let knowOwn!: (submission: Submission | undefined) => void;
-    const ownKnown = new Promise<Submission | undefined>((resolve) => (knowOwn = resolve));
-    if (continuing) {
-      const known = body.request_id
-        ? await submissionByRequest(harness, conversation, body.request_id, BACKGROUND_CONTEXT)
-        : undefined;
-      if (known && known.record.type !== "continue") {
-        sendJson(res, 409, { error: "request_id already names another message" });
-        return;
-      }
-      own = known?.submission;
-      if (!own) {
-        const blocker = await continueBlocker(conversation, BACKGROUND_CONTEXT);
-        if (blocker) {
-          sendJson(res, 409, { error: CONTINUE_REFUSALS[blocker], reason: blocker });
-          return;
-        }
-      }
-    }
-
-    res.writeHead(200, {
-      "Content-Type": "application/x-ndjson",
-      "Cache-Control": "no-cache",
-      "X-Accel-Buffering": "no",
-    });
-    let connected = true;
-    res.on("close", () => {
-      // A dropped browser connection does not cancel durable work. Retrying with
-      // the same request_id recovers the committed answer instead of paying for
-      // a second model turn.
-      connected = false;
-    });
-    const write = (event: NdjsonEvent): void => {
-      if (connected && !res.writableEnded) res.write(encodeLine(event));
-    };
-    const ping = CHAT_PING_MS > 0 ? setInterval(() => write({ type: "ping" }), CHAT_PING_MS) : null;
-
-    // Stream what changes in the conversation view; its first value is history.
-    const events = await conversation.watch(BACKGROUND_CONTEXT);
-    if (own) knowOwn(own);
-    // Where the turn's own message was placed, once its submit returned. Its
-    // placement commits the entry and the submission's `entry` together, so
-    // by the time the stream sees an entry, the record names it if it is ours.
-    const ownEntry = async (): Promise<number | undefined> => {
-      const submission = await ownKnown;
-      const record = await submission?.status(BACKGROUND_CONTEXT);
-      return record?.type === "input" && record.entry !== undefined ? Number(record.entry) : undefined;
-    };
-    const stream = new ViewEventStream(
-      conversation,
-      events.value,
-      (event) => writeAgentEvent(event, write),
-      BACKGROUND_CONTEXT,
-      // A run recovered from a runtime that died with a steer queued places that
-      // steer before this turn's message, which waits for the run. A continue has
-      // no message of its own: a steer streamed during it lands where it shows.
-      continuing
-        ? undefined
-        : async (entryId) => {
-            const at = await ownEntry();
-            return at === undefined || at > entryId;
-          },
-      // Where this turn's own message lands, so what a recovered run streamed
-      // before it closes there. Only the entry its own submission placed: a
-      // plain user message a recovered run places first (an earlier turn's
-      // wrap-up) is not it.
-      continuing ? undefined : async (entryId) => (await ownEntry()) === entryId,
-    );
-    events.start(async (call) => {
-      if (call.kind !== "value") return;
-      await stream.push(call.value).catch((error: unknown) => {
-        console.warn("[agent-runtime] chat stream revision failed:", error);
-      });
-    });
-    try {
-      // Only now, with the conversation watched, may a run recovered from an
-      // earlier request go on: every steer it places is streamed.
-      harness.resume();
-      // Abort also resumes scheduling: expose the conversation only after the
-      // store-wide recovery guard and watch are ready. Earlier stops stay queued.
-      active.opened(conversation);
-      try {
-        if (!own && continuing) {
-          own = await conversation.submit(
-            { type: "continue", ...(body.request_id ? { requestId: body.request_id } : {}) },
-            BACKGROUND_CONTEXT,
-          );
-        } else if (!own) {
-          own = await submitInput(body, conversation, approval, opened.writeTools, write);
-        }
-      } finally {
-        knowOwn(own);
-      }
-      // A stop that came while the input was admitted may have aborted
-      // nothing yet (the run the submit started came after it): apply it now,
-      // before any steer is admitted.
-      if (active.stopRequested) await conversation.abort(BACKGROUND_CONTEXT);
-      // Steers may follow from here: the turn's own input is admitted.
-      active.ready(harness, conversation);
-      // A steer is placed after the current tool round, so the model reads it
-      // before deciding on more tools and answers in the same run.
-      let wrapUp: Promise<Submission | undefined> | undefined;
-      const wrapUpTimer =
-        CHAT_WRAP_UP_MS > 0
-          ? setTimeout(() => {
-              wrapUp = active.steerInternal(WRAP_UP_MESSAGE);
-              // Handled after the turn settles; keep the rejection from going unhandled meanwhile.
-              wrapUp.catch(() => undefined);
-            }, CHAT_WRAP_UP_MS)
-          : null;
-      const timeout =
-        CHAT_TIMEOUT_MS > 0
-          ? setTimeout(() => void conversation.abort(BACKGROUND_CONTEXT), CHAT_TIMEOUT_MS)
-          : null;
-      const ownSubmission = own;
-      settlement = await settleChat(active, harness, ownSubmission, BACKGROUND_CONTEXT, async () => {
-        // The turn answered: a wrap-up still queued would only start another run.
-        await wrapUp
-          ?.then((placed) => placed?.abort(BACKGROUND_CONTEXT))
-          .catch((error: unknown) => console.warn("[agent-runtime] wrap-up steer failed:", error));
-      }).finally(() => {
-        if (wrapUpTimer) clearTimeout(wrapUpTimer);
-        if (timeout) clearTimeout(timeout);
-      });
-      // Stream every commit of the turn, also those the watch had not delivered when it settled.
-      await stream.finish(events);
-      for (const [requestId, record] of settlement.steers) {
-        const outcome = steerOutcomeOf(record);
-        if (outcome.status === "withdrawn") {
-          write({ type: "steer", request_id: requestId, status: "withdrawn", reason: outcome.reason });
-        }
-      }
-      const settled = settlement.final;
-      if (settled.status === "done" && settled.type !== "write") {
-        write({
-          type: "done",
-          text: await answerText(conversation, settled.answer),
-          entry_id: String(settled.answer),
-        });
-      } else if (settled.type === "continue" && settled.reason === "nothing_to_answer") {
-        // Not a failure: the context ended in an answer, so nothing was asked of the model.
-        write({ type: "noop", reason: "nothing_to_answer" });
-      } else {
-        // `detail` carries the provider's error text (HTTP status, vLLM message).
-        const detail = formatSettledDetail(settled.detail);
-        console.error(`[agent-runtime] chat not answered: ${settled.reason}${truncateLog(detail)}`);
-        // A failed compaction says nothing the user can act on in its own words;
-        // its detail stays in the log above.
-        write(
-          isCompactionFailure(settled.reason, settled.detail)
-            ? { type: "error", code: "compaction_failed", message: COMPACTION_FAILED_MESSAGE }
-            : { type: "error", message: `conversation was not answered: ${settled.reason}${detail}` },
-        );
-      }
-    } catch (error) {
-      write({
-        type: "error",
-        message: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      // Whatever ended the turn, no stream revision waits for its submission any more.
-      knowOwn(own);
-      if (ping) clearInterval(ping);
-      await events.stop();
-    }
-  } finally {
-    // Refuse steers still waiting for the turn to be ready, and every later one.
-    active.failed();
-    await active.drain();
-    try {
-      await opened.close();
-    } finally {
-      stores.delete(target.key);
-      // End the stream only once the conversation is free, so a client that
-      // sends its next message as soon as the stream ends is not refused.
-      if (!res.writableEnded) res.end();
-    }
-  }
+  await runChatTurn(
+    {
+      request: body,
+      opened,
+      active,
+      feed,
+      storePath: target.path,
+      release: () => stores.delete(target.key),
+      timing: { wrapUpMs: CHAT_WRAP_UP_MS, timeoutMs: CHAT_TIMEOUT_MS, pingMs: CHAT_PING_MS },
+      expandSkillCommand: (message) => runtime.expandSkillCommand(message),
+    },
+    chatResponse(res, acceptsPresentation(req.headers.accept)),
+  );
 }
 
-/** Submit the turn's message: what the user typed, or the outcome of the write call they decided on. */
-async function submitInput(
-  body: ChatBody,
-  conversation: OpenDurableSession["conversation"],
-  approval: ApprovalRequest | undefined,
-  writeTools: OpenDurableSession["writeTools"],
-  write: (event: NdjsonEvent) => void,
-): Promise<Submission> {
-  const view = await conversation.context(BACKGROUND_CONTEXT);
-  const isNew = !view.entries.some((entry) => UserEntry.is(entry));
-  let message = isNew && body.initial_message ? body.initial_message : (body.message ?? "");
-  if (approval) {
-    // The runtime, not the model, runs the call the user approved, with the
-    // exact arguments the user saw. The model only learns the outcome.
-    if (body.approval?.approve === true) {
-      const id = `${approval.id}:approved`;
-      write({
-        type: "tool_start",
-        name: approval.tool,
-        id,
-        args: approval.args,
+/**
+ * Start a turn's stream: the presentation contract when the request asked for it
+ * (see presentation.ts), else the turn's raw NDJSON events.
+ */
+function writeStreamHead(res: ServerResponse, presentation: boolean): (event: NdjsonEvent) => string {
+  res.writeHead(200, {
+    "Content-Type": presentation ? PRESENTATION_CONTENT_TYPE : "application/x-ndjson",
+    "Cache-Control": "no-cache",
+    "X-Accel-Buffering": "no",
+  });
+  return streamEncoder(presentation, encodeLine);
+}
+
+/** The transport of a chat turn: a JSON refusal, or the turn's stream. */
+function chatResponse(res: ServerResponse, presentation: boolean): TurnResponse {
+  return {
+    refuse: (status, body) => sendJson(res, status, body),
+    stream: (feed) => {
+      const encode = writeStreamHead(res, presentation);
+      let connected = true;
+      const detach = feed.subscribe((event) => {
+        if (connected && !res.writableEnded) res.write(encode(event));
       });
-      try {
-        const result = await writeTools.runApproved(approval);
-        write({
-          type: "tool_end",
-          name: approval.tool,
-          id,
-          isError: false,
-        });
-        message = decisionMessage(approval, { approved: true, result });
-      } catch (error) {
-        write({ type: "tool_end", name: approval.tool, id, isError: true });
-        const reason = error instanceof Error ? error.message : String(error);
-        message = decisionMessage(approval, {
-          approved: true,
-          error: reason,
-        });
-      }
-    } else {
-      message = decisionMessage(approval, { approved: false });
-    }
-  }
-  // Opening figures go with the first turn only; attachments go with every turn.
-  const images = [
-    ...(isNew ? toImageContent(body.initial_images) : []),
-    ...toImageContent(body.images),
-  ];
-  const content = images.length
-    ? [{ type: "text" as const, text: message }, ...images]
-    : message;
-  return conversation.submit(
-    {
-      type: "input",
-      content,
-      ...(body.request_id ? { requestId: body.request_id } : {}),
+      res.on("close", () => {
+        connected = false;
+        detach();
+      });
     },
-    BACKGROUND_CONTEXT,
+    end: () => {
+      if (!res.writableEnded) res.end();
+    },
+  };
+}
+
+/**
+ * Stream a running turn to a request that reattached to it: the turn's events
+ * so far, then its live ones, until it ends. A turn that ends without having
+ * written a terminal event refused its request before streaming (it submitted
+ * nothing); the reattached stream says so.
+ */
+async function attachTurn(res: ServerResponse, feed: TurnFeed, presentation: boolean): Promise<void> {
+  // Its own mapping state: the replay maps the turn from its start, as the original stream did.
+  const encode = writeStreamHead(res, presentation);
+  let connected = true;
+  const detach = feed.subscribe((event) => {
+    if (connected && !res.writableEnded) res.write(encode(event));
+  });
+  res.on("close", () => {
+    connected = false;
+    detach();
+  });
+  await feed.closed;
+  if (!feed.terminal && connected && !res.writableEnded) {
+    res.write(
+      encode({
+        type: "error",
+        code: "turn_not_started",
+        message: "The message was refused before the assistant started on it; send it again.",
+      }),
+    );
+  }
+  if (!res.writableEnded) res.end();
+}
+
+/**
+ * Which turn, if any, runs exactly this chat now: read-only, from memory, so
+ * another window of the same user's chat can follow it by reattaching with the
+ * turn's request ID (which submits nothing). It opens no store and starts
+ * nothing. It names the turn only to its own user (`owner_id`, set by the API
+ * from the signed-in user) in the project the turn was sent from; for another
+ * project it says only that a turn runs. A turn that already wrote its last
+ * event is not reported: its end is being saved. The turn's start (`turn_start`)
+ * lets that window place it only over a saved transcript that holds the start.
+ */
+async function handleActiveChat(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = await readJsonBody<StoreFields & { owner_id?: string; conversation_id?: string }>(
+    req,
+    MAX_BODY_BYTES,
   );
+  if (!body.owner_id || !body.conversation_id) {
+    sendJson(res, 400, { error: "owner_id and conversation_id are required" });
+    return;
+  }
+  let auth;
+  try {
+    auth = requestQDashAuth(req.headers);
+  } catch {
+    sendJson(res, 401, { error: "QDash user authentication is required" });
+    return;
+  }
+  const target = requestTarget(body.owner_id, body.conversation_id, body);
+  if (!target) {
+    sendJson(res, 400, { error: "store_conversation_id is not a conversation ID" });
+    return;
+  }
+  const hold = stores.get(target.key);
+  if (hold?.kind !== "chat" || !hold.active.runs(target.chat) || !hold.active.turnRequestId || hold.feed.terminal) {
+    sendJson(res, 200, { running: false });
+    return;
+  }
+  if (hold.active.projectId !== auth.projectId) {
+    sendJson(res, 200, { running: true, other_project: true });
+    return;
+  }
+  sendJson(res, 200, {
+    running: true,
+    request_id: hold.active.turnRequestId,
+    continuing: hold.continuing,
+    started_at: hold.startedAt,
+    turn_start: hold.turnStart,
+  });
 }
 
 interface SteerRequest {
@@ -868,6 +751,10 @@ async function handleAbortChat(req: IncomingMessage, res: ServerResponse): Promi
   // From the moment the turn holds the store, also before its input is
   // admitted: the turn applies the stop once it is (see ActiveChat.stop).
   const active = activeFor(target);
+  if (active && body.turn_request_id && active.turnRequestId !== body.turn_request_id) {
+    sendJson(res, 404, { error: "the named turn is not running" });
+    return;
+  }
   if (active) {
     await active.stop(BACKGROUND_CONTEXT);
     sendJson(res, 200, { aborted: true });
@@ -1102,100 +989,85 @@ function authorized(req: IncomingMessage): boolean {
   return hasBearerToken(req.headers.authorization, RUNTIME_TOKEN);
 }
 
+/** Report liveness and load: running chat turns and planner-less evaluations. */
+function sendHealth(res: ServerResponse): void {
+  sendJson(res, 200, {
+    status: "ok",
+    running: [...stores.values()].filter((hold) => hold.kind === "chat").length,
+    evaluating,
+  });
+}
+
+/** The system prompt a chat would start with, for the user's own instructions. */
+function handleSystemPrompt(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  return readJsonBody<{ user_instructions?: unknown }>(req, MAX_BODY_BYTES).then((body) =>
+    sendJson(
+      res,
+      200,
+      runtime.chatSystemPrompt(typeof body.user_instructions === "string" ? body.user_instructions : undefined),
+    ),
+  );
+}
+
+function handleSkills(res: ServerResponse): void {
+  sendJson(res, 200, { skills: runtime.chatSkills() });
+}
+
+function handleChatModels(res: ServerResponse): Promise<void> {
+  return runtime.chatModels().then((chatModels) => sendJson(res, 200, { chat_models: chatModels }));
+}
+
+/**
+ * A route that requires the runtime bearer secret, matched on the method and the
+ * exact URL (a query string does not match). A promise `handle` returns is
+ * caught by handleRouteError and logged under `label`; an error `handle` throws
+ * synchronously is not caught and escapes the request listener.
+ */
+interface ProtectedRoute {
+  method: "GET" | "POST" | "DELETE";
+  url: string;
+  label: string;
+  handle: (req: IncomingMessage, res: ServerResponse) => Promise<void> | void;
+}
+
+const PROTECTED_ROUTES: readonly ProtectedRoute[] = [
+  { method: "POST", url: "/evaluate", label: "evaluate", handle: handleEvaluate },
+  { method: "POST", url: "/evaluation-prompts", label: "evaluation-prompts", handle: handleEvaluationPrompts },
+  { method: "POST", url: "/chat", label: "request", handle: handleChat },
+  { method: "POST", url: "/system-prompt", label: "system prompt", handle: handleSystemPrompt },
+  { method: "GET", url: "/skills", label: "skills", handle: (_req, res) => handleSkills(res) },
+  { method: "GET", url: "/chat-models", label: "chat models", handle: (_req, res) => handleChatModels(res) },
+  { method: "POST", url: "/chat/active", label: "active turn", handle: handleActiveChat },
+  { method: "POST", url: "/chat/steer/status", label: "steer status", handle: handleSteerStatus },
+  { method: "POST", url: "/chat/steer", label: "steer", handle: handleSteer },
+  { method: "POST", url: "/chat/abort", label: "abort", handle: handleAbortChat },
+  { method: "POST", url: "/chat/branch", label: "branch", handle: handleBranch },
+  { method: "DELETE", url: "/session", label: "session delete", handle: handleDeleteSession },
+];
+
+/** The protected route a request names, if any. */
+function protectedRouteFor(req: IncomingMessage): ProtectedRoute | undefined {
+  return PROTECTED_ROUTES.find((route) => route.method === req.method && route.url === req.url);
+}
+
+// Health is the only route open without the runtime bearer. Every other route is
+// refused before its body is read when the bearer is missing or wrong.
 const server = createServer((req, res) => {
   if (req.method === "GET" && req.url === "/health") {
-    sendJson(res, 200, {
-      status: "ok",
-      running: [...stores.values()].filter((hold) => hold.kind === "chat").length,
-      evaluating,
-    });
+    sendHealth(res);
     return;
   }
-  if (req.method === "POST" && req.url === "/evaluate") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleEvaluate(req, res).catch((error: unknown) => handleRouteError(res, error, "evaluate"));
+  const route = protectedRouteFor(req);
+  if (!route) {
+    res.writeHead(404).end();
     return;
   }
-  if (req.method === "POST" && req.url === "/evaluation-prompts") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleEvaluationPrompts(req, res).catch((error: unknown) => handleRouteError(res, error, "evaluation-prompts"));
+  if (!authorized(req)) {
+    sendJson(res, 401, { error: "unauthorized" });
     return;
   }
-  if (req.method === "POST" && req.url === "/chat") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleChat(req, res).catch((error: unknown) => handleRouteError(res, error, "request"));
-    return;
-  }
-  if (req.method === "POST" && req.url === "/system-prompt") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    readJsonBody<{ user_instructions?: unknown }>(req, MAX_BODY_BYTES)
-      .then((body) =>
-        sendJson(
-          res,
-          200,
-          runtime.chatSystemPrompt(
-            typeof body.user_instructions === "string" ? body.user_instructions : undefined,
-          ),
-        ),
-      )
-      .catch((error: unknown) => handleRouteError(res, error, "system prompt"));
-    return;
-  }
-  if (req.method === "POST" && req.url === "/chat/steer/status") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleSteerStatus(req, res).catch((error: unknown) => handleRouteError(res, error, "steer status"));
-    return;
-  }
-  if (req.method === "POST" && req.url === "/chat/steer") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleSteer(req, res).catch((error: unknown) => handleRouteError(res, error, "steer"));
-    return;
-  }
-  if (req.method === "POST" && req.url === "/chat/abort") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleAbortChat(req, res).catch((error: unknown) => handleRouteError(res, error, "abort"));
-    return;
-  }
-  if (req.method === "POST" && req.url === "/chat/branch") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleBranch(req, res).catch((error: unknown) => handleRouteError(res, error, "branch"));
-    return;
-  }
-  if (req.method === "DELETE" && req.url === "/session") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleDeleteSession(req, res).catch((error: unknown) =>
-      handleRouteError(res, error, "session delete"),
-    );
-    return;
-  }
-  res.writeHead(404).end();
+  const pending = route.handle(req, res);
+  if (pending) pending.catch((error: unknown) => handleRouteError(res, error, route.label));
 });
 
 /** Map route failures without exposing internal exception details. */

@@ -1,8 +1,9 @@
 """Tests for TaskExecutor."""
 
-from typing import Any
-from unittest.mock import MagicMock
+from typing import Any, cast
+from unittest.mock import ANY, MagicMock
 
+import plotly.graph_objects as go
 import pytest
 
 from qdash.datamodel.task import (
@@ -846,49 +847,6 @@ class TestCouplingTask:
         assert result["success"] is True
 
 
-class TestReconstructParam:
-    """Test TaskExecutor._reconstruct_param static method."""
-
-    def test_reconstruct_from_dict(self) -> None:
-        """Test reconstructing a ParameterModel from a dict."""
-        result = TaskExecutor._reconstruct_param(
-            ParameterModel, "freq", {"value": 5.0, "unit": "GHz"}
-        )
-        assert result is not None
-        assert result.value == 5.0
-        assert result.unit == "GHz"
-
-    def test_reconstruct_from_scalar(self) -> None:
-        """Test reconstructing a ParameterModel from a scalar value."""
-        result = TaskExecutor._reconstruct_param(ParameterModel, "freq", 5.0)
-        assert result is not None
-        assert result.value == 5.0
-
-    def test_reconstruct_run_parameter_from_dict(self) -> None:
-        """Test reconstructing a RunParameterModel from a dict."""
-        result = TaskExecutor._reconstruct_param(
-            RunParameterModel, "shots", {"value": 1024, "value_type": "int"}
-        )
-        assert result is not None
-        assert result.value == 1024
-
-    def test_reconstruct_returns_none_on_invalid_data(self) -> None:
-        """Test that invalid data returns None instead of raising."""
-        result = TaskExecutor._reconstruct_param(
-            ParameterModel, "bad", {"invalid_field_only": True}
-        )
-        # ParameterModel requires 'value', so this should log error and return None
-        # or succeed depending on model validation - either way it shouldn't raise
-        # The method catches TypeError and ValueError
-        assert result is None or isinstance(result, ParameterModel)
-
-    def test_reconstruct_returns_none_on_type_error(self) -> None:
-        """Test that TypeError returns None."""
-        # Passing something that can't be unpacked as kwargs
-        result = TaskExecutor._reconstruct_param(ParameterModel, "bad", [1, 2, 3])
-        assert result is None
-
-
 class TestSnapshotOverrides:
     """Test TaskExecutor snapshot override integration."""
 
@@ -1198,6 +1156,140 @@ class TestSnapshotOverrides:
         mock_state_manager.put_input_parameters.assert_not_called()
         mock_state_manager.put_run_parameters.assert_not_called()
 
+    def test_snapshot_run_parameters_are_not_seeded_without_run_overrides(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        """Declared run defaults are seeded only when explicit run overrides exist."""
+        mock_snapshot_loader.get_snapshot.return_value = (
+            {},
+            {"shots": {"value": 512, "value_type": "int"}},
+        )
+        task = MockTask()
+        task.run_parameters = {
+            "shots": RunParameterModel(value=1024, value_type="int"),
+            "interval": RunParameterModel(value=8, value_type="int"),
+        }
+
+        executor_with_snapshot._apply_snapshot_overrides(task, "Task", "qubit", "0")
+
+        assert set(task.run_parameters) == {"shots"}
+        assert task.run_parameters["shots"].value == 512
+        recorded_run = mock_state_manager.put_run_parameters.call_args[0][1]
+        assert set(recorded_run) == {"shots"}
+        mock_state_manager.put_input_parameters.assert_not_called()
+
+    def test_explicit_input_override_takes_precedence_over_alias_value(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+    ) -> None:
+        """An override on the declared name wins and the legacy alias is dropped."""
+
+        class AliasedTask(MockTask):
+            input_spec = {
+                "control_drag_pi_duration": InputParameterSpec.required_database(
+                    parameter_name="drag_pi_duration",
+                    parameter_aliases=("drag_pi_length",),
+                    qid_role="control",
+                )
+            }
+
+        mock_snapshot_loader.has_snapshot_source = True
+        mock_snapshot_loader.get_snapshot.return_value = (
+            {"control_drag_pi_length": {"value": 32, "unit": "ns"}},
+            {},
+        )
+        task = AliasedTask()
+        task.input_overrides = {"control_drag_pi_duration": 40}
+
+        executor_with_snapshot._apply_snapshot_overrides(task, "Task", "coupling", "0-1")
+
+        assert set(task.input_parameters) == {"control_drag_pi_duration"}
+        assert task.input_parameters["control_drag_pi_duration"].value == 40
+        assert task.input_parameters_from_snapshot is True
+
+    def test_optional_snapshot_with_missing_inputs_is_applied_without_snapshot_flag(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+    ) -> None:
+        """Only a required snapshot is checked against the declared inputs."""
+
+        class ExpandedTask(MockTask):
+            input_spec = {
+                "existing": InputParameterSpec.required_database(),
+                "new_dependency": InputParameterSpec.required_database(),
+            }
+
+        mock_snapshot_loader.get_snapshot.return_value = ({"existing": {"value": 1.0}}, {})
+        task = ExpandedTask()
+
+        executor_with_snapshot._apply_snapshot_overrides(task, "ExpandedTask", "qubit", "0")
+
+        assert set(task.input_parameters) == {"existing"}
+        assert task.input_parameters_from_snapshot is False
+
+    def test_run_only_optional_snapshot_keeps_fresh_input_declarations(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        class TaskWithOptionalInput(MockTask):
+            input_spec = {
+                "required": InputParameterSpec.required_database(),
+                "optional": InputParameterSpec.database_optional(),
+            }
+
+        task = TaskWithOptionalInput()
+        initial_inputs = {
+            name: declaration.create_model() for name, declaration in task.input_spec.items()
+        }
+        task.input_parameters = initial_inputs
+        mock_snapshot_loader.get_snapshot.return_value = ({}, {"shots": {"value": 512}})
+
+        executor_with_snapshot._apply_snapshot_overrides(task, task.name, "qubit", "0")
+
+        assert task.input_parameters is initial_inputs
+        assert task.run_parameters["shots"].value == 512
+        mock_state_manager.put_input_parameters.assert_not_called()
+
+    def test_incompatible_snapshot_lists_missing_inputs_before_state_changes(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        class ExpandedTask(MockTask):
+            input_spec = {
+                "existing": InputParameterSpec.required_database(),
+                "z_dependency": InputParameterSpec.required_database(),
+                "a_dependency": InputParameterSpec.required_database(),
+            }
+
+        mock_snapshot_loader.has_snapshot_source = True
+        mock_snapshot_loader.get_snapshot.return_value = (
+            {"existing": {"value": 1.0}},
+            {"shots": {"value": 512}},
+        )
+        task = ExpandedTask()
+
+        with pytest.raises(ValueError) as exc_info:
+            executor_with_snapshot._apply_snapshot_overrides(task, "ExpandedTask", "qubit", "0")
+
+        assert str(exc_info.value) == (
+            "Snapshot inputs for task 'ExpandedTask' and qid '0' are incompatible "
+            "with the current task definition; run a fresh calibration instead. "
+            "Missing inputs: a_dependency, z_dependency"
+        )
+        assert task.input_parameters == {}
+        assert task.input_parameters_from_snapshot is False
+        mock_state_manager.put_input_parameters.assert_not_called()
+        mock_state_manager.put_run_parameters.assert_not_called()
+
     def test_apply_snapshot_overrides_filters_invalid_params(
         self,
         executor_with_snapshot: TaskExecutor,
@@ -1303,40 +1395,152 @@ class TestSnapshotOverrides:
         assert results["4"].r2 == {"4": 0.87}
 
 
-class TestMergeOverrides:
-    """Test TaskExecutor._merge_overrides static method."""
+class TestPostprocessResultParity:
+    """Single-qid and batch execution apply one postprocess result policy."""
 
-    def test_empty_overrides_returns_snapshot(self) -> None:
-        snapshot: dict[str, Any] = {"a": 1, "b": 2}
-        result = TaskExecutor._merge_overrides(snapshot, {})
-        assert result == snapshot
+    @pytest.fixture
+    def state_manager(self) -> MagicMock:
+        state_manager = MagicMock()
+        state_manager.get_task.return_value = QubitTaskModel(
+            name="CheckRabi", qid="0", task_id="task-001", status=TaskStatusModel.RUNNING
+        )
+        return state_manager
 
-    def test_override_replaces_simple_value(self) -> None:
-        snapshot: dict[str, Any] = {"a": 1, "b": 2}
-        result = TaskExecutor._merge_overrides(snapshot, {"a": 10})
-        assert result == {"a": 10, "b": 2}
-
-    def test_override_replaces_value_key_in_dict(self) -> None:
-        """When snapshot has {"value": ...}, override replaces only the value."""
-        snapshot: dict[str, Any] = {
-            "freq": {"value": 5.0, "unit": "GHz", "description": "Frequency"},
+    @pytest.fixture
+    def result_processor(self) -> MagicMock:
+        processor = MagicMock()
+        processor.process_output_parameters.return_value = {
+            "qubit_frequency": ParameterModel(value=5.0)
         }
-        result = TaskExecutor._merge_overrides(snapshot, {"freq": 6.0})
-        assert result["freq"] == {"value": 6.0, "unit": "GHz", "description": "Frequency"}
+        return processor
 
-    def test_override_replaces_entire_entry_without_value_key(self) -> None:
-        """When snapshot dict lacks 'value' key, override replaces entirely."""
-        snapshot: dict[str, Any] = {"config": {"mode": "fast", "retries": 3}}
-        result = TaskExecutor._merge_overrides(snapshot, {"config": "simple"})
-        assert result["config"] == "simple"
+    @pytest.fixture
+    def executor(self, state_manager: MagicMock, result_processor: MagicMock) -> TaskExecutor:
+        saver = MagicMock()
+        saver.save_figures.return_value = ([], [])
+        saver.save_raw_data.return_value = []
+        executor = TaskExecutor(
+            state_manager=state_manager,
+            calib_dir="/tmp/calib",
+            execution_id="exec-001",
+            task_manager_id="tm-001",
+            result_processor=result_processor,
+            data_saver=saver,
+        )
+        executor.history_recorder = MagicMock()
+        executor._backend_saver = MagicMock()
+        return executor
 
-    def test_override_adds_new_key(self) -> None:
-        snapshot: dict[str, Any] = {"a": 1}
-        result = TaskExecutor._merge_overrides(snapshot, {"b": 2})
-        assert result == {"a": 1, "b": 2}
+    @staticmethod
+    def _execution_service() -> MagicMock:
+        service = MagicMock(project_id="proj-1", chip_id="chip-1")
+        service.merge_calib_data.return_value = service
+        return service
 
-    def test_does_not_mutate_original(self) -> None:
-        snapshot: dict[str, Any] = {"a": {"value": 1, "unit": "V"}}
-        original_snapshot: dict[str, Any] = {"a": {"value": 1, "unit": "V"}}
-        TaskExecutor._merge_overrides(snapshot, {"a": 2})
-        assert snapshot == original_snapshot
+    @staticmethod
+    def _run(
+        executor: TaskExecutor, task: MockTask, mode: str, service: MagicMock
+    ) -> tuple[bool, str]:
+        session: Any = MockSession()
+        if mode == "single":
+            try:
+                _, result = executor.execute(task, session, "0", service)
+            except ValueError as e:
+                return False, str(e)
+            return result.success, result.message
+        _, results = executor.execute_batch(task, session, ["0"], service)
+        return results["0"].success, results["0"].message
+
+    @staticmethod
+    def _task(run_result: RunResult, postprocess_result: PostProcessResult) -> MockTask:
+        task = MockTask()
+        task.run = MagicMock(return_value=run_result)  # type: ignore[method-assign]
+        task.batch_run = MagicMock(return_value=run_result)  # type: ignore[method-assign]
+        task.postprocess = MagicMock(return_value=postprocess_result)  # type: ignore[method-assign]
+        return task
+
+    @pytest.mark.parametrize("mode", ["single", "batch"])
+    def test_r2_failure_clears_outputs_and_saves_backend_as_failed(
+        self,
+        executor: TaskExecutor,
+        state_manager: MagicMock,
+        result_processor: MagicMock,
+        mode: str,
+    ) -> None:
+        result_processor.validate_r2.side_effect = R2ValidationError("low")
+        task = self._task(
+            RunResult(raw_result={}, r2={"0": 0.2}),
+            PostProcessResult(
+                output_parameters={"qubit_frequency": OutputParameterModel(value=5.0)}
+            ),
+        )
+        service = self._execution_service()
+
+        success, message = self._run(executor, task, mode, service)
+
+        assert success is False
+        assert message == "CheckRabi R² value too low: 0.2000 (threshold = 0.7)"
+        state_manager.put_output_parameters.assert_called_once()
+        state_manager.clear_output_parameters.assert_called_with("CheckRabi", "qubit", "0")
+        executor._backend_saver.save.assert_called_once_with(  # type: ignore[attr-defined]
+            task, service, "0", ANY, False
+        )
+
+    @pytest.mark.parametrize("mode", ["single", "batch"])
+    def test_validation_error_saves_artifacts_then_fails(
+        self, executor: TaskExecutor, state_manager: MagicMock, mode: str
+    ) -> None:
+        task = self._task(
+            RunResult(raw_result={}),
+            PostProcessResult(
+                output_parameters={"qubit_frequency": OutputParameterModel(value=5.0)},
+                figures=[go.Figure()],
+                validation_error="out of range",
+            ),
+        )
+        service = self._execution_service()
+
+        success, message = self._run(executor, task, mode, service)
+
+        assert (success, message) == (False, "out of range")
+        executor.data_saver.save_figures.assert_called_once()  # type: ignore[attr-defined]
+        state_manager.clear_output_parameters.assert_called_once_with("CheckRabi", "qubit", "0")
+        backend_save = cast("MagicMock", executor._backend_saver.save)
+        backend_save.assert_called_once()
+        assert backend_save.call_args.args[-1] is False
+
+    @pytest.mark.parametrize("mode", ["single", "batch"])
+    def test_missing_r2_saves_backend_as_failed_without_raising(
+        self, executor: TaskExecutor, state_manager: MagicMock, mode: str
+    ) -> None:
+        task = self._task(
+            RunResult(raw_result={}, r2={"4": 0.99}),
+            PostProcessResult(
+                output_parameters={"qubit_frequency": OutputParameterModel(value=5.0)}
+            ),
+        )
+        service = self._execution_service()
+
+        success, _ = self._run(executor, task, mode, service)
+
+        assert success is True
+        state_manager.clear_output_parameters.assert_called_once_with("CheckRabi", "qubit", "0")
+        backend_save = cast("MagicMock", executor._backend_saver.save)
+        assert backend_save.call_args.args[-1] is False
+
+    @pytest.mark.parametrize("mode", ["single", "batch"])
+    def test_start_is_recorded_with_source_task_id(self, executor: TaskExecutor, mode: str) -> None:
+        executor._source_task_id = "parent-task"
+        task = self._task(
+            RunResult(raw_result={}),
+            PostProcessResult(output_parameters={}),
+        )
+        task.run_parameters = {"shots": RunParameterModel(value=1024)}
+
+        success, _ = self._run(executor, task, mode, self._execution_service())
+
+        assert success is True
+        executor.state_manager.put_run_parameters.assert_called_once()  # type: ignore[attr-defined]
+        executor.history_recorder.set_source_task_id.assert_called_once_with(  # type: ignore[attr-defined]
+            project_id="proj-1", task_id="task-001", source_task_id="parent-task"
+        )

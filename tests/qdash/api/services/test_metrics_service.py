@@ -35,6 +35,73 @@ def test_coupling_strength_is_extracted_with_mhz_display_config():
     assert metadata.evaluation.mode == "none"
 
 
+def test_readout_amplitude_is_an_overview_qubit_metric_in_arbitrary_units():
+    metadata = load_metrics_config().qubit_metrics["readout_amplitude"]
+
+    assert metadata.title == "Readout Amplitude"
+    # Matches the a.u. unit of the readout_amplitude task outputs; no display scaling.
+    assert metadata.unit == "a.u."
+    assert metadata.scale == 1
+    # Amplitude has no better direction, so "best" selection must not rank it.
+    assert metadata.evaluation.mode == "none"
+
+
+def test_readout_amplitude_is_extracted_keeping_zero_and_omitting_missing_qubits():
+    repository = MagicMock()
+    repository.aggregate_latest_metrics.return_value = {
+        "readout_amplitude": {
+            "0": {"value": 0.12, "task_id": "task-0", "execution_id": "exec-1"},
+            "1": {"value": 0.0, "task_id": "task-1", "execution_id": "exec-1"},
+        }
+    }
+    service = MetricsService(repository, MagicMock())
+
+    metrics = service.extract_entity_metrics("chip-1", "project-1", "qubit")
+
+    assert (
+        "readout_amplitude" in repository.aggregate_latest_metrics.call_args.kwargs["metric_keys"]
+    )
+    values = metrics["readout_amplitude"]
+    assert values["0"].value == pytest.approx(0.12)
+    assert values["0"].task_id == "task-0"
+    assert values["1"].value == 0.0
+    assert "2" not in values
+
+
+def test_readout_amplitude_is_skipped_by_best_selection():
+    repository = MagicMock()
+    repository.aggregate_best_metrics.return_value = {}
+    service = MetricsService(repository, MagicMock())
+
+    metrics = service.extract_entity_metrics("chip-1", "project-1", "qubit", selection_mode="best")
+
+    metric_modes = repository.aggregate_best_metrics.call_args.kwargs["metric_modes"]
+    assert "readout_amplitude" not in metric_modes
+    assert metrics["readout_amplitude"] == {}
+
+
+def test_latest_fh_metrics_preserve_values_and_reported_stddev():
+    repository = MagicMock()
+    values = {
+        "fh_frequency": 4.516,
+        "charging_energy": 0.24,
+        "josephson_energy_first_harmonic": 15.0,
+        "josephson_energy_second_harmonic": -0.15,
+    }
+    repository.aggregate_latest_metrics.return_value = {
+        name: {"0": {"value": value, "task_id": "task-1", "execution_id": "exec-1", "stddev": 0.0}}
+        for name, value in values.items()
+    }
+    service = MetricsService(repository, MagicMock())
+
+    latest = service.extract_entity_metrics("chip-1", "project-1", "qubit")
+
+    assert values.keys() <= repository.aggregate_latest_metrics.call_args.kwargs["metric_keys"]
+    for name, value in values.items():
+        assert latest[name]["0"].value == value
+        assert latest[name]["0"].stddev == 0.0
+
+
 class TestParseDateRange:
     """Tests for _parse_date_range absolute date-range parsing."""
 

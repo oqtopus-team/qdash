@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import json
 import logging
 import os
 import re
@@ -25,6 +26,7 @@ from bunnet import SortDirection
 from fastapi import HTTPException, status
 from pymongo.errors import DuplicateKeyError
 
+from qdash.agent.config import load_agent_config
 from qdash.api.schemas.evaluation import (
     EvaluationItem,
     EvaluationRunDetailResponse,
@@ -36,7 +38,6 @@ from qdash.api.services.pi_evaluation_service import (
     evaluate_task_result,
 )
 from qdash.common.utils.datetime import end_of_day, ensure_timezone, now, parse_date, start_of_day
-from qdash.copilot.config import load_copilot_config
 from qdash.datamodel.evaluation import (
     EvaluationCallModel,
     EvaluationExampleModel,
@@ -48,6 +49,7 @@ from qdash.datamodel.evaluation import (
     EvaluationVerdictModel,
     EvaluatorModel,
 )
+from qdash.dbmodel.agent_chat_turn import AgentChatTurnDocument
 from qdash.dbmodel.evaluation import EvaluationDocument
 from qdash.dbmodel.evaluation_asset import EvaluationAssetDocument
 from qdash.dbmodel.evaluation_run import EvaluationRunDocument
@@ -82,7 +84,7 @@ MODES = frozenset({"direct", "planner"})
 
 def planner_model_config() -> tuple[dict[str, str], str | None]:
     """The chat planner the UI would use, as the runtime wants it, with its thinking level."""
-    config = load_copilot_config()
+    config = load_agent_config()
     model = config.chat_models[0] if config.chat_models else config.model
     return (
         {"provider": model.provider, "name": model.name},
@@ -92,7 +94,7 @@ def planner_model_config() -> tuple[dict[str, str], str | None]:
 
 def evaluation_model_config(requested: dict[str, str] | None) -> dict[str, str] | None:
     """Resolve a requested evaluator against the configured evaluation model list."""
-    candidates = load_copilot_config().evaluation_models
+    candidates = load_agent_config().evaluation_models
     if not candidates:
         if requested is not None:
             raise HTTPException(
@@ -300,9 +302,9 @@ def _context_window(model: Any) -> int | None:
     if not isinstance(model, str) or not model:
         return None
     try:
-        config = load_copilot_config()
+        config = load_agent_config()
     except Exception:
-        logger.warning("copilot config unavailable; context window of %s unknown", model)
+        logger.warning("agent config unavailable; context window of %s unknown", model)
         return None
     for candidate in [*config.evaluation_models, *config.chat_models, config.model]:
         if f"{candidate.provider}/{candidate.name}" == model:
@@ -809,12 +811,15 @@ class EvaluationService:
         session_id: str | None,
         planner_model: str,
         task_id: str | None = None,
+        request_id: str | None = None,
     ) -> ChatEvaluationRecorder:
         """A recorder for the evaluations one chat turn's planner makes.
 
         `task_id` is the task result a task chat is about: the figures it opens
         with are that result's, so a judgement of them without a tool-fetched
-        provenance is filed under it.
+        provenance is filed under it. `request_id` names the turn: with it and
+        `session_id`, each evaluation is stored once however many streams of the
+        turn (the original and any reattach) report it.
         """
         return ChatEvaluationRecorder(
             self,
@@ -823,7 +828,108 @@ class EvaluationService:
             session_id=session_id,
             planner_model=planner_model,
             task_id=task_id,
+            request_id=request_id,
         )
+
+    def chat_turn_recorder(
+        self,
+        *,
+        project_id: str,
+        username: str,
+        session_id: str | None,
+        request_id: str | None,
+        planner_model: str,
+        task_id: str | None,
+        reattach: bool,
+    ) -> ChatEvaluationRecorder | None:
+        """The recorder for one chat turn, filed under what the turn was admitted with.
+
+        The turn's first request (not a reattach) stores its project, planner model
+        and task once (`AgentChatTurnDocument`); a later request of the same turn,
+        a retry or a reattach, reads that record and never what it says itself, so
+        a call first reported by a replay is filed exactly as the original stream
+        would have filed it. A reattach whose turn has no record (it was admitted
+        before records were kept, or its record could not be written) records
+        nothing: its provenance is not known. Raises `ChatTurnRefusedError` when the
+        turn was admitted in another project than `project_id`.
+        """
+        if not session_id or not request_id:
+            if reattach:
+                return None
+            # Without a turn identity a call cannot be named again; it is filed once, as streamed.
+            return self.chat_recorder(
+                project_id=project_id,
+                username=username,
+                session_id=session_id,
+                planner_model=planner_model,
+                task_id=task_id,
+            )
+        if reattach:
+            turn = AgentChatTurnDocument.find_one(
+                AgentChatTurnDocument.username == username,
+                AgentChatTurnDocument.session_id == session_id,
+                AgentChatTurnDocument.request_id == request_id,
+            ).run()
+            if turn is None:
+                logger.warning(
+                    "no admission record for chat turn %s of session %s; its evaluations "
+                    "are not recorded from the reattach",
+                    request_id,
+                    session_id,
+                )
+                return None
+        else:
+            turn = self._admit_chat_turn(
+                project_id=project_id,
+                username=username,
+                session_id=session_id,
+                request_id=request_id,
+                planner_model=planner_model,
+                task_id=task_id,
+            )
+        if turn.project_id != project_id:
+            raise ChatTurnRefusedError
+        return ChatEvaluationRecorder(
+            self,
+            project_id=turn.project_id,
+            username=turn.username,
+            session_id=turn.session_id,
+            planner_model=turn.planner_model,
+            task_id=turn.task_id,
+            request_id=turn.request_id,
+        )
+
+    def _admit_chat_turn(
+        self,
+        *,
+        project_id: str,
+        username: str,
+        session_id: str,
+        request_id: str,
+        planner_model: str,
+        task_id: str | None,
+    ) -> AgentChatTurnDocument:
+        """Store what the turn is admitted with, or read what its first request stored."""
+        turn = AgentChatTurnDocument(
+            username=username,
+            session_id=session_id,
+            request_id=request_id,
+            project_id=project_id,
+            planner_model=planner_model,
+            task_id=task_id,
+        )
+        try:
+            turn.insert()
+        except DuplicateKeyError:
+            stored = AgentChatTurnDocument.find_one(
+                AgentChatTurnDocument.username == username,
+                AgentChatTurnDocument.session_id == session_id,
+                AgentChatTurnDocument.request_id == request_id,
+            ).run()
+            if stored is None:
+                raise
+            return stored
+        return turn
 
     def record_chat_evaluation(
         self,
@@ -832,16 +938,32 @@ class EvaluationService:
         username: str,
         planner_model: str,
         record: dict[str, Any],
+        call_key: ChatCallKey | None = None,
     ) -> tuple[str, str] | None:
         """Store one `qcal_evaluate` call the chat planner made, as a run of one.
 
         The figures a chat judges come from a tool that fetched them for a task
         result; its id rides on the record. A judgement of a figure with no
         known task result (a user attachment) is not recorded.
+
+        With `call_key`, the run and evaluation IDs are derived from it, so
+        storing the same call again (a reattached stream replaying the turn, a
+        concurrent stream of it, or a retry after a partial write) returns the
+        stored IDs and changes nothing; a write that stopped between the run
+        and the evaluation is completed. Raises when the call could not be stored.
         """
         task_id = record.get("task_id")
         if not isinstance(task_id, str) or not task_id:
             return None
+        if call_key is not None:
+            run_id, evaluation_id = call_key.ids(project_id, username)
+            stored = EvaluationDocument.find_one(
+                EvaluationDocument.evaluation_id == evaluation_id
+            ).run()
+            if stored is not None:
+                return _same_chat_call(stored, project_id, run_id)
+        else:
+            run_id, evaluation_id = f"evr_{uuid.uuid4().hex}", f"ev_{uuid.uuid4().hex}"
         docs = self._task_result_repo.find({"project_id": project_id, "task_id": task_id}, limit=1)
         if not docs:
             return None
@@ -851,7 +973,7 @@ class EvaluationService:
         self._store_assets(project_id, record)
         requested = now()
         run = EvaluationRunDocument(
-            run_id=f"evr_{uuid.uuid4().hex}",
+            run_id=run_id,
             project_id=project_id,
             chip_id=doc.chip_id,
             task_name=doc.name,
@@ -869,7 +991,7 @@ class EvaluationService:
             evaluator=evaluator,
         )
         evaluation = EvaluationDocument(
-            evaluation_id=f"ev_{uuid.uuid4().hex}",
+            evaluation_id=evaluation_id,
             run_id=run.run_id,
             project_id=project_id,
             chip_id=doc.chip_id,
@@ -891,16 +1013,46 @@ class EvaluationService:
             evaluator=evaluator,
             planner=EvaluationPlannerModel(model=planner_model),
         )
-        run.insert()
-        evaluation.insert()
-        return run.run_id, evaluation.evaluation_id
+        if call_key is None:
+            run.insert()
+            evaluation.insert()
+            return run.run_id, evaluation.evaluation_id
+        # Another stream of the turn may store the same call at the same time:
+        # the unique IDs let exactly one write win, and the first write is kept.
+        try:
+            run.insert()
+        except DuplicateKeyError:
+            existing_run = EvaluationRunDocument.find_one(
+                EvaluationRunDocument.run_id == run_id
+            ).run()
+            if existing_run is None or existing_run.project_id != project_id:
+                raise
+        try:
+            evaluation.insert()
+        except DuplicateKeyError:
+            stored = EvaluationDocument.find_one(
+                EvaluationDocument.evaluation_id == evaluation_id
+            ).run()
+            if stored is None:
+                raise
+            return _same_chat_call(stored, project_id, run_id)
+        return run_id, evaluation_id
 
-    def attach_chat_answer(self, evaluation_ids: list[str], answer: str) -> None:
-        """Keep the planner's final answer with the evaluations it made in the turn."""
+    def attach_chat_answer(
+        self, evaluation_ids: list[str], answer: str, *, project_id: str | None = None
+    ) -> None:
+        """Keep the planner's final answer with the evaluations it made in the turn.
+
+        Setting the same answer again, as a reattached stream of the turn does, changes
+        nothing. With `project_id`, evaluations of other projects are left alone.
+        """
         if not evaluation_ids or not answer:
             return
-        for doc in EvaluationDocument.find({"evaluation_id": {"$in": evaluation_ids}}).to_list():
-            if doc.planner is None:
+        query: dict[str, Any] = {"evaluation_id": {"$in": evaluation_ids}}
+        if project_id is not None:
+            query["project_id"] = project_id
+        for doc in EvaluationDocument.find(query).to_list():
+            if doc.planner is None or doc.planner.answer == answer:
                 continue
             doc.planner = doc.planner.model_copy(update={"answer": answer})
             doc.save()
@@ -1168,12 +1320,55 @@ class EvaluationService:
         return run
 
 
+@dataclass(frozen=True)
+class ChatCallKey:
+    """One evaluation tool call of one chat turn, as every stream of the turn names it.
+
+    `call` names the call within the turn: the durable entry of its result in the
+    runtime's transcript, which every stream of the turn reports the same way
+    whatever ID the model gave the call.
+    """
+
+    session_id: str
+    request_id: str
+    call: str
+
+    def ids(self, project_id: str, username: str) -> tuple[str, str]:
+        """The run and evaluation IDs of this call in the project's ledger."""
+        material = json.dumps(
+            [project_id, username, self.session_id, self.request_id, self.call],
+            separators=(",", ":"),
+        )
+        digest = hashlib.sha256(material.encode()).hexdigest()[:32]
+        return f"evr_{digest}", f"ev_{digest}"
+
+
+class ChatTurnRefusedError(Exception):
+    """A request of a chat turn came from another project than the turn's own."""
+
+    detail = "This message was sent in another project; open the chat in that project."
+
+
+def _same_chat_call(stored: EvaluationDocument, project_id: str, run_id: str) -> tuple[str, str]:
+    """The IDs of a chat evaluation already stored for this call, refusing a foreign one."""
+    if stored.project_id != project_id or stored.run_id != run_id:
+        msg = f"evaluation {stored.evaluation_id} belongs to another chat call"
+        raise RuntimeError(msg)
+    return stored.run_id, stored.evaluation_id
+
+
 class ChatEvaluationRecorder:
     """Records the evaluations the planner makes during one chat turn.
 
     `record` is called from the SSE translation on every `qcal_evaluate`
     result; `finish` once the turn's answer is known. Failures are logged and
-    never interrupt the chat.
+    never interrupt the chat; an evaluation that was not stored is reported
+    without IDs.
+
+    With the turn's `session_id` and `request_id`, the original stream of a
+    turn and every reattached stream that replays it store each call once, so
+    a call whose result reached only a reattached stream is still recorded and
+    the answer is attached by whichever stream sees the turn finish.
     """
 
     def __init__(
@@ -1185,26 +1380,44 @@ class ChatEvaluationRecorder:
         session_id: str | None,
         planner_model: str,
         task_id: str | None = None,
+        request_id: str | None = None,
     ) -> None:
         self._service = service
         self._project_id = project_id
         self._username = username
         self._session_id = session_id
+        self._request_id = request_id
         self._planner_model = planner_model
         self._task_id = task_id
         self.evaluation_ids: list[str] = []
 
-    def record(self, record: dict[str, Any]) -> dict[str, str] | None:
-        """Store one evaluation; returns its run and evaluation ids, or None when not stored."""
+    def record(self, record: dict[str, Any], call: str | None = None) -> dict[str, str] | None:
+        """Store one evaluation; returns its run and evaluation ids, or None when not stored.
+
+        `call` names the tool call within the turn; see `ChatCallKey`. A recorder of
+        a known turn (with `session_id` and `request_id`) stores nothing without it.
+        """
         if not record.get("task_id") and self._task_id:
             # The opening figures of a task chat are the task's own.
             record = {**record, "task_id": self._task_id}
+        key = None
+        if self._session_id and self._request_id:
+            if call is None:
+                # The call cannot be named the same way by every stream of the turn, so
+                # storing it could file it twice: it is not stored.
+                logger.warning(
+                    "a chat evaluation without a result entry was not recorded (session %s)",
+                    self._session_id,
+                )
+                return None
+            key = ChatCallKey(session_id=self._session_id, request_id=self._request_id, call=call)
         try:
             ids = self._service.record_chat_evaluation(
                 project_id=self._project_id,
                 username=self._username,
                 planner_model=self._planner_model,
                 record=record,
+                call_key=key,
             )
         except Exception:
             logger.exception("recording a chat evaluation failed (session %s)", self._session_id)
@@ -1212,12 +1425,15 @@ class ChatEvaluationRecorder:
         if ids is None:
             return None
         run_id, evaluation_id = ids
-        self.evaluation_ids.append(evaluation_id)
+        if evaluation_id not in self.evaluation_ids:
+            self.evaluation_ids.append(evaluation_id)
         return {"run_id": run_id, "evaluation_id": evaluation_id}
 
     def finish(self, answer: str) -> None:
         """Attach the planner's answer to the evaluations of this turn."""
         try:
-            self._service.attach_chat_answer(self.evaluation_ids, answer)
+            self._service.attach_chat_answer(
+                self.evaluation_ids, answer, project_id=self._project_id
+            )
         except Exception:
             logger.exception("attaching the chat answer failed (session %s)", self._session_id)

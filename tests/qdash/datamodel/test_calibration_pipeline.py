@@ -14,6 +14,7 @@ from qdash.datamodel.calibration_pipeline import (
     FULL_1Q_TASKS,
     FULL_2Q_TASKS,
     STEP_CATALOG,
+    BringUpStep,
     CalibrationPipelineSpec,
     LegacyExecutionModeError,
     migrate_pipeline_spec,
@@ -49,8 +50,20 @@ def test_defaults_fill_in_the_template_task_lists() -> None:
     assert step_tasks(parsed.steps[0]) == names(CHECK_1Q_TASKS)
     assert step_tasks(parsed.steps[1]) == names(FULL_2Q_TASKS)
     assert [call.call_id for call in step_calls(parsed.steps[0])] == names(CHECK_1Q_TASKS)
-    assert parsed.name == "pipeline"
+    assert parsed.name is None
     assert parsed.all_tasks() == names(CHECK_1Q_TASKS) + names(FULL_2Q_TASKS)
+
+
+def test_name_is_optional_and_left_out_of_dumps_when_omitted() -> None:
+    """An unnamed spec stays unnamed through a dump; a given name, even 'pipeline', stays."""
+    unnamed = parse()
+    assert "name" not in unnamed.model_dump(mode="json")
+    assert "name" not in unnamed.model_dump(mode="json", exclude_none=True)
+    assert CalibrationPipelineSpec.model_validate(unnamed.model_dump(mode="json")).name is None
+
+    named = parse(name="pipeline")
+    assert named.model_dump(mode="json")["name"] == "pipeline"
+    assert named.plan()["name"] == "pipeline"
 
 
 def test_default_lists_are_valid_call_lists() -> None:
@@ -67,20 +80,47 @@ def test_spec_version_is_required() -> None:
 
 
 def test_targets_need_exactly_one_kind() -> None:
-    with pytest.raises(ValidationError, match="exactly one of qids or mux_ids"):
+    with pytest.raises(ValidationError, match="exactly one of qids, mux_ids or pairs"):
         parse(targets={})
-    with pytest.raises(ValidationError, match="exactly one of qids or mux_ids"):
+    with pytest.raises(ValidationError, match="exactly one of qids, mux_ids or pairs"):
         parse(targets={"qids": ["0"], "mux_ids": [0]})
     with pytest.raises(ValidationError, match="exclude_qids only applies"):
         parse(targets={"qids": ["0"], "exclude_qids": ["1"]})
     parsed = parse(targets={"mux_ids": [0, 1], "exclude_qids": ["5"]})
     assert parsed.targets.mux_ids == [0, 1]
     # The empty selector is rejected too, as the published descriptions state.
-    with pytest.raises(ValidationError, match="exactly one of qids or mux_ids"):
+    with pytest.raises(ValidationError, match="exactly one of qids, mux_ids or pairs"):
         parse(targets={"qids": []})
     targets = CalibrationPipelineSpec.model_json_schema()["$defs"]["PipelineTargets"]
-    assert "exactly one of qids and mux_ids" in targets["properties"]["qids"]["description"]
+    assert "exactly one of qids, mux_ids and pairs" in targets["properties"]["qids"]["description"]
     assert "Must be empty with qids" in targets["properties"]["exclude_qids"]["description"]
+
+
+def test_pair_targets_keep_their_direction_and_leave_old_digests_alone() -> None:
+    parsed = parse(targets={"pairs": [["1", "0"], ["4", "5"]]})
+    assert parsed.targets.pairs == [["1", "0"], ["4", "5"]]
+    assert parsed.targets.pair_qids() == ["0", "1", "4", "5"]
+    with pytest.raises(ValidationError, match="exactly one of qids, mux_ids or pairs"):
+        parse(targets={"pairs": [["0", "1"]], "qids": ["0"]})
+    with pytest.raises(ValidationError, match="exclude_qids only applies"):
+        parse(targets={"pairs": [["0", "1"]], "exclude_qids": ["0"]})
+    with pytest.raises(ValidationError, match="duplicates"):
+        parse(targets={"pairs": [["0", "1"], ["0", "1"]]})
+    with pytest.raises(ValidationError, match="couples a qubit with itself"):
+        parse(targets={"pairs": [["0", "0"]]})
+    # A spec without pairs dumps as before, so its plan digest is unchanged.
+    assert "pairs" not in parse(targets={"qids": ["0"]}).model_dump(mode="json")["targets"]
+
+
+def test_bring_up_mode_defaults_to_parallel_by_mux_and_keeps_old_digests() -> None:
+    default = parse(steps=[{"type": "BringUp"}])
+    assert isinstance(default.steps[0], BringUpStep)
+    assert default.steps[0].execution_mode == "parallel_by_mux"
+    assert "execution_mode" not in default.model_dump(mode="json")["steps"][0]
+    chosen = parse(steps=[{"type": "BringUp", "execution_mode": "sequential"}])
+    assert chosen.model_dump(mode="json")["steps"][0]["execution_mode"] == "sequential"
+    with pytest.raises(ValidationError, match="execution_mode"):
+        parse(steps=[{"type": "BringUp", "execution_mode": "manual"}])
 
 
 @pytest.mark.parametrize(

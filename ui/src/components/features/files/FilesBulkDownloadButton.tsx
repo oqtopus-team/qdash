@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { downloadZipFile } from "@/client/file/file";
 import { getApiErrorMessage, parseBlobErrorBody } from "@/lib/utils/apiError";
+import { saveBlob } from "@/lib/utils/download";
 
 interface FilesBulkDownloadButtonProps {
   disabled?: boolean;
@@ -45,15 +46,7 @@ export function useConfigZipDownload(onError: (message: string) => void) {
       const blob = new Blob([response.data as unknown as BlobPart], {
         type: "application/zip",
       });
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-
-      link.href = downloadUrl;
-      link.download = getArchiveFilename(response.headers["content-disposition"]);
-      document.body.appendChild(link);
-      link.click();
-      window.URL.revokeObjectURL(downloadUrl);
-      document.body.removeChild(link);
+      saveBlob(blob, getArchiveFilename(response.headers["content-disposition"]));
     } catch (error) {
       onError(
         getApiErrorMessage(await parseBlobErrorBody(error), "Failed to download config files"),

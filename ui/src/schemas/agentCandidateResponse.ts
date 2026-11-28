@@ -5,9 +5,12 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { AgentAppliedQualityGate } from './agentAppliedQualityGate';
+import type { AgentCandidateResponseAcceptanceBasis } from './agentCandidateResponseAcceptanceBasis';
 import type { AgentCandidateResponseMaximum } from './agentCandidateResponseMaximum';
 import type { AgentCandidateResponseMinimum } from './agentCandidateResponseMinimum';
 import type { AgentCandidateResponseQualityMetrics } from './agentCandidateResponseQualityMetrics';
+import type { AgentCandidateResponseRejection } from './agentCandidateResponseRejection';
 
 /**
  * A numeric candidate derived from an authoritative task result.
@@ -26,7 +29,13 @@ export interface AgentCandidateResponse {
   unit?: string;
   value_type?: string;
   quality_metrics?: AgentCandidateResponseQualityMetrics;
+  /** The session's quality gates this result was checked against: its task's gates and any legacy session-wide gate. Gates of other tasks are not listed. */
+  applied_quality_gates?: AgentAppliedQualityGate[];
+  /** What accepted the candidate: session_bounds (inside numeric bounds approved with the session) or task_checks (a parameter the session's update grant names, without bounds, accepted on its task's completion checks); null when rejected */
+  acceptance_basis?: AgentCandidateResponseAcceptanceBasis;
   accepted: boolean;
+  /** Why the candidate was not accepted; null when accepted. not_in_scope: the output is neither granted from this task nor bounded by the session, so it is staged for reference only; it cannot be committed from this session and is not evidence against the result or its other candidates. outside_bounds: the value is outside the session's approved bounds. quality_gate: a quality gate of the result's task failed or its metric is missing */
+  rejection?: AgentCandidateResponseRejection;
   reason: string;
   minimum?: AgentCandidateResponseMinimum;
   maximum?: AgentCandidateResponseMaximum;

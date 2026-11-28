@@ -31,9 +31,11 @@ from qdash.datamodel.user import (
     generate_user_id,
     is_valid_username,
 )
+from qdash.dbmodel.lookups import user_id_for_username
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.user import UserDocument
+from qdash.repository.project_membership import MongoProjectMembershipRepository
 
 logger = logging.getLogger(__name__)
 
@@ -55,40 +57,6 @@ SUPPORTED_BULK_IMPORT_COLUMNS = {
 
 class AdminService:
     """Service for admin user and project management operations."""
-
-    @staticmethod
-    def _user_id_for_username(username: str | None) -> str | None:
-        """Resolve a username to a user_id for new relationship writes."""
-        if not username:
-            return None
-        user = UserDocument.find_one({"username": username}).run()
-        return user.user_id if user else None
-
-    @staticmethod
-    def _find_membership_for_user(
-        project_id: str,
-        username: str,
-        user_id: str,
-        *,
-        status: str | None = None,
-    ) -> ProjectMembershipDocument | None:
-        """Find membership by current user_id, then repair stale rows by username."""
-        query: dict[str, str] = {"project_id": project_id, "user_id": user_id}
-        if status is not None:
-            query["status"] = status
-        membership = ProjectMembershipDocument.find_one(query).run()
-        if membership:
-            return membership
-
-        fallback_query: dict[str, str] = {"project_id": project_id, "username": username}
-        if status is not None:
-            fallback_query["status"] = status
-        membership = ProjectMembershipDocument.find_one(fallback_query).run()
-        if membership and membership.user_id != user_id:
-            membership.user_id = user_id
-            membership.system_info.update_time()
-            membership.save()
-        return membership
 
     @staticmethod
     def _user_to_detail(user: UserDocument) -> UserDetailResponse:
@@ -418,7 +386,7 @@ class AdminService:
                 detail=f"Project '{project_id}' not found",
             )
 
-        admin_user_id = self._user_id_for_username(admin_username)
+        admin_user_id = user_id_for_username(admin_username)
         if admin_user_id and project.owner_user_id == admin_user_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -484,7 +452,7 @@ class AdminService:
                 detail=f"User '{username}' not found",
             )
 
-        existing = self._find_membership_for_user(
+        existing = MongoProjectMembershipRepository().find_for_user(
             project_id=project_id,
             username=username,
             user_id=user.user_id,
@@ -500,7 +468,7 @@ class AdminService:
             existing.status = "active"
             existing.user_id = user.user_id
             existing.invited_by = admin_username
-            existing.invited_by_user_id = self._user_id_for_username(admin_username)
+            existing.invited_by_user_id = user_id_for_username(admin_username)
             existing.system_info.update_time()
             existing.save()
             logger.info("Reactivated %s in project %s as %s", username, project_id, role.value)
@@ -520,7 +488,7 @@ class AdminService:
             username=username,
             role=role,
             status="active",
-            invited_by_user_id=self._user_id_for_username(admin_username),
+            invited_by_user_id=user_id_for_username(admin_username),
             invited_by=admin_username,
             system_info=SystemInfoModel(),
         )
@@ -559,7 +527,7 @@ class AdminService:
                 detail="Cannot remove the project owner",
             )
 
-        membership = self._find_membership_for_user(
+        membership = MongoProjectMembershipRepository().find_for_user(
             project_id=project_id,
             username=username,
             user_id=user.user_id,

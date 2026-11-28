@@ -1,0 +1,29 @@
+# Agent Evaluation Models: oqtopus profile (sample)
+#
+# Used when QDASH_AGENT_PROFILE=oqtopus. Replaces config/agent/evaluation.yaml
+# as a whole; it is not merged with it. Only `evaluation_models` may be set
+# here. The first entry is the default in the evaluation request dialog. Every
+# entry is checked when the profile loads; see
+# docs/developer-guide/agent/model-configuration.md#deployment-profiles.
+#
+# This is a sample, not a verified deployment: no serving API has been tested
+# with it, and nothing here establishes how well the model judges calibration
+# figures. Before selecting it, the operator confirms against the deployment
+# that serves the model that the model name, image input, context length and
+# output limit below hold, and adjusts them where they do not.
+evaluation_models:
+  # Operator prerequisites: an OpenAI-compatible Chat Completions API serving
+  # this model name, and accepting image input, because evaluation sends the
+  # task's figures. OPENAI_COMPATIBLE_BASE_URL_EVALUATION must include /v1.
+  - provider: openai-compatible-evaluation
+    name: Qwen/Qwen3.8-27B
+    api_style: completion
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_EVALUATION
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_EVALUATION
+    # Requests greedy sampling. Whether two runs on the same figure then give
+    # the same answer depends on the serving deployment and is not verified.
+    temperature: 0.0
+    # Sample values: num_ctx must not exceed the deployment's maximum context
+    # length (for vLLM, max_model_len), and max_output_tokens must be below it.
+    num_ctx: 131072
+    max_output_tokens: 4096

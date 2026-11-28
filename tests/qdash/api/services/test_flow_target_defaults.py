@@ -279,6 +279,23 @@ def test_automatic_two_qubit_template_accepts_pairs():
     assert supported_target_modes(two_qubit, "two_qubit") == ["mux_ids", "qids"]
 
 
+def test_saved_sources_that_still_pass_the_run_name_keep_their_target_modes():
+    """A saved flow written before templates stopped passing ``name=flow_name`` is unchanged."""
+    for template, function in [
+        ("two_qubit_pairs.py", "two_qubit_pairs"),
+        ("simple.py", "simple_calibration"),
+    ]:
+        current = (TEMPLATES / template).read_text()
+        assert "name=flow_name" not in current
+        legacy = current.replace("session.run(\n", "session.run(\n        name=flow_name,\n", 1)
+        assert legacy != current
+        modes = supported_target_modes(current, function)
+        assert supported_target_modes(legacy, function) == modes
+        assert resolve_target_defaults(legacy, function, {"mux_ids": [0]}) == (
+            resolve_target_defaults(current, function, {"mux_ids": [0]})
+        )
+
+
 @pytest.mark.parametrize(
     "steps", ["[]", "[GenerateCRSchedule()]", "[OpaqueStep()]", "[ConfigureAll()]"]
 )

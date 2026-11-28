@@ -137,9 +137,10 @@ services:
     volumes:
       - ./src/qdash/workflow:/app/qdash/workflow
       - ./src/qdash/analysis:/app/qdash/analysis # Shared spectroscopy analysis (also used by api)
-      - ./src/qdash/copilot:/app/qdash/copilot
+      - ./src/qdash/agent:/app/qdash/agent
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
       - ./src/qdash/datamodel:/app/qdash/datamodel
+      - ./sdks/python/src/qdash/calibration:/app/qdash/calibration # Shared calibration definitions (shipped in qdash-sdk)
       - ./src/qdash/common:/app/qdash/common
       - ./src/qdash/repository:/app/qdash/repository
       - ./src/qdash/config.py:/app/qdash/config.py
@@ -170,15 +171,16 @@ services:
     volumes:
       - ./src/qdash/workflow:/app/qdash/workflow
       - ./src/qdash/analysis:/app/qdash/analysis # Shared spectroscopy analysis
-      - ./src/qdash/copilot:/app/qdash/copilot
+      - ./src/qdash/agent:/app/qdash/agent
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
       - ./src/qdash/datamodel:/app/qdash/datamodel
+      - ./sdks/python/src/qdash/calibration:/app/qdash/calibration # Shared calibration definitions (shipped in qdash-sdk)
       - ./src/qdash/common:/app/qdash/common
       - ./src/qdash/repository:/app/qdash/repository
       - ./src/qdash/config.py:/app/qdash/config.py
       - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
       - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config # Qubex backend configuration repository/data
-      - ./config:/app/config # QDash app/domain/copilot config files
+      - ./config:/app/config # QDash app/domain/agent config files
       - ${QUELWARE_CLIENT_PATH:-${HOME}/.config/quelware-client}:/root/.config/quelware-client # quelware-client PAT path
       - worker-logs:/app/logs
     working_dir: /app/qdash/workflow
@@ -201,9 +203,9 @@ services:
       - ./src/qdash/api:/app/qdash/api
       - ./src/qdash/analysis:/app/qdash/analysis # Shared spectroscopy analysis (used by reanalysis service)
       - ./src/qdash/agent:/app/qdash/agent
-      - ./src/qdash/copilot:/app/qdash/copilot
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
       - ./src/qdash/datamodel:/app/qdash/datamodel
+      - ./sdks/python/src/qdash/calibration:/app/qdash/calibration # Shared calibration definitions (shipped in qdash-sdk)
       - ./src/qdash/common:/app/qdash/common
       - ./src/qdash/repository:/app/qdash/repository
       - ./src/qdash/config.py:/app/qdash/config.py
@@ -211,14 +213,14 @@ services:
       - ./src/qdash/workflow/templates:/app/qdash/workflow/templates # Flow templates
       - ./src/qdash/workflow/service:/app/qdash/workflow/service # Calibration service modules
       - ${CALIBTASKS_PATH:-./src/qdash/workflow/calibtasks}:/app/qdash/workflow/calibtasks # Calibration tasks
-      - ./config:/app/config # QDash app/domain/copilot config files
+      - ./config:/app/config # QDash app/domain/agent config files
       - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
       - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config # Qubex backend configuration repository/data
       - api-logs:/app/logs
       - agent-runtime-auth:/run/agent-runtime-auth:ro
       # The metric runner's socket: metric scripts run in metric-runner, not in the API.
       - metric-runner-socket:/run/metric-runner:ro
-      # Read-only source the Copilot searches when it investigates a failure
+      # Read-only source the Agent searches when it investigates a failure
       - ./src/qdash:/app/source/qdash:ro
       - ${CALIBTASKS_PATH:-./src/qdash/workflow/calibtasks}:/app/source/qdash/workflow/calibtasks:ro
     working_dir: /app/qdash/api
@@ -283,7 +285,7 @@ services:
         if not path.read_text().strip():
             raise RuntimeError('Runtime credential file is empty')
   agent-runtime:
-    # Pi Agent Runtime backing Copilot chat and figure analysis.
+    # Pi Agent Runtime backing Agent chat and figure analysis.
     build:
       context: .
       dockerfile: ./agent-runtime/Dockerfile
@@ -293,11 +295,8 @@ services:
     volumes:
       - ./agent-runtime/src:/app/agent-runtime/src
       - ./agent-runtime/exec:/app/agent-runtime/exec # Hello protocol shared with agent-exec
-      - ./ui/src/lib/copilotUiSpec.ts:/app/ui/src/lib/copilotUiSpec.ts:ro # render_ui catalog shared with the chat
-      - ./config:/app/config # Read for copilot language and model settings only
-      # Local pi extension checkouts for development (gitignored, empty in
-      # production); the runtime trusts whatever package directories it finds.
-      - ./agent-runtime/extensions:/app/extensions:ro
+      - ./ui/src/lib/agentUiSpec.ts:/app/ui/src/lib/agentUiSpec.ts:ro # render_ui catalog shared with the chat
+      - ./config:/app/config # Read for agent language and model settings only
       - agent-runtime-state:/app/state
       - agent-runtime-auth:/run/agent-runtime-auth:ro
       - agent-exec-socket:/run/agent-exec:ro
@@ -320,17 +319,17 @@ services:
       # The API forwards the logged-in user's token and project on each turn.
       # No shared API token or administrator login is used by the runtime.
       - QDASH_BASE_URL=http://api:${API_PORT:-5715}
-      # Links in Copilot answers point here. QDASH_BASE_URL is an internal
+      # Links in Agent answers point here. QDASH_BASE_URL is an internal
       # hostname, so the browser-facing UI address comes from CLIENT_URL.
       - QDASH_WEB_URL=${CLIENT_URL:-http://localhost:${UI_PORT:-5714}}
       # Pi hides models whose provider has no credential, even when the server
       # ignores it. Keep a placeholder for keyless local endpoints.
       - OPENAI_COMPATIBLE_API_KEY_CHAT=${OPENAI_COMPATIBLE_API_KEY_CHAT:-openai-compatible}
       - OPENAI_COMPATIBLE_API_KEY_EVALUATION=${OPENAI_COMPATIBLE_API_KEY_EVALUATION:-openai-compatible}
-      # The classifier of config/copilot/classifier.yaml reads CLASSIFIER_BASE_URL
+      # The classifier of config/agent/classifier.yaml reads CLASSIFIER_BASE_URL
       # and CLASSIFIER_API_KEY from .env (env_file above). There is no default
       # endpoint; without both the classifier stays unavailable.
-      # The Copilot workspace (agent-exec below): where the chat's bash, read,
+      # The Agent workspace (agent-exec below): where the chat's bash, read,
       # write and edit tools run. Unset AGENT_EXEC_SOCKET to offer no workspace.
       - AGENT_EXEC_SOCKET=/run/agent-exec/exec.sock
       # Bun's fetch reads HTTP(S)_PROXY on its own. NO_PROXY comes from .env via
@@ -345,12 +344,12 @@ services:
     networks:
       - custom_net
   agent-exec:
-    # The Copilot workspace: a shell and files for each chat, behind the
+    # The Agent workspace: a shell and files for each chat, behind the
     # runtime's bash/read/write/edit tools. It holds no QDash credentials (no
     # env_file) and has no network. A Unix socket restricted to the runtime's
     # group (bun, gid 1000) prevents workspace users from impersonating others.
     # The server starts one pi-env daemon per conversation as that user's own
-    # uid; see docs/developer-guide/copilot/workspace.md.
+    # uid; see docs/developer-guide/agent/workspace.md.
     build:
       context: .
       dockerfile: ./agent-runtime/exec/Dockerfile
@@ -386,7 +385,7 @@ services:
   metric-runner:
     # Validates and evaluates the API's metric scripts, and nothing else: the
     # API keeps authentication, data access and persistence, and agent-exec
-    # stays the Copilot workspace. One persistent supervisor (PID 1) runs each
+    # stays the Agent workspace. One persistent supervisor (PID 1) runs each
     # job as a per-slot uid in a fresh directory and relays its data requests
     # to the API's broker over metric.sock (0660 root:0, so only the API, which
     # runs as root, connects). It holds no QDash credentials (no env_file, no

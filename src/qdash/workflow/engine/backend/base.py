@@ -37,6 +37,13 @@ class BaseBackend(ABC):
         msg = "This method should be implemented by subclasses."
         raise NotImplementedError(msg)
 
+    def before_task_run(self, task_name: str, qid: str) -> None:
+        """Run just before a task measures; a backend may refuse the run by raising.
+
+        Only the fake backend overrides it, for opt-in validation faults
+        (``qdash.workflow.engine.backend.fake_faults``); hardware backends do nothing here.
+        """
+
     def capture_progress(
         self,
         reporter: ProgressReporter,

@@ -236,11 +236,13 @@ test("the Python workflow publishes only from the TypeScript pipeline's release 
     assert.deepEqual([...job.matchAll(/^\s+name: (qdash-\S+-dist)$/gm)].map((m) => m[1]), [dist]);
     assert.doesNotMatch(job, /actions\/checkout@|\n\s+run:/);
   }
-  // The SDK pins qdash-client==<version>, so it publishes only after that client.
+  // The SDK publishes after the client, so one release record lands as a pair.
   assert.match(publishSdk, /needs: \[build, publish\]/);
-  // Both packages of one run carry the record's version, and the build checks the pin.
+  // Both packages of one run carry the record's version; the self-contained SDK must not
+  // depend on qdash-client, and its tests run without the client installed.
   assert.match(steps, /uv build --package qdash-client --out-dir dist\n\s+uv build --package qdash-sdk --out-dir dist/);
-  assert.match(steps, /grep -Fx "Requires-Dist: qdash-client==\$CLIENT_VERSION"/);
+  assert.match(steps, /grep -i "\^Requires-Dist: qdash-client" sdk-metadata\.txt/);
+  assert.match(steps, /uv run --package qdash-sdk pytest sdks\/python\/tests/);
   // The npm client and the record come from one build output in one reusable workflow run.
   assert.match(client, /python: \$\{\{ steps\.version\.outputs\.python \}\}/);
   const upload = client.slice(client.indexOf("- name: Publish package"));

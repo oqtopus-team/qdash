@@ -82,6 +82,27 @@ class AgentActionType(StrEnum):
     complete_session = "complete_session"
 
 
+class ActorKind(StrEnum):
+    agent = "agent"
+    human = "human"
+    server = "server"
+    worker = "worker"
+    unknown = "unknown"
+
+
+class Provenance(StrEnum):
+    """
+    server_record: QDash recorded it; server_computed: derived at read time from immutable records; agent_reported, human_reported, evaluator_reported: text that party supplied, recorded as given; client_reported: text a client sent without saying whether an agent or a person wrote it
+    """
+
+    server_record = "server_record"
+    server_computed = "server_computed"
+    agent_reported = "agent_reported"
+    human_reported = "human_reported"
+    evaluator_reported = "evaluator_reported"
+    client_reported = "client_reported"
+
+
 class AgentAutonomy(StrEnum):
     """
     How much of a plan the agent may run without a person confirming each step.
@@ -89,6 +110,33 @@ class AgentAutonomy(StrEnum):
 
     confirm_each = "confirm_each"
     auto = "auto"
+
+
+class AgentCandidateAcceptanceBasis(StrEnum):
+    """
+    What accepted a candidate.
+    """
+
+    session_bounds = "session_bounds"
+    task_checks = "task_checks"
+
+
+class Authority(StrEnum):
+    """
+    reviewed: a per-call approved commit; session_policy: committed under the session's parameter_updates authority
+    """
+
+    reviewed = "reviewed"
+    session_policy = "session_policy"
+
+
+class BackendAuthority(StrEnum):
+    """
+    Authority of the backend apply request, once requested
+    """
+
+    reviewed = "reviewed"
+    session_policy = "session_policy"
 
 
 class AgentCandidateCommitResponse(BaseModel):
@@ -128,6 +176,26 @@ class AgentCandidateCommitResponse(BaseModel):
         None
     )
     backend_applied_at: Annotated[AwareDatetime | None, Field(title="Backend Applied At")] = None
+    authority: Annotated[Authority, Field(title="Authority")] = Authority.reviewed
+    """
+    reviewed: a per-call approved commit; session_policy: committed under the session's parameter_updates authority
+    """
+    decision_id: Annotated[str | None, Field(title="Decision Id")] = None
+    """
+    The pass decision a session_policy commit rests on
+    """
+    assessment_evidence: Annotated[dict[str, Any] | None, Field(title="Assessment Evidence")] = None
+    """
+    What QDash checked for a session_policy commit, frozen when it was reserved: the agent-reported assessment, the mechanical gates, and cited evaluations
+    """
+    backend_authority: Annotated[BackendAuthority | None, Field(title="Backend Authority")] = None
+    """
+    Authority of the backend apply request, once requested
+    """
+    backend_requested_by: Annotated[str | None, Field(title="Backend Requested By")] = None
+    """
+    Who requested the backend apply, once requested
+    """
 
 
 class AgentCandidateReference(BaseModel):
@@ -140,50 +208,811 @@ class AgentCandidateReference(BaseModel):
     task_id: Annotated[str, Field(max_length=200, min_length=1, title="Task Id")]
 
 
-class AgentCandidateResponse(BaseModel):
+class AgentCandidateRejection(StrEnum):
     """
-    A numeric candidate derived from an authoritative task result.
+    Why a candidate was not accepted.
+
+    ``not_in_scope`` is not a verdict on the measurement: the output is neither granted from
+    this task nor bounded by the session, so it is staged for reference only. It cannot be
+    committed from the session, and it is never evidence against the result or the result's
+    other candidates. The other two are deterministic checks the value or its result failed.
+    """
+
+    not_in_scope = "not_in_scope"
+    outside_bounds = "outside_bounds"
+    quality_gate = "quality_gate"
+
+
+class AgentChatBranchSchema(BaseModel):
+    """
+    Where a branched chat came from.
+    """
+
+    source_session_id: Annotated[str, Field(title="Source Session Id")]
+    """
+    The chat session it was branched from
+    """
+    source_entry_id: Annotated[str, Field(title="Source Entry Id")]
+    """
+    The answer it was branched at
+    """
+
+
+class EntryId(RootModel[str]):
+    root: Annotated[str, Field(pattern="^[0-9]{1,15}$", title="Entry Id")]
+    """
+    An assistant answer's entry in the runtime's transcript, from the chat stream's result; the chat can be branched from that answer
+    """
+
+
+class TurnRequestId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, title="Turn Request Id")]
+    """
+    The chat turn this message belongs to. The server records the latest turn's messages itself; a save cannot replace them.
+    """
+
+
+class AgentChatSessionSummary(BaseModel):
+    """
+    Lightweight session entry used in the session list.
     """
 
     session_id: Annotated[str, Field(title="Session Id")]
-    action_id: Annotated[str, Field(title="Action Id")]
-    execution_id: Annotated[str, Field(title="Execution Id")]
-    task_id: Annotated[str, Field(title="Task Id")]
-    task_name: Annotated[str, Field(title="Task Name")]
-    qid: Annotated[str, Field(title="Qid")]
-    source_parameter_name: Annotated[str, Field(title="Source Parameter Name")]
-    parameter_name: Annotated[str, Field(title="Parameter Name")]
-    value: Annotated[float, Field(title="Value")]
-    error: Annotated[float, Field(title="Error")] = 0.0
-    unit: Annotated[str, Field(title="Unit")] = ""
-    value_type: Annotated[str, Field(title="Value Type")] = "float"
-    quality_metrics: Annotated[dict[str, float] | None, Field(title="Quality Metrics")] = None
-    accepted: Annotated[bool, Field(title="Accepted")]
-    reason: Annotated[str, Field(title="Reason")]
-    minimum: Annotated[float | None, Field(title="Minimum")] = None
-    maximum: Annotated[float | None, Field(title="Maximum")] = None
-
-
-class AgentCandidateSetCommitResponse(BaseModel):
-    """
-    Audited all-at-once QDash commit of the final candidate set.
-    """
-
-    commit_id: Annotated[str, Field(title="Commit Id")]
-    session_id: Annotated[str, Field(title="Session Id")]
-    idempotency_key: Annotated[str, Field(title="Idempotency Key")]
-    chip_id: Annotated[str, Field(title="Chip Id")]
-    qid: Annotated[str, Field(title="Qid")]
-    candidates: Annotated[list[AgentCandidateResponse], Field(title="Candidates")]
-    status: Annotated[str, Field(title="Status")]
-    reason: Annotated[str, Field(title="Reason")]
-    before_snapshot: Annotated[dict[str, Any] | None, Field(title="Before Snapshot")] = None
-    after_snapshot: Annotated[dict[str, Any] | None, Field(title="After Snapshot")] = None
-    committed_by: Annotated[str, Field(title="Committed By")]
-    state_version_before: Annotated[int, Field(title="State Version Before")]
-    state_version_after: Annotated[int, Field(title="State Version After")]
+    title: Annotated[str, Field(title="Title")]
+    context: Annotated[dict[str, Any] | None, Field(title="Context")] = None
+    message_count: Annotated[int, Field(title="Message Count")] = 0
+    branch: AgentChatBranchSchema | None = None
     created_at: Annotated[AwareDatetime, Field(title="Created At")]
-    committed_at: Annotated[AwareDatetime | None, Field(title="Committed At")] = None
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+
+
+class AgentChatShareBlockType(StrEnum):
+    """
+    The kind of one piece of a shared answer.
+
+    A named enum, so generated clients give it its own name instead of a generic
+    ``Type`` that would take that name from another schema's enum.
+    """
+
+    text = "text"
+    chart = "chart"
+    ui = "ui"
+
+
+class Role(StrEnum):
+    user = "user"
+    assistant = "assistant"
+
+
+class Incomplete(StrEnum):
+    """
+    The answer did not end normally
+    """
+
+    stopped = "stopped"
+    interrupted = "interrupted"
+
+
+class AgentChatShareSummary(BaseModel):
+    """
+    A chat's snapshot shared with the current project, as its owner manages it.
+    """
+
+    share_id: Annotated[str, Field(title="Share Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    title: Annotated[str, Field(title="Title")]
+    message_count: Annotated[int, Field(title="Message Count")]
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    """
+    When the chat was first shared
+    """
+    snapshot_at: Annotated[AwareDatetime, Field(title="Snapshot At")]
+    """
+    When the snapshot was last copied
+    """
+
+
+class EntryId1(RootModel[str]):
+    root: Annotated[str, Field(max_length=64, title="Entry Id")]
+
+
+class Placement(StrEnum):
+    """
+    exact: the chat saw where it landed. approximate: it was confirmed after the answer it interrupted was saved as one message, and follows that message.
+    """
+
+    exact = "exact"
+    approximate = "approximate"
+
+
+class AgentChatSteerSchema(BaseModel):
+    """
+    Where a user message sent while an answer was written landed in the conversation.
+    """
+
+    request_id: Annotated[str, Field(max_length=200, min_length=1, title="Request Id")]
+    entry_id: Annotated[EntryId1 | None, Field(title="Entry Id")] = None
+    placement: Annotated[Placement, Field(title="Placement")] = Placement.exact
+    """
+    exact: the chat saw where it landed. approximate: it was confirmed after the answer it interrupted was saved as one message, and follows that message.
+    """
+
+
+class Status(StrEnum):
+    """
+    Whether the turn still runs, or how it ended
+    """
+
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    stopped = "stopped"
+    noop = "noop"
+
+
+class AgentChatTurnSchema(BaseModel):
+    """
+    The latest turn the server records for a chat, as a reloaded page needs it.
+
+    A page that reattaches to a turn, or follows one another window started, finds
+    the turn's messages by ``request_id`` (each carries it as ``turn_request_id``)
+    and uses ``status`` to tell a running turn from one whose end is saved.
+    """
+
+    request_id: Annotated[str, Field(title="Request Id")]
+    """
+    The turn's request ID
+    """
+    project_id: Annotated[str | None, Field(title="Project Id")] = None
+    """
+    The project it was sent from
+    """
+    status: Annotated[Status, Field(title="Status")]
+    """
+    Whether the turn still runs, or how it ended
+    """
+    start_index: Annotated[int, Field(title="Start Index")]
+    """
+    How many messages precede the turn
+    """
+    continuing: Annotated[bool, Field(title="Continuing")] = False
+    """
+    A continue: no user message
+    """
+    started_at: Annotated[AwareDatetime | None, Field(title="Started At")] = None
+
+
+class AgentCheckpointCandidate(BaseModel):
+    """
+    An accepted candidate the plan carries; the runner re-reads its value from QDash.
+    """
+
+    action_id: Annotated[str, Field(max_length=200, min_length=1, title="Action Id")]
+    parameter_name: Annotated[str, Field(max_length=200, min_length=1, title="Parameter Name")]
+    task_id: Annotated[str, Field(max_length=200, min_length=1, title="Task Id")]
+
+
+class AgentDecisionAssessment(StrEnum):
+    """
+    How the agent judged the evidence a decision cites; reported by the agent.
+    """
+
+    pass_ = "pass"
+    fail = "fail"
+    inconclusive = "inconclusive"
+
+
+class AgentDecisionNextAction(StrEnum):
+    """
+    What the agent decided to do next; a stated intent, not an execution.
+    """
+
+    next_task = "next_task"
+    repeat = "repeat"
+    adjust_and_retry = "adjust_and_retry"
+    rollback = "rollback"
+    propose_commit = "propose_commit"
+    request_human = "request_human"
+    skip_target = "skip_target"
+    complete = "complete"
+    stop = "stop"
+
+
+class AgentEvaluationMode(StrEnum):
+    """
+    Whether the session's results are evaluated with the calibration evaluator.
+
+    The evaluator (qcal_evaluate from pi-qcaleval) is optional and separate from the task's
+    own completion checks and any numeric gates. In every mode an evaluation that exists for
+    a result must support an update: a failed, pending, disputed, or negative one blocks it.
+    """
+
+    off = "off"
+    required = "required"
+
+
+class AgentForumThreadStatus(StrEnum):
+    """
+    Progress of the Forum thread QDash opens for one intervention.
+    """
+
+    pending = "pending"
+    creating = "creating"
+    created = "created"
+
+
+class ActionId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Action Id")]
+
+
+class ExecutionId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Execution Id")]
+
+
+class TaskId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Task Id")]
+
+
+class EvaluationId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Evaluation Id")]
+
+
+class EvaluationRunId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Evaluation Run Id")]
+
+
+class AgentInterventionAttempt(BaseModel):
+    """
+    One recent attempt shown to the expert, as references rather than log output.
+
+    ``transition``, ``status``, and ``reason`` are what the client reported; QDash stores
+    them as given. The ids are evidence: QDash checks that they form one chain of this
+    session's action, execution, task result, and evaluation before it records them.
+    """
+
+    node_id: Annotated[str, Field(max_length=200, title="Node Id")] = ""
+    task_name: Annotated[str, Field(max_length=200, title="Task Name")] = ""
+    qid: Annotated[str, Field(max_length=200, title="Qid")] = ""
+    transition: Annotated[str, Field(max_length=64, title="Transition")] = ""
+    """
+    Reported by the client
+    """
+    status: Annotated[str, Field(max_length=200, title="Status")] = ""
+    """
+    Evaluation or execution status, as reported by the client
+    """
+    reason: Annotated[str, Field(max_length=1000, title="Reason")] = ""
+    """
+    Reported by the client
+    """
+    action_id: Annotated[ActionId | None, Field(title="Action Id")] = None
+    execution_id: Annotated[ExecutionId | None, Field(title="Execution Id")] = None
+    task_id: Annotated[TaskId | None, Field(title="Task Id")] = None
+    evaluation_id: Annotated[EvaluationId | None, Field(title="Evaluation Id")] = None
+    evaluation_run_id: Annotated[EvaluationRunId | None, Field(title="Evaluation Run Id")] = None
+
+
+class AgentInterventionDecision(StrEnum):
+    """
+    What the expert decided for the paused session.
+    """
+
+    resume = "resume"
+    stop = "stop"
+
+
+class AgentInterventionEvent(BaseModel):
+    """
+    One audit entry: who did what to the intervention, and when.
+    """
+
+    at: Annotated[AwareDatetime, Field(title="At")]
+    actor: Annotated[str, Field(title="Actor")]
+    kind: Annotated[str, Field(title="Kind")]
+    detail: Annotated[str, Field(title="Detail")] = ""
+
+
+class AgentInterventionForumThreadResponse(BaseModel):
+    """
+    The Forum thread QDash opens for an intervention, and the attempts to open it.
+    """
+
+    status: AgentForumThreadStatus
+    attempts: Annotated[int, Field(title="Attempts")]
+    last_error: Annotated[str, Field(title="Last Error")] = ""
+    last_attempt_at: Annotated[AwareDatetime | None, Field(title="Last Attempt At")] = None
+    next_attempt_at: Annotated[AwareDatetime | None, Field(title="Next Attempt At")] = None
+    post_id: Annotated[str | None, Field(title="Post Id")] = None
+    """
+    The root Forum post, once created
+    """
+    number: Annotated[int | None, Field(title="Number")] = None
+    """
+    The project's Forum thread number
+    """
+    created_at: Annotated[AwareDatetime | None, Field(title="Created At")] = None
+
+
+class AgentInterventionReason(StrEnum):
+    """
+    Why an agent stopped and asked a person for help.
+    """
+
+    unknown_outcome = "unknown_outcome"
+    recovery_exhausted = "recovery_exhausted"
+    evaluation_failed = "evaluation_failed"
+    platform_error = "platform_error"
+    policy_limit = "policy_limit"
+    agent_request = "agent_request"
+
+
+class AgentInterventionResponseRecord(BaseModel):
+    """
+    The expert's recorded answer. Guidance is evidence for the agent, never a command.
+    """
+
+    response_id: Annotated[str, Field(title="Response Id")]
+    idempotency_key: Annotated[str, Field(title="Idempotency Key")] = ""
+    decision: AgentInterventionDecision
+    guidance: Annotated[str, Field(max_length=5000, title="Guidance")] = ""
+    resume_node_id: Annotated[str | None, Field(title="Resume Node Id")] = None
+    responded_by: Annotated[str, Field(title="Responded By")]
+    responded_at: Annotated[AwareDatetime, Field(title="Responded At")]
+    expected_state_version: Annotated[int, Field(title="Expected State Version")]
+
+
+class AgentInterventionStatus(StrEnum):
+    """
+    Lifecycle of one human intervention.
+
+    ``open`` waits for an expert. ``responding`` is the short window while a response is
+    being applied to the session. ``resume_authorized`` means an expert allowed the runner to
+    continue but no runner has claimed it yet; ``resumed`` means a runner claimed it and the
+    session is active again. ``stopped`` means the expert ended the session. ``discarded``
+    marks a request that never paused its session.
+    """
+
+    open = "open"
+    responding = "responding"
+    resume_authorized = "resume_authorized"
+    resumed = "resumed"
+    stopped = "stopped"
+    discarded = "discarded"
+
+
+class AgentModelIdentity(BaseModel):
+    """
+    The provider and model a client host reports it ran the agent with.
+
+    The host (pi CLI, the QDash web Agent, or another API client) reads it from its own
+    runtime and sends it with the request; the agent's tool arguments never supply it. QDash
+    records it as reported and cannot verify it. A model ID is only unique within its
+    provider, so the two are always recorded together. Only identifiers are accepted: no
+    endpoint URLs, credentials, or free text.
+    """
+
+    provider: Annotated[
+        str,
+        Field(
+            max_length=100,
+            min_length=1,
+            pattern="^[A-Za-z0-9][A-Za-z0-9._:/@+\\-]*$",
+            title="Provider",
+        ),
+    ]
+    model_id: Annotated[
+        str,
+        Field(
+            max_length=200,
+            min_length=1,
+            pattern="^[A-Za-z0-9][A-Za-z0-9._:/@+\\-]*$",
+            title="Model Id",
+        ),
+    ]
+    host: Annotated[
+        str, Field(max_length=64, pattern="^([a-z0-9][a-z0-9._-]*)?$", title="Host")
+    ] = ""
+    """
+    The client host that reported the identity, such as pi or qdash-web-agent
+    """
+
+
+class AgentNotificationStatus(StrEnum):
+    """
+    Delivery state of the Slack root message for one intervention.
+    """
+
+    disabled = "disabled"
+    pending = "pending"
+    sending = "sending"
+    sent = "sent"
+    failed = "failed"
+
+
+class AgentParameterUpdatePolicy(BaseModel):
+    """
+    Opt-in authority, approved once with the session, to commit passing results.
+
+    Without it (the default, and every session created before it existed) a candidate is
+    committed or applied only through the reviewed calls a person approves each time. With
+    it, the session's creator may let the agent commit a candidate of one of ``parameters``
+    from a completed measurement of one of ``tasks`` on a session qubit, and with
+    ``apply_backend`` also write that committed value to the backend, without a per-update
+    approval. QDash still requires, for every such update, an explicit ``pass`` assessment
+    the agent recorded for that measurement, the task's own completion checks (a completed
+    task result, so its fit and validation checks passed), the current session and
+    calibration state, and any numeric bounds or task quality gates the session holds for
+    the parameter and task. The grant names which parameters may change; it does not need
+    numeric bounds, so none has to be made up to authorize it. A failed, uncertain, or
+    unexplained result is never committed this way.
+    """
+
+    parameters: Annotated[list[str], Field(max_length=50, min_length=1, title="Parameters")]
+    """
+    Calibration parameters the agent may commit. Numeric bounds are optional: bounds in allowed_overrides, when the session has them, still apply; without them a candidate is accepted on its task's own completion checks
+    """
+    tasks: Annotated[list[str], Field(max_length=50, min_length=1, title="Tasks")]
+    """
+    Tasks whose completed results may supply an update; a subset of allowed_tasks
+    """
+    apply_backend: Annotated[bool, Field(title="Apply Backend")] = False
+    """
+    Also write a value committed under this authority to the backend configuration (never pushed to GitHub)
+    """
+
+
+class SourceExecutionId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Source Execution Id")]
+
+
+class MaxNodeVisits(RootModel[int]):
+    root: Annotated[int, Field(ge=1, le=10000, title="Max Node Visits")]
+
+
+class OnPass(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="On Pass")]
+
+
+class OnRollback(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="On Rollback")]
+
+
+class AgentPlanCheckpointNode(BaseModel):
+    """
+    One node of the approved plan, as the runner received it.
+    """
+
+    id: Annotated[str, Field(max_length=200, min_length=1, title="Id")]
+    task_name: Annotated[str, Field(max_length=200, min_length=1, title="Task Name")]
+    candidate_parameter: Annotated[
+        str, Field(max_length=200, min_length=1, title="Candidate Parameter")
+    ]
+    on_pass: Annotated[OnPass | None, Field(title="On Pass")] = None
+    on_rollback: Annotated[OnRollback | None, Field(title="On Rollback")] = None
+    parameter_overrides: Annotated[dict[str, float] | None, Field(title="Parameter Overrides")] = (
+        None
+    )
+    diagnosis: Annotated[str, Field(max_length=2000, title="Diagnosis")] = ""
+    reconfigure_before_task: Annotated[bool, Field(title="Reconfigure Before Task")] = False
+    commit_candidate: Annotated[bool, Field(title="Commit Candidate")] = False
+    apply_backend: Annotated[bool, Field(title="Apply Backend")] = False
+    push_to_github: Annotated[bool, Field(title="Push To Github")] = False
+
+
+class FitReliability(RootModel[str]):
+    root: Annotated[str, Field(max_length=64, title="Fit Reliability")]
+
+
+class AgentPlannerVerdictRecord(BaseModel):
+    """
+    One evaluation verdict the planner remembers for its stop rules.
+    """
+
+    status: Annotated[str, Field(max_length=200, title="Status")]
+    fit_reliability: Annotated[FitReliability | None, Field(title="Fit Reliability")] = None
+    evaluation_id: Annotated[str, Field(max_length=200, title="Evaluation Id")] = ""
+
+
+class AgentPreferences(BaseModel):
+    """
+    The current user's Agent preferences.
+    """
+
+    instructions: Annotated[str, Field(max_length=2000, title="Instructions")] = ""
+    """
+    Instructions added to every chat of this user (style, language, formats). They apply to chat only, not to evaluations or forum replies, and cannot override the approval of write operations.
+    """
+    max_instructions_chars: Annotated[int, Field(title="Max Instructions Chars")] = 2000
+    """
+    Longest instructions accepted
+    """
+
+
+class AgentPreferencesUpdate(BaseModel):
+    """
+    Replace the current user's Agent instructions; empty clears them.
+    """
+
+    instructions: Annotated[str, Field(max_length=2000, title="Instructions")] = ""
+
+
+class AgentQualityGateScope(StrEnum):
+    """
+    Which results a quality gate checks.
+    """
+
+    task = "task"
+    all_tasks = "all_tasks"
+
+
+class AgentResumeOption(BaseModel):
+    """
+    A plan node the expert may resume from, with its remaining visit budget.
+    """
+
+    node_id: Annotated[str, Field(title="Node Id")]
+    task_name: Annotated[str, Field(title="Task Name")]
+    visits: Annotated[int, Field(title="Visits")]
+    max_visits: Annotated[int | None, Field(title="Max Visits")] = None
+    available: Annotated[bool, Field(title="Available")]
+    reason: Annotated[str, Field(title="Reason")] = ""
+
+
+class AgentResumeOutcomeRecord(BaseModel):
+    """
+    What the resumed runner reported when its run ended.
+    """
+
+    transition: Annotated[str, Field(max_length=64, title="Transition")]
+    reason: Annotated[str, Field(max_length=2000, title="Reason")] = ""
+    follow_up_intervention_id: Annotated[str | None, Field(title="Follow Up Intervention Id")] = (
+        None
+    )
+    recorded_by: Annotated[str, Field(title="Recorded By")]
+    recorded_at: Annotated[AwareDatetime, Field(title="Recorded At")]
+
+
+class AgentSessionGraphDecision(BaseModel):
+    """
+    The agent's reading of earlier results and the step it chose; agent reported.
+    """
+
+    decision_id: Annotated[str, Field(title="Decision Id")]
+    assessment: Annotated[str | None, Field(title="Assessment")] = None
+    interpretation: Annotated[str, Field(title="Interpretation")]
+    next_action: Annotated[str, Field(title="Next Action")]
+    next_detail: Annotated[str, Field(title="Next Detail")] = ""
+    evidence_action_ids: Annotated[list[str] | None, Field(title="Evidence Action Ids")] = None
+    evaluation_ids: Annotated[list[str] | None, Field(title="Evaluation Ids")] = None
+    next_action_id: Annotated[str | None, Field(title="Next Action Id")] = None
+    superseded_by_decision_id: Annotated[str | None, Field(title="Superseded By Decision Id")] = (
+        None
+    )
+    supersedes_decision_id: Annotated[str | None, Field(title="Supersedes Decision Id")] = None
+
+
+class Kind(StrEnum):
+    sequence = "sequence"
+    evidence = "evidence"
+    next_action = "next_action"
+    retry_of = "retry_of"
+    escalation = "escalation"
+    follow_up = "follow_up"
+
+
+class AgentSessionGraphEdge(BaseModel):
+    """
+    A typed link between two nodes.
+
+    ``sequence`` is temporal only: the next measurement dispatched. Every other kind comes from
+    an explicit reference in a record (a decision's evidence or next action, a declared repeat,
+    an intervention's action or predecessor); no scientific dependency is inferred from time.
+    """
+
+    edge_id: Annotated[str, Field(title="Edge Id")]
+    kind: Annotated[Kind, Field(title="Kind")]
+    source: Annotated[str, Field(title="Source")]
+    target: Annotated[str, Field(title="Target")]
+
+
+class AgentSessionGraphIntervention(BaseModel):
+    """
+    A stop for an expert and the expert's answer.
+    """
+
+    intervention_id: Annotated[str, Field(title="Intervention Id")]
+    reason: Annotated[str, Field(title="Reason")]
+    status: Annotated[str, Field(title="Status")]
+    question: Annotated[str, Field(title="Question")]
+    summary: Annotated[str, Field(title="Summary")] = ""
+    pauses_session: Annotated[bool, Field(title="Pauses Session")] = False
+    response_decision: Annotated[str | None, Field(title="Response Decision")] = None
+    response_guidance: Annotated[str, Field(title="Response Guidance")] = ""
+    responded_by: Annotated[str | None, Field(title="Responded By")] = None
+    responded_at: Annotated[AwareDatetime | None, Field(title="Responded At")] = None
+    resumed_at: Annotated[AwareDatetime | None, Field(title="Resumed At")] = None
+    resume_outcome: Annotated[str | None, Field(title="Resume Outcome")] = None
+
+
+class AgentSessionGraphMeasurement(BaseModel):
+    """
+    A measurement the session authorized, and what its real execution reports.
+    """
+
+    action_id: Annotated[str, Field(title="Action Id")]
+    task_name: Annotated[str | None, Field(title="Task Name")] = None
+    qid: Annotated[str | None, Field(title="Qid")] = None
+    sequence: Annotated[int | None, Field(title="Sequence")] = None
+    """
+    1-based dispatch order among the session's measurements; null before dispatch
+    """
+    attempt: Annotated[int | None, Field(title="Attempt")] = None
+    """
+    1-based count of dispatched measurements of this task on this target
+    """
+    repeat_of_action_id: Annotated[str | None, Field(title="Repeat Of Action Id")] = None
+    """
+    The measurement this one repeats, as the agent declared it
+    """
+    dispatch_status: Annotated[str, Field(title="Dispatch Status")]
+    """
+    The action's own dispatch state
+    """
+    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
+    execution_status: Annotated[str | None, Field(title="Execution Status")] = None
+    """
+    The real execution's status; null before it exists
+    """
+    task_id: Annotated[str | None, Field(title="Task Id")] = None
+    task_status: Annotated[str | None, Field(title="Task Status")] = None
+    started_at: Annotated[AwareDatetime | None, Field(title="Started At")] = None
+    finished_at: Annotated[AwareDatetime | None, Field(title="Finished At")] = None
+    figure_count: Annotated[int, Field(title="Figure Count")] = 0
+    evaluation_id: Annotated[str | None, Field(title="Evaluation Id")] = None
+    """
+    The latest evaluation of the task
+    """
+    evaluation_status: Annotated[str | None, Field(title="Evaluation Status")] = None
+    intent: Annotated[str, Field(title="Intent")] = ""
+    """
+    The agent's stated intent; agent reported
+    """
+
+
+class Kind1(StrEnum):
+    measurement = "measurement"
+    proposal = "proposal"
+    session_action = "session_action"
+    decision = "decision"
+    intervention = "intervention"
+
+
+class AgentSessionGraphProposal(BaseModel):
+    """
+    An action that did not reach hardware: rejected by the policy.
+    """
+
+    action_id: Annotated[str, Field(title="Action Id")]
+    action_type: Annotated[str, Field(title="Action Type")]
+    task_name: Annotated[str | None, Field(title="Task Name")] = None
+    qids: Annotated[list[str] | None, Field(title="Qids")] = None
+    reason: Annotated[str, Field(title="Reason")] = ""
+    """
+    Why the policy rejected it
+    """
+    intent: Annotated[str, Field(title="Intent")] = ""
+    """
+    The agent's stated intent; agent reported
+    """
+
+
+class AgentSessionGraphSessionAction(BaseModel):
+    """
+    An authorized action other than a measurement: asking for an expert, or completing.
+    """
+
+    action_id: Annotated[str, Field(title="Action Id")]
+    action_type: Annotated[str, Field(title="Action Type")]
+    reason: Annotated[str, Field(title="Reason")] = ""
+
+
+class AgentSessionGroupCounts(BaseModel):
+    """
+    What one agent session has done, counted from its own records.
+    """
+
+    actions: Annotated[int, Field(title="Actions")]
+    """
+    Actions the session counted against its budget
+    """
+    max_actions: Annotated[int, Field(title="Max Actions")]
+    """
+    The session's action budget
+    """
+    measurements: Annotated[int, Field(title="Measurements")]
+    """
+    Dispatched measurements linked to a real execution on the session's chip
+    """
+    pending_dispatch: Annotated[int, Field(title="Pending Dispatch")]
+    """
+    Authorized measurements without an execution yet: not dispatched, being dispatched, queued, or whose execution record was not found
+    """
+    dispatch_failed: Annotated[int, Field(title="Dispatch Failed")] = 0
+    """
+    Authorized measurements whose dispatch failed before an execution
+    """
+    in_flight: Annotated[int, Field(title="In Flight")]
+    """
+    Measurements being dispatched or queued, or whose execution is scheduled, running, or cancelling
+    """
+    rejected_proposals: Annotated[int, Field(title="Rejected Proposals")]
+    """
+    Proposals the session policy rejected; they never reached hardware
+    """
+    open_interventions: Annotated[int, Field(title="Open Interventions")]
+    """
+    Requests for an expert not answered yet
+    """
+    decisions: Annotated[int, Field(title="Decisions")]
+    """
+    Agent decisions recorded in the session
+    """
+
+
+class Kind2(StrEnum):
+    measurement = "measurement"
+    candidate_commit = "candidate_commit"
+    candidate_set_commit = "candidate_set_commit"
+    backend_apply = "backend_apply"
+
+
+class AgentSessionInFlightOperation(BaseModel):
+    """
+    An operation that passed the session gate before the session ended and has not settled.
+
+    QDash does not cancel it: a measurement keeps running on the hardware and its result
+    is recorded; a commit or backend apply finishes or fails on its own.
+    """
+
+    kind: Annotated[Kind2, Field(title="Kind")]
+    id: Annotated[str, Field(title="Id")]
+    """
+    The action, commit, or candidate set commit ID
+    """
+    status: Annotated[str, Field(title="Status")]
+    """
+    Its status as QDash records it now
+    """
+    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
+    """
+    The measurement's execution, once QDash knows it
+    """
+
+
+class AgentSessionLifecycleEvent(StrEnum):
+    """
+    A session lifecycle event announced in the agent Slack channel.
+    """
+
+    started = "started"
+    completed = "completed"
+    cancelled = "cancelled"
+    expired = "expired"
+
+
+class AgentSessionNotificationResponse(BaseModel):
+    """
+    Slack delivery state of one session lifecycle message.
+    """
+
+    event: AgentSessionLifecycleEvent
+    actor: Annotated[str, Field(title="Actor")] = ""
+    status: AgentNotificationStatus
+    attempts: Annotated[int, Field(title="Attempts")]
+    last_error: Annotated[str, Field(title="Last Error")]
+    last_attempt_at: Annotated[AwareDatetime | None, Field(title="Last Attempt At")] = None
+    next_attempt_at: Annotated[AwareDatetime | None, Field(title="Next Attempt At")] = None
+    sent_at: Annotated[AwareDatetime | None, Field(title="Sent At")] = None
 
 
 class AgentSessionStatus(StrEnum):
@@ -198,6 +1027,80 @@ class AgentSessionStatus(StrEnum):
     expired = "expired"
 
 
+class AgentSessionStopRecord(BaseModel):
+    """
+    Who stopped a session with a stop request, why, and when.
+
+    Stored by the one update that moves the session to ``cancelled``. A stop ends the
+    session's authority to start, commit, or apply anything; it does not cancel a
+    measurement, commit, or backend apply that passed the session gate before it.
+    """
+
+    stopped_by: Annotated[str, Field(title="Stopped By")]
+    """
+    The signed-in account that sent the stop
+    """
+    stopped_at: Annotated[AwareDatetime, Field(title="Stopped At")]
+    reason: Annotated[str, Field(title="Reason")]
+    """
+    Why, as the person gave it
+    """
+    idempotency_key: Annotated[str, Field(title="Idempotency Key")]
+    """
+    The stop request's key, so a retry is a no-op
+    """
+    status_before: AgentSessionStatus
+    """
+    active or waiting_for_human, the status the stop ended
+    """
+    state_version: Annotated[int, Field(title="State Version")]
+    """
+    The session state version the stop created
+    """
+
+
+class AgentSkill(BaseModel):
+    """
+    A skill the chat can run; the user invokes it with ``/skill:<name>``.
+    """
+
+    name: Annotated[str, Field(title="Name")]
+    """
+    Skill name, as typed after /skill:
+    """
+    description: Annotated[str, Field(title="Description")] = ""
+    """
+    What the skill is for
+    """
+
+
+class AgentSkillList(BaseModel):
+    """
+    The skills the Agent runtime has loaded, for the chat composer's / menu.
+    """
+
+    skills: Annotated[list[AgentSkill] | None, Field(title="Skills")] = None
+
+
+class AgentSystemPrompt(BaseModel):
+    """
+    What QDash tells the chat model, read-only: its system prompt and this user's part.
+    """
+
+    system_prompt: Annotated[str, Field(title="System Prompt")]
+    """
+    QDash's system prompt for chats, set by the application
+    """
+    user_preferences: Annotated[str | None, Field(title="User Preferences")] = None
+    """
+    This user's instructions as they are appended to it, or None when unset
+    """
+    tools: Annotated[list[str] | None, Field(title="Tools")] = None
+    """
+    Tools offered to the chat; their descriptions are sent with each request
+    """
+
+
 class ApplyAgentCandidateRequest(BaseModel):
     """
     Dispatch a committed candidate for worker-side backend application.
@@ -206,6 +1109,10 @@ class ApplyAgentCandidateRequest(BaseModel):
     idempotency_key: Annotated[str, Field(max_length=128, min_length=1, title="Idempotency Key")]
     expected_state_version: Annotated[int, Field(ge=0, title="Expected State Version")]
     push_to_github: Annotated[bool, Field(title="Push To Github")] = False
+    autonomous: Annotated[bool, Field(title="Autonomous")] = False
+    """
+    Apply under the session's parameter_updates authority instead of a per-call approval. QDash then also requires that the signed-in user created the auto session, that its approval granted apply_backend, that the commit was made under that authority in this session and is still the stored value, and that no earlier apply of it was requested. push_to_github must stay false.
+    """
 
 
 class ArtifactPreviewResponse(BaseModel):
@@ -270,6 +1177,20 @@ class BodyLogin(BaseModel):
     password: Annotated[str, Field(title="Password")]
 
 
+class CalibrationSessionId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Calibration Session Id")]
+    """
+    Add the run to this calibration session (open, on the task's chip, created by the signed-in user); otherwise the request is refused before anything starts. Without it, the run joins an automatic session created for it.
+    """
+
+
+class IdempotencyKey(RootModel[str]):
+    root: Annotated[str, Field(max_length=128, min_length=1, title="Idempotency Key")]
+    """
+    A retry with the same key and request returns the recorded run instead of starting another. Without a key, every request starts a new run.
+    """
+
+
 class BodyReExecuteTaskResult(BaseModel):
     parameter_overrides: Annotated[
         dict[str, dict[str, Any]] | None, Field(title="Parameter Overrides")
@@ -285,6 +1206,16 @@ class BodyReExecuteTaskResult(BaseModel):
     """
     Run Configure (system_manager load + push) before executing the task
     """
+    calibration_session_id: Annotated[
+        CalibrationSessionId | None, Field(title="Calibration Session Id")
+    ] = None
+    """
+    Add the run to this calibration session (open, on the task's chip, created by the signed-in user); otherwise the request is refused before anything starts. Without it, the run joins an automatic session created for it.
+    """
+    idempotency_key: Annotated[IdempotencyKey | None, Field(title="Idempotency Key")] = None
+    """
+    A retry with the same key and request returns the recorded run instead of starting another. Without a key, every request starts a new run.
+    """
 
 
 class BodyUploadForumImage(BaseModel):
@@ -297,7 +1228,99 @@ class BodyUploadForumImage(BaseModel):
     ]
 
 
-class Status(StrEnum):
+class CalibrationAdmission(StrEnum):
+    """
+    Whether an agent session created in a calibration session may operate.
+
+    An agent session created with a calibration session ID is written ``pending`` and can do
+    nothing (no action, measurement, commit, apply, or pause) until its reservation in the
+    calibration session is finalized. Finalizing removes the reservation and records its ID in
+    ``CalibrationSessionDocument.admitted_reservation_ids`` in one update, so the outcome is
+    durable proof in the parent:
+
+    ``admitted``: the reservation was finalized; the session operates under its own policy.
+    ``rejected``: the reservation was cleared without being finalized (the calibration session
+    was closed first). The session is cancelled and never operates.
+
+    A session created alone, or before admission existed, has no admission and keeps the
+    behavior it always had.
+    """
+
+    pending = "pending"
+    admitted = "admitted"
+    rejected = "rejected"
+
+
+class CalibrationChildKind(StrEnum):
+    """
+    What a child of a calibration session is.
+    """
+
+    pipeline_run = "pipeline_run"
+    agent_session = "agent_session"
+
+
+class CalibrationChildReservation(BaseModel):
+    """
+    A child counted in a calibration session before its own record is written.
+
+    The reservation is pushed into the session by the same conditional update that checks the
+    session is open, with the ID the child will have. The request that made it removes it
+    (``finalize``) once the child's record exists, and only then may a pipeline run be
+    launched. Closing the session clears every reservation it accepts; a request whose
+    reservation was cleared undoes its child instead of starting it.
+    """
+
+    reservation_id: Annotated[str, Field(title="Reservation Id")]
+    kind: CalibrationChildKind
+    child_id: Annotated[str, Field(title="Child Id")]
+    reserved_by: Annotated[str, Field(title="Reserved By")]
+    reserved_at: Annotated[AwareDatetime, Field(title="Reserved At")]
+
+
+class RecommendedCandidateId(RootModel[str]):
+    root: Annotated[str, Field(pattern="^[A-Za-z0-9_.:-]{1,64}$", title="Recommended Candidate Id")]
+
+
+class CalibrationDecisionOutcome(StrEnum):
+    """
+    What a final decision recommends; a statement of the person or agent recording it.
+
+    ``recommend_candidate``: a candidate other than the baseline, backed by its confirmation
+    experiments. ``keep_baseline``: the baseline candidate stays the recommendation.
+    ``inconclusive``: the evidence supports no recommendation.
+    """
+
+    recommend_candidate = "recommend_candidate"
+    keep_baseline = "keep_baseline"
+    inconclusive = "inconclusive"
+
+
+class EvidenceStatus(StrEnum):
+    complete = "complete"
+    partial = "partial"
+    running = "running"
+    failed = "failed"
+    unavailable = "unavailable"
+    not_run = "not_run"
+
+
+class CalibrationExperimentStage(StrEnum):
+    """
+    Where one experiment stands in an optimization search.
+
+    ``baseline``: the incumbent's evidence the search starts from.
+    ``screening``: a candidate condition measured to decide whether it is worth confirming.
+    ``confirmation``: a whole-arm rerun of a candidate or the incumbent, used for the final
+    comparison. Only confirmation evidence may back a recommendation of a new candidate.
+    """
+
+    baseline = "baseline"
+    screening = "screening"
+    confirmation = "confirmation"
+
+
+class Status1(StrEnum):
     disabled = "disabled"
     synced = "synced"
     failed = "failed"
@@ -308,9 +1331,88 @@ class CalibrationGitHubSync(BaseModel):
     GitHub synchronization result, independent of the applied calibration values.
     """
 
-    status: Annotated[Status, Field(title="Status")] = Status.disabled
+    status: Annotated[Status1, Field(title="Status")] = Status1.disabled
     commit: Annotated[str | None, Field(title="Commit")] = None
     message: Annotated[str, Field(title="Message")] = ""
+
+
+class CalibrationGroupCounts(BaseModel):
+    """
+    What a calibration session row holds, counted from its explicit records.
+    """
+
+    pipeline_runs: Annotated[int, Field(title="Pipeline Runs")]
+    """
+    Pipeline runs recorded in the session
+    """
+    agent_sessions: Annotated[int, Field(title="Agent Sessions")]
+    """
+    Admitted agent sessions on the chip in the session
+    """
+    executions: Annotated[int, Field(title="Executions")]
+    """
+    Executions of its runs and agent sessions, every day
+    """
+    executions_in_filter: Annotated[int, Field(title="Executions In Filter")]
+    """
+    Of those, the ones matching the day filter
+    """
+    running: Annotated[int, Field(title="Running")]
+    """
+    Executions scheduled, running, or cancelling
+    """
+    failed: Annotated[int, Field(title="Failed")]
+    """
+    Executions that failed
+    """
+    unknown_dispatch: Annotated[int, Field(title="Unknown Dispatch")] = 0
+    """
+    Runs whose dispatch outcome is unknown; they may be running
+    """
+    decisions: Annotated[int, Field(title="Decisions")] = 0
+    """
+    Decisions recorded in the session's audit
+    """
+
+
+class ExecutionOutcome(StrEnum):
+    refused = "refused"
+    unknown = "unknown"
+    no_execution = "no_execution"
+    running = "running"
+    failed = "failed"
+    partial = "partial"
+    completed = "completed"
+
+
+class CalibrationMeasuredTask(BaseModel):
+    """
+    A task result on the experiment's target, with its actual timing.
+    """
+
+    task_id: Annotated[str, Field(title="Task Id")]
+    name: Annotated[str, Field(title="Name")]
+    status: Annotated[str, Field(title="Status")]
+    execution_id: Annotated[str, Field(title="Execution Id")]
+    start_at: Annotated[AwareDatetime | None, Field(title="Start At")] = None
+    end_at: Annotated[AwareDatetime | None, Field(title="End At")] = None
+    elapsed_seconds: Annotated[float | None, Field(title="Elapsed Seconds")] = None
+
+
+class CalibrationMeasuredValue(BaseModel):
+    """
+    One output parameter of a task result, read from QDash's task result history.
+    """
+
+    value: Annotated[float, Field(title="Value")]
+    error: Annotated[float | None, Field(title="Error")] = None
+    """
+    The task's reported error, if any
+    """
+    unit: Annotated[str, Field(title="Unit")] = ""
+    task_id: Annotated[str, Field(title="Task Id")]
+    task_name: Annotated[str, Field(title="Task Name")]
+    execution_id: Annotated[str, Field(title="Execution Id")]
 
 
 class CalibrationNoteResponse(BaseModel):
@@ -325,6 +1427,25 @@ class CalibrationNoteResponse(BaseModel):
     timestamp: Annotated[AwareDatetime | None, Field(title="Timestamp")] = None
 
 
+class CalibrationParameterCheck(BaseModel):
+    """
+    One requested change, compared with the exact request and with what the task used.
+
+    ``requested`` is the decision's statement; ``in_spec`` is the run's stored spec (server
+    record); ``executed`` is the task result's run parameter (server record). ``consistent`` is
+    null when either record is missing.
+    """
+
+    task_name: Annotated[str, Field(title="Task Name")]
+    call_id: Annotated[str | None, Field(title="Call Id")] = None
+    parameter: Annotated[str, Field(title="Parameter")]
+    requested: Annotated[bool | int | float | str | None, Field(title="Requested")] = None
+    in_spec: Annotated[bool | int | float | str | None, Field(title="In Spec")] = None
+    executed: Annotated[bool | int | float | str | None, Field(title="Executed")] = None
+    consistent: Annotated[bool | None, Field(title="Consistent")] = None
+    missing: Annotated[list[str] | None, Field(title="Missing")] = None
+
+
 class CalibrationParameterDeleteResponse(BaseModel):
     """
     Response from deleting one current calibration parameter value.
@@ -334,6 +1455,108 @@ class CalibrationParameterDeleteResponse(BaseModel):
     qid: Annotated[str, Field(title="Qid")]
     parameter_name: Annotated[str, Field(title="Parameter Name")]
     deleted: Annotated[bool, Field(title="Deleted")] = True
+
+
+class CalibrationPipelineRunStatus(StrEnum):
+    """
+    Dispatch state of one run, whatever its kind.
+
+    ``dispatching``: the request was recorded and its launch has not reported back.
+    ``dispatched``: QDash created the run's flow run; its executions carry its ``run_id``.
+    ``rejected``: QDash refused the launch before any flow run was created (the hardware was
+    busy, the worker deployment was missing, or the attempt was never admitted); a retry with
+    the same key may launch it.
+    ``unknown``: the launch failed in a way that may have created a flow run anyway, or it
+    stayed ``dispatching`` past the time a launch takes. A retry with the same key never
+    launches it again.
+    """
+
+    dispatching = "dispatching"
+    dispatched = "dispatched"
+    rejected = "rejected"
+    unknown = "unknown"
+
+
+class CalibrationRecommendationRef(BaseModel):
+    """
+    The session's current recommendation: a decision's conclusion, never a status.
+    """
+
+    decision_id: Annotated[str, Field(title="Decision Id")]
+    outcome: Annotated[str, Field(title="Outcome")]
+    recommended_candidate_id: Annotated[str | None, Field(title="Recommended Candidate Id")] = None
+    recorded_at: Annotated[AwareDatetime, Field(title="Recorded At")]
+
+
+class CalibrationRunKind(StrEnum):
+    """
+    What one run launched.
+
+    ``pipeline``: a calibration pipeline spec (every run recorded before other kinds existed).
+    ``workflow``: a saved workflow (flow). ``task``: one catalog task, from the Task Workbench
+    or a re-execution. ``agent_action``: the task an agent session's action ran.
+    """
+
+    pipeline = "pipeline"
+    workflow = "workflow"
+    task = "task"
+    agent_action = "agent_action"
+
+
+class CalibrationRunTrigger(StrEnum):
+    """
+    Who started a run, as QDash recorded it.
+
+    ``api``: a signed-in request to QDash recorded the run before launching it. ``schedule``:
+    Prefect's scheduler started the flow run from a cron schedule; the worker recorded it when
+    the flow started. ``worker``: the worker found a flow run QDash had not recorded (a
+    one-time schedule, or a run started in Prefect directly) and recorded it when it started.
+    """
+
+    api = "api"
+    schedule = "schedule"
+    worker = "worker"
+
+
+class CalibrationSessionCloseOrigin(StrEnum):
+    """
+    Who closed a calibration session.
+
+    ``manual``: the person who created it closed it (every session closed before this was
+    recorded). ``automatic``: QDash closed an automatic session once every run and agent
+    session in it had ended and nothing was being started, dispatched, or settled in it. An
+    automatic close only stops new runs from joining; it cancels nothing and judges nothing.
+    """
+
+    manual = "manual"
+    automatic = "automatic"
+
+
+class CalibrationSessionOrigin(StrEnum):
+    """
+    How a calibration session came to exist.
+
+    ``manual``: a person or agent created it for an objective (every session recorded before
+    automatic sessions existed). ``automatic``: QDash created it for a run started without a
+    session ID; it is an ordinary session that a later run may name to add to it.
+    """
+
+    manual = "manual"
+    automatic = "automatic"
+
+
+class CalibrationSessionStatus(StrEnum):
+    """
+    Whether a calibration session accepts new runs.
+
+    ``closed`` says that work on the objective has ended: a person's statement, or, for an
+    automatic session, QDash's record that everything started in it ended (see
+    ``CalibrationSessionCloseOrigin``). It says nothing about whether the objective was met or
+    how the runs ended, and is refused while a child still runs or waits.
+    """
+
+    open = "open"
+    closed = "closed"
 
 
 class CancelExecutionResponse(BaseModel):
@@ -430,7 +1653,7 @@ class ChipConfigOptions(BaseModel):
     """
 
 
-class Status1(StrEnum):
+class Status2(StrEnum):
     created = "created"
     existing = "existing"
     skipped = "skipped"
@@ -441,7 +1664,7 @@ class ChipConfigResult(BaseModel):
     Outcome of creating the chip's configuration directory.
     """
 
-    status: Annotated[Status1, Field(title="Status")]
+    status: Annotated[Status2, Field(title="Status")]
     path: Annotated[str, Field(title="Path")]
     source_system_id: Annotated[str | None, Field(title="Source System Id")] = None
     backend: Annotated[str | None, Field(title="Backend")] = None
@@ -499,6 +1722,36 @@ class ActivityStatus(StrEnum):
     inactive = "inactive"
 
 
+class ClaimAgentResumeRequest(BaseModel):
+    """
+    A runner claims an authorized resume; one claim key owns the resumed run.
+    """
+
+    claim_key: Annotated[str, Field(max_length=128, min_length=1, title="Claim Key")]
+
+
+class CloseCalibrationSessionRequest(BaseModel):
+    """
+    End work on a calibration session's objective.
+    """
+
+    closing_note: Annotated[str, Field(max_length=2000, title="Closing Note")] = ""
+    """
+    What the person closing it wants recorded; QDash does not judge the outcome
+    """
+    acknowledge_unknown_runs: Annotated[bool, Field(title="Acknowledge Unknown Runs")] = False
+    """
+    Close although some pipeline runs have an unknown dispatch outcome, or some agent session starts were reserved long ago and never recorded, after checking the Execution list and the agent sessions for them. They are recorded with the closure. Such a pipeline run was admitted: it may be running or may still start after the close, which does not cancel it. Such an agent session was never admitted: if it is recorded later it is rejected and never operates.
+    """
+
+
+class DecisionId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Decision Id")]
+    """
+    The recorded pass decision an autonomous commit rests on
+    """
+
+
 class CommitAgentCandidateRequest(BaseModel):
     """
     Commit one server-derived candidate into authoritative calibration state.
@@ -507,6 +1760,14 @@ class CommitAgentCandidateRequest(BaseModel):
     idempotency_key: Annotated[str, Field(max_length=128, min_length=1, title="Idempotency Key")]
     expected_state_version: Annotated[int, Field(ge=0, title="Expected State Version")]
     task_id: Annotated[str, Field(max_length=200, min_length=1, title="Task Id")]
+    autonomous: Annotated[bool, Field(title="Autonomous")] = False
+    """
+    Commit under the session's parameter_updates authority instead of a per-call approval. QDash then also requires that the signed-in user created the auto session, that its approval granted updates of this parameter from this task, that decision_id is the agent's latest pass assessment of exactly this measurement, that the measurement is the newest finished one of its task and qubit and nothing else of the session is running, that no assessment of it was fail or inconclusive, and that the stored value did not change since it was measured.
+    """
+    decision_id: Annotated[DecisionId | None, Field(title="Decision Id")] = None
+    """
+    The recorded pass decision an autonomous commit rests on
+    """
 
 
 class CommitAgentCandidateSetRequest(BaseModel):
@@ -636,116 +1897,60 @@ class CooldownWiringEventResponse(BaseModel):
     created_at: Annotated[AwareDatetime, Field(title="Created At")]
 
 
-class CopilotChatBranchSchema(BaseModel):
-    """
-    Where a branched chat came from.
-    """
-
-    source_session_id: Annotated[str, Field(title="Source Session Id")]
-    """
-    The chat session it was branched from
-    """
-    source_entry_id: Annotated[str, Field(title="Source Entry Id")]
-    """
-    The answer it was branched at
-    """
-
-
-class EntryId(RootModel[str]):
-    root: Annotated[str, Field(pattern="^[0-9]{1,15}$", title="Entry Id")]
-    """
-    An assistant answer's entry in the runtime's transcript, from the chat stream's result; the chat can be branched from that answer
-    """
-
-
-class CopilotChatSessionSummary(BaseModel):
-    """
-    Lightweight session entry used in the session list.
-    """
-
-    session_id: Annotated[str, Field(title="Session Id")]
-    title: Annotated[str, Field(title="Title")]
-    context: Annotated[dict[str, Any] | None, Field(title="Context")] = None
-    message_count: Annotated[int, Field(title="Message Count")] = 0
-    branch: CopilotChatBranchSchema | None = None
-    created_at: Annotated[AwareDatetime, Field(title="Created At")]
-    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
-
-
-class EntryId1(RootModel[str]):
-    root: Annotated[str, Field(max_length=64, title="Entry Id")]
-
-
-class Placement(StrEnum):
-    """
-    exact: the chat saw where it landed. approximate: it was confirmed after the answer it interrupted was saved as one message, and follows that message.
-    """
-
-    exact = "exact"
-    approximate = "approximate"
-
-
-class CopilotChatSteerSchema(BaseModel):
-    """
-    Where a user message sent while an answer was written landed in the conversation.
-    """
-
-    request_id: Annotated[str, Field(max_length=200, min_length=1, title="Request Id")]
-    entry_id: Annotated[EntryId1 | None, Field(title="Entry Id")] = None
-    placement: Annotated[Placement, Field(title="Placement")] = Placement.exact
-    """
-    exact: the chat saw where it landed. approximate: it was confirmed after the answer it interrupted was saved as one message, and follows that message.
-    """
-
-
-class CopilotPreferences(BaseModel):
-    """
-    The current user's Copilot preferences.
-    """
-
-    instructions: Annotated[str, Field(max_length=2000, title="Instructions")] = ""
-    """
-    Instructions added to every chat of this user (style, language, formats). They apply to chat only, not to evaluations or forum replies, and cannot override the approval of write operations.
-    """
-    max_instructions_chars: Annotated[int, Field(title="Max Instructions Chars")] = 2000
-    """
-    Longest instructions accepted
-    """
-
-
-class CopilotPreferencesUpdate(BaseModel):
-    """
-    Replace the current user's Copilot instructions; empty clears them.
-    """
-
-    instructions: Annotated[str, Field(max_length=2000, title="Instructions")] = ""
-
-
-class CopilotSystemPrompt(BaseModel):
-    """
-    What QDash tells the chat model, read-only: its system prompt and this user's part.
-    """
-
-    system_prompt: Annotated[str, Field(title="System Prompt")]
-    """
-    QDash's system prompt for chats, set by the application
-    """
-    user_preferences: Annotated[str | None, Field(title="User Preferences")] = None
-    """
-    This user's instructions as they are appended to it, or None when unset
-    """
-    tools: Annotated[list[str] | None, Field(title="Tools")] = None
-    """
-    Tools offered to the chat; their descriptions are sent with each request
-    """
-
-
 class CouplingGateDuration(BaseModel):
     """
     Gate duration of the coupling.
     """
 
     rzx90: Annotated[int, Field(title="Rzx90")]
+
+
+class CreateAgentChatBranchRequest(BaseModel):
+    """
+    Body for POST /agent/chat/sessions/{session_id}/branches.
+    """
+
+    entry_id: Annotated[str, Field(pattern="^[0-9]{1,15}$", title="Entry Id")]
+    """
+    The saved answer to branch at: its runtime entry ID
+    """
+    target_session_id: Annotated[
+        str, Field(max_length=200, min_length=1, title="Target Session Id")
+    ]
+    """
+    Client-generated ID of the new chat session; sending the same request again returns the same branch
+    """
+
+
+class NodeId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Node Id")]
+
+
+class TaskName(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Task Name")]
+
+
+class PreviousInterventionId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Previous Intervention Id")]
+
+
+class CalibrationSessionId1(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Calibration Session Id")]
+    """
+    Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy. Without it, the session joins an automatic calibration session created for it.
+    """
+
+
+class CreateCalibrationSessionRequest(BaseModel):
+    """
+    Start a calibration session for one objective on one chip.
+    """
+
+    chip_id: Annotated[str, Field(max_length=200, min_length=1, title="Chip Id")]
+    objective: Annotated[str, Field(max_length=500, min_length=1, title="Objective")]
+    """
+    What the calibration is for, in a person's words; shown with every run
+    """
 
 
 class CreateChipRequest(BaseModel):
@@ -771,23 +1976,6 @@ class CreateChipRequest(BaseModel):
     """
 
 
-class CreateCopilotChatBranchRequest(BaseModel):
-    """
-    Body for POST /copilot/chat/sessions/{session_id}/branches.
-    """
-
-    entry_id: Annotated[str, Field(pattern="^[0-9]{1,15}$", title="Entry Id")]
-    """
-    The saved answer to branch at: its runtime entry ID
-    """
-    target_session_id: Annotated[
-        str, Field(max_length=200, min_length=1, title="Target Session Id")
-    ]
-    """
-    Client-generated ID of the new chat session; sending the same request again returns the same branch
-    """
-
-
 class Trigger(StrEnum):
     """
     "bulk" from the chip page, "single" for one task result
@@ -805,6 +1993,26 @@ class Mode(StrEnum):
 
     direct = "direct"
     planner = "planner"
+
+
+class CreatePipelinePlanRequest(BaseModel):
+    """
+    Store a validated spec as a plan that can be approved and run by reference.
+    """
+
+    chip_id: Annotated[str, Field(min_length=1, title="Chip Id")]
+    spec: Annotated[dict[str, Any], Field(title="Spec")]
+    """
+    CalibrationPipelineSpec as JSON; see GET /calibration-pipelines/catalog.
+    """
+    backend_name: Annotated[str | None, Field(title="Backend Name")] = None
+    """
+    Defaults to the configured backend.
+    """
+    idempotency_key: Annotated[str, Field(max_length=128, min_length=1, title="Idempotency Key")]
+    """
+    Identity of this creation, such as the tool call that asks for it. While the plan it created is stored (until seven days after the plan expires), repeating it with the same request returns that plan, or reports it expired, and repeating it with another request is a conflict; it never changes or renews that plan. After the plan is deleted the key is free again: the same key then creates a new plan with a new plan_id and review_digest that needs its own approval.
+    """
 
 
 class CryostatCreateRequest(BaseModel):
@@ -1055,7 +2263,7 @@ class EvaluationFigureModel(BaseModel):
     """
 
 
-class Status2(StrEnum):
+class Status3(StrEnum):
     pending = "pending"
     running = "running"
     completed = "completed"
@@ -1193,7 +2401,7 @@ class Mode1(StrEnum):
     planner = "planner"
 
 
-class Status3(StrEnum):
+class Status4(StrEnum):
     running = "running"
     completed = "completed"
     interrupted = "interrupted"
@@ -1258,7 +2466,22 @@ class EvaluatorModel(BaseModel):
     """
 
 
-class SourceExecutionId(RootModel[str]):
+class ExcludedTarget(BaseModel):
+    """
+    A candidate a filter left out, and why.
+    """
+
+    target: Annotated[str, Field(title="Target")]
+    """
+    Qubit ID the filter removed from the candidates
+    """
+    reason: Annotated[str, Field(title="Reason")]
+    """
+    Why it did not pass, read from the source result
+    """
+
+
+class SourceExecutionId1(RootModel[str]):
     root: Annotated[str, Field(max_length=200, min_length=1, title="Source Execution Id")]
     """
     Execution the action was decided from, kept for provenance. The run reads the current calibration state, as a Task Workbench run does.
@@ -1270,14 +2493,32 @@ class ExecuteAgentActionRequest(BaseModel):
     Dispatch one authorized run-task action as a staged measurement.
     """
 
-    source_execution_id: Annotated[SourceExecutionId | None, Field(title="Source Execution Id")] = (
-        None
-    )
+    source_execution_id: Annotated[
+        SourceExecutionId1 | None, Field(title="Source Execution Id")
+    ] = None
     """
     Execution the action was decided from, kept for provenance. The run reads the current calibration state, as a Task Workbench run does.
     """
     update_params: Annotated[bool, Field(title="Update Params")] = False
     reconfigure: Annotated[bool, Field(title="Reconfigure")] = False
+    autonomous: Annotated[bool, Field(title="Autonomous")] = False
+    """
+    The dispatch is an autonomous step. QDash then also requires that the signed-in user created the session, that its autonomy is auto, and that no other measurement of the session is being dispatched or running.
+    """
+
+
+class CalibrationSessionId2(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Calibration Session Id")]
+    """
+    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
+    """
+
+
+class IdempotencyKey1(RootModel[str]):
+    root: Annotated[str, Field(max_length=128, min_length=1, title="Idempotency Key")]
+    """
+    A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run.
+    """
 
 
 class ExecuteFlowResponse(BaseModel):
@@ -1305,21 +2546,24 @@ class ExecuteFlowResponse(BaseModel):
     """
     Success message
     """
+    calibration_session_id: Annotated[str | None, Field(title="Calibration Session Id")] = None
+    """
+    The calibration session the run joined: the one the request named, or an automatic one; null when the run joined none
+    """
+    calibration_run_id: Annotated[str | None, Field(title="Calibration Run Id")] = None
+    """
+    The run QDash recorded for the launch; every step execution carries it. Null only for a run the worker records when it starts (a saved flow with no chip)
+    """
+    replayed: Annotated[bool, Field(title="Replayed")] = False
+    """
+    True when a retry returned the run an earlier request with its key started
+    """
 
 
-class ExecutePipelineRequest(BaseModel):
+class DecisionId1(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Decision Id")]
     """
-    Validate, then dispatch the pipeline as one execution.
-    """
-
-    chip_id: Annotated[str, Field(min_length=1, title="Chip Id")]
-    spec: Annotated[dict[str, Any], Field(title="Spec")]
-    """
-    CalibrationPipelineSpec as JSON; see GET /calibration-pipelines/catalog.
-    """
-    backend_name: Annotated[str | None, Field(title="Backend Name")] = None
-    """
-    Defaults to the configured backend.
+    With calibration_session_id: the decision of that session this run carries out, recorded before dispatch with an experiment. QDash checks it belongs to the session and records the link on the run; it grants nothing.
     """
 
 
@@ -1402,6 +2646,31 @@ class ExecutionActivityResponse(BaseModel):
     """
 
 
+class ExecutionAgentSessionLink(BaseModel):
+    """
+    The agent session an execution belongs to, as its records establish it.
+    """
+
+    session_id: Annotated[str, Field(title="Session Id")]
+    linked: Annotated[bool, Field(title="Linked")]
+    """
+    True when an action of the session dispatched this execution on the same chip; false when only a tag names the session, which is no authority to group it
+    """
+    action_id: Annotated[str | None, Field(title="Action Id")] = None
+    status: AgentSessionStatus | None = None
+    """
+    The session's state, when the session is in this project
+    """
+    created_by: Annotated[str | None, Field(title="Created By")] = None
+    """
+    The user who created the session and is responsible for it; set only when linked. Answers, resumes, and commit authorizations are recorded separately in the audit
+    """
+    model_name: Annotated[str, Field(title="Model Name")] = ""
+    """
+    provider/model_id the creating host reported for the session (client reported, not verified); empty when none was reported
+    """
+
+
 class ExecutionAvailabilityRequest(BaseModel):
     """
     Targets to check without reserving hardware or creating an execution.
@@ -1418,6 +2687,42 @@ class ExecutionAvailabilityResponse(BaseModel):
 
     available: Annotated[bool, Field(title="Available")]
     reason: Annotated[str | None, Field(title="Reason")] = None
+
+
+class Via(StrEnum):
+    pipeline_run = "pipeline_run"
+    agent_session = "agent_session"
+
+
+class ExecutionCalibrationSessionLink(BaseModel):
+    """
+    The calibration session an execution belongs to, and the server record that says so.
+
+    ``via`` names the record: ``pipeline_run`` when the execution is a step of a pipeline run
+    recorded in the session (matched by project, chip, and flow run), ``agent_session`` when an
+    action of an admitted agent session of the session dispatched it. Membership says what the
+    work was for; it never says that an agent ran it.
+    """
+
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    objective: Annotated[str, Field(title="Objective")]
+    status: CalibrationSessionStatus
+    via: Annotated[Via, Field(title="Via")]
+    pipeline_run_id: Annotated[str | None, Field(title="Pipeline Run Id")] = None
+    """
+    The pipeline run, when via is pipeline_run
+    """
+    agent_session_id: Annotated[str | None, Field(title="Agent Session Id")] = None
+    """
+    The agent session, when via is agent_session
+    """
+
+
+class Kind3(StrEnum):
+    execution = "execution"
+    agent_session = "agent_session"
+    calibration_session = "calibration_session"
 
 
 class ExecutionIdResponse(BaseModel):
@@ -1507,7 +2812,7 @@ class Schedule(StrEnum):
 
 class ExecutionPlanStep(BaseModel):
     """
-    One step of a CalibService run, as stated in the saved source.
+    One step of a CalibrationSession.run call, as the saved source states it.
     """
 
     index: Annotated[int, Field(title="Index")]
@@ -1547,37 +2852,6 @@ class ExecutionPlanStep(BaseModel):
     """
 
 
-class ExecutionResponseSummary(BaseModel):
-    """
-    ExecutionResponseSummary is a Pydantic model that represents the summary of an execution response.
-
-    Attributes
-    ----------
-        name (str): The name of the execution.
-        execution_id (str): The ID of the execution.
-        status (str): The current status of the execution.
-        start_at (datetime | None): The start time of the execution.
-        end_at (datetime | None): The end time of the execution.
-        elapsed_time (timedelta | None): The total elapsed time of the execution.
-        user_id (str | None): Internal ID of the user who started the execution.
-        username (str): Username snapshot of the user who started the execution.
-        tags (list[str]): Tags associated with the execution.
-        note (dict): Notes for the execution.
-    """
-
-    name: Annotated[str, Field(title="Name")]
-    execution_id: Annotated[str, Field(title="Execution Id")]
-    status: Annotated[str, Field(title="Status")]
-    message: Annotated[str, Field(title="Message")] = ""
-    user_id: Annotated[str | None, Field(title="User Id")] = None
-    username: Annotated[str, Field(title="Username")] = ""
-    start_at: Annotated[AwareDatetime | None, Field(title="Start At")] = None
-    end_at: Annotated[AwareDatetime | None, Field(title="End At")] = None
-    elapsed_time: Annotated[timedelta | None, Field(title="Elapsed Time")] = None
-    tags: Annotated[list[str], Field(title="Tags")]
-    note: Annotated[dict[str, Any], Field(title="Note")]
-
-
 class FidelityCondition(BaseModel):
     """
     Condition for fidelity filtering.
@@ -1600,7 +2874,7 @@ class FileTreeNode(BaseModel):
     children: Annotated[list[FileTreeNode] | None, Field(title="Children")] = None
 
 
-class Status4(StrEnum):
+class Status5(StrEnum):
     """
     resolved: every run and step was read from literals. unresolved: the source decides its steps at run time; reason says why. invalid: manual rounds that cannot run were found; execution would fail before measuring.
     """
@@ -1828,7 +3102,7 @@ class FormatSourceRequest(BaseModel):
     """
 
 
-class Status5(StrEnum):
+class Status6(StrEnum):
     """
     formatted: source differs from the input; unchanged: the input is already formatted; syntax_error: the input cannot be parsed and is returned as given
     """
@@ -1843,7 +3117,7 @@ class FormatSourceResponse(BaseModel):
     The source formatted with Ruff, or the input unchanged when it cannot be parsed.
     """
 
-    status: Annotated[Status5, Field(title="Status")]
+    status: Annotated[Status6, Field(title="Status")]
     """
     formatted: source differs from the input; unchanged: the input is already formatted; syntax_error: the input cannot be parsed and is returned as given
     """
@@ -2119,7 +3393,7 @@ class AssigneeUsername(RootModel[str]):
     """
 
 
-class Status6(StrEnum):
+class Status7(StrEnum):
     """
     Thread workflow status
     """
@@ -2158,7 +3432,7 @@ class CooldownId(RootModel[str]):
     """
 
 
-class TaskId(RootModel[str]):
+class TaskId1(RootModel[str]):
     root: Annotated[str, Field(max_length=128, title="Task Id")]
     """
     Task result this thread is about. Chip and target are filled from it when not given.
@@ -2206,7 +3480,7 @@ class ForumPostCreate(BaseModel):
     """
     Assigned project member username
     """
-    status: Annotated[Status6, Field(title="Status")] = Status6.open
+    status: Annotated[Status7, Field(title="Status")] = Status7.open
     """
     Thread workflow status
     """
@@ -2226,7 +3500,7 @@ class ForumPostCreate(BaseModel):
     """
     Linked cool-down ID
     """
-    task_id: Annotated[TaskId | None, Field(title="Task Id")] = None
+    task_id: Annotated[TaskId1 | None, Field(title="Task Id")] = None
     """
     Task result this thread is about. Chip and target are filled from it when not given.
     """
@@ -2268,7 +3542,7 @@ class AssigneeUsername1(RootModel[str]):
     """
 
 
-class Status8(StrEnum):
+class Status9(StrEnum):
     """
     Updated thread workflow status
     """
@@ -2336,7 +3610,7 @@ class ForumPostUpdate(BaseModel):
     """
     Updated assigned project member username
     """
-    status: Annotated[Status8 | None, Field(title="Status")] = None
+    status: Annotated[Status9 | None, Field(title="Status")] = None
     """
     Updated thread workflow status
     """
@@ -2515,13 +3789,12 @@ class LineageEdgeResponse(BaseModel):
     target_id: Annotated[str, Field(title="Target Id")]
 
 
-class ListAgentCandidatesResponse(BaseModel):
+class ListAgentChatSessionsResponse(BaseModel):
     """
-    Task-result candidates and their deterministic gate decisions.
+    Response for GET /agent/chat/sessions.
     """
 
-    items: Annotated[list[AgentCandidateResponse], Field(title="Items")]
-    total: Annotated[int, Field(title="Total")]
+    sessions: Annotated[list[AgentChatSessionSummary], Field(title="Sessions")]
 
 
 class ListBackendsResponse(BaseModel):
@@ -2558,33 +3831,12 @@ class ListCooldownWiringEventsResponse(BaseModel):
     events: Annotated[list[CooldownWiringEventResponse], Field(title="Events")]
 
 
-class ListCopilotChatSessionsResponse(BaseModel):
-    """
-    Response for GET /copilot/chat/sessions.
-    """
-
-    sessions: Annotated[list[CopilotChatSessionSummary], Field(title="Sessions")]
-
-
 class ListDashboardTemplatesResponse(BaseModel):
     """
     Available starter templates.
     """
 
     templates: Annotated[list[DashboardTemplateResponse], Field(title="Templates")]
-
-
-class ListExecutionsResponse(BaseModel):
-    """
-    Response model for listing executions.
-
-    Wraps list of executions for API consistency and future extensibility (e.g., pagination).
-    """
-
-    executions: Annotated[list[ExecutionResponseSummary], Field(title="Executions")]
-    total: Annotated[int | None, Field(title="Total")] = None
-    skip: Annotated[int | None, Field(title="Skip")] = None
-    limit: Annotated[int | None, Field(title="Limit")] = None
 
 
 class ListFlowSchedulesResponse(BaseModel):
@@ -2736,7 +3988,7 @@ class MetricCatalogEntry(BaseModel):
     description: Annotated[str, Field(title="Description")]
 
 
-class Status9(StrEnum):
+class Status10(StrEnum):
     ok = "ok"
     missing = "missing"
     empty = "empty"
@@ -2873,7 +4125,7 @@ class Result(StrEnum):
     series = "series"
 
 
-class Kind(StrEnum):
+class Kind4(StrEnum):
     categorical = "categorical"
     continuous = "continuous"
 
@@ -2883,12 +4135,12 @@ class MetricLegend(BaseModel):
     Legend declared by a metric.
     """
 
-    kind: Annotated[Kind, Field(title="Kind")]
+    kind: Annotated[Kind4, Field(title="Kind")]
     items: Annotated[list[LegendItem] | None, Field(title="Items")] = None
     stops: Annotated[list[LegendStop] | None, Field(title="Stops")] = None
 
 
-class Kind1(StrEnum):
+class Kind5(StrEnum):
     integer = "integer"
     number = "number"
     boolean = "boolean"
@@ -2902,7 +4154,7 @@ class MetricParameterInfo(BaseModel):
 
     default: Annotated[bool | int | float | str, Field(title="Default")]
     label: Annotated[str, Field(title="Label")] = ""
-    kind: Annotated[Kind1, Field(title="Kind")]
+    kind: Annotated[Kind5, Field(title="Kind")]
     min: Annotated[float | None, Field(title="Min")] = None
     max: Annotated[float | None, Field(title="Max")] = None
     step: Annotated[float | None, Field(title="Step")] = None
@@ -2980,7 +4232,7 @@ class Revision(RootModel[int]):
     """
 
 
-class Status10(StrEnum):
+class Status11(StrEnum):
     valid = "valid"
     invalid = "invalid"
 
@@ -3038,7 +4290,7 @@ class MetricScriptValidateRequest(BaseModel):
     source: Annotated[str, Field(max_length=262144, title="Source")]
 
 
-class Status13(StrEnum):
+class Status14(StrEnum):
     """
     ok (has a value), no_data or insufficient (a gap)
     """
@@ -3073,7 +4325,7 @@ class MetricSeriesPoint(BaseModel):
     """
     Observations behind the value
     """
-    status: Annotated[Status13, Field(title="Status")]
+    status: Annotated[Status14, Field(title="Status")]
     """
     ok (has a value), no_data or insufficient (a gap)
     """
@@ -3387,6 +4639,26 @@ class NumericBounds(BaseModel):
     maximum: Annotated[float | None, Field(title="Maximum")] = None
 
 
+class OperationErrorDetail(BaseModel):
+    """
+    Error body of a failed operation.
+
+    ``detail`` is a message safe to show users. An unexpected failure also carries ``code``,
+    naming the failed operation, and ``error_id``, the ID under which the server logged the
+    cause; endpoints that do not report one yet return ``detail`` alone.
+    """
+
+    detail: Annotated[str, Field(title="Detail")]
+    code: Annotated[str | None, Field(title="Code")] = None
+    """
+    Stable code of the failed operation, e.g. file_read_failed
+    """
+    error_id: Annotated[str | None, Field(title="Error Id")] = None
+    """
+    Opaque ID of the server log entry recording the cause
+    """
+
+
 class PanelLayoutModel(BaseModel):
     """
     Position and size of a panel on the 12-column grid.
@@ -3633,40 +4905,13 @@ class PipelineProblem(BaseModel):
     message: Annotated[str, Field(title="Message")]
 
 
-class PipelineStepProgress(BaseModel):
+class PipelineProblemsDetail(BaseModel):
     """
-    One planned step of a pipeline run and how far its execution got.
+    Why a calibration pipeline spec was refused, with every problem found.
     """
 
-    index: Annotated[int, Field(title="Index")]
-    """
-    1-based position in the pipeline spec
-    """
-    name: Annotated[str, Field(title="Name")]
-    step_id: Annotated[str | None, Field(title="Step Id")] = None
-    """
-    Plan-scoped step id; null for transforms and older runs
-    """
-    type: Annotated[str, Field(title="Type")] = ""
-    kind: Annotated[str, Field(title="Kind")] = "calibration"
-    """
-    "calibration" or "transform"
-    """
-    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
-    """
-    The step's own execution, once it has started
-    """
-    status: Annotated[str, Field(title="Status")]
-    """
-    The execution status, "skipped" for transforms, or "pending" before it starts
-    """
-    task_total: Annotated[int, Field(title="Task Total")] = 0
-    task_finished: Annotated[int, Field(title="Task Finished")] = 0
-    task_failed: Annotated[int, Field(title="Task Failed")] = 0
-    figure_paths: Annotated[list[str] | None, Field(title="Figure Paths")] = None
-    """
-    Figures of the step's finished tasks, in task order
-    """
+    message: Annotated[str, Field(title="Message")]
+    problems: Annotated[list[PipelineProblem] | None, Field(title="Problems")] = None
 
 
 class Position(BaseModel):
@@ -3878,6 +5123,16 @@ class QuickRunTaskRequest(BaseModel):
     Replace the current calibration values with the task's validated outputs. When false, the run still saves its task history, figures and raw data.
     """
     update_params: Annotated[bool, Field(title="Update Params")] = False
+    calibration_session_id: Annotated[
+        CalibrationSessionId2 | None, Field(title="Calibration Session Id")
+    ] = None
+    """
+    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
+    """
+    idempotency_key: Annotated[IdempotencyKey1 | None, Field(title="Idempotency Key")] = None
+    """
+    A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run.
+    """
     persist_output_parameters: Annotated[
         bool | None, Field(deprecated=True, title="Persist Output Parameters")
     ] = None
@@ -3913,6 +5168,14 @@ class ReanalyzeQubitSpectroscopyParams(BaseModel):
     Optional analysis-parameter overrides for qubit spectroscopy.
     """
 
+    frequency_min: Annotated[float | None, Field(title="Frequency Min")] = None
+    """
+    Lowest frequency (GHz) to analyze. Columns below it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Use it to exclude a spur or edge noise without measuring again.
+    """
+    frequency_max: Annotated[float | None, Field(title="Frequency Max")] = None
+    """
+    Highest frequency (GHz) to analyze. Columns above it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Must be greater than frequency_min when both are given.
+    """
     binarize_threshold_sigma_plus: Annotated[
         float | None, Field(title="Binarize Threshold Sigma Plus")
     ] = None
@@ -3920,6 +5183,9 @@ class ReanalyzeQubitSpectroscopyParams(BaseModel):
         float | None, Field(title="Binarize Threshold Sigma Minus")
     ] = None
     top_power: Annotated[float | None, Field(title="Top Power")] = None
+    """
+    Power (dB) just above the strongest analyzed row; peak heights are measured from it. Rows at or above top_power are dropped before the analysis runs, so the returned figure shows only the rows below it.
+    """
     f01_height_min: Annotated[float | None, Field(title="F01 Height Min")] = None
     f12_distance_min: Annotated[float | None, Field(title="F12 Distance Min")] = None
     f12_distance_max: Annotated[float | None, Field(title="F12 Distance Max")] = None
@@ -3937,7 +5203,15 @@ class ReanalyzeQubitSpectroscopyRequest(BaseModel):
 
     source_task_id: Annotated[str | None, Field(title="Source Task Id")] = None
     """
-    Task result to re-analyze. If omitted, the latest matching task result for the (chip_id, qid) is used.
+    Task result to re-analyze. If omitted (and no figure is given), the latest matching task result for the (chip_id, qid) is used. Cannot be combined with figure.
+    """
+    figure: Annotated[dict[str, Any] | None, Field(title="Figure")] = None
+    """
+    Plotly figure JSON of a raw spectroscopy measurement to re-analyze instead of a stored task result. The first trace must have type 'heatmap' with plain lists of finite numbers: x (frequency, GHz) and y (power, dB) of at least 2 values each, and z with one row per y and one value per x. A figure labeled as marked is rejected. Only that heatmap, a named colorscale, and plain-text titles and sizes are kept; other traces and layout content (images, templates, shapes, annotations) are dropped. Stored run parameters do not apply, so unset parameters use the analysis defaults. At most 20 MiB as JSON. Cannot be combined with source_task_id.
+    """
+    include_image: Annotated[bool, Field(title="Include Image")] = False
+    """
+    If true, also render the marked figure as a PNG and return it base64-encoded in image_base64. Rendering adds latency, so the chip page leaves it off.
     """
     parameters: ReanalyzeQubitSpectroscopyParams | None = None
 
@@ -3973,6 +5247,14 @@ class ReanalyzeResonatorSpectroscopyParams(BaseModel):
     :class:`EstimateResonatorFrequencyConfig`.
     """
 
+    frequency_min: Annotated[float | None, Field(title="Frequency Min")] = None
+    """
+    Lowest frequency (GHz) to analyze. Columns below it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Use it to exclude a spur or edge noise without measuring again.
+    """
+    frequency_max: Annotated[float | None, Field(title="Frequency Max")] = None
+    """
+    Highest frequency (GHz) to analyze. Columns above it are dropped from the heatmap before the analysis runs, and the returned figure shows only the analyzed window. Must be greater than frequency_min when both are given.
+    """
     num_resonators: Annotated[int | None, Field(title="Num Resonators")] = None
     """
     Number of resonators to detect in the MUX (typically 4).
@@ -4016,7 +5298,15 @@ class ReanalyzeResonatorSpectroscopyRequest(BaseModel):
 
     source_task_id: Annotated[str | None, Field(title="Source Task Id")] = None
     """
-    Task result to re-analyze. If omitted, the latest matching task result for the (chip_id, qid) is used.
+    Task result to re-analyze. If omitted (and no figure is given), the latest matching task result for the (chip_id, qid) is used. Cannot be combined with figure.
+    """
+    figure: Annotated[dict[str, Any] | None, Field(title="Figure")] = None
+    """
+    Plotly figure JSON of a raw spectroscopy measurement to re-analyze instead of a stored task result. The first trace must have type 'heatmap' with plain lists of finite numbers: x (frequency, GHz) and y (power, dB) of at least 2 values each, and z with one row per y and one value per x. A figure labeled as marked is rejected. Only that heatmap, a named colorscale, and plain-text titles and sizes are kept; other traces and layout content (images, templates, shapes, annotations) are dropped. Stored run parameters do not apply, so unset parameters use the analysis defaults. At most 20 MiB as JSON. Cannot be combined with source_task_id.
+    """
+    include_image: Annotated[bool, Field(title="Include Image")] = False
+    """
+    If true, also render the marked figure as a PNG and return it base64-encoded in image_base64. Rendering adds latency, so the chip page leaves it off.
     """
     parameters: ReanalyzeResonatorSpectroscopyParams | None = None
 
@@ -4030,17 +5320,32 @@ class ReanalyzeResponse(BaseModel):
     will be added in a follow-up.
     """
 
-    source_task_id: Annotated[str, Field(title="Source Task Id")]
+    source_task_id: Annotated[str | None, Field(title="Source Task Id")] = None
     """
-    Task result whose data was re-analyzed.
+    Task result whose data was re-analyzed; null when an inline figure was re-analyzed.
     """
     source_task_name: Annotated[str, Field(title="Source Task Name")]
+    """
+    Task whose analysis ran: the stored result's task name, or the endpoint's task for an inline figure.
+    """
     qid: Annotated[str, Field(title="Qid")]
     figure: Annotated[dict[str, Any], Field(title="Figure")]
     """
     Plotly figure JSON of the re-analyzed result with markers.
     """
     output_parameters: Annotated[list[ReanalyzeOutputParameter], Field(title="Output Parameters")]
+    image_base64: Annotated[str | None, Field(title="Image Base64")] = None
+    """
+    Base64-encoded PNG of the marked figure. Set only when include_image was true and the server could render the figure.
+    """
+    image_media_type: Annotated[str | None, Field(title="Image Media Type")] = None
+    """
+    Media type of image_base64 (image/png), or null when no image is returned.
+    """
+    image_error: Annotated[str | None, Field(title="Image Error")] = None
+    """
+    A fixed message saying the requested image could not be rendered; the cause is logged on the server only. Null when no image was requested or rendering succeeded.
+    """
     committed: Annotated[bool, Field(title="Committed")] = False
     """
     Always false in this version; persisting changes will land later.
@@ -4125,6 +5430,130 @@ class RecommendedTaskResponse(BaseModel):
     """
 
 
+class EvidenceActionId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class EvaluationId1(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class NextActionId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Next Action Id")]
+    """
+    The action of this session that carries out the next step, when one exists
+    """
+
+
+class InterventionId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Intervention Id")]
+    """
+    The intervention of this session the decision opened or acts on
+    """
+
+
+class SupersedesDecisionId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Supersedes Decision Id")]
+    """
+    An earlier decision of this session that this record corrects
+    """
+
+
+class RecordAgentDecisionRequest(BaseModel):
+    """
+    Record the agent's reading of a result and the step it chose next.
+
+    The text fields are the agent's own concise statements, recorded as reported. QDash checks
+    that every referenced action, evaluation, intervention, and decision belongs to the session
+    and freezes what its records say about the cited evidence.
+    """
+
+    idempotency_key: Annotated[str, Field(max_length=128, min_length=1, title="Idempotency Key")]
+    assessment: AgentDecisionAssessment | None = None
+    """
+    How the agent judged the evidence; omitted when not stated
+    """
+    interpretation: Annotated[str, Field(max_length=2000, min_length=1, title="Interpretation")]
+    """
+    Concise reasoning the agent states for the decision, citing the evidence
+    """
+    next_action: AgentDecisionNextAction
+    next_detail: Annotated[str, Field(max_length=500, title="Next Detail")] = ""
+    """
+    The chosen next step
+    """
+    evidence_action_ids: Annotated[
+        list[EvidenceActionId] | None, Field(max_length=20, title="Evidence Action Ids")
+    ] = None
+    """
+    Actions of this session whose results the decision reads
+    """
+    evaluation_ids: Annotated[
+        list[EvaluationId1] | None, Field(max_length=20, title="Evaluation Ids")
+    ] = None
+    """
+    Evaluations of those actions' task results
+    """
+    next_action_id: Annotated[NextActionId | None, Field(title="Next Action Id")] = None
+    """
+    The action of this session that carries out the next step, when one exists
+    """
+    intervention_id: Annotated[InterventionId | None, Field(title="Intervention Id")] = None
+    """
+    The intervention of this session the decision opened or acts on
+    """
+    supersedes_decision_id: Annotated[
+        SupersedesDecisionId | None, Field(title="Supersedes Decision Id")
+    ] = None
+    """
+    An earlier decision of this session that this record corrects
+    """
+    model: AgentModelIdentity | None = None
+    """
+    The provider and model the client host reports it ran the agent with, read from the host's own runtime, never from the agent's tool arguments. Recorded as reported; QDash does not verify it, and it changes no scope or approval. Omitted when the host does not know it.
+    """
+
+
+class Transition(StrEnum):
+    pass_ = "pass"
+    retry = "retry"
+    rollback = "rollback"
+    human_escalation = "human_escalation"
+
+
+class FollowUpInterventionId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Follow Up Intervention Id")]
+
+
+class RecordAgentResumeOutcomeRequest(BaseModel):
+    """
+    The resumed runner reports how its run ended.
+    """
+
+    claim_key: Annotated[str, Field(max_length=128, min_length=1, title="Claim Key")]
+    transition: Annotated[Transition, Field(title="Transition")]
+    reason: Annotated[str, Field(max_length=2000, title="Reason")] = ""
+    follow_up_intervention_id: Annotated[
+        FollowUpInterventionId | None, Field(title="Follow Up Intervention Id")
+    ] = None
+
+
+class EvidenceRunId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class EvidenceTaskId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class EvidenceDecisionId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class SupersedesDecisionId1(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Supersedes Decision Id")]
+
+
 class RelativePeriod(BaseModel):
     """
     The last ``days`` days, resolved to ``[now - days, now]`` at evaluation.
@@ -4134,6 +5563,83 @@ class RelativePeriod(BaseModel):
     days: Annotated[int, Field(ge=1, le=400, title="Days")] = 14
 
 
+class ReportedLaunchOrigin(BaseModel):
+    """
+    A caller's own account of how a run was started; client reported, not verified.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    source: Annotated[Literal["agent_tool"], Field(title="LaunchSource")]
+    """
+    What a caller reports started a run.
+
+    ``agent_tool``: a tool of an agent host, such as pi-qdash's ``qdash_run_pipeline``, made
+    the request with the user's sign-in after the user approved it.
+    """
+    tool: Annotated[
+        str,
+        Field(max_length=100, min_length=1, pattern="^[A-Za-z0-9_.:-]+$", title="Tool"),
+    ]
+    """
+    The tool that made the request, such as qdash_run_pipeline
+    """
+    client: Annotated[
+        str, Field(max_length=100, pattern="^[A-Za-z0-9_.:@/ -]*$", title="Client")
+    ] = ""
+    """
+    The host or package that reports it, such as pi-qdash; empty when unnamed
+    """
+
+
+class RequestFieldError(BaseModel):
+    """
+    One field of the request body that failed schema validation.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+    )
+    loc: Annotated[list[str | int], Field(title="Loc")]
+    """
+    Where in the request, e.g. ['body', 'chip_id'].
+    """
+    msg: Annotated[str, Field(title="Msg")]
+    type: Annotated[str, Field(title="Type")]
+
+
+class CallId(RootModel[str]):
+    root: Annotated[str, Field(max_length=100, title="Call Id")]
+    """
+    The task call the change is for, when a step calls the task more than once
+    """
+
+
+class RequestedParameterChangeModel(BaseModel):
+    """
+    One run parameter a decision asks a task to use, as the recorder states it.
+    """
+
+    task_name: Annotated[
+        str,
+        Field(max_length=100, min_length=1, pattern="^[A-Za-z0-9_]+$", title="Task Name"),
+    ]
+    call_id: Annotated[CallId | None, Field(title="Call Id")] = None
+    """
+    The task call the change is for, when a step calls the task more than once
+    """
+    parameter: Annotated[
+        str,
+        Field(max_length=100, min_length=1, pattern="^[A-Za-z0-9_.]+$", title="Parameter"),
+    ]
+    value: Annotated[bool | int | float | str | None, Field(title="Value")] = None
+    previous: Annotated[bool | int | float | str | None, Field(title="Previous")] = None
+    """
+    The value before the change, when the recorder knows it
+    """
+
+
 class ResolvedPipelineTargets(BaseModel):
     """
     The starting targets after chip lookup.
@@ -4141,10 +5647,14 @@ class ResolvedPipelineTargets(BaseModel):
 
     qids: Annotated[list[str], Field(title="Qids")]
     """
-    Explicit qids, or empty when targeting MUXes.
+    Explicit qids, the qubits of the pairs, or empty when targeting MUXes.
     """
     mux_ids: Annotated[list[int] | None, Field(title="Mux Ids")] = None
     exclude_qids: Annotated[list[str] | None, Field(title="Exclude Qids")] = None
+    pairs: Annotated[list[list[str]] | None, Field(title="Pairs")] = None
+    """
+    Directed [control, target] coupling pairs, or empty without pair targets.
+    """
 
 
 class ResolvedTaskCall(BaseModel):
@@ -4168,6 +5678,73 @@ class ResolvedTaskCall(BaseModel):
     """
     Effective call settings (run, input, and update_calibration_parameters when set): the call's own settings over the deprecated task_parameters. default_run_parameters and task declarations fill in the rest when the task runs.
     """
+
+
+class ResumeNodeId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Resume Node Id")]
+    """
+    Plan node to continue from; defaults to the node where the plan stopped
+    """
+
+
+class RespondAgentInterventionRequest(BaseModel):
+    """
+    An expert's answer: resume within the approved plan, or stop the session.
+
+    Guidance is recorded for the agent and the audit trail; it does not change the plan,
+    the scope, or any parameter.
+    """
+
+    idempotency_key: Annotated[str, Field(max_length=128, min_length=1, title="Idempotency Key")]
+    expected_state_version: Annotated[int, Field(ge=0, title="Expected State Version")]
+    decision: AgentInterventionDecision
+    guidance: Annotated[str, Field(max_length=5000, title="Guidance")] = ""
+    resume_node_id: Annotated[ResumeNodeId | None, Field(title="Resume Node Id")] = None
+    """
+    Plan node to continue from; defaults to the node where the plan stopped
+    """
+
+
+class RunFlowEndState(StrEnum):
+    """
+    How the whole flow run that carried out a run ended, as Prefect reported it.
+
+    Recorded once QDash reads a terminal Prefect state for the run's flow run: the flow as a
+    whole, after its retries, never one step of it. A state Prefect may still leave (scheduled,
+    awaiting retry, pending, running, paused, cancelling) is never recorded. ``completed``,
+    ``failed``, ``cancelled``, and ``crashed`` are Prefect's own terminal state types; they say
+    how the flow run ended, not whether its calibration results are good.
+    """
+
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+    crashed = "crashed"
+
+
+class RunFlowStatus(StrEnum):
+    """
+    The state of a run's whole flow run, as one read of the run found it.
+
+    Never stored: each read decides it from the run's record and, for a launched run, from
+    Prefect at that moment. ``dispatching``: the launch has not reported back.
+    ``not_launched``: QDash refused the launch; no flow run was created. ``running``: Prefect
+    reports a state the flow run may still leave (scheduled, awaiting retry, late, pending,
+    running, paused, or cancelling). ``completed``, ``failed``, ``cancelled``, and ``crashed``:
+    Prefect reports that terminal state now. ``unknown``: the launch outcome is unknown, no flow
+    run was recorded, or Prefect does not report the flow run. ``unavailable``: Prefect could
+    not be read. A step execution's status never decides it.
+    """
+
+    dispatching = "dispatching"
+    not_launched = "not_launched"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+    crashed = "crashed"
+    unknown = "unknown"
+    unavailable = "unavailable"
 
 
 class SaveFileRequest(BaseModel):
@@ -4419,7 +5996,7 @@ class SourceFileResponse(BaseModel):
 
 class SourceRootResponse(BaseModel):
     """
-    One source tree the Copilot can search and read.
+    One source tree the Agent can search and read.
     """
 
     name: Annotated[str, Field(title="Name")]
@@ -4459,8 +6036,40 @@ class SourceSearchMatch(BaseModel):
     text: Annotated[str | None, Field(title="Text")] = None
 
 
-class TaskName(RootModel[str]):
+class StopAgentSessionRequest(BaseModel):
+    """
+    A person's request to end an agent session's authority now.
+    """
+
+    idempotency_key: Annotated[str, Field(max_length=200, min_length=1, title="Idempotency Key")]
+    """
+    Key of this stop; repeating it returns the same outcome
+    """
+    reason: Annotated[str, Field(max_length=2000, min_length=1, title="Reason")]
+    """
+    Why the session is stopped, for the audit
+    """
+
+
+class Outcome(StrEnum):
+    """
+    stopped: this request ended the session. already_stopped: an earlier request with this key stopped it. already_ended: it had already ended another way (completed, cancelled, or expired), and this request changed nothing
+    """
+
+    stopped = "stopped"
+    already_stopped = "already_stopped"
+    already_ended = "already_ended"
+
+
+class TaskName1(RootModel[str]):
     root: Annotated[str, Field(max_length=200, title="Task Name")]
+
+
+class RepeatOfActionId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Repeat Of Action Id")]
+    """
+    The finished identical action an autonomous step measures again on purpose
+    """
 
 
 class SubmitAgentActionRequest(BaseModel):
@@ -4471,12 +6080,26 @@ class SubmitAgentActionRequest(BaseModel):
     idempotency_key: Annotated[str, Field(max_length=128, min_length=1, title="Idempotency Key")]
     expected_state_version: Annotated[int, Field(ge=0, title="Expected State Version")]
     action_type: AgentActionType
-    task_name: Annotated[TaskName | None, Field(title="Task Name")] = None
+    task_name: Annotated[TaskName1 | None, Field(title="Task Name")] = None
     qids: Annotated[list[str] | None, Field(title="Qids")] = None
     parameter_overrides: Annotated[dict[str, float] | None, Field(title="Parameter Overrides")] = (
         None
     )
     diagnosis: Annotated[str, Field(max_length=5000, title="Diagnosis")] = ""
+    autonomous: Annotated[bool, Field(title="Autonomous")] = False
+    """
+    The proposal is an autonomous step that runs without a per-call approval. QDash then also requires that the signed-in user created the session, that its autonomy is auto, that no measurement of the session is running, that an undispatched identical action is dispatched instead, that the task and qubit stay within max_rounds_per_target, and that a finished identical measurement is repeated only with repeat_of_action_id. A refused step is not recorded and uses no action budget. Only valid for run_task.
+    """
+    repeat_of_action_id: Annotated[RepeatOfActionId | None, Field(title="Repeat Of Action Id")] = (
+        None
+    )
+    """
+    The finished identical action an autonomous step measures again on purpose
+    """
+    model: AgentModelIdentity | None = None
+    """
+    The provider and model the client host reports it ran the agent with, read from the host's own runtime, never from the agent's tool arguments. Recorded as reported; QDash does not verify it, and it changes no scope or approval. Omitted when the host does not know it.
+    """
 
 
 class SuccessResponse(BaseModel):
@@ -4579,7 +6202,7 @@ class OutputParameters2(BaseModel):
     database_updates: Annotated[list[DatabaseUpdate] | None, Field(title="Database Updates")] = None
 
 
-class CallId(RootModel[str]):
+class CallId1(RootModel[str]):
     root: Annotated[str, Field(pattern="^[A-Za-z][A-Za-z0-9_.-]{0,63}$", title="Call Id")]
     """
     Identifier of this call, unique within its step. Defaults to the task name; required on every occurrence of a task that appears more than once.
@@ -4607,7 +6230,7 @@ class TaskCall(BaseModel):
     """
     Registered task name, e.g. "CheckRamsey".
     """
-    call_id: Annotated[CallId | None, Field(title="Call Id")] = None
+    call_id: Annotated[CallId1 | None, Field(title="Call Id")] = None
     """
     Identifier of this call, unique within its step. Defaults to the task name; required on every occurrence of a task that appears more than once.
     """
@@ -4628,6 +6251,37 @@ class TaskCall(BaseModel):
     on_failure: Annotated[OnFailure | None, Field(title="On Failure")] = None
     """
     "stop" skips this target's later calls in the step when this call fails; "continue" runs them. None inherits the step's continue_on_failure.
+    """
+
+
+class TaskDocumentation(BaseModel):
+    """
+    Human-readable guidance a task class declares about itself.
+
+    A task class sets ``documentation: ClassVar[TaskDocumentation]`` to a literal
+    ``TaskDocumentation(...)`` call. The task catalog reads that call statically,
+    so every field must be a string literal, or a list or tuple of string
+    literals for ``prerequisites``.
+
+    ``prerequisites`` explains to readers what the task expects; it is not
+    enforced. The task's ``input_spec`` remains the only declaration that decides
+    which calibration values must exist before the task runs.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    description: Annotated[str, Field(min_length=1, title="Description")]
+    """
+    What the task measures or produces, in one or two sentences.
+    """
+    when_to_use: Annotated[str, Field(title="When To Use")] = ""
+    """
+    The situation in which an operator or agent should run the task.
+    """
+    prerequisites: Annotated[list[str], Field(title="Prerequisites")] = []
+    """
+    Calibration state the task expects, explained for readers. Not enforced; input parameter metadata carries the enforced requirements.
     """
 
 
@@ -4659,6 +6313,13 @@ class TaskInfo(BaseModel):
     class_name: Annotated[str, Field(title="Class Name")]
     task_type: Annotated[str | None, Field(title="Task Type")] = None
     description: Annotated[str | None, Field(title="Description")] = None
+    """
+    Short task description: documentation.description when the task declares documentation, otherwise the class docstring.
+    """
+    documentation: TaskDocumentation | None = None
+    """
+    Structured guidance the task class declares, when it declares any.
+    """
     file_path: Annotated[str, Field(title="File Path")]
     category: Annotated[str | None, Field(title="Category")] = None
     enabled: Annotated[bool, Field(title="Enabled")] = True
@@ -5131,6 +6792,90 @@ class TokenResponse(BaseModel):
     must_change_password: Annotated[bool, Field(title="Must Change Password")] = False
 
 
+class Kind6(StrEnum):
+    """
+    "filter", "cr_schedule", or "transform" for a custom transform step
+    """
+
+    filter = "filter"
+    cr_schedule = "cr_schedule"
+    transform = "transform"
+
+
+class TransformStepRecord(BaseModel):
+    """
+    The outcome of one transform step, copied when the step ended.
+
+    Lists are snapshots: later steps never change a recorded outcome. Fields that do not
+    apply to a kind stay at their defaults (``None`` or empty).
+    """
+
+    kind: Annotated[Kind6, Field(title="Kind")]
+    """
+    "filter", "cr_schedule", or "transform" for a custom transform step
+    """
+    input_qids: Annotated[list[str] | None, Field(title="Input Qids")] = None
+    """
+    Candidates before the step
+    """
+    output_qids: Annotated[list[str] | None, Field(title="Output Qids")] = None
+    """
+    Candidates after the step
+    """
+    input_couplings: Annotated[list[str] | None, Field(title="Input Couplings")] = None
+    """
+    Candidate couplings before the step
+    """
+    output_couplings: Annotated[list[str] | None, Field(title="Output Couplings")] = None
+    """
+    Candidate couplings after the step
+    """
+    excluded: Annotated[list[ExcludedTarget] | None, Field(title="Excluded")] = None
+    """
+    Filters: each removed candidate with its reason
+    """
+    criteria: Annotated[str | None, Field(title="Criteria")] = None
+    """
+    Filters: the condition applied
+    """
+    source_step: Annotated[str | None, Field(title="Source Step")] = None
+    """
+    Filters: step_id read; null for the latest one-qubit result
+    """
+    source_call_id: Annotated[str | None, Field(title="Source Call Id")] = None
+    """
+    Filters: call_id read
+    """
+    metric: Annotated[str | None, Field(title="Metric")] = None
+    """
+    FilterByMetric: the metric compared
+    """
+    threshold: Annotated[float | None, Field(title="Threshold")] = None
+    """
+    FilterByMetric: minimum kept
+    """
+    source_found: Annotated[bool | None, Field(title="Source Found")] = None
+    """
+    Filters: false when no one-qubit result existed, so every candidate was kept unfiltered
+    """
+    groups: Annotated[list[list[str]] | None, Field(title="Groups")] = None
+    """
+    cr_schedule: parallel groups of control-target couplings, in order
+    """
+    max_parallel_ops: Annotated[int | None, Field(title="Max Parallel Ops")] = None
+    """
+    cr_schedule: group cap
+    """
+    direction: Annotated[str | None, Field(title="Direction")] = None
+    """
+    cr_schedule: "forward", "reverse" or "as listed"
+    """
+    message: Annotated[str | None, Field(title="Message")] = None
+    """
+    Why the step produced nothing, when it did not
+    """
+
+
 class UITaskFilesSettings(BaseModel):
     """
     Task files editor settings.
@@ -5453,6 +7198,17 @@ class StepId(RootModel[str]):
     """
 
 
+class ExecutionMode(StrEnum):
+    """
+    How MUX targets run; explicit qubit targets run directly in parallel. parallel_by_mux (default): MUXes run in parallel and the qubits of one MUX run one after another. parallel_by_round: rounds of qubits from different MUXes. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. Bring-up has no manual rounds.
+    """
+
+    parallel_by_round = "parallel_by_round"
+    parallel_by_mux = "parallel_by_mux"
+    simultaneous_spectroscopy = "simultaneous_spectroscopy"
+    sequential = "sequential"
+
+
 class BringUpStep(BaseModel):
     """
     Initial characterization: resonator and qubit spectroscopy, chevron.
@@ -5469,6 +7225,12 @@ class BringUpStep(BaseModel):
     tasks: Annotated[list[TaskCall] | None, Field(title="Tasks")] = None
     """
     Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to BRINGUP_TASKS.
+    """
+    execution_mode: Annotated[ExecutionMode, Field(title="Execution Mode")] = (
+        ExecutionMode.parallel_by_mux
+    )
+    """
+    How MUX targets run; explicit qubit targets run directly in parallel. parallel_by_mux (default): MUXes run in parallel and the qubits of one MUX run one after another. parallel_by_round: rounds of qubits from different MUXes. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. Bring-up has no manual rounds.
     """
 
 
@@ -5496,7 +7258,7 @@ class ConfigureAllStep(BaseModel):
     """
 
 
-class ExecutionMode(StrEnum):
+class ExecutionMode1(StrEnum):
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
     """
@@ -5527,8 +7289,8 @@ class CustomOneQubitStep(BaseModel):
     """
     Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id.
     """
-    execution_mode: Annotated[ExecutionMode, Field(title="Execution Mode")] = (
-        ExecutionMode.parallel_by_round
+    execution_mode: Annotated[ExecutionMode1, Field(title="Execution Mode")] = (
+        ExecutionMode1.parallel_by_round
     )
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
@@ -5543,7 +7305,7 @@ class CustomOneQubitStep(BaseModel):
     """
 
 
-class ExecutionMode1(StrEnum):
+class ExecutionMode2(StrEnum):
     """
     automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
     """
@@ -5582,8 +7344,8 @@ class CustomTwoQubitStep(BaseModel):
     """
     Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id.
     """
-    execution_mode: Annotated[ExecutionMode1, Field(title="Execution Mode")] = (
-        ExecutionMode1.automatic
+    execution_mode: Annotated[ExecutionMode2, Field(title="Execution Mode")] = (
+        ExecutionMode2.automatic
     )
     """
     automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
@@ -5609,7 +7371,7 @@ class Step(RootModel[str]):
     """
 
 
-class CallId1(RootModel[str]):
+class CallId2(RootModel[str]):
     root: Annotated[str, Field(pattern="^[A-Za-z][A-Za-z0-9_.-]{0,63}$", title="Call Id")]
     """
     call_id within `step` to read; requires `step`.
@@ -5628,7 +7390,7 @@ class FilterByMetricStep(BaseModel):
     """
     step_id of an earlier one-qubit step to read. Omitted: the latest of OneQubitFineTune and OneQubitCheck, as in version 1.
     """
-    call_id: Annotated[CallId1 | None, Field(title="Call Id")] = None
+    call_id: Annotated[CallId2 | None, Field(title="Call Id")] = None
     """
     call_id within `step` to read; requires `step`.
     """
@@ -5655,7 +7417,7 @@ class FilterByStatusStep(BaseModel):
     """
     step_id of an earlier one-qubit step to read. Omitted: the latest of OneQubitFineTune and OneQubitCheck, as in version 1.
     """
-    call_id: Annotated[CallId1 | None, Field(title="Call Id")] = None
+    call_id: Annotated[CallId2 | None, Field(title="Call Id")] = None
     """
     call_id within `step` to read; requires `step`.
     """
@@ -5750,7 +7512,7 @@ class StepId2(RootModel[str]):
     """
 
 
-class ExecutionMode2(StrEnum):
+class ExecutionMode3(StrEnum):
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
     """
@@ -5775,8 +7537,8 @@ class OneQubitCheckStep(BaseModel):
     """
     Identifier of this step, unique within the pipeline; filters reference it. Defaults to the step's name. Set it when a pipeline runs the same step type twice.
     """
-    execution_mode: Annotated[ExecutionMode2, Field(title="Execution Mode")] = (
-        ExecutionMode2.parallel_by_round
+    execution_mode: Annotated[ExecutionMode3, Field(title="Execution Mode")] = (
+        ExecutionMode3.parallel_by_round
     )
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
@@ -5808,8 +7570,8 @@ class OneQubitFineTuneStep(BaseModel):
     """
     Identifier of this step, unique within the pipeline; filters reference it. Defaults to the step's name. Set it when a pipeline runs the same step type twice.
     """
-    execution_mode: Annotated[ExecutionMode2, Field(title="Execution Mode")] = (
-        ExecutionMode2.parallel_by_round
+    execution_mode: Annotated[ExecutionMode3, Field(title="Execution Mode")] = (
+        ExecutionMode3.parallel_by_round
     )
     """
     Where and when the step's targets run; every target runs the step's full task list. parallel_by_round: the scheduler selects rounds of qubits from different MUXes and the next round starts after every qubit of the current round finishes. parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after another, each MUX advancing independently. sequential: one MUX and one qubit at a time. simultaneous_spectroscopy: experimental batch spectroscopy. manual: run the rounds listed in `rounds` exactly as written.
@@ -5828,11 +7590,15 @@ class OneQubitFineTuneStep(BaseModel):
     """
 
 
+class Pair(RootModel[list[str]]):
+    root: Annotated[list[str], Field(max_length=2, min_length=2)]
+
+
 class PipelineTargets(BaseModel):
     """
-    Which qubits the pipeline starts from: explicit qids or whole MUXes.
+    Which qubits or couplings the pipeline starts from.
 
-    Set exactly one of qids and mux_ids to a nonempty list without duplicates.
+    Set exactly one of qids, mux_ids and pairs to a nonempty list without duplicates.
     exclude_qids may be nonempty only with mux_ids.
     """
 
@@ -5841,15 +7607,19 @@ class PipelineTargets(BaseModel):
     )
     qids: Annotated[list[str] | None, Field(title="Qids")] = None
     """
-    Qubit ids as QDash lists them, e.g. ["0", "1"]. Set exactly one of qids and mux_ids, as a nonempty list without duplicates.
+    Qubit ids as QDash lists them, e.g. ["0", "1"]. Set exactly one of qids, mux_ids and pairs, as a nonempty list without duplicates.
     """
     mux_ids: Annotated[list[int] | None, Field(title="Mux Ids")] = None
     """
-    MUX ids; every qubit of each MUX is a target. Set exactly one of qids and mux_ids, as a nonempty list without duplicates.
+    MUX ids; every qubit of each MUX is a target. Set exactly one of qids, mux_ids and pairs, as a nonempty list without duplicates.
+    """
+    pairs: Annotated[list[Pair] | None, Field(title="Pairs")] = None
+    """
+    Directed coupling pairs [control, target], e.g. [["0", "1"], ["4", "5"]]; the candidate qubits are their qubits and the candidate couplings the pairs, in that direction. Set exactly one of qids, mux_ids and pairs.
     """
     exclude_qids: Annotated[list[str], Field(title="Exclude Qids")] = []
     """
-    Qubits to leave out of the MUX targets. Must be empty with qids.
+    Qubits to leave out of the MUX targets. Must be empty with qids or pairs.
     """
 
 
@@ -5881,7 +7651,7 @@ class TaskSettings(BaseModel):
     """
 
 
-class ExecutionMode4(StrEnum):
+class ExecutionMode5(StrEnum):
     """
     automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
     """
@@ -5907,8 +7677,8 @@ class TwoQubitCalibrationStep(BaseModel):
     """
     Task calls to run on every target, in order. A task may appear more than once when each occurrence has its own call_id. Defaults to FULL_2Q_TASKS.
     """
-    execution_mode: Annotated[ExecutionMode4, Field(title="Execution Mode")] = (
-        ExecutionMode4.automatic
+    execution_mode: Annotated[ExecutionMode5, Field(title="Execution Mode")] = (
+        ExecutionMode5.automatic
     )
     """
     automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written.
@@ -5953,6 +7723,429 @@ class AgentActionResponse(BaseModel):
     state_version_before: Annotated[int, Field(title="State Version Before")]
     state_version_after: Annotated[int, Field(title="State Version After")]
     created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    intervention_id: Annotated[str | None, Field(title="Intervention Id")] = None
+    """
+    Intervention recorded for an authorized request_human
+    """
+    autonomous: Annotated[bool, Field(title="Autonomous")] = False
+    """
+    Whether QDash authorized the action as an autonomous step
+    """
+    model: AgentModelIdentity | None = None
+    """
+    The model the client host reported for this record; null when none was reported. Client reported, not verified by QDash.
+    """
+
+
+class AgentAppliedQualityGate(BaseModel):
+    """
+    One quality gate a specific task result was checked against.
+    """
+
+    metric_name: Annotated[str, Field(title="Metric Name")]
+    scope: AgentQualityGateScope
+    task_name: Annotated[str | None, Field(title="Task Name")] = None
+    """
+    The gate's task; null for a legacy session-wide gate
+    """
+    minimum: Annotated[float | None, Field(title="Minimum")] = None
+    maximum: Annotated[float | None, Field(title="Maximum")] = None
+
+
+class AgentAuditEvent(BaseModel):
+    """
+    One entry of a session's experiment audit timeline, built from QDash's own records.
+    """
+
+    event_id: Annotated[str, Field(title="Event Id")]
+    """
+    Stable identifier: <kind>:<source record id>
+    """
+    sequence: Annotated[int, Field(title="Sequence")]
+    """
+    Position in the session's full timeline, from 0
+    """
+    at: Annotated[AwareDatetime, Field(title="At")]
+    """
+    When the event happened, as its source record says
+    """
+    state_version: Annotated[int, Field(title="State Version")]
+    """
+    Session state version the event belongs to: recorded by its source record, or inherited from its action or commit. Orders events that share a timestamp.
+    """
+    kind: Annotated[str, Field(title="Kind")]
+    """
+    session_created, action_proposed, measurement, evaluation, decision, candidate_commit, candidate_set_commit, backend_apply, intervention_opened, intervention_response, intervention_resumed, resume_outcome, or session_stopped; a calibration session's audit adds pipeline_requested, pipeline_dispatch, agent_session_linked, and session_closed
+    """
+    summary: Annotated[str, Field(title="Summary")]
+    """
+    One readable line about the event
+    """
+    actor: Annotated[str | None, Field(title="Actor")] = None
+    """
+    Who acted, when a record names them
+    """
+    actor_kind: Annotated[ActorKind, Field(title="Actor Kind")] = ActorKind.unknown
+    provenance: Annotated[Provenance, Field(title="Provenance")]
+    """
+    server_record: QDash recorded it; server_computed: derived at read time from immutable records; agent_reported, human_reported, evaluator_reported: text that party supplied, recorded as given; client_reported: text a client sent without saying whether an agent or a person wrote it
+    """
+    status: Annotated[str | None, Field(title="Status")] = None
+    """
+    Status of the source record
+    """
+    status_is_current: Annotated[bool, Field(title="Status Is Current")] = False
+    """
+    Whether status is the source record's live status rather than frozen
+    """
+    action_id: Annotated[str | None, Field(title="Action Id")] = None
+    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
+    task_id: Annotated[str | None, Field(title="Task Id")] = None
+    task_name: Annotated[str | None, Field(title="Task Name")] = None
+    qid: Annotated[str | None, Field(title="Qid")] = None
+    commit_id: Annotated[str | None, Field(title="Commit Id")] = None
+    evaluation_id: Annotated[str | None, Field(title="Evaluation Id")] = None
+    intervention_id: Annotated[str | None, Field(title="Intervention Id")] = None
+    decision_id: Annotated[str | None, Field(title="Decision Id")] = None
+    pipeline_run_id: Annotated[str | None, Field(title="Pipeline Run Id")] = None
+    """
+    The calibration session pipeline run the event belongs to, if any
+    """
+    agent_session_id: Annotated[str | None, Field(title="Agent Session Id")] = None
+    """
+    In a calibration session's audit: the agent session an event comes from. Always null in an agent session's own audit
+    """
+    model: AgentModelIdentity | None = None
+    """
+    The model the client host reported for the record behind an agent event: the session's creation, an action proposal, a decision, an agent's intervention request, or a commit made under session authority (the model of the decision it rests on). Client reported, not verified by QDash; null when none was reported, and then named in missing
+    """
+    missing: Annotated[list[str] | None, Field(title="Missing")] = None
+    """
+    Facts the records do not hold for this event; never filled in
+    """
+    data: Annotated[dict[str, Any] | None, Field(title="Data")] = None
+    """
+    Kind-specific details; see the developer guide
+    """
+
+
+class AgentCandidateResponse(BaseModel):
+    """
+    A numeric candidate derived from an authoritative task result.
+    """
+
+    session_id: Annotated[str, Field(title="Session Id")]
+    action_id: Annotated[str, Field(title="Action Id")]
+    execution_id: Annotated[str, Field(title="Execution Id")]
+    task_id: Annotated[str, Field(title="Task Id")]
+    task_name: Annotated[str, Field(title="Task Name")]
+    qid: Annotated[str, Field(title="Qid")]
+    source_parameter_name: Annotated[str, Field(title="Source Parameter Name")]
+    parameter_name: Annotated[str, Field(title="Parameter Name")]
+    value: Annotated[float, Field(title="Value")]
+    error: Annotated[float, Field(title="Error")] = 0.0
+    unit: Annotated[str, Field(title="Unit")] = ""
+    value_type: Annotated[str, Field(title="Value Type")] = "float"
+    quality_metrics: Annotated[dict[str, float] | None, Field(title="Quality Metrics")] = None
+    applied_quality_gates: Annotated[
+        list[AgentAppliedQualityGate] | None, Field(title="Applied Quality Gates")
+    ] = None
+    """
+    The session's quality gates this result was checked against: its task's gates and any legacy session-wide gate. Gates of other tasks are not listed.
+    """
+    acceptance_basis: AgentCandidateAcceptanceBasis | None = None
+    """
+    What accepted the candidate: session_bounds (inside numeric bounds approved with the session) or task_checks (a parameter the session's update grant names, without bounds, accepted on its task's completion checks); null when rejected
+    """
+    accepted: Annotated[bool, Field(title="Accepted")]
+    rejection: AgentCandidateRejection | None = None
+    """
+    Why the candidate was not accepted; null when accepted. not_in_scope: the output is neither granted from this task nor bounded by the session, so it is staged for reference only; it cannot be committed from this session and is not evidence against the result or its other candidates. outside_bounds: the value is outside the session's approved bounds. quality_gate: a quality gate of the result's task failed or its metric is missing
+    """
+    reason: Annotated[str, Field(title="Reason")]
+    minimum: Annotated[float | None, Field(title="Minimum")] = None
+    maximum: Annotated[float | None, Field(title="Maximum")] = None
+
+
+class AgentCandidateSetCommitResponse(BaseModel):
+    """
+    Audited all-at-once QDash commit of the final candidate set.
+    """
+
+    commit_id: Annotated[str, Field(title="Commit Id")]
+    session_id: Annotated[str, Field(title="Session Id")]
+    idempotency_key: Annotated[str, Field(title="Idempotency Key")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    qid: Annotated[str, Field(title="Qid")]
+    candidates: Annotated[list[AgentCandidateResponse], Field(title="Candidates")]
+    status: Annotated[str, Field(title="Status")]
+    reason: Annotated[str, Field(title="Reason")]
+    before_snapshot: Annotated[dict[str, Any] | None, Field(title="Before Snapshot")] = None
+    after_snapshot: Annotated[dict[str, Any] | None, Field(title="After Snapshot")] = None
+    committed_by: Annotated[str, Field(title="Committed By")]
+    state_version_before: Annotated[int, Field(title="State Version Before")]
+    state_version_after: Annotated[int, Field(title="State Version After")]
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    committed_at: Annotated[AwareDatetime | None, Field(title="Committed At")] = None
+
+
+class AgentChatMessageSchema(BaseModel):
+    """
+    One message inside an agent chat session.
+    """
+
+    role: Annotated[str, Field(title="Role")]
+    """
+    "user" or "assistant"
+    """
+    content: Annotated[str, Field(title="Content")]
+    """
+    Message content
+    """
+    attached_image: Annotated[str | None, Field(title="Attached Image")] = None
+    steer: AgentChatSteerSchema | None = None
+    """
+    Set on a user message sent while an answer was written
+    """
+    entry_id: Annotated[EntryId | None, Field(title="Entry Id")] = None
+    """
+    An assistant answer's entry in the runtime's transcript, from the chat stream's result; the chat can be branched from that answer
+    """
+    turn_request_id: Annotated[TurnRequestId | None, Field(title="Turn Request Id")] = None
+    """
+    The chat turn this message belongs to. The server records the latest turn's messages itself; a save cannot replace them.
+    """
+    created_at: Annotated[AwareDatetime | None, Field(title="Created At")] = None
+
+
+class AgentChatSessionResponse(BaseModel):
+    """
+    Full session payload returned to the client.
+    """
+
+    session_id: Annotated[str, Field(title="Session Id")]
+    title: Annotated[str, Field(title="Title")]
+    context: Annotated[dict[str, Any] | None, Field(title="Context")] = None
+    messages: Annotated[list[AgentChatMessageSchema] | None, Field(title="Messages")] = None
+    branch: AgentChatBranchSchema | None = None
+    turn: AgentChatTurnSchema | None = None
+    """
+    The latest turn the server records for the chat
+    """
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+
+
+class AgentChatShareBlockSchema(BaseModel):
+    """
+    One user-facing piece of a shared answer.
+    """
+
+    type: AgentChatShareBlockType
+    content: Annotated[str | None, Field(title="Content")] = None
+    """
+    Markdown for text; the plain-text fallback for ui
+    """
+    chart: Annotated[dict[str, Any] | None, Field(title="Chart")] = None
+    """
+    Plotly data and layout
+    """
+    ui: Annotated[dict[str, Any] | None, Field(title="Ui")] = None
+    """
+    A read-only composed UI spec
+    """
+
+
+class AgentChatShareMessageSchema(BaseModel):
+    """
+    One message of a shared snapshot, without tool steps or runtime identifiers.
+    """
+
+    role: Annotated[Role, Field(title="Role")]
+    blocks: Annotated[list[AgentChatShareBlockSchema] | None, Field(title="Blocks")] = None
+    is_error: Annotated[bool, Field(title="Is Error")] = False
+    """
+    The answer ended with an error
+    """
+    figures_attached: Annotated[bool, Field(title="Figures Attached")] = False
+    """
+    The user message went out with figures; the snapshot does not keep them
+    """
+    incomplete: Annotated[Incomplete | None, Field(title="Incomplete")] = None
+    """
+    The answer did not end normally
+    """
+    omitted_content: Annotated[bool, Field(title="Omitted Content")] = False
+    """
+    Tool steps, figures or interactive cards of the answer were left out
+    """
+    created_at: Annotated[AwareDatetime | None, Field(title="Created At")] = None
+
+
+class AgentChatShareResponse(BaseModel):
+    """
+    A shared snapshot as a project member reads it.
+    """
+
+    share_id: Annotated[str, Field(title="Share Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    title: Annotated[str, Field(title="Title")]
+    owner_username: Annotated[str, Field(title="Owner Username")]
+    messages: Annotated[list[AgentChatShareMessageSchema], Field(title="Messages")]
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    """
+    When the chat was first shared
+    """
+    snapshot_at: Annotated[AwareDatetime, Field(title="Snapshot At")]
+    """
+    When the snapshot was last copied
+    """
+    is_owner: Annotated[bool, Field(title="Is Owner")]
+    """
+    The caller owns the chat and may update the snapshot
+    """
+    can_revoke: Annotated[bool, Field(title="Can Revoke")]
+    """
+    The caller may stop sharing: the chat's owner or a project owner
+    """
+
+
+class AgentChatShareStatusResponse(BaseModel):
+    """
+    Whether one of the caller's chats is shared with the current project.
+    """
+
+    share: AgentChatShareSummary | None = None
+
+
+class AgentDecisionResponse(BaseModel):
+    """
+    One recorded agent decision with QDash's frozen reading of its evidence.
+    """
+
+    decision_id: Annotated[str, Field(title="Decision Id")]
+    session_id: Annotated[str, Field(title="Session Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    idempotency_key: Annotated[str, Field(title="Idempotency Key")]
+    recorded_by: Annotated[str, Field(title="Recorded By")]
+    recorded_at: Annotated[AwareDatetime, Field(title="Recorded At")]
+    session_status_at_record: Annotated[str, Field(title="Session Status At Record")]
+    session_state_version_at_record: Annotated[int, Field(title="Session State Version At Record")]
+    assessment: AgentDecisionAssessment | None = None
+    interpretation: Annotated[str, Field(title="Interpretation")]
+    next_action: AgentDecisionNextAction
+    next_detail: Annotated[str, Field(title="Next Detail")]
+    evidence_action_ids: Annotated[list[str], Field(title="Evidence Action Ids")]
+    evaluation_ids: Annotated[list[str], Field(title="Evaluation Ids")]
+    next_action_id: Annotated[str | None, Field(title="Next Action Id")] = None
+    intervention_id: Annotated[str | None, Field(title="Intervention Id")] = None
+    supersedes_decision_id: Annotated[str | None, Field(title="Supersedes Decision Id")] = None
+    evidence_snapshot: Annotated[dict[str, Any] | None, Field(title="Evidence Snapshot")] = None
+    """
+    What QDash's records said about the cited evidence when it was recorded
+    """
+    model: AgentModelIdentity | None = None
+    """
+    The model the client host reported for this record; null when none was reported. Client reported, not verified by QDash.
+    """
+
+
+class AgentNotificationDeliveryResponse(BaseModel):
+    """
+    Slack delivery state shown with an intervention.
+    """
+
+    status: AgentNotificationStatus
+    attempts: Annotated[int, Field(title="Attempts")]
+    last_error: Annotated[str, Field(title="Last Error")]
+    last_attempt_at: Annotated[AwareDatetime | None, Field(title="Last Attempt At")] = None
+    next_attempt_at: Annotated[AwareDatetime | None, Field(title="Next Attempt At")] = None
+    channel_id: Annotated[str | None, Field(title="Channel Id")] = None
+    message_ts: Annotated[str | None, Field(title="Message Ts")] = None
+    sent_at: Annotated[AwareDatetime | None, Field(title="Sent At")] = None
+    last_reply_error: Annotated[str, Field(title="Last Reply Error")] = ""
+
+
+class AgentPlanCheckpoint(BaseModel):
+    """
+    Where a stopped plan was, so a runner can continue it without repeating work.
+
+    The checkpoint holds the approved plan, the idempotency prefix, and every counter the
+    plan's bounds use. QDash does not take the counters on trust: it binds a session to the
+    plan of its first checkpoint and rejects a checkpoint that changes the plan, its prefix,
+    or its bounds, shortens the recorded path, or reports fewer node visits than the
+    session's run_task actions show.
+    """
+
+    version: Annotated[int, Field(ge=1, le=1, title="Version")] = 1
+    qid: Annotated[str, Field(max_length=200, min_length=1, title="Qid")]
+    source_execution_id: Annotated[SourceExecutionId | None, Field(title="Source Execution Id")] = (
+        None
+    )
+    nodes: Annotated[
+        list[AgentPlanCheckpointNode], Field(max_length=50, min_length=1, title="Nodes")
+    ]
+    idempotency_prefix: Annotated[
+        str, Field(max_length=96, min_length=1, title="Idempotency Prefix")
+    ]
+    node_path: Annotated[list[str] | None, Field(max_length=1000, title="Node Path")] = None
+    visit_counts: Annotated[dict[str, int] | None, Field(title="Visit Counts")] = None
+    stopped_node_id: Annotated[str, Field(max_length=200, min_length=1, title="Stopped Node Id")]
+    accepted_candidates: Annotated[
+        list[AgentCheckpointCandidate] | None,
+        Field(max_length=100, title="Accepted Candidates"),
+    ] = None
+    max_pre_dispatch_retries: Annotated[
+        int, Field(ge=0, le=10, title="Max Pre Dispatch Retries")
+    ] = 1
+    max_node_executions: Annotated[int, Field(ge=1, le=10000, title="Max Node Executions")]
+    max_node_visits: Annotated[MaxNodeVisits | None, Field(title="Max Node Visits")] = None
+    commit_on_success: Annotated[bool, Field(title="Commit On Success")] = False
+    planner: Annotated[str, Field(pattern="^(none|evaluation)$", title="Planner")] = "none"
+    planner_history: Annotated[
+        dict[str, list[AgentPlannerVerdictRecord]] | None,
+        Field(title="Planner History"),
+    ] = None
+
+
+class AgentSessionGraphNode(BaseModel):
+    """
+    One step of the graph. Exactly the field named by ``kind`` is set.
+    """
+
+    node_id: Annotated[str, Field(title="Node Id")]
+    """
+    Stable id: the kind and the id of its record
+    """
+    kind: Annotated[Kind1, Field(title="Kind")]
+    order: Annotated[int, Field(title="Order")]
+    """
+    0-based position in time among all nodes of the graph
+    """
+    at: Annotated[AwareDatetime, Field(title="At")]
+    label: Annotated[str, Field(title="Label")]
+    status: Annotated[str, Field(title="Status")]
+    """
+    Measurement: the execution status, or the dispatch state before one exists; link_claimed or link_ambiguous when the action was dispatched but no execution can be attributed to it. Proposal: rejected. Decision: recorded or superseded. Intervention: its status
+    """
+    status_is_current: Annotated[bool, Field(title="Status Is Current")] = False
+    """
+    The status is read live from a record that can still change
+    """
+    model: AgentModelIdentity | None = None
+    """
+    The model the client host reported for the action, decision, or intervention record; client reported, not verified by QDash. Null when none was reported
+    """
+    missing: Annotated[list[str] | None, Field(title="Missing")] = None
+    """
+    Facts the records do not hold, such as execution, execution_on_session_chip, execution_link_claimed, execution_link_ambiguous, task_result, or action_record (shown from the session's pending payload, not written yet)
+    """
+    measurement: AgentSessionGraphMeasurement | None = None
+    proposal: AgentSessionGraphProposal | None = None
+    session_action: AgentSessionGraphSessionAction | None = None
+    decision: AgentSessionGraphDecision | None = None
+    intervention: AgentSessionGraphIntervention | None = None
 
 
 class AgentSessionPolicy(BaseModel):
@@ -5968,7 +8161,19 @@ class AgentSessionPolicy(BaseModel):
     allowed_overrides: Annotated[
         dict[str, NumericBounds] | None, Field(title="Allowed Overrides")
     ] = None
+    """
+    Parameter name -> bounds. A step may override a task input of that name within the bounds, and a task output of that name is an accepted candidate only inside them. Output parameters are bounded here, never in quality gates. Give only bounds a person stated; QDash records them as approved with the session and cannot verify where they came from
+    """
     quality_gates: Annotated[dict[str, NumericBounds] | None, Field(title="Quality Gates")] = None
+    """
+    Legacy session-wide quality gates: metric name -> bounds checked on every candidate of every task. Kept so sessions approved before task_quality_gates keep their exact meaning; a new session must leave it empty and use task_quality_gates.
+    """
+    task_quality_gates: Annotated[
+        dict[str, dict[str, NumericBounds]] | None, Field(title="Task Quality Gates")
+    ] = None
+    """
+    Task name -> quality metric name -> bounds. A candidate from a result of that task is accepted only when the result records each named metric inside its bounds; a missing metric rejects it. Results of other tasks are not checked against these gates. Each task must be an allowed task, and each metric a quality metric QDash records on task results (currently only r2).
+    """
     allow_reconfigure: Annotated[bool, Field(title="Allow Reconfigure")] = False
     max_actions: Annotated[int, Field(ge=1, le=10000, title="Max Actions")] = 100
     autonomy: AgentAutonomy = AgentAutonomy.confirm_each
@@ -5978,6 +8183,14 @@ class AgentSessionPolicy(BaseModel):
     max_rounds_per_target: Annotated[int, Field(ge=1, le=20, title="Max Rounds Per Target")] = 3
     """
     How many times an autonomous plan may run the same node on one target
+    """
+    parameter_updates: AgentParameterUpdatePolicy | None = None
+    """
+    Opt-in authority to commit (and optionally apply) passing candidates without a per-update approval; absent means every commit and apply is reviewed
+    """
+    evaluation: AgentEvaluationMode | None = None
+    """
+    Calibration evaluator use, fixed at approval: off (the agent does not call qcal_evaluate) or required (every autonomous update needs a completed evaluation of its result with a reliable fit and a SUCCESS diagnosis). New sessions record off unless they ask for required; null marks a session approved before this field, which keeps its earlier meaning. In every mode an existing evaluation that is pending, failed, disputed, or negative blocks an update
     """
 
 
@@ -5994,13 +8207,44 @@ class AgentSessionResponse(BaseModel):
     skill_name: Annotated[str, Field(title="Skill Name")]
     skill_version: Annotated[str, Field(title="Skill Version")]
     skill_hash: Annotated[str, Field(title="Skill Hash")]
-    model_name: Annotated[str, Field(title="Model Name")]
+    model: AgentModelIdentity | None = None
+    """
+    The model the client host reported for this record; null when none was reported. Client reported, not verified by QDash.
+    """
+    model_name: Annotated[str, Field(title="Model Name")] = ""
+    """
+    provider/model_id of model, for display; empty when none was reported
+    """
     status: AgentSessionStatus
     state_version: Annotated[int, Field(title="State Version")]
     action_count: Annotated[int, Field(title="Action Count")]
     created_at: Annotated[AwareDatetime, Field(title="Created At")]
     updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
     expires_at: Annotated[AwareDatetime, Field(title="Expires At")]
+    active_intervention_id: Annotated[str | None, Field(title="Active Intervention Id")] = None
+    """
+    The intervention the session waits on, if any
+    """
+    start_notification: AgentSessionNotificationResponse | None = None
+    """
+    Slack delivery of the session's start message; null for a session created before lifecycle messages existed
+    """
+    end_notification: AgentSessionNotificationResponse | None = None
+    """
+    Slack delivery of the session's end message, stored by the update that ended it; null while the session is open
+    """
+    stop: AgentSessionStopRecord | None = None
+    """
+    Who stopped the session with a stop request, why, and when; null unless a stop request ended it (an expert's stop answer is recorded on its intervention)
+    """
+    calibration_session_id: Annotated[str | None, Field(title="Calibration Session Id")] = None
+    """
+    The calibration session it was created in; null when it was created alone
+    """
+    calibration_admission: CalibrationAdmission | None = None
+    """
+    Admission in its calibration session: pending (written, start not finalized; every operation is refused), admitted (operates under its policy), or rejected (the calibration session was closed first; cancelled, never operates). Null for a session created alone, which is never checked
+    """
 
 
 class BackendConfigResponse(BaseModel):
@@ -6029,6 +8273,281 @@ class BulkUserImportResult(BaseModel):
     initial_password: Annotated[str | None, Field(title="Initial Password")] = None
     status: Annotated[str, Field(title="Status")]
     message: Annotated[str | None, Field(title="Message")] = None
+
+
+class CalibrationAuditSessionHeader(BaseModel):
+    """
+    Who and what a calibration session's audit belongs to.
+    """
+
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    objective: Annotated[str, Field(title="Objective")]
+    created_by: Annotated[str, Field(title="Created By")]
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    status: CalibrationSessionStatus
+    pipeline_run_total: Annotated[int, Field(title="Pipeline Run Total")]
+    agent_session_total: Annotated[int, Field(title="Agent Session Total")]
+    decision_total: Annotated[int, Field(title="Decision Total")]
+
+
+class CalibrationConclusionModel(BaseModel):
+    """
+    A final recommendation; a statement of its recorder, never implied by closing.
+    """
+
+    outcome: CalibrationDecisionOutcome
+    recommended_candidate_id: Annotated[
+        RecommendedCandidateId | None, Field(title="Recommended Candidate Id")
+    ] = None
+
+
+class CalibrationExperimentMeasurement(BaseModel):
+    """
+    What QDash's task results say an experiment measured; never the recorder's statement.
+
+    ``evidence_status``: ``complete`` when every task on the target completed, ``running``
+    while an execution or task still runs, ``failed`` when none completed and one failed,
+    ``partial`` when some completed and others failed or were cancelled, ``unavailable`` when
+    no task result on the target was found, ``not_run`` when no run carries the decision out
+    (never dispatched, declined, or refused before it started). It never says whether the
+    experiment succeeded scientifically.
+    """
+
+    evidence_status: Annotated[EvidenceStatus, Field(title="Evidence Status")]
+    pipeline_dispatch_status: CalibrationPipelineRunStatus | None = None
+    execution_ids: Annotated[list[str] | None, Field(title="Execution Ids")] = None
+    tasks: Annotated[list[CalibrationMeasuredTask] | None, Field(title="Tasks")] = None
+    gate_time_ns: CalibrationMeasuredValue | None = None
+    """
+    zx90_gate_time of the latest completed task that published it
+    """
+    cr_duration_ns: CalibrationMeasuredValue | None = None
+    cr_amplitude: CalibrationMeasuredValue | None = None
+    gate_fidelity: CalibrationMeasuredValue | None = None
+    """
+    zx90_gate_fidelity, with the benchmark's error
+    """
+    task_seconds: Annotated[float | None, Field(title="Task Seconds")] = None
+    """
+    Sum of the target's task durations; null when none ended
+    """
+    execution_seconds: Annotated[float | None, Field(title="Execution Seconds")] = None
+    """
+    From the first execution start to the last end; null until all ended
+    """
+
+
+class CalibrationExperimentPlanModel(BaseModel):
+    """
+    The experiment a decision proposes before its run is dispatched.
+    """
+
+    candidate_id: Annotated[str, Field(pattern="^[A-Za-z0-9_.:-]{1,64}$", title="Candidate Id")]
+    """
+    The recorder's name for the condition, such as incumbent or c03
+    """
+    stage: CalibrationExperimentStage
+    target: Annotated[
+        str, Field(pattern="^[A-Za-z0-9_]{1,32}(-[A-Za-z0-9_]{1,32})?$", title="Target")
+    ]
+    """
+    The qubit (0) or directed coupling (0-1) measured
+    """
+    requested_changes: Annotated[
+        list[RequestedParameterChangeModel] | None,
+        Field(max_length=20, title="Requested Changes"),
+    ] = None
+
+
+class CalibrationExperimentRow(BaseModel):
+    """
+    One experiment of the search: a proposing decision and one run that carried it out.
+
+    A decision carried out by several runs gives a row per run; one carried out by none gives a
+    row without a run. Built from the audit's records; nothing here is stored.
+    """
+
+    sequence: Annotated[int, Field(title="Sequence")]
+    """
+    1-based order among the rows
+    """
+    decision_id: Annotated[str, Field(title="Decision Id")]
+    stage: CalibrationExperimentStage
+    candidate_id: Annotated[str, Field(title="Candidate Id")]
+    target: Annotated[str, Field(title="Target")]
+    requested_changes: Annotated[
+        list[RequestedParameterChangeModel] | None, Field(title="Requested Changes")
+    ] = None
+    rationale: Annotated[str, Field(title="Rationale")]
+    """
+    The decision's interpretation; recorder's statement
+    """
+    model: AgentModelIdentity | None = None
+    recorded_at: Annotated[AwareDatetime, Field(title="Recorded At")]
+    pipeline_run_id: Annotated[str | None, Field(title="Pipeline Run Id")] = None
+    parameter_checks: Annotated[
+        list[CalibrationParameterCheck] | None, Field(title="Parameter Checks")
+    ] = None
+    measured: CalibrationExperimentMeasurement
+
+
+class CalibrationLatestRequestedRun(BaseModel):
+    """
+    The session's most recently requested pipeline run and its recorded execution outcome.
+
+    "Latest" is the order QDash recorded the requests in (``requested_at``), not the order runs
+    finished or wrote: a run requested earlier may complete later. QDash keeps no authoritative
+    record of hardware writes, so this never states the current or last written hardware state.
+
+    ``execution_outcome``, from QDash's dispatch and execution records only: ``refused``: QDash
+    refused the launch and created no flow run. ``unknown``: the launch is still being reported
+    or its outcome is unknown. ``no_execution``: the flow run was created and QDash holds no
+    execution record for it. ``running``: an execution is still open. ``failed``: every
+    execution ended and none completed. ``partial``: some executions completed and others
+    failed or were cancelled. ``completed``: every execution completed. Runs outside the
+    session are not considered.
+    """
+
+    pipeline_run_id: Annotated[str, Field(title="Pipeline Run Id")]
+    requested_at: Annotated[AwareDatetime, Field(title="Requested At")]
+    dispatch_status: CalibrationPipelineRunStatus
+    execution_outcome: Annotated[ExecutionOutcome, Field(title="Execution Outcome")]
+    decision_id: Annotated[str | None, Field(title="Decision Id")] = None
+    """
+    The decision the request named; never inferred
+    """
+    candidate_id: Annotated[str | None, Field(title="Candidate Id")] = None
+    """
+    The candidate of the decision the run carries out; null when it names none
+    """
+    execution_ids: Annotated[list[str] | None, Field(title="Execution Ids")] = None
+    finished_at: Annotated[AwareDatetime | None, Field(title="Finished At")] = None
+    """
+    When the last of its executions ended; null while any is open
+    """
+    candidate_is_recommended: Annotated[bool | None, Field(title="Candidate Is Recommended")] = None
+    """
+    Whether the run's requested candidate is the recommended candidate, comparing the two records only; null when either is unknown. It says nothing about the hardware
+    """
+    missing: Annotated[list[str] | None, Field(title="Missing")] = None
+    """
+    Facts QDash does not record and this view therefore cannot state
+    """
+
+
+class CalibrationSessionAuditResponse(BaseModel):
+    """
+    A page of one snapshot of a calibration session's audit, or all of it.
+
+    The events have the same schema and semantics as an agent session's audit, and an admitted
+    agent session's events appear inside it with ``agent_session_id`` set. A snapshot is two
+    matching projected reads, not an atomic database view.
+    """
+
+    schema_version: Annotated[
+        Literal["qdash.calibration-session-audit.v1"], Field(title="Schema Version")
+    ] = "qdash.calibration-session-audit.v1"
+    generated_at: Annotated[AwareDatetime, Field(title="Generated At")]
+    snapshot_id: Annotated[str, Field(title="Snapshot Id")]
+    calibration_session: CalibrationAuditSessionHeader
+    events: Annotated[list[AgentAuditEvent], Field(title="Events")]
+    total_events: Annotated[int, Field(title="Total Events")]
+    next_cursor: Annotated[str | None, Field(title="Next Cursor")] = None
+    complete: Annotated[bool, Field(title="Complete")]
+    notes: Annotated[list[str], Field(title="Notes")]
+
+
+class CalibrationSessionGroupSummary(BaseModel):
+    """
+    One calibration session as the display parent of the work started in it.
+
+    ``status`` is open or closed; neither says whether the objective was met.
+    """
+
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    objective: Annotated[str, Field(title="Objective")]
+    status: CalibrationSessionStatus
+    origin: CalibrationSessionOrigin = CalibrationSessionOrigin.manual
+    """
+    automatic when QDash created it for a run started without a session ID
+    """
+    created_by: Annotated[str, Field(title="Created By")]
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    closed_at: Annotated[AwareDatetime | None, Field(title="Closed At")] = None
+    targets: Annotated[list[str] | None, Field(title="Targets")] = None
+    """
+    Qubits the session's records name: resolved pipeline targets, agent session policies, and experiment targets of its decisions; empty when none is recorded
+    """
+    counts: CalibrationGroupCounts
+    first_activity_at: Annotated[AwareDatetime, Field(title="First Activity At")]
+    """
+    Its creation or earliest execution start
+    """
+    latest_activity_at: Annotated[AwareDatetime, Field(title="Latest Activity At")]
+    """
+    Its latest execution start or end, nested agent activity, or creation
+    """
+    recommendation: CalibrationRecommendationRef | None = None
+
+
+class CalibrationSessionRef(BaseModel):
+    """
+    A calibration session another record belongs to, read in the request's project.
+    """
+
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    objective: Annotated[str, Field(title="Objective")]
+    status: CalibrationSessionStatus
+
+
+class CalibrationSessionResponse(BaseModel):
+    """
+    A calibration session record.
+    """
+
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    objective: Annotated[str, Field(title="Objective")]
+    created_by: Annotated[str, Field(title="Created By")]
+    """
+    The signed-in user who created it
+    """
+    status: CalibrationSessionStatus
+    origin: CalibrationSessionOrigin = CalibrationSessionOrigin.manual
+    """
+    manual when a person or agent created it for an objective; automatic when QDash created it for a run started without a session ID (a later run may name it)
+    """
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    closed_at: Annotated[AwareDatetime | None, Field(title="Closed At")] = None
+    closed_by: Annotated[str | None, Field(title="Closed By")] = None
+    """
+    The user who closed it, or system:auto-close when QDash closed it automatically
+    """
+    close_origin: CalibrationSessionCloseOrigin | None = None
+    """
+    manual when the creator closed it; automatic when QDash closed an automatic session because every run and agent session in it ended. Null while open, and for a session closed before this was recorded (closed by its creator). Closing says nothing about how the runs ended.
+    """
+    closing_note: Annotated[str, Field(title="Closing Note")] = ""
+    closed_with_unknown_runs: Annotated[
+        list[str] | None, Field(title="Closed With Unknown Runs")
+    ] = None
+    """
+    Pipeline runs whose dispatch outcome was unknown when it was closed
+    """
+    closed_with_unknown_starts: Annotated[
+        list[CalibrationChildReservation] | None,
+        Field(title="Closed With Unknown Starts"),
+    ] = None
+    """
+    Agent session starts reserved long ago and never recorded when it was closed. One recorded later is rejected (calibration_admission: rejected) and never operates.
+    """
 
 
 class CellAssessment(BaseModel):
@@ -6134,45 +8653,6 @@ class CooldownResponse(BaseModel):
     wiring_blocks: Annotated[list[dict[str, Any]] | None, Field(title="Wiring Blocks")] = None
 
 
-class CopilotChatMessageSchema(BaseModel):
-    """
-    One message inside a copilot chat session.
-    """
-
-    role: Annotated[str, Field(title="Role")]
-    """
-    "user" or "assistant"
-    """
-    content: Annotated[str, Field(title="Content")]
-    """
-    Message content
-    """
-    attached_image: Annotated[str | None, Field(title="Attached Image")] = None
-    steer: CopilotChatSteerSchema | None = None
-    """
-    Set on a user message sent while an answer was written
-    """
-    entry_id: Annotated[EntryId | None, Field(title="Entry Id")] = None
-    """
-    An assistant answer's entry in the runtime's transcript, from the chat stream's result; the chat can be branched from that answer
-    """
-    created_at: Annotated[AwareDatetime | None, Field(title="Created At")] = None
-
-
-class CopilotChatSessionResponse(BaseModel):
-    """
-    Full session payload returned to the client.
-    """
-
-    session_id: Annotated[str, Field(title="Session Id")]
-    title: Annotated[str, Field(title="Title")]
-    context: Annotated[dict[str, Any] | None, Field(title="Context")] = None
-    messages: Annotated[list[CopilotChatMessageSchema] | None, Field(title="Messages")] = None
-    branch: CopilotChatBranchSchema | None = None
-    created_at: Annotated[AwareDatetime, Field(title="Created At")]
-    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
-
-
 class Coupling(BaseModel):
     """
     Coupling information.
@@ -6197,6 +8677,56 @@ class CouplingResponse(BaseModel):
     metric_notes: Annotated[dict[str, NoteModel] | None, Field(title="Metric Notes")] = None
 
 
+class CreateAgentChatSessionRequest(BaseModel):
+    """
+    Body for POST /agent/chat/sessions.
+    """
+
+    session_id: Annotated[str, Field(title="Session Id")]
+    """
+    Client-generated session identifier
+    """
+    title: Annotated[str, Field(title="Title")] = "New Chat"
+    context: Annotated[dict[str, Any] | None, Field(title="Context")] = None
+    messages: Annotated[list[AgentChatMessageSchema] | None, Field(title="Messages")] = None
+
+
+class CreateAgentInterventionRequest(BaseModel):
+    """
+    Record that an agent stopped and needs a person, with evidence references.
+
+    QDash records the request even when the session has no actions left or has expired; it
+    then pauses the session if it was active. Attempts reference actions, executions, task
+    results, and evaluations that QDash checks; free text stays short and human-facing.
+    """
+
+    idempotency_key: Annotated[str, Field(max_length=128, min_length=1, title="Idempotency Key")]
+    reason: AgentInterventionReason
+    summary: Annotated[str, Field(max_length=2000, min_length=1, title="Summary")]
+    question: Annotated[str, Field(max_length=2000, min_length=1, title="Question")]
+    node_id: Annotated[NodeId | None, Field(title="Node Id")] = None
+    task_name: Annotated[TaskName | None, Field(title="Task Name")] = None
+    qids: Annotated[list[str] | None, Field(max_length=64, title="Qids")] = None
+    attempts: Annotated[
+        list[AgentInterventionAttempt] | None, Field(max_length=20, title="Attempts")
+    ] = None
+    checkpoint: AgentPlanCheckpoint | None = None
+    """
+    Where the plan stopped; required for a runner to resume it
+    """
+    previous_intervention_id: Annotated[
+        PreviousInterventionId | None, Field(title="Previous Intervention Id")
+    ] = None
+    autonomous: Annotated[bool, Field(title="Autonomous")] = False
+    """
+    The request comes from an autonomous agent without a per-call approval. QDash then also requires that the signed-in user created the session and that its autonomy is auto. Who may answer the intervention does not change.
+    """
+    model: AgentModelIdentity | None = None
+    """
+    The provider and model the client host reports it ran the agent with, read from the host's own runtime, never from the agent's tool arguments. Recorded as reported; QDash does not verify it, and it changes no scope or approval. Omitted when the host does not know it.
+    """
+
+
 class CreateAgentSessionRequest(BaseModel):
     """
     Create a bounded authorization session for a local agent.
@@ -6208,7 +8738,16 @@ class CreateAgentSessionRequest(BaseModel):
     skill_name: Annotated[str, Field(max_length=200, title="Skill Name")] = ""
     skill_version: Annotated[str, Field(max_length=200, title="Skill Version")] = ""
     skill_hash: Annotated[str, Field(max_length=256, title="Skill Hash")] = ""
-    model_name: Annotated[str, Field(max_length=300, title="Model Name")] = ""
+    model: AgentModelIdentity | None = None
+    """
+    The provider and model the client host reports it ran the agent with, read from the host's own runtime, never from the agent's tool arguments. Recorded as reported; QDash does not verify it, and it changes no scope or approval. Omitted when the host does not know it.
+    """
+    calibration_session_id: Annotated[
+        CalibrationSessionId1 | None, Field(title="Calibration Session Id")
+    ] = None
+    """
+    Create the session in this calibration session, which must be open, on the same chip, and created by the signed-in user. It groups the session with the objective's other work and grants nothing beyond the policy. Without it, the session joins an automatic calibration session created for it.
+    """
 
 
 class CreateChipResponse(BaseModel):
@@ -6228,20 +8767,6 @@ class CreateChipResponse(BaseModel):
     current_cooldown_id: Annotated[str | None, Field(title="Current Cooldown Id")] = None
     note: NoteModel | None = None
     config: ChipConfigResult | None = None
-
-
-class CreateCopilotChatSessionRequest(BaseModel):
-    """
-    Body for POST /copilot/chat/sessions.
-    """
-
-    session_id: Annotated[str, Field(title="Session Id")]
-    """
-    Client-generated session identifier
-    """
-    title: Annotated[str, Field(title="Title")] = "New Chat"
-    context: Annotated[dict[str, Any] | None, Field(title="Context")] = None
-    messages: Annotated[list[CopilotChatMessageSchema] | None, Field(title="Messages")] = None
 
 
 class CreateEvaluationRunRequest(BaseModel):
@@ -6533,7 +9058,7 @@ class EvaluationItem(BaseModel):
     The task result's figures, for display
     """
     json_figure_path: Annotated[list[str] | None, Field(title="Json Figure Path")] = None
-    status: Annotated[Status2, Field(title="Status")]
+    status: Annotated[Status3, Field(title="Status")]
     requested_at: Annotated[AwareDatetime, Field(title="Requested At")]
     started_at: Annotated[AwareDatetime | None, Field(title="Started At")] = None
     completed_at: Annotated[AwareDatetime | None, Field(title="Completed At")] = None
@@ -6618,7 +9143,7 @@ class EvaluationRunSummary(BaseModel):
     requested_by: Annotated[str, Field(title="Requested By")]
     requested_at: Annotated[AwareDatetime, Field(title="Requested At")]
     completed_at: Annotated[AwareDatetime | None, Field(title="Completed At")] = None
-    status: Annotated[Status3, Field(title="Status")]
+    status: Annotated[Status4, Field(title="Status")]
     total: Annotated[int, Field(title="Total")]
     completed_count: Annotated[int, Field(title="Completed Count")]
     failed_count: Annotated[int, Field(title="Failed Count")]
@@ -6689,11 +9214,95 @@ class ExecuteFlowRequest(BaseModel):
 
     target_override: FlowTargetOverride | None = None
     """
-    Targets for this run, overriding direct CalibService and pipeline targets
+    Targets for this run, overriding the initial targets of every CalibrationSession.run (or legacy CalibService.run) and pipeline
     """
     parameters: Annotated[dict[str, Any] | None, Field(title="Parameters")] = None
     """
     Execution parameters (overrides default_parameters)
+    """
+    calibration_session_id: Annotated[
+        CalibrationSessionId2 | None, Field(title="Calibration Session Id")
+    ] = None
+    """
+    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
+    """
+    idempotency_key: Annotated[IdempotencyKey1 | None, Field(title="Idempotency Key")] = None
+    """
+    A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run.
+    """
+
+
+class ExecutePipelinePlanRequest(BaseModel):
+    """
+    Run a stored plan exactly as it was reviewed.
+    """
+
+    chip_id: Annotated[str, Field(min_length=1, title="Chip Id")]
+    """
+    Must be the plan's chip.
+    """
+    expected_review_digest: Annotated[
+        str,
+        Field(pattern="^sha256:v[0-9]+:[0-9a-f]{64}$", title="Expected Review Digest"),
+    ]
+    """
+    The review digest the person approved. A plan with another digest, or one whose revalidated content no longer has it, is refused.
+    """
+    backend_name: Annotated[str | None, Field(title="Backend Name")] = None
+    """
+    Must be the plan's backend when given.
+    """
+    calibration_session_id: Annotated[
+        CalibrationSessionId2 | None, Field(title="Calibration Session Id")
+    ] = None
+    """
+    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
+    """
+    idempotency_key: Annotated[IdempotencyKey1 | None, Field(title="Idempotency Key")] = None
+    """
+    A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run.
+    """
+    decision_id: Annotated[DecisionId1 | None, Field(title="Decision Id")] = None
+    """
+    With calibration_session_id: the decision of that session this run carries out, recorded before dispatch with an experiment. QDash checks it belongs to the session and records the link on the run; it grants nothing.
+    """
+    reported_origin: ReportedLaunchOrigin | None = None
+    """
+    As for POST /calibration-pipelines/execute: stored as reported.
+    """
+
+
+class ExecutePipelineRequest(BaseModel):
+    """
+    Dispatch one pipeline run with a separate execution for each step reached.
+    """
+
+    chip_id: Annotated[str, Field(min_length=1, title="Chip Id")]
+    spec: Annotated[dict[str, Any], Field(title="Spec")]
+    """
+    CalibrationPipelineSpec as JSON; see GET /calibration-pipelines/catalog.
+    """
+    backend_name: Annotated[str | None, Field(title="Backend Name")] = None
+    """
+    Defaults to the configured backend.
+    """
+    calibration_session_id: Annotated[
+        CalibrationSessionId2 | None, Field(title="Calibration Session Id")
+    ] = None
+    """
+    Add the run to this calibration session, which must exist, be open, be on the run's chip, and be created by the signed-in user; otherwise the request is refused before anything starts. It groups the run with the session's other work and grants nothing. Without it, the run joins an automatic session created for it.
+    """
+    idempotency_key: Annotated[IdempotencyKey1 | None, Field(title="Idempotency Key")] = None
+    """
+    A retry with the same key and request returns the recorded run instead of starting another, and a run whose launch outcome is unknown is never launched again with it. Without a key, every request starts a new run.
+    """
+    decision_id: Annotated[DecisionId1 | None, Field(title="Decision Id")] = None
+    """
+    With calibration_session_id: the decision of that session this run carries out, recorded before dispatch with an experiment. QDash checks it belongs to the session and records the link on the run; it grants nothing.
+    """
+    reported_origin: ReportedLaunchOrigin | None = None
+    """
+    How the caller says it started the run, such as an agent tool. QDash stores it as given and shows it as reported: it is not verified, does not link the run to an agent session, and grants nothing. The signed-in user stays responsible for the run.
     """
 
 
@@ -6727,7 +9336,7 @@ class ExecutionComparisonResponse(BaseModel):
 
 class ExecutionPlanRun(BaseModel):
     """
-    One CalibService.run call of the entrypoint.
+    One CalibrationSession.run (or legacy CalibService.run) call of the entrypoint.
     """
 
     targets: FlowTargetOverride | None = None
@@ -6735,6 +9344,49 @@ class ExecutionPlanRun(BaseModel):
     Literal targets of the call; null when computed at run time
     """
     steps: Annotated[list[ExecutionPlanStep], Field(title="Steps")]
+
+
+class ExecutionResponseSummary(BaseModel):
+    """
+    ExecutionResponseSummary is a Pydantic model that represents the summary of an execution response.
+
+    Attributes
+    ----------
+        name (str): The name of the execution.
+        execution_id (str): The ID of the execution.
+        status (str): The current status of the execution.
+        start_at (datetime | None): The start time of the execution.
+        end_at (datetime | None): The end time of the execution.
+        elapsed_time (timedelta | None): The total elapsed time of the execution.
+        user_id (str | None): Internal ID of the user who started the execution.
+        username (str): Username snapshot of the user who started the execution.
+        tags (list[str]): Tags associated with the execution.
+        note (dict): Notes for the execution.
+    """
+
+    name: Annotated[str, Field(title="Name")]
+    execution_id: Annotated[str, Field(title="Execution Id")]
+    status: Annotated[str, Field(title="Status")]
+    message: Annotated[str, Field(title="Message")] = ""
+    user_id: Annotated[str | None, Field(title="User Id")] = None
+    username: Annotated[str, Field(title="Username")] = ""
+    start_at: Annotated[AwareDatetime | None, Field(title="Start At")] = None
+    end_at: Annotated[AwareDatetime | None, Field(title="End At")] = None
+    elapsed_time: Annotated[timedelta | None, Field(title="Elapsed Time")] = None
+    tags: Annotated[list[str], Field(title="Tags")]
+    note: Annotated[dict[str, Any], Field(title="Note")]
+    agent_session: ExecutionAgentSessionLink | None = None
+    """
+    Set only when an action of an agent session dispatched this execution; a tag alone never sets it
+    """
+    calibration_session: ExecutionCalibrationSessionLink | None = None
+    """
+    The calibration session this execution belongs to, from QDash's own records: a pipeline run recorded in it, or an action of an agent session admitted to it. Null when no record relates it, or when records disagree on the session
+    """
+    reported_origin: ReportedLaunchOrigin | None = None
+    """
+    How the caller that launched this execution's pipeline said it was started, such as an agent tool. Client reported, not verified by QDash; null when nothing was reported. The recorded user is still the one whose sign-in started it
+    """
 
 
 class FlowExecutionPlanResponse(BaseModel):
@@ -6748,7 +9400,7 @@ class FlowExecutionPlanResponse(BaseModel):
     """
     Version of the saved source the plan was read from
     """
-    status: Annotated[Status4, Field(title="Status")]
+    status: Annotated[Status5, Field(title="Status")]
     """
     resolved: every run and step was read from literals. unresolved: the source decides its steps at run time; reason says why. invalid: manual rounds that cannot run were found; execution would fail before measuring.
     """
@@ -6826,7 +9478,7 @@ class ForumPostResponse(BaseModel):
     """
     Assigned project member username
     """
-    status: Annotated[Status6, Field(title="Status")] = Status6.open
+    status: Annotated[Status7, Field(title="Status")] = Status7.open
     """
     Thread workflow status
     """
@@ -7018,6 +9670,56 @@ class ListAgentActionsResponse(BaseModel):
     total: Annotated[int, Field(title="Total")]
 
 
+class ListAgentCandidatesResponse(BaseModel):
+    """
+    Task-result candidates and their deterministic gate decisions.
+    """
+
+    items: Annotated[list[AgentCandidateResponse], Field(title="Items")]
+    total: Annotated[int, Field(title="Total")]
+
+
+class ListAgentDecisionsResponse(BaseModel):
+    """
+    Decisions of one session, oldest first.
+    """
+
+    items: Annotated[list[AgentDecisionResponse], Field(title="Items")]
+    total: Annotated[int, Field(title="Total")]
+
+
+class ListAgentSessionsResponse(BaseModel):
+    """
+    Agent sessions of the current project, newest first.
+    """
+
+    items: Annotated[list[AgentSessionResponse], Field(title="Items")]
+    total: Annotated[int, Field(title="Total")]
+    """
+    Number of sessions returned, after filters and the limit
+    """
+
+
+class ListCalibrationSessionsResponse(BaseModel):
+    """
+    Calibration sessions of the current project, newest first.
+    """
+
+    items: Annotated[list[CalibrationSessionResponse], Field(title="Items")]
+    total: Annotated[int, Field(title="Total")]
+    """
+    Number of sessions returned, after filters and the limit
+    """
+    skip: Annotated[int, Field(title="Skip")] = 0
+    """
+    Sessions skipped before the first one returned
+    """
+    has_more: Annotated[bool, Field(title="Has More")] = False
+    """
+    True when more sessions match after the ones returned
+    """
+
+
 class ListChipsResponse(BaseModel):
     """
     Response model for listing chips.
@@ -7085,6 +9787,19 @@ class ListEvaluationsResponse(BaseModel):
     """
 
     evaluations: Annotated[list[EvaluationItem], Field(title="Evaluations")]
+
+
+class ListExecutionsResponse(BaseModel):
+    """
+    Response model for listing executions.
+
+    Wraps list of executions for API consistency and future extensibility (e.g., pagination).
+    """
+
+    executions: Annotated[list[ExecutionResponseSummary], Field(title="Executions")]
+    total: Annotated[int | None, Field(title="Total")] = None
+    skip: Annotated[int | None, Field(title="Skip")] = None
+    limit: Annotated[int | None, Field(title="Limit")] = None
 
 
 class ListForumPostsResponse(BaseModel):
@@ -7272,7 +9987,7 @@ class MetricCell(BaseModel):
     source: Annotated[str | None, Field(title="Source")] = None
     target: Annotated[str | None, Field(title="Target")] = None
     hops: Annotated[int | None, Field(title="Hops")] = None
-    status: Annotated[Status9, Field(title="Status")]
+    status: Annotated[Status10, Field(title="Status")]
     value: Annotated[float | None, Field(title="Value")] = None
     color: Annotated[str | None, Field(title="Color")] = None
     label: Annotated[str | None, Field(title="Label")] = None
@@ -7397,7 +10112,7 @@ class MetricScriptRevision(BaseModel):
     revision: Annotated[int, Field(title="Revision")]
     source: Annotated[str, Field(title="Source")]
     created_at: Annotated[AwareDatetime, Field(title="Created At")]
-    status: Annotated[Status10, Field(title="Status")]
+    status: Annotated[Status11, Field(title="Status")]
     metrics: Annotated[list[MetricInfo] | None, Field(title="Metrics")] = None
     """
     Catalog of this revision (valid revisions only)
@@ -7414,7 +10129,7 @@ class MetricScriptSummary(BaseModel):
     name: Annotated[str, Field(title="Name")]
     description: Annotated[str, Field(title="Description")]
     visibility: Annotated[Visibility, Field(title="Visibility")]
-    status: Annotated[Status10, Field(title="Status")]
+    status: Annotated[Status11, Field(title="Status")]
     revision: Annotated[int, Field(title="Revision")]
     active_revision: Annotated[int | None, Field(title="Active Revision")]
     metrics: Annotated[list[MetricInfo], Field(title="Metrics")]
@@ -7474,22 +10189,63 @@ class ParameterHistoryResponse(BaseModel):
     total_versions: Annotated[int, Field(title="Total Versions")]
 
 
-class PipelineProgress(BaseModel):
+class PipelinePlanUnprocessableResponse(BaseModel):
     """
-    A pipeline run as a whole: one execution per calibration step, same flow run.
+    The 422 body of the stored-plan endpoints.
 
-    ``status`` is the whole run's: running while any step runs or the run holds
-    the project lock between steps, otherwise the outcome of the last step.
+    ``detail`` is a list when the request body does not match its schema, an object with
+    ``problems`` when the spec is not valid or its targets cannot be resolved, and a message
+    when the request does not match the plan (another chip or backend) or its calibration
+    session is on another chip.
     """
 
+    detail: Annotated[list[RequestFieldError] | PipelineProblemsDetail | str, Field(title="Detail")]
+
+
+class PipelineStepProgress(BaseModel):
+    """
+    One planned step of a pipeline run and how far its execution got.
+
+    Every step the run reaches, calibration or transform, has its own execution.
+    """
+
+    index: Annotated[int, Field(title="Index")]
+    """
+    1-based position in the pipeline spec
+    """
     name: Annotated[str, Field(title="Name")]
-    flow_run_id: Annotated[str, Field(title="Flow Run Id")]
-    root_execution_id: Annotated[str, Field(title="Root Execution Id")]
+    step_id: Annotated[str | None, Field(title="Step Id")] = None
     """
-    The first step's execution, as returned at dispatch
+    Plan-scoped step id; null for transforms and older runs
+    """
+    key: Annotated[str, Field(title="Key")] = ""
+    """
+    Identifier of this step occurrence in the plan: the step_id of a calibration step; a transform's name, suffixed with its index when the name repeats
+    """
+    type: Annotated[str, Field(title="Type")] = ""
+    kind: Annotated[str, Field(title="Kind")] = "calibration"
+    """
+    "calibration" or "transform"
+    """
+    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
+    """
+    The step's own execution, once it has started
     """
     status: Annotated[str, Field(title="Status")]
-    steps: Annotated[list[PipelineStepProgress], Field(title="Steps")]
+    """
+    The execution status; "pending" before the step starts while the run may still reach it; "skipped" when the run ended without reaching it; "not_recorded" for a transform of a run recorded before transform steps had executions
+    """
+    transform: TransformStepRecord | None = None
+    """
+    A transform step's recorded outcome: candidates kept and excluded with reasons, or the CR groups planned; null for calibration steps and unfinished transforms
+    """
+    task_total: Annotated[int, Field(title="Task Total")] = 0
+    task_finished: Annotated[int, Field(title="Task Finished")] = 0
+    task_failed: Annotated[int, Field(title="Task Failed")] = 0
+    figure_paths: Annotated[list[str] | None, Field(title="Figure Paths")] = None
+    """
+    Figures of the step's finished tasks, in task order
+    """
 
 
 class PipelineStepTypeInfo(BaseModel):
@@ -7601,6 +10357,58 @@ class RecalibrationRecommendationResponse(BaseModel):
     max_depth_reached: Annotated[int, Field(title="Max Depth Reached")] = 0
     """
     Impact graph depth traversed
+    """
+
+
+class RecordCalibrationDecisionRequest(BaseModel):
+    """
+    Record a decision in a calibration session's audit, as an agent session decision is.
+
+    The text fields are the recorder's statements, recorded as given. QDash checks that every
+    cited pipeline run and decision belongs to the session and every cited task result is on
+    its chip (and on the experiment's target), and freezes what its records say about them.
+    Record ``experiment`` before dispatching the run it proposes, then start the run with this
+    decision's ID. ``conclusion`` needs next_action complete or stop.
+    """
+
+    idempotency_key: Annotated[str, Field(max_length=128, min_length=1, title="Idempotency Key")]
+    assessment: AgentDecisionAssessment | None = None
+    """
+    How the recorder judged the evidence; omitted when not stated
+    """
+    interpretation: Annotated[str, Field(max_length=2000, min_length=1, title="Interpretation")]
+    """
+    Concise reasoning for the decision, citing the evidence
+    """
+    next_action: AgentDecisionNextAction
+    next_detail: Annotated[str, Field(max_length=500, title="Next Detail")] = ""
+    evidence_run_ids: Annotated[
+        list[EvidenceRunId] | None, Field(max_length=20, title="Evidence Run Ids")
+    ] = None
+    """
+    Pipeline runs of this session
+    """
+    evidence_task_ids: Annotated[
+        list[EvidenceTaskId] | None, Field(max_length=50, title="Evidence Task Ids")
+    ] = None
+    """
+    Task results on the session's chip
+    """
+    evidence_decision_ids: Annotated[
+        list[EvidenceDecisionId] | None,
+        Field(max_length=50, title="Evidence Decision Ids"),
+    ] = None
+    """
+    Earlier decisions of this session
+    """
+    supersedes_decision_id: Annotated[
+        SupersedesDecisionId1 | None, Field(title="Supersedes Decision Id")
+    ] = None
+    experiment: CalibrationExperimentPlanModel | None = None
+    conclusion: CalibrationConclusionModel | None = None
+    model: AgentModelIdentity | None = None
+    """
+    The model the client host reports for this record; client reported, not verified
     """
 
 
@@ -7727,6 +10535,30 @@ class SeedImportResponse(BaseModel):
     """
 
 
+class StopAgentSessionResponse(BaseModel):
+    """
+    What a stop request did, read back from QDash's records.
+    """
+
+    outcome: Annotated[Outcome, Field(title="Outcome")]
+    """
+    stopped: this request ended the session. already_stopped: an earlier request with this key stopped it. already_ended: it had already ended another way (completed, cancelled, or expired), and this request changed nothing
+    """
+    session: AgentSessionResponse
+    in_flight: Annotated[list[AgentSessionInFlightOperation] | None, Field(title="In Flight")] = (
+        None
+    )
+    """
+    Operations that passed the session gate before it ended and have not settled; QDash does not cancel them
+    """
+    closed_intervention_ids: Annotated[list[str] | None, Field(title="Closed Intervention Ids")] = (
+        None
+    )
+    """
+    Open or resume-authorized interventions this stop closed
+    """
+
+
 class Task(BaseModel):
     """
     Task is a Pydantic model that represents a task.
@@ -7817,14 +10649,14 @@ class UISettings(BaseModel):
     task_files: UITaskFilesSettings | None = None
 
 
-class UpdateCopilotChatSessionRequest(BaseModel):
+class UpdateAgentChatSessionRequest(BaseModel):
     """
-    Body for PATCH /copilot/chat/sessions/{session_id}.
+    Body for PATCH /agent/chat/sessions/{session_id}.
     """
 
     title: Annotated[str | None, Field(title="Title")] = None
     context: Annotated[dict[str, Any] | None, Field(title="Context")] = None
-    messages: Annotated[list[CopilotChatMessageSchema] | None, Field(title="Messages")] = None
+    messages: Annotated[list[AgentChatMessageSchema] | None, Field(title="Messages")] = None
 
 
 class ValidatePipelineResponse(BaseModel):
@@ -7905,9 +10737,9 @@ class CalibrationPipelineSpec(BaseModel):
     """
     Spec format version. Convert a version 1 spec with migrate_pipeline_spec.
     """
-    name: Annotated[str, Field(pattern="^[A-Za-z][A-Za-z0-9_-]{0,63}$", title="Name")] = "pipeline"
+    name: Annotated[str | None, Field(pattern="^[A-Za-z][A-Za-z0-9_-]{0,63}$", title="Name")] = None
     """
-    Display name of the execution.
+    Optional display name of the run. Each step's execution is named <name>_<step name> when given, and after the step alone when omitted.
     """
     targets: PipelineTargets
     steps: Annotated[
@@ -7942,6 +10774,214 @@ class CalibrationPipelineSpec(BaseModel):
     tags: Annotated[list[str], Field(max_length=16, title="Tags")] = []
 
 
+class AgentAuditSessionHeader(BaseModel):
+    """
+    Who and what a session's audit belongs to.
+    """
+
+    session_id: Annotated[str, Field(title="Session Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    created_by: Annotated[str, Field(title="Created By")]
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    expires_at: Annotated[AwareDatetime, Field(title="Expires At")]
+    status: AgentSessionStatus
+    state_version: Annotated[int, Field(title="State Version")]
+    action_count: Annotated[int, Field(title="Action Count")]
+    policy: AgentSessionPolicy
+    skill_name: Annotated[str, Field(title="Skill Name")]
+    skill_version: Annotated[str, Field(title="Skill Version")]
+    skill_hash: Annotated[str, Field(title="Skill Hash")]
+    model: AgentModelIdentity | None = None
+    """
+    The model the creating host reported; later events carry their own model. Client reported, not verified by QDash
+    """
+    model_name: Annotated[str, Field(title="Model Name")] = ""
+    """
+    provider/model_id of model; empty when none was reported
+    """
+    missing: Annotated[list[str] | None, Field(title="Missing")] = None
+    """
+    Identity fields the session did not record (for example model)
+    """
+
+
+class AgentInterventionResponse(BaseModel):
+    """
+    An intervention with the session state an expert needs to decide.
+    """
+
+    intervention_id: Annotated[str, Field(title="Intervention Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    session_id: Annotated[str, Field(title="Session Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    idempotency_key: Annotated[str, Field(title="Idempotency Key")]
+    created_by: Annotated[str, Field(title="Created By")]
+    reason: AgentInterventionReason
+    summary: Annotated[str, Field(title="Summary")]
+    question: Annotated[str, Field(title="Question")]
+    node_id: Annotated[str | None, Field(title="Node Id")] = None
+    task_name: Annotated[str | None, Field(title="Task Name")] = None
+    qids: Annotated[list[str], Field(title="Qids")]
+    attempts: Annotated[list[AgentInterventionAttempt], Field(title="Attempts")]
+    action_id: Annotated[str | None, Field(title="Action Id")] = None
+    previous_intervention_id: Annotated[str | None, Field(title="Previous Intervention Id")] = None
+    checkpoint: AgentPlanCheckpoint | None = None
+    plan_hash: Annotated[str, Field(title="Plan Hash")]
+    pauses_session: Annotated[bool, Field(title="Pauses Session")]
+    status: AgentInterventionStatus
+    response: AgentInterventionResponseRecord | None = None
+    resume_claim_key: Annotated[str | None, Field(title="Resume Claim Key")] = None
+    resumed_by: Annotated[str | None, Field(title="Resumed By")] = None
+    resumed_at: Annotated[AwareDatetime | None, Field(title="Resumed At")] = None
+    resume_outcome: AgentResumeOutcomeRecord | None = None
+    notification: AgentNotificationDeliveryResponse
+    forum_thread: AgentInterventionForumThreadResponse | None = None
+    """
+    The intervention's Forum thread; None for interventions recorded before Forum threads existed
+    """
+    events: Annotated[list[AgentInterventionEvent], Field(title="Events")]
+    model: AgentModelIdentity | None = None
+    """
+    The model the client host reported for this record; null when none was reported. Client reported, not verified by QDash.
+    """
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    session_status: AgentSessionStatus
+    session_state_version: Annotated[int, Field(title="Session State Version")]
+    session_expires_at: Annotated[AwareDatetime, Field(title="Session Expires At")]
+    actions_used: Annotated[int, Field(title="Actions Used")]
+    max_actions: Annotated[int, Field(title="Max Actions")]
+    can_resume: Annotated[bool, Field(title="Can Resume")]
+    """
+    Whether an expert can authorize a resume now
+    """
+    resume_blockers: Annotated[list[str] | None, Field(title="Resume Blockers")] = None
+    """
+    Why a resume is not possible, in plain words
+    """
+    resume_options: Annotated[list[AgentResumeOption] | None, Field(title="Resume Options")] = None
+    resume_command: Annotated[str | None, Field(title="Resume Command")] = None
+    """
+    The client command that continues an authorized plan
+    """
+    page_path: Annotated[str, Field(title="Page Path")]
+
+
+class AgentSessionAuditResponse(BaseModel):
+    """
+    A page of one snapshot of a session's chronological experiment audit, or all of it.
+
+    A snapshot contains two matching projected reads, not an atomic point-in-time database
+    view. Changes that revert between reads can go undetected. Pagination is bound to the
+    fingerprint of that projected content. Read a new first page or export for later records.
+    """
+
+    schema_version: Annotated[
+        Literal["qdash.agent-session-audit.v1"], Field(title="Schema Version")
+    ] = "qdash.agent-session-audit.v1"
+    generated_at: Annotated[AwareDatetime, Field(title="Generated At")]
+    snapshot_id: Annotated[str, Field(title="Snapshot Id")]
+    """
+    Fingerprint of the snapshot this response belongs to; every page of one cursor chain carries the same value
+    """
+    session: AgentAuditSessionHeader
+    events: Annotated[list[AgentAuditEvent], Field(title="Events")]
+    total_events: Annotated[int, Field(title="Total Events")]
+    """
+    Events in the snapshot
+    """
+    next_cursor: Annotated[str | None, Field(title="Next Cursor")] = None
+    """
+    Pass as cursor to read the next page of the same snapshot. The read is refused with 409 when the records changed since the snapshot; then start again without a cursor
+    """
+    complete: Annotated[bool, Field(title="Complete")]
+    """
+    Whether this response ends the snapshot: with the earlier pages of the same snapshot_id it holds every event of the snapshot
+    """
+    notes: Annotated[list[str] | None, Field(title="Notes")] = None
+    """
+    What the audit does and does not contain
+    """
+
+
+class AgentSessionChildExecution(BaseModel):
+    """
+    A real execution one action of the session dispatched.
+    """
+
+    action_id: Annotated[str, Field(title="Action Id")]
+    sequence: Annotated[int, Field(title="Sequence")]
+    """
+    1-based dispatch order of the measurement in the session
+    """
+    attempt: Annotated[int, Field(title="Attempt")]
+    """
+    1-based count of measurements of this task on this target so far
+    """
+    task_name: Annotated[str | None, Field(title="Task Name")] = None
+    qid: Annotated[str | None, Field(title="Qid")] = None
+    in_filter: Annotated[bool, Field(title="In Filter")]
+    """
+    Whether the execution matches the list's day filter; true without one
+    """
+    execution: ExecutionResponseSummary
+
+
+class AgentSessionGroupSummary(BaseModel):
+    """
+    One agent session as a group of the Execution list.
+
+    ``status`` is the session's own state, not an execution status: a session waiting for an
+    expert, or active between measurements, holds no hardware and is not failed for it.
+    """
+
+    session_id: Annotated[str, Field(title="Session Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    created_by: Annotated[str, Field(title="Created By")]
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    expires_at: Annotated[AwareDatetime, Field(title="Expires At")]
+    status: AgentSessionStatus
+    """
+    The session's state; an active or paused session past its expiry reads as expired even before a write records it
+    """
+    stored_status: AgentSessionStatus
+    """
+    The status the session record holds
+    """
+    active_intervention_id: Annotated[str | None, Field(title="Active Intervention Id")] = None
+    """
+    The intervention the session waits on, when paused
+    """
+    qids: Annotated[list[str], Field(title="Qids")]
+    allowed_tasks: Annotated[list[str], Field(title="Allowed Tasks")]
+    autonomy: Annotated[str, Field(title="Autonomy")]
+    skill_name: Annotated[str, Field(title="Skill Name")] = ""
+    model: AgentModelIdentity | None = None
+    """
+    The model the creating host reported; later steps carry their own. Client reported, not verified by QDash
+    """
+    model_name: Annotated[str, Field(title="Model Name")] = ""
+    """
+    provider/model_id of model; empty when none was reported
+    """
+    calibration_session: CalibrationSessionRef | None = None
+    """
+    The calibration session the session was admitted to, when it was created in one; null for a session created alone, or one not admitted
+    """
+    counts: AgentSessionGroupCounts
+    latest_activity_at: Annotated[AwareDatetime, Field(title="Latest Activity At")]
+    """
+    The session's latest measurement start, or its creation before the first
+    """
+    missing: Annotated[list[str] | None, Field(title="Missing")] = None
+    """
+    Facts the records do not hold, such as a dispatched execution not found, an execution held by another action, or a record the session has not written yet
+    """
+
+
 class AllConfigResponse(BaseModel):
     """
     Response containing all application configuration.
@@ -7949,7 +10989,7 @@ class AllConfigResponse(BaseModel):
 
     ui: UISettings | None = None
     metrics: Annotated[dict[str, Any] | None, Field(title="Metrics")] = None
-    copilot: Annotated[dict[str, Any] | None, Field(title="Copilot")] = None
+    agent: Annotated[dict[str, Any] | None, Field(title="Agent")] = None
 
 
 class BulkUserImportResponse(BaseModel):
@@ -7962,6 +11002,112 @@ class BulkUserImportResponse(BaseModel):
     skipped: Annotated[int, Field(title="Skipped")]
     failed: Annotated[int, Field(title="Failed")]
     total: Annotated[int, Field(title="Total")]
+
+
+class CalibrationAgentSessionChild(BaseModel):
+    """
+    An agent session created in a calibration session, with the executions it dispatched.
+    """
+
+    session_id: Annotated[str, Field(title="Session Id")]
+    status: AgentSessionStatus
+    """
+    Its own status, with expiry applied
+    """
+    created_by: Annotated[str, Field(title="Created By")]
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    expires_at: Annotated[AwareDatetime, Field(title="Expires At")]
+    autonomy: AgentAutonomy
+    qids: Annotated[list[str], Field(title="Qids")]
+    allowed_tasks: Annotated[list[str], Field(title="Allowed Tasks")]
+    action_count: Annotated[int, Field(title="Action Count")]
+    active_intervention_id: Annotated[str | None, Field(title="Active Intervention Id")] = None
+    model_name: Annotated[str, Field(title="Model Name")] = ""
+    calibration_admission: CalibrationAdmission | None = None
+    """
+    pending until its start is finalized, admitted after, rejected when the session was closed first; it operates only when admitted
+    """
+    executions: Annotated[list[ExecutionResponseSummary] | None, Field(title="Executions")] = None
+    """
+    Executions its actions dispatched, as the agent session links them
+    """
+
+
+class CalibrationDecisionResponse(BaseModel):
+    """
+    One recorded decision with QDash's frozen reading of its evidence.
+    """
+
+    decision_id: Annotated[str, Field(title="Decision Id")]
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    idempotency_key: Annotated[str, Field(title="Idempotency Key")]
+    recorded_by: Annotated[str, Field(title="Recorded By")]
+    recorded_at: Annotated[AwareDatetime, Field(title="Recorded At")]
+    session_status_at_record: Annotated[str, Field(title="Session Status At Record")]
+    assessment: AgentDecisionAssessment | None = None
+    interpretation: Annotated[str, Field(title="Interpretation")]
+    next_action: AgentDecisionNextAction
+    next_detail: Annotated[str, Field(title="Next Detail")] = ""
+    evidence_run_ids: Annotated[list[str] | None, Field(title="Evidence Run Ids")] = None
+    evidence_task_ids: Annotated[list[str] | None, Field(title="Evidence Task Ids")] = None
+    evidence_decision_ids: Annotated[list[str] | None, Field(title="Evidence Decision Ids")] = None
+    supersedes_decision_id: Annotated[str | None, Field(title="Supersedes Decision Id")] = None
+    experiment: CalibrationExperimentPlanModel | None = None
+    conclusion: CalibrationConclusionModel | None = None
+    evidence_snapshot: Annotated[dict[str, Any] | None, Field(title="Evidence Snapshot")] = None
+    """
+    What QDash's records said about the cited evidence when it was recorded
+    """
+    model: AgentModelIdentity | None = None
+    carried_out_by_run_ids: Annotated[list[str] | None, Field(title="Carried Out By Run Ids")] = (
+        None
+    )
+    """
+    Pipeline runs that named this decision when they were started
+    """
+    superseded_by_decision_id: Annotated[str | None, Field(title="Superseded By Decision Id")] = (
+        None
+    )
+
+
+class CalibrationGroupAgentSession(BaseModel):
+    """
+    An admitted agent session nested in a calibration session row.
+    """
+
+    agent_session: AgentSessionGroupSummary
+    children: Annotated[list[AgentSessionChildExecution] | None, Field(title="Children")] = None
+    children_total: Annotated[int, Field(title="Children Total")] = 0
+    children_in_filter: Annotated[int, Field(title="Children In Filter")] = 0
+    children_omitted: Annotated[int, Field(title="Children Omitted")] = 0
+
+
+class CalibrationGroupPipelineRun(BaseModel):
+    """
+    One run of a calibration session row, whatever it launched, with its step executions.
+    """
+
+    run_id: Annotated[str, Field(title="Run Id")]
+    run_kind: CalibrationRunKind = CalibrationRunKind.pipeline
+    run_name: Annotated[str, Field(title="Run Name")] = ""
+    """
+    The workflow, pipeline, or task it launched
+    """
+    trigger: CalibrationRunTrigger = CalibrationRunTrigger.api
+    pipeline_name: Annotated[str, Field(title="Pipeline Name")] = ""
+    dispatch_status: Annotated[str, Field(title="Dispatch Status")]
+    requested_by: Annotated[str, Field(title="Requested By")]
+    requested_at: Annotated[AwareDatetime, Field(title="Requested At")]
+    decision_id: Annotated[str | None, Field(title="Decision Id")] = None
+    """
+    The decision the run carries out, as its request named it
+    """
+    targets: Annotated[list[str] | None, Field(title="Targets")] = None
+    executions: Annotated[list[ExecutionResponseSummary] | None, Field(title="Executions")] = None
+    executions_total: Annotated[int, Field(title="Executions Total")] = 0
+    executions_in_filter: Annotated[int, Field(title="Executions In Filter")] = 0
 
 
 class CreateEvaluationRunResponse(BaseModel):
@@ -8042,8 +11188,611 @@ class ExecutePipelineResponse(BaseModel):
     """
     Success message
     """
+    calibration_session_id: Annotated[str | None, Field(title="Calibration Session Id")] = None
+    """
+    The calibration session the run joined: the one the request named, or an automatic one; null when the run joined none
+    """
+    calibration_run_id: Annotated[str | None, Field(title="Calibration Run Id")] = None
+    """
+    The run QDash recorded for the launch; every step execution carries it. Null only for a run the worker records when it starts (a saved flow with no chip)
+    """
+    replayed: Annotated[bool, Field(title="Replayed")] = False
+    """
+    True when a retry returned the run an earlier request with its key started
+    """
     steps: Annotated[list[ResolvedPipelineStep] | None, Field(title="Steps")] = None
     targets: ResolvedPipelineTargets | None = None
+    pipeline_run_id: Annotated[str | None, Field(title="Pipeline Run Id")] = None
+    """
+    The run QDash recorded for the launch (calibration_run_id)
+    """
+    decision_id: Annotated[str | None, Field(title="Decision Id")] = None
+    """
+    The decision the recorded run carries out, as QDash linked it; null when the request named none. A client that sent a decision checks it is echoed here
+    """
+    plan_id: Annotated[str | None, Field(title="Plan Id")] = None
+    """
+    For a run of a stored plan: the plan it carries out. A client that ran a plan checks it and review_digest are echoed here
+    """
+    review_digest: Annotated[str | None, Field(title="Review Digest")] = None
+    """
+    For a run of a stored plan: the review digest it ran.
+    """
+
+
+class ExecutionGroupItem(BaseModel):
+    """
+    One row of the grouped Execution list: an execution, an agent session, or a
+    calibration session with the runs and agent sessions started in it.
+    """
+
+    kind: Annotated[Kind3, Field(title="Kind")]
+    sort_at: Annotated[AwareDatetime | None, Field(title="Sort At")] = None
+    """
+    Time the row is ordered by: the execution start, or the session's latest activity within the day filter
+    """
+    execution: ExecutionResponseSummary | None = None
+    """
+    Set for an execution row
+    """
+    agent_session: AgentSessionGroupSummary | None = None
+    """
+    Set for an agent session row
+    """
+    children: Annotated[list[AgentSessionChildExecution] | None, Field(title="Children")] = None
+    """
+    The session's latest executions in dispatch order; at most children_limit
+    """
+    children_total: Annotated[int, Field(title="Children Total")] = 0
+    """
+    Every execution the session dispatched
+    """
+    children_in_filter: Annotated[int, Field(title="Children In Filter")] = 0
+    """
+    The session's executions that match the day filter
+    """
+    children_omitted: Annotated[int, Field(title="Children Omitted")] = 0
+    """
+    Earlier executions left out of children; the graph lists all
+    """
+    calibration_session: CalibrationSessionGroupSummary | None = None
+    """
+    Set for a calibration session row
+    """
+    pipeline_runs: Annotated[
+        list[CalibrationGroupPipelineRun] | None, Field(title="Pipeline Runs")
+    ] = None
+    """
+    The row's latest pipeline runs (at most 20), oldest first
+    """
+    pipeline_runs_omitted: Annotated[int, Field(title="Pipeline Runs Omitted")] = 0
+    """
+    Earlier runs left out
+    """
+    nested_agent_sessions: Annotated[
+        list[CalibrationGroupAgentSession] | None, Field(title="Nested Agent Sessions")
+    ] = None
+    """
+    The row's latest admitted agent sessions (at most 20), oldest first
+    """
+    nested_agent_sessions_omitted: Annotated[int, Field(title="Nested Agent Sessions Omitted")] = 0
+
+
+class ImpactResponse(BaseModel):
+    """
+    Response model for impact query.
+
+    Attributes
+    ----------
+    origin : LineageNodeResponse
+        The queried entity
+    nodes : list[LineageNodeResponse]
+        All nodes affected by this entity
+    edges : list[LineageEdgeResponse]
+        All edges in the impact graph
+    max_depth : int
+        Maximum depth traversed
+    """
+
+    origin: LineageNodeResponse
+    nodes: Annotated[list[LineageNodeResponse], Field(title="Nodes")]
+    edges: Annotated[list[LineageEdgeResponse], Field(title="Edges")]
+    max_depth: Annotated[int, Field(title="Max Depth")]
+
+
+class ListAgentInterventionsResponse(BaseModel):
+    """
+    Interventions of one session, newest first.
+    """
+
+    items: Annotated[list[AgentInterventionResponse], Field(title="Items")]
+    total: Annotated[int, Field(title="Total")]
+
+
+class ListCalibrationDecisionsResponse(BaseModel):
+    """
+    Decisions of one calibration session, oldest first.
+    """
+
+    items: Annotated[list[CalibrationDecisionResponse], Field(title="Items")]
+    total: Annotated[int, Field(title="Total")]
+
+
+class ListExecutionGroupsResponse(BaseModel):
+    """
+    A page of the Execution list with calibration and agent sessions grouped on the server.
+
+    Grouping happens before pagination, so a session is one row on one page with all its
+    executions, and no execution appears both in a group and as its own row. An agent session
+    admitted to a calibration session is nested in that session's row. ``total`` counts
+    rows; ``total_executions`` counts real executions, the number the ungrouped list reports.
+    """
+
+    items: Annotated[list[ExecutionGroupItem], Field(title="Items")]
+    total: Annotated[int, Field(title="Total")]
+    """
+    Rows: calibration sessions, agent sessions outside one, and executions outside both
+    """
+    total_executions: Annotated[int, Field(title="Total Executions")]
+    """
+    Real executions that match the filter, grouped or not
+    """
+    grouped_executions: Annotated[int, Field(title="Grouped Executions")]
+    """
+    Executions that match the filter and are shown inside a session row
+    """
+    agent_sessions: Annotated[int, Field(title="Agent Sessions")]
+    """
+    Agent session rows that match the filter
+    """
+    calibration_sessions: Annotated[int, Field(title="Calibration Sessions")] = 0
+    """
+    Calibration session rows that match the filter
+    """
+    skip: Annotated[int, Field(title="Skip")]
+    limit: Annotated[int, Field(title="Limit")]
+    children_limit: Annotated[int, Field(title="Children Limit")]
+    """
+    Most executions one session row lists
+    """
+
+
+class ListMetricScriptsResponse(BaseModel):
+    """
+    Scripts visible to the caller.
+    """
+
+    scripts: Annotated[list[MetricScriptSummary], Field(title="Scripts")]
+    total: Annotated[int, Field(title="Total")]
+
+
+class ListMuxResponse(BaseModel):
+    """
+    ListMuxResponse is a Pydantic model that represents the response for fetching the multiplexers.
+    """
+
+    muxes: Annotated[dict[str, MuxDetailResponse], Field(title="Muxes")]
+
+
+class MetricScriptResponse(BaseModel):
+    """
+    A script with its source, last-good source and revision list.
+    """
+
+    script_id: Annotated[str, Field(title="Script Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    name: Annotated[str, Field(title="Name")]
+    description: Annotated[str, Field(title="Description")]
+    visibility: Annotated[Visibility, Field(title="Visibility")]
+    status: Annotated[Status11, Field(title="Status")]
+    revision: Annotated[int, Field(title="Revision")]
+    active_revision: Annotated[int | None, Field(title="Active Revision")]
+    metrics: Annotated[list[MetricInfo], Field(title="Metrics")]
+    template_id: Annotated[str | None, Field(title="Template Id")]
+    owner_username: Annotated[str, Field(title="Owner Username")]
+    owner_user_id: Annotated[str | None, Field(title="Owner User Id")]
+    can_edit: Annotated[bool, Field(title="Can Edit")]
+    """
+    Whether the caller may update or delete it
+    """
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    source: Annotated[str, Field(title="Source")]
+    active_source: Annotated[str | None, Field(title="Active Source")]
+    diagnostics: Annotated[list[ScriptDiagnostic], Field(title="Diagnostics")]
+    revisions: Annotated[list[MetricScriptRevision], Field(title="Revisions")]
+
+
+class PipelineCatalogResponse(BaseModel):
+    """
+    Everything needed to write a spec for this project.
+    """
+
+    backend_name: Annotated[str, Field(title="Backend Name")]
+    step_types: Annotated[list[PipelineStepTypeInfo], Field(title="Step Types")]
+    one_qubit_execution_modes: Annotated[list[str], Field(title="One Qubit Execution Modes")]
+    """
+    Values OneQubitCheck, OneQubitFineTune and CustomOneQubit accept for execution_mode; manual requires rounds.
+    """
+    two_qubit_execution_modes: Annotated[list[str], Field(title="Two Qubit Execution Modes")]
+    """
+    Values TwoQubitCalibration and CustomTwoQubit accept for execution_mode; manual requires rounds.
+    """
+    tasks: Annotated[dict[str, list[str]], Field(title="Tasks")]
+    """
+    Available task names by task_type ("qubit", "coupling", ...).
+    """
+    task_documentation: Annotated[
+        dict[str, TaskDocumentation] | None, Field(title="Task Documentation")
+    ] = None
+    """
+    Guidance declared by available tasks, keyed by task name. Tasks that declare no documentation are omitted.
+    """
+    spec_version: Annotated[int, Field(title="Spec Version")]
+    """
+    The spec version this QDash accepts.
+    """
+    spec_schema: Annotated[dict[str, Any], Field(title="Spec Schema")]
+    """
+    JSON schema of CalibrationPipelineSpec.
+    """
+    example: Annotated[dict[str, Any] | None, Field(title="Example")] = None
+
+
+class PipelinePlanResponse(BaseModel):
+    """
+    A stored plan and everything an approval of it covers.
+
+    A plan starts nothing and grants nothing. ``review_digest`` is a full, versioned SHA-256
+    of the review content: the normalized spec with every default task list written out,
+    the qubits its targets resolve to when the run starts, the resolved calls of every step,
+    and the run defaults. Running the plan names that digest, so the run is the plan that
+    was reviewed. Filters and CR schedules still select from results while the run goes;
+    calibration values, task code and hardware state are read when it runs.
+    """
+
+    plan_id: Annotated[str, Field(title="Plan Id")]
+    """
+    Opaque ID of the plan.
+    """
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    backend_name: Annotated[str, Field(title="Backend Name")]
+    created_by: Annotated[str, Field(title="Created By")]
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    expires_at: Annotated[AwareDatetime, Field(title="Expires At")]
+    """
+    After this the plan cannot be executed; create a new plan instead.
+    """
+    expired: Annotated[bool, Field(title="Expired")]
+    review_version: Annotated[int, Field(title="Review Version")]
+    review_digest: Annotated[str, Field(title="Review Digest")]
+    """
+    sha256:v<version>:<hex> of the review content; pass it as expected_review_digest. Not the spec's plan_digest.
+    """
+    spec: Annotated[dict[str, Any], Field(title="Spec")]
+    """
+    The normalized spec with default task lists.
+    """
+    spec_digest: Annotated[str | None, Field(title="Spec Digest")] = None
+    """
+    The short spec digest /validate reports as plan_digest, for history.
+    """
+    targets: ResolvedPipelineTargets | None = None
+    target_qids: Annotated[list[str], Field(title="Target Qids")]
+    """
+    The qubits the targets resolve to when the run starts (MUXes expanded).
+    """
+    steps: Annotated[list[ResolvedPipelineStep] | None, Field(title="Steps")] = None
+    warnings: Annotated[list[PipelineProblem] | None, Field(title="Warnings")] = None
+    task_run_count: Annotated[int, Field(title="Task Run Count")] = 0
+    default_run_parameters: Annotated[
+        dict[str, Any] | None, Field(title="Default Run Parameters")
+    ] = None
+    task_parameters: Annotated[dict[str, Any] | None, Field(title="Task Parameters")] = None
+    replayed: Annotated[bool, Field(title="Replayed")] = False
+    """
+    True when a repeated creation returned the plan it stored before.
+    """
+
+
+class PipelineProgress(BaseModel):
+    """
+    A pipeline run as a whole: one execution per step it reached, same flow run.
+
+    ``status`` is the whole run's: running while any step runs or the run holds
+    the project lock between steps, otherwise the outcome of the last step.
+    """
+
+    name: Annotated[str, Field(title="Name")]
+    flow_run_id: Annotated[str, Field(title="Flow Run Id")]
+    root_execution_id: Annotated[str, Field(title="Root Execution Id")]
+    """
+    The first step's execution, as returned at dispatch
+    """
+    status: Annotated[str, Field(title="Status")]
+    steps: Annotated[list[PipelineStepProgress], Field(title="Steps")]
+
+
+class AgentSessionGraphResponse(BaseModel):
+    """
+    One agent session as an experiment graph over its real executions.
+
+    A live read of the session's records, collected one after another: statuses can move while
+    it is read, and it is not a snapshot. The full audit, with its consistency check and export,
+    stays on the session's audit endpoints.
+    """
+
+    generated_at: Annotated[AwareDatetime, Field(title="Generated At")]
+    session: AgentSessionGroupSummary
+    nodes: Annotated[list[AgentSessionGraphNode], Field(title="Nodes")]
+    edges: Annotated[list[AgentSessionGraphEdge], Field(title="Edges")]
+    total_nodes: Annotated[int, Field(title="Total Nodes")]
+    omitted_nodes: Annotated[int, Field(title="Omitted Nodes")]
+    """
+    Earliest nodes left out to bound the response; the audit holds them all
+    """
+    complete: Annotated[bool, Field(title="Complete")]
+    notes: Annotated[list[str], Field(title="Notes")]
+
+
+class CalibrationPipelineRunResponse(BaseModel):
+    """
+    One run requested in a calibration session, with its step executions.
+    """
+
+    run_id: Annotated[str, Field(title="Run Id")]
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    run_kind: CalibrationRunKind = CalibrationRunKind.pipeline
+    """
+    What the run launched: a pipeline, a saved workflow, a task, or an agent action
+    """
+    trigger: CalibrationRunTrigger = CalibrationRunTrigger.api
+    """
+    api when a signed-in request recorded it before launch; schedule or worker when the worker recorded a flow run QDash had not launched (a schedule) as it started
+    """
+    run_name: Annotated[str, Field(title="Run Name")] = ""
+    """
+    The workflow or pipeline name, or the task the run launched
+    """
+    agent_session_id: Annotated[str | None, Field(title="Agent Session Id")] = None
+    """
+    For an agent action's run, the agent session that ran it
+    """
+    action_id: Annotated[str | None, Field(title="Action Id")] = None
+    """
+    For an agent action's run, the action that dispatched it
+    """
+    idempotency_key: Annotated[str, Field(title="Idempotency Key")]
+    requested_by: Annotated[str, Field(title="Requested By")]
+    reported_origin: ReportedLaunchOrigin | None = None
+    """
+    How the caller said it started the run (client reported, not verified); null when nothing was reported, as for a run requested directly
+    """
+    dispatch_status: CalibrationPipelineRunStatus
+    """
+    Whether QDash launched the run: dispatching, dispatched, rejected (nothing was started), or unknown (it may have started; check the Execution list)
+    """
+    attempts: Annotated[int, Field(title="Attempts")]
+    pipeline_name: Annotated[str, Field(title="Pipeline Name")]
+    backend_name: Annotated[str, Field(title="Backend Name")]
+    flow_run_id: Annotated[str | None, Field(title="Flow Run Id")] = None
+    flow_end_state: RunFlowEndState | None = None
+    """
+    How the run's whole flow run ended, as Prefect reported it once it was terminal (completed, failed, cancelled, or crashed); null while it may still run or was not observed
+    """
+    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
+    """
+    The first step's execution, as returned at dispatch
+    """
+    error: Annotated[str, Field(title="Error")] = ""
+    plan_id: Annotated[str | None, Field(title="Plan Id")] = None
+    """
+    For a run of a stored calibration pipeline plan: the plan it carries out; null for a run requested with a spec
+    """
+    review_digest: Annotated[str | None, Field(title="Review Digest")] = None
+    """
+    For a run of a stored plan: the review digest the request approved and the run carries out; null for a run requested with a spec
+    """
+    requested_at: Annotated[AwareDatetime, Field(title="Requested At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    pipeline: PipelineProgress | None = None
+    """
+    The run as a whole, from its step executions; null until its first execution exists
+    """
+    executions: Annotated[list[ExecutionResponseSummary] | None, Field(title="Executions")] = None
+    """
+    Every step execution of the run on the chip, oldest first: those the worker stamped with the run, or, for older runs, those of its flow run
+    """
+
+
+class CalibrationRunStateResponse(BaseModel):
+    """
+    One run of a calibration session, with its whole flow run's state read now.
+
+    ``flow_end_state`` is the terminal state Prefect reports in this read, and null otherwise,
+    whatever an earlier read recorded.
+    """
+
+    run_id: Annotated[str, Field(title="Run Id")]
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    run_kind: CalibrationRunKind = CalibrationRunKind.pipeline
+    """
+    What the run launched: a pipeline, a saved workflow, a task, or an agent action
+    """
+    trigger: CalibrationRunTrigger = CalibrationRunTrigger.api
+    """
+    api when a signed-in request recorded it before launch; schedule or worker when the worker recorded a flow run QDash had not launched (a schedule) as it started
+    """
+    run_name: Annotated[str, Field(title="Run Name")] = ""
+    """
+    The workflow or pipeline name, or the task the run launched
+    """
+    agent_session_id: Annotated[str | None, Field(title="Agent Session Id")] = None
+    """
+    For an agent action's run, the agent session that ran it
+    """
+    action_id: Annotated[str | None, Field(title="Action Id")] = None
+    """
+    For an agent action's run, the action that dispatched it
+    """
+    idempotency_key: Annotated[str, Field(title="Idempotency Key")]
+    requested_by: Annotated[str, Field(title="Requested By")]
+    reported_origin: ReportedLaunchOrigin | None = None
+    """
+    How the caller said it started the run (client reported, not verified); null when nothing was reported, as for a run requested directly
+    """
+    dispatch_status: CalibrationPipelineRunStatus
+    """
+    Whether QDash launched the run: dispatching, dispatched, rejected (nothing was started), or unknown (it may have started; check the Execution list)
+    """
+    attempts: Annotated[int, Field(title="Attempts")]
+    pipeline_name: Annotated[str, Field(title="Pipeline Name")]
+    backend_name: Annotated[str, Field(title="Backend Name")]
+    flow_run_id: Annotated[str | None, Field(title="Flow Run Id")] = None
+    flow_end_state: RunFlowEndState | None = None
+    """
+    How the run's whole flow run ended, as Prefect reported it once it was terminal (completed, failed, cancelled, or crashed); null while it may still run or was not observed
+    """
+    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
+    """
+    The first step's execution, as returned at dispatch
+    """
+    error: Annotated[str, Field(title="Error")] = ""
+    plan_id: Annotated[str | None, Field(title="Plan Id")] = None
+    """
+    For a run of a stored calibration pipeline plan: the plan it carries out; null for a run requested with a spec
+    """
+    review_digest: Annotated[str | None, Field(title="Review Digest")] = None
+    """
+    For a run of a stored plan: the review digest the request approved and the run carries out; null for a run requested with a spec
+    """
+    requested_at: Annotated[AwareDatetime, Field(title="Requested At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    pipeline: PipelineProgress | None = None
+    """
+    The run as a whole, from its step executions; null until its first execution exists
+    """
+    executions: Annotated[list[ExecutionResponseSummary] | None, Field(title="Executions")] = None
+    """
+    Every step execution of the run on the chip, oldest first: those the worker stamped with the run, or, for older runs, those of its flow run
+    """
+    flow_status: RunFlowStatus
+    """
+    The whole flow run's state in this read: dispatching, not_launched, running (Prefect reports a state it may still leave), completed, failed, cancelled, crashed, unknown (no flow run recorded, an unknown launch outcome, or Prefect does not report it), or unavailable (Prefect could not be read). Never derived from step executions
+    """
+    prefect_state: Annotated[str | None, Field(title="Prefect State")] = None
+    """
+    Prefect's state type for the flow run in this read, such as RUNNING or SCHEDULED; null when Prefect was not read or did not report it
+    """
+    flow_status_reason: Annotated[str, Field(title="Flow Status Reason")] = ""
+    """
+    Why the state is what it is, for display
+    """
+    observed_at: Annotated[AwareDatetime, Field(title="Observed At")]
+    """
+    When this read decided flow_status
+    """
+
+
+class CalibrationSessionDetailResponse(BaseModel):
+    """
+    A calibration session with every run started in it.
+    """
+
+    calibration_session_id: Annotated[str, Field(title="Calibration Session Id")]
+    project_id: Annotated[str, Field(title="Project Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    objective: Annotated[str, Field(title="Objective")]
+    created_by: Annotated[str, Field(title="Created By")]
+    """
+    The signed-in user who created it
+    """
+    status: CalibrationSessionStatus
+    origin: CalibrationSessionOrigin = CalibrationSessionOrigin.manual
+    """
+    manual when a person or agent created it for an objective; automatic when QDash created it for a run started without a session ID (a later run may name it)
+    """
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    closed_at: Annotated[AwareDatetime | None, Field(title="Closed At")] = None
+    closed_by: Annotated[str | None, Field(title="Closed By")] = None
+    """
+    The user who closed it, or system:auto-close when QDash closed it automatically
+    """
+    close_origin: CalibrationSessionCloseOrigin | None = None
+    """
+    manual when the creator closed it; automatic when QDash closed an automatic session because every run and agent session in it ended. Null while open, and for a session closed before this was recorded (closed by its creator). Closing says nothing about how the runs ended.
+    """
+    closing_note: Annotated[str, Field(title="Closing Note")] = ""
+    closed_with_unknown_runs: Annotated[
+        list[str] | None, Field(title="Closed With Unknown Runs")
+    ] = None
+    """
+    Pipeline runs whose dispatch outcome was unknown when it was closed
+    """
+    closed_with_unknown_starts: Annotated[
+        list[CalibrationChildReservation] | None,
+        Field(title="Closed With Unknown Starts"),
+    ] = None
+    """
+    Agent session starts reserved long ago and never recorded when it was closed. One recorded later is rejected (calibration_admission: rejected) and never operates.
+    """
+    pipeline_runs: Annotated[
+        list[CalibrationPipelineRunResponse] | None, Field(title="Pipeline Runs")
+    ] = None
+    """
+    The most recent pipeline runs (at most 100), oldest first
+    """
+    pipeline_run_total: Annotated[int, Field(title="Pipeline Run Total")] = 0
+    """
+    Every pipeline run requested in it; more than listed when the list is cut
+    """
+    agent_sessions: Annotated[
+        list[CalibrationAgentSessionChild] | None, Field(title="Agent Sessions")
+    ] = None
+    """
+    The most recent agent sessions (at most 100), oldest first
+    """
+    agent_session_total: Annotated[int, Field(title="Agent Session Total")] = 0
+    """
+    Every agent session created in it; more than listed when the list is cut
+    """
+    close_blockers: Annotated[list[str] | None, Field(title="Close Blockers")] = None
+    """
+    Why it cannot be closed now, read from every child (not only the listed ones): runs and agent sessions that still run or wait, operations an ended agent session has not settled, and children being started. Empty when closing is allowed.
+    """
+    unknown_runs: Annotated[list[str] | None, Field(title="Unknown Runs")] = None
+    """
+    Pipeline runs whose dispatch outcome is unknown. Each was admitted, so it may be running or may still start, even after the session is closed
+    """
+    unknown_starts: Annotated[
+        list[CalibrationChildReservation] | None, Field(title="Unknown Starts")
+    ] = None
+    """
+    Agent session starts reserved long ago whose session was never recorded; the request may have stopped or may still record it. One recorded after a close is rejected and never operates
+    """
+    experiments: Annotated[list[CalibrationExperimentRow] | None, Field(title="Experiments")] = None
+    """
+    Experiments of the search, oldest first, from decisions that proposed one and the runs that named them (latest 200 decisions)
+    """
+    decisions: Annotated[list[CalibrationDecisionResponse] | None, Field(title="Decisions")] = None
+    """
+    The most recent decisions (at most 200), oldest first
+    """
+    decision_total: Annotated[int, Field(title="Decision Total")] = 0
+    """
+    Every decision recorded in it
+    """
+    recommendation: CalibrationDecisionResponse | None = None
+    """
+    The latest decision with a conclusion that no later decision supersedes; null when none was recorded. Closing records none
+    """
+    latest_requested_run: CalibrationLatestRequestedRun | None = None
+    """
+    The most recently requested pipeline run and its recorded execution outcome; null without a run. Not the current or last written hardware state
+    """
 
 
 class ExecutionResponseDetail(BaseModel):
@@ -8082,104 +11831,18 @@ class ExecutionResponseDetail(BaseModel):
     """
     Set when this execution belongs to a pipeline run; covers every step of it
     """
-
-
-class ImpactResponse(BaseModel):
+    agent_session: ExecutionAgentSessionLink | None = None
     """
-    Response model for impact query.
-
-    Attributes
-    ----------
-    origin : LineageNodeResponse
-        The queried entity
-    nodes : list[LineageNodeResponse]
-        All nodes affected by this entity
-    edges : list[LineageEdgeResponse]
-        All edges in the impact graph
-    max_depth : int
-        Maximum depth traversed
+    The agent session whose action dispatched this execution, or the session only its tag names (linked false); null for an execution outside agent sessions
     """
-
-    origin: LineageNodeResponse
-    nodes: Annotated[list[LineageNodeResponse], Field(title="Nodes")]
-    edges: Annotated[list[LineageEdgeResponse], Field(title="Edges")]
-    max_depth: Annotated[int, Field(title="Max Depth")]
-
-
-class ListMetricScriptsResponse(BaseModel):
+    calibration_session: ExecutionCalibrationSessionLink | None = None
     """
-    Scripts visible to the caller.
+    The calibration session this execution belongs to, from QDash's own records: a pipeline run recorded in it, or an action of an agent session admitted to it. Null when no record relates it, or when records disagree on the session
     """
-
-    scripts: Annotated[list[MetricScriptSummary], Field(title="Scripts")]
-    total: Annotated[int, Field(title="Total")]
-
-
-class ListMuxResponse(BaseModel):
+    reported_origin: ReportedLaunchOrigin | None = None
     """
-    ListMuxResponse is a Pydantic model that represents the response for fetching the multiplexers.
+    How the caller that launched this execution's pipeline said it was started, such as an agent tool. Client reported, not verified by QDash; null when nothing was reported. The recorded user is still the one whose sign-in started it
     """
-
-    muxes: Annotated[dict[str, MuxDetailResponse], Field(title="Muxes")]
-
-
-class MetricScriptResponse(BaseModel):
-    """
-    A script with its source, last-good source and revision list.
-    """
-
-    script_id: Annotated[str, Field(title="Script Id")]
-    project_id: Annotated[str, Field(title="Project Id")]
-    name: Annotated[str, Field(title="Name")]
-    description: Annotated[str, Field(title="Description")]
-    visibility: Annotated[Visibility, Field(title="Visibility")]
-    status: Annotated[Status10, Field(title="Status")]
-    revision: Annotated[int, Field(title="Revision")]
-    active_revision: Annotated[int | None, Field(title="Active Revision")]
-    metrics: Annotated[list[MetricInfo], Field(title="Metrics")]
-    template_id: Annotated[str | None, Field(title="Template Id")]
-    owner_username: Annotated[str, Field(title="Owner Username")]
-    owner_user_id: Annotated[str | None, Field(title="Owner User Id")]
-    can_edit: Annotated[bool, Field(title="Can Edit")]
-    """
-    Whether the caller may update or delete it
-    """
-    created_at: Annotated[AwareDatetime, Field(title="Created At")]
-    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
-    source: Annotated[str, Field(title="Source")]
-    active_source: Annotated[str | None, Field(title="Active Source")]
-    diagnostics: Annotated[list[ScriptDiagnostic], Field(title="Diagnostics")]
-    revisions: Annotated[list[MetricScriptRevision], Field(title="Revisions")]
-
-
-class PipelineCatalogResponse(BaseModel):
-    """
-    Everything needed to write a spec for this project.
-    """
-
-    backend_name: Annotated[str, Field(title="Backend Name")]
-    step_types: Annotated[list[PipelineStepTypeInfo], Field(title="Step Types")]
-    one_qubit_execution_modes: Annotated[list[str], Field(title="One Qubit Execution Modes")]
-    """
-    Values OneQubitCheck, OneQubitFineTune and CustomOneQubit accept for execution_mode; manual requires rounds.
-    """
-    two_qubit_execution_modes: Annotated[list[str], Field(title="Two Qubit Execution Modes")]
-    """
-    Values TwoQubitCalibration and CustomTwoQubit accept for execution_mode; manual requires rounds.
-    """
-    tasks: Annotated[dict[str, list[str]], Field(title="Tasks")]
-    """
-    Available task names by task_type ("qubit", "coupling", ...).
-    """
-    spec_version: Annotated[int, Field(title="Spec Version")]
-    """
-    The spec version this QDash accepts.
-    """
-    spec_schema: Annotated[dict[str, Any], Field(title="Spec Schema")]
-    """
-    JSON schema of CalibrationPipelineSpec.
-    """
-    example: Annotated[dict[str, Any] | None, Field(title="Example")] = None
 
 
 FileTreeNode.model_rebuild()

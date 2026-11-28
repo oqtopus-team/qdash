@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { parse } from "yaml";
 
-/** Language settings read from QDash's shared copilot config. */
+/** Language settings read from QDash's shared agent config. */
 export interface LanguageConfig {
   responseLanguage: string;
   thinkingLanguage: string;
@@ -11,7 +11,7 @@ export interface LanguageConfig {
 const FALLBACK: LanguageConfig = { responseLanguage: "en", thinkingLanguage: "en" };
 
 /**
- * Read `response_language` / `thinking_language` from config/copilot/config.yaml.
+ * Read `response_language` / `thinking_language` from config/agent/config.yaml.
  *
  * Only the language keys are used here. Model wiring comes from chat.yaml via
  * models-config.ts, see adr/0004.

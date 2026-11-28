@@ -11,7 +11,12 @@ import numpy.typing as npt
 from qubex.core import DataModel
 from qubex.experiment.experiment_constants import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
-from qdash.datamodel.task import InputParameterSpec, OutputParameterSpec, RunParameterSpec
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+    TaskDocumentation,
+)
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import (
     QubexTask,
@@ -78,6 +83,33 @@ class CheckSpinLockSpectroscopy(QubexTask):
 
     name: str = "CheckSpinLockSpectroscopy"
     task_type: str = "qubit"
+    documentation: ClassVar[TaskDocumentation] = TaskDocumentation(
+        description=(
+            "Measures relaxation and dephasing in the rotating frame (T1rho, T2rho) while "
+            "spin-locking over a sweep of drive Rabi frequencies (4 to 100 MHz by default), "
+            "skipping points the Rabi model cannot reach. It stores a data artifact and figures"
+            " but no calibration values."
+        ),
+        when_to_use=(
+            "Run it during characterization to probe noise near the spin-lock Rabi frequency, a"
+            " higher-frequency range than CPMG noise spectroscopy covers."
+        ),
+        prerequisites=(
+            (
+                "Rabi parameters from a CheckRabi run under the current readout_duration, with "
+                "rabi_r2 at or above the R² threshold; they normalize the IQ data."
+            ),
+            "hpi_amplitude and hpi_duration stored by CreateHPIPulse.",
+            (
+                "control_frequency (or qubit_frequency), readout_frequency (or "
+                "resonator_frequency), and readout_amplitude are stored for the qubit."
+            ),
+            (
+                "Stored t1 and t2_echo, when present, set the duration sweep; otherwise it "
+                "spans 100 ns to 200 us."
+            ),
+        ),
+    )
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         **required_rabi_normalization_inputs(),
         "control_frequency": InputParameterSpec.required_database(

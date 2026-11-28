@@ -13,6 +13,7 @@ from fastapi.security import (
 )
 
 from qdash.api.dependencies import (
+    get_calibration_session_service,
     get_flow_service,
     get_knowledge_draft_store,
     get_task_file_service,
@@ -33,7 +34,13 @@ from qdash.api.schemas.task import (
     TaskKnowledgeResponse,
     TaskResultResponse,
 )
-from qdash.api.services.catalog_task_run import resolve_catalog_task, run_catalog_task
+from qdash.api.services.calibration_run_launch import launch_run
+from qdash.api.services.calibration_session_service import CalibrationSessionService
+from qdash.api.services.catalog_task_run import (
+    resolve_catalog_task,
+    run_catalog_task,
+    validate_overrides,
+)
 from qdash.api.services.flow_service import FlowService
 from qdash.api.services.knowledge_draft_service import KnowledgeDraftStore, task_archive
 from qdash.api.services.pi_chat_service import QDashAuth
@@ -43,6 +50,7 @@ from qdash.api.services.pi_evaluation_service import (
 )
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_service import TaskService
+from qdash.datamodel.run import RunIdentity, RunKind
 from qdash.datamodel.task_knowledge import get_task_knowledge as lookup_task_knowledge
 
 router = APIRouter()
@@ -94,8 +102,13 @@ async def quick_run_task(
     flow_service: Annotated[FlowService, Depends(get_flow_service)],
     task_file_service: Annotated[TaskFileService, Depends(get_task_file_service)],
     task_service: Annotated[TaskService, Depends(get_task_service)],
+    sessions: Annotated[CalibrationSessionService, Depends(get_calibration_session_service)],
 ) -> ExecuteFlowResponse:
-    """Execute one task without requiring a previous execution snapshot."""
+    """Execute one task without requiring a previous execution snapshot.
+
+    The run is recorded before it is launched. It joins ``calibration_session_id`` when given;
+    otherwise an automatic calibration session created for it.
+    """
     task, backend_name = resolve_catalog_task(task_file_service, task_name, body.backend_name)
 
     source = None
@@ -110,22 +123,50 @@ async def quick_run_task(
                 status_code=400, detail="Source task does not match the task and target"
             )
 
-    return await run_catalog_task(
-        flow_service=flow_service,
-        task=task,
-        backend_name=backend_name,
-        chip_id=body.chip_id,
-        qid=body.qid,
-        username=ctx.user.username,
+    async def dispatch(_: object, identity: RunIdentity | None) -> ExecuteFlowResponse:
+        return await run_catalog_task(
+            flow_service=flow_service,
+            task=task,
+            backend_name=backend_name,
+            chip_id=body.chip_id,
+            qid=body.qid,
+            username=ctx.user.username,
+            project_id=ctx.project_id,
+            input_overrides=body.input_parameter_overrides,
+            run_overrides=body.run_parameter_overrides,
+            update_calibration_parameters=body.update_calibration_parameters,
+            update_params=body.update_params,
+            reconfigure=body.reconfigure,
+            execution_name=f"quick-run:{task_name}",
+            source_task_id=body.source_task_id,
+            tags=source.tags if source else None,
+            calibration_run=identity,
+        )
+
+    return await launch_run(
+        sessions,
         project_id=ctx.project_id,
-        input_overrides=body.input_parameter_overrides,
-        run_overrides=body.run_parameter_overrides,
-        update_calibration_parameters=body.update_calibration_parameters,
-        update_params=body.update_params,
-        reconfigure=body.reconfigure,
-        execution_name=f"quick-run:{task_name}",
-        source_task_id=body.source_task_id,
-        tags=source.tags if source else None,
+        username=ctx.user.username,
+        chip_id=body.chip_id,
+        kind=RunKind.TASK,
+        run_name=f"{task_name} on {body.qid}",
+        request={
+            "task_name": task_name,
+            **body.model_dump(mode="json", exclude={"calibration_session_id", "idempotency_key"}),
+        },
+        calibration_session_id=body.calibration_session_id,
+        idempotency_key=body.idempotency_key,
+        validate=lambda: validate_overrides(
+            task, body.input_parameter_overrides, body.run_parameter_overrides
+        ),
+        dispatch=dispatch,
+        # The single-task run claims only its qubit's hardware.
+        preflight=lambda _: flow_service.ensure_hardware_available(
+            project_id=ctx.project_id,
+            chip_id=body.chip_id,
+            parameters={"qid": body.qid},
+            workflow=False,
+        ),
     )
 
 
@@ -178,6 +219,12 @@ def list_task_knowledge(
     summary="Get raw markdown for a task knowledge entry",
     operation_id="getTaskKnowledgeMarkdown",
     response_class=Response,
+    responses={
+        200: {
+            "description": "The task's knowledge as Markdown, images inlined as data URIs",
+            "content": {"text/markdown": {"schema": {"type": "string"}}},
+        }
+    },
 )
 def get_task_knowledge_markdown(
     task_name: str,

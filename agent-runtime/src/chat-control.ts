@@ -555,3 +555,131 @@ export function awaitsUser(entries: readonly EntryRecord[]): boolean {
   }
   return false;
 }
+
+/**
+ * Where a stored turn's entries end, as read from the store's submissions.
+ *
+ * A turn starts at its own message and runs on through the steers it accepted
+ * and the runs they started, until the next turn's message (another request's
+ * input) or a continue takes over. `bounded`: the turn's entries are those
+ * after `after` through `through` (undefined: no later turn exists, so every
+ * later entry is the turn's), and `members` are the steers and runtime steers
+ * placed in that range, whose submissions may end the turn. `unknown`: the
+ * store does not establish where the turn ends, and nothing is replayed.
+ */
+export type StoredTurn =
+  | { status: "bounded"; after: EntryId; through: EntryId | undefined; members: SubmissionRecord[] }
+  | { status: "unknown"; reason: string };
+
+/** A submission that starts a turn of its own: a request's input (not a steer) or a continue. */
+function startsTurn(record: SubmissionRecord): boolean {
+  if (record.type === "continue") return true;
+  return record.type === "input" && typeof record.requestId === "string" && !record.requestId.startsWith("steer:");
+}
+
+/**
+ * The range of `own`'s turn among `later`, the conversation's submissions created after it in ID order.
+ *
+ * A steer is admitted with a `steer:` request key; the runtime's own wrap-up steer has no request ID (every turn
+ * the chat sends carries one). The next turn's message bounds the turn exactly: its entry is the first that is not
+ * the turn's. A continue places no entry, so after one the turn ends at the last message or answer its own
+ * submissions placed, which needs them all settled. A later message still queued for placement leaves the end
+ * open, so the turn is `unknown`.
+ */
+export function storedTurn(own: SubmissionRecord, later: readonly SubmissionRecord[]): StoredTurn {
+  if (own.type !== "input" || own.entry === undefined) return { status: "unknown", reason: "own_not_placed" };
+  const start = Number(own.entry);
+  const members: SubmissionRecord[] = [];
+  for (const record of later) {
+    if (Number(record.id) <= Number(own.id)) continue;
+    if (startsTurn(record)) {
+      if (record.type === "input") {
+        if (record.entry !== undefined) {
+          const next = Number(record.entry);
+          return {
+            status: "bounded",
+            after: own.entry,
+            through: (next - 1) as EntryId,
+            members: members.filter((member) => Number(member.entry) < next),
+          };
+        }
+        // Never placed: it is not in the transcript and bounds nothing.
+        if (record.status === "unanswered") continue;
+        return { status: "unknown", reason: "later_turn_queued" };
+      }
+      // A continue: the turn ended before it was admitted, at what its own submissions placed last.
+      const placed = [own, ...members];
+      if (placed.some((member) => member.status !== "done" && member.status !== "unanswered")) {
+        return { status: "unknown", reason: "turn_unsettled" };
+      }
+      let through = start;
+      for (const member of placed) {
+        for (const at of [member.entry, member.answer]) {
+          if (at !== undefined && Number(at) > through) through = Number(at);
+        }
+      }
+      return { status: "bounded", after: own.entry, through: through as EntryId, members };
+    }
+    if (record.type !== "input") continue;
+    // A steer placed before this turn's message belongs to an earlier turn (a run recovered after a restart).
+    if (record.entry !== undefined && Number(record.entry) > start) members.push(record);
+  }
+  return { status: "bounded", after: own.entry, through: undefined, members };
+}
+
+/** Page size for reading a conversation's submissions. */
+const SUBMISSION_PAGE = 200;
+
+/**
+ * `storedTurn()` for `own`, read from the store at `path` through a second connection beside the harness that has
+ * it open (as `readSteerReceipt` does). Only the submissions created after `own` are read, newest first.
+ */
+export async function readStoredTurn(
+  path: string,
+  conversationId: ConversationId,
+  own: SubmissionRecord,
+  context: Context,
+): Promise<StoredTurn> {
+  const storage = await openNodeSqliteStorage(path, { busyTimeoutMs: STEER_RECEIPT_BUSY_TIMEOUT_MS });
+  try {
+    const later: SubmissionRecord[] = [];
+    let cursor: Parameters<typeof storage.scanSubmissions>[2];
+    scan: do {
+      const page = await storage.scanSubmissions(
+        { conversationId, order: "descending" },
+        SUBMISSION_PAGE,
+        cursor,
+        context,
+      );
+      for (const record of page.items) {
+        if (Number(record.id) <= Number(own.id)) break scan;
+        later.push(record);
+      }
+      cursor = page.next;
+    } while (cursor !== undefined);
+    return storedTurn(own, later.reverse());
+  } finally {
+    await storage.close(context);
+  }
+}
+
+/**
+ * The submission that ended a stored turn, as `settleChat` picks it for a live one: of the turn's own submission
+ * and the members `storedTurn()` found admitted after it, the one placed last.
+ */
+export function storedTurnFinal(
+  own: SettledSubmissionRecord,
+  members: readonly SettledSubmissionRecord[],
+): SettledSubmissionRecord {
+  let final = own;
+  let last = own.type === "input" && own.entry !== undefined ? Number(own.entry) : -1;
+  for (const record of members) {
+    if (record.type !== "input" || record.entry === undefined) continue;
+    if (Number(record.id) <= Number(own.id)) continue;
+    if (Number(record.entry) > last) {
+      last = Number(record.entry);
+      final = record;
+    }
+  }
+  return final;
+}

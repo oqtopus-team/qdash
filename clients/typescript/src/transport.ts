@@ -18,6 +18,8 @@ export interface RequestOptions {
   query?: Record<string, QueryValue>;
   body?: unknown;
   headers?: HeadersInit;
+  /** Cancels the request, including retries. */
+  signal?: AbortSignal;
 }
 
 export interface TransportOptions {
@@ -110,6 +112,7 @@ export class QDashTransport {
       ...(options.headers
         ? { headers: Object.fromEntries(new Headers(options.headers).entries()) }
         : {}),
+      ...(options.signal ? { signal: options.signal } : {}),
     });
   }
 
@@ -151,6 +154,7 @@ export class QDashTransport {
       method: config.method ?? "GET",
       headers,
       ...(body === undefined ? {} : { body }),
+      ...(config.signal ? { signal: config.signal as AbortSignal } : {}),
     });
     let payload: unknown;
     if (config.responseType === "arraybuffer") payload = await response.arrayBuffer();
@@ -184,6 +188,8 @@ export class QDashTransport {
         await this.sleep(this.retryDelayMilliseconds(attempt, response));
       } catch (cause) {
         if (cause instanceof QDashApiError) throw cause;
+        // A caller's cancellation is not a transport failure to retry.
+        if (authenticated.signal.aborted) throw authenticated.signal.reason ?? cause;
         if (attempt === attempts) {
           throw new QDashTransportError("QDash request failed", { cause });
         }

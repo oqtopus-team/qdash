@@ -1,5 +1,6 @@
 """Tests for flow router endpoints."""
 
+import logging
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -14,6 +15,7 @@ from qdash.dbmodel.flow import FlowDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.user import UserDocument
+from tests.qdash.api._operation_errors import ERRORS_LOGGER, assert_operation_failure
 
 
 @pytest.fixture
@@ -397,6 +399,213 @@ class TestFlowExecution:
         assert parameters["project_id"] == "test_project"
 
 
+class TestFlowExecutionRunRecording:
+    """A run is recorded before its launch only when its chip is known before it."""
+
+    @pytest.fixture
+    def chipless_flow(self, test_project):
+        flow = FlowDocument(
+            project_id="test_project",
+            name="chipless_flow",
+            username="test_user",
+            chip_id="",
+            flow_function_name="run_chipless_flow",
+            default_parameters={"qids": ["0"]},
+            file_path="/app/flows/test_user/chipless_flow.py",
+            deployment_id="chipless-deployment-id",
+        )
+        flow.insert()
+        return flow
+
+    @staticmethod
+    def _recorded() -> tuple[int, int]:
+        from qdash.dbmodel.calibration_session import (
+            CalibrationPipelineRunDocument,
+            CalibrationSessionDocument,
+        )
+
+        return (
+            CalibrationSessionDocument.find({"project_id": "test_project"}).count(),
+            CalibrationPipelineRunDocument.find({"project_id": "test_project"}).count(),
+        )
+
+    @pytest.mark.parametrize(
+        "options",
+        [
+            {"idempotency_key": "tool-call-1"},
+            {"calibration_session_id": "cs-anything"},
+            {"idempotency_key": "tool-call-1", "calibration_session_id": "cs-anything"},
+        ],
+    )
+    def test_chipless_flow_with_session_or_key_is_refused_before_launch(
+        self, test_client, auth_headers, chipless_flow, options
+    ):
+        create_flow_run = AsyncMock(return_value="never")
+        with patch(
+            "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+            new=create_flow_run,
+        ):
+            response = test_client.post(
+                "/flows/chipless_flow/execute",
+                headers=auth_headers,
+                json={"parameters": {}, **options},
+            )
+
+        assert response.status_code == 400
+        detail = response.json()["detail"]
+        assert "names no chip" in detail
+        assert "Nothing was started" in detail
+        assert "parameters.chip_id" in detail
+        create_flow_run.assert_not_awaited()
+        assert self._recorded() == (0, 0)
+
+    def test_chipless_flow_with_chip_parameter_is_recorded(
+        self, test_client, auth_headers, chipless_flow
+    ):
+        create_flow_run = AsyncMock(return_value="flow-run-1")
+        with patch(
+            "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+            new=create_flow_run,
+        ):
+            response = test_client.post(
+                "/flows/chipless_flow/execute",
+                headers=auth_headers,
+                json={"parameters": {"chip_id": "chip-a"}, "idempotency_key": "tool-call-1"},
+            )
+
+        assert response.status_code == 200
+        assert response.json()["calibration_run_id"]
+        create_flow_run.assert_awaited_once()
+        assert self._recorded() == (1, 1)
+
+    def test_chipless_flow_without_options_defers_recording_to_the_worker(
+        self, test_client, auth_headers, chipless_flow
+    ):
+        from qdash.datamodel.calibration_session import CALIBRATION_RUN_CONTEXT_KEY
+
+        create_flow_run = AsyncMock(return_value="flow-run-2")
+        with patch(
+            "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+            new=create_flow_run,
+        ):
+            response = test_client.post(
+                "/flows/chipless_flow/execute", headers=auth_headers, json={"parameters": {}}
+            )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["calibration_run_id"] is None
+        assert body["calibration_session_id"] is None
+        create_flow_run.assert_awaited_once()
+        context = create_flow_run.call_args.kwargs.get("context") or {}
+        assert CALIBRATION_RUN_CONTEXT_KEY not in context
+        assert self._recorded() == (0, 0)
+
+    def test_known_chip_flow_with_key_is_recorded_and_replayed(
+        self, test_client, auth_headers, sample_flow
+    ):
+        create_flow_run = AsyncMock(return_value="flow-run-3")
+        with patch(
+            "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+            new=create_flow_run,
+        ):
+            first = test_client.post(
+                "/flows/test_flow/execute",
+                headers=auth_headers,
+                json={"parameters": {}, "idempotency_key": "tool-call-2"},
+            )
+            second = test_client.post(
+                "/flows/test_flow/execute",
+                headers=auth_headers,
+                json={"parameters": {}, "idempotency_key": "tool-call-2"},
+            )
+
+        assert first.status_code == second.status_code == 200
+        assert first.json()["calibration_run_id"] == second.json()["calibration_run_id"]
+        assert second.json()["replayed"] is True
+        create_flow_run.assert_awaited_once()
+
+        from qdash.datamodel.calibration_session import CALIBRATION_RUN_CONTEXT_KEY
+        from qdash.dbmodel.calibration_session import CalibrationPipelineRunDocument
+
+        # Only the flow run QDash created receives the launch's dispatch token, and no
+        # response carries it.
+        run = CalibrationPipelineRunDocument.find_one(
+            {"run_id": first.json()["calibration_run_id"]}
+        ).run()
+        assert run is not None
+        handed = create_flow_run.call_args.kwargs["context"][CALIBRATION_RUN_CONTEXT_KEY]
+        assert handed["run_id"] == run.run_id
+        assert handed["dispatch_token"] == run.dispatch_token
+        assert run.dispatch_token not in first.text
+        assert run.dispatch_token not in second.text
+
+
+class TestFlowExecutionOnBusyHardware:
+    """A saved flow whose chip is already claimed is refused before anything is recorded."""
+
+    CREATE = "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run"
+
+    @staticmethod
+    def _hold(chip_id: str, resources: tuple[str, ...] = (), exclusive: bool = True) -> None:
+        from qdash.repository import MongoExecutionLockRepository
+
+        assert MongoExecutionLockRepository().try_lock(
+            project_id="test_project",
+            execution_id="running-elsewhere",
+            chip_id=chip_id,
+            resources=resources,
+            exclusive=exclusive,
+        )
+
+    @staticmethod
+    def _recorded() -> tuple[int, int, int]:
+        from qdash.dbmodel.calibration_session import CalibrationSessionDocument
+        from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+        from qdash.dbmodel.run import RunDocument
+
+        return (
+            CalibrationSessionDocument.find_all().count(),
+            RunDocument.find_all().count(),
+            ExecutionHistoryDocument.find_all().count(),
+        )
+
+    @pytest.mark.parametrize("options", [{}, {"idempotency_key": "tool-call-busy"}])
+    def test_a_claimed_chip_refuses_the_flow_before_it_is_recorded(
+        self, test_client, auth_headers, sample_flow, options
+    ):
+        # Another execution holds only one MUX; a saved flow needs the whole chip.
+        self._hold("test_chip", ("mux:0",), exclusive=False)
+        create_flow_run = AsyncMock(return_value="never")
+        with patch(self.CREATE, new=create_flow_run):
+            response = test_client.post(
+                "/flows/test_flow/execute",
+                headers=auth_headers,
+                json={"parameters": {}, **options},
+            )
+
+        assert response.status_code == 409
+        assert "overlapping hardware resources" in response.json()["detail"]
+        create_flow_run.assert_not_awaited()
+        assert self._recorded() == (0, 0, 0)
+
+    def test_a_claim_on_another_chip_does_not_refuse_the_flow(
+        self, test_client, auth_headers, sample_flow
+    ):
+        self._hold("other_chip")
+        create_flow_run = AsyncMock(return_value="flow-run-free")
+        with patch(self.CREATE, new=create_flow_run):
+            response = test_client.post(
+                "/flows/test_flow/execute",
+                headers=auth_headers,
+                json={"parameters": {}, "idempotency_key": "tool-call-free"},
+            )
+
+        assert response.status_code == 200, response.text
+        create_flow_run.assert_awaited_once()
+        assert self._recorded() == (1, 1, 1)
+
+
 class TestFlowTemplates:
     """Tests for flow template endpoints."""
 
@@ -754,3 +963,72 @@ class TestFlowExecutionPlan:
             params={"chip_id": "unknown_chip"},
         )
         assert chip.status_code == 404
+
+
+class TestFlowSourceFailures:
+    """Unexpected flow file failures return a safe message and the ID of the logged cause."""
+
+    def _save(self, test_client, auth_headers):
+        body = {"name": "first_calibration", "code": FLOW_SOURCE, "chip_id": "chip-1"}
+        return test_client.post("/flows", json=body, headers=auth_headers)
+
+    def test_read_failure_returns_code_message_and_logged_error_id(
+        self, test_client, test_project, auth_headers, flow_service_on_tmp, caplog
+    ):
+        """A flow file that cannot be read answers 500 without the path or exception text."""
+        assert self._save(test_client, auth_headers).status_code == 200
+        stored = FlowDocument.find_by_project_and_name("test_project", "first_calibration")
+        assert stored is not None
+        file_path = Path(stored.file_path)
+        file_path.unlink()
+        file_path.mkdir()  # exists, but reading it raises IsADirectoryError
+
+        with caplog.at_level(logging.ERROR, logger=ERRORS_LOGGER):
+            response = test_client.get("/flows/first_calibration", headers=auth_headers)
+
+        assert_operation_failure(
+            response,
+            caplog,
+            code="flow_source_read_failed",
+            message="Failed to read the flow file",
+            cause=IsADirectoryError,
+            hidden=(str(file_path), str(flow_service_on_tmp.store.base_dir), "Errno"),
+        )
+
+    def test_write_failure_returns_code_message_and_logged_error_id(
+        self, test_client, test_project, auth_headers, flow_service_on_tmp, caplog
+    ):
+        """A flow file that cannot be written answers 500 and registers no deployment."""
+        file_path = flow_service_on_tmp.store.path_for("test_project", "first_calibration")
+        file_path.mkdir()
+
+        with caplog.at_level(logging.ERROR, logger=ERRORS_LOGGER):
+            response = self._save(test_client, auth_headers)
+
+        assert_operation_failure(
+            response,
+            caplog,
+            code="flow_source_write_failed",
+            message="Failed to save the flow file",
+            cause=IsADirectoryError,
+            hidden=(str(file_path), "Errno"),
+        )
+        assert flow_service_on_tmp.deployment.calls == []
+        assert FlowDocument.find_by_project_and_name("test_project", "first_calibration") is None
+
+    def test_expected_errors_and_success_keep_their_payloads(
+        self, test_client, test_project, auth_headers, flow_service_on_tmp
+    ):
+        """Not-found and success responses are unchanged by the structured 500s."""
+        missing = test_client.get("/flows/unknown_flow", headers=auth_headers)
+        assert missing.status_code == 404
+        assert missing.json() == {"detail": "Flow 'unknown_flow' not found"}
+
+        saved = self._save(test_client, auth_headers)
+        assert saved.status_code == 200
+        assert set(saved.json()) == {"name", "file_path", "message", "code"}
+        assert saved.json()["message"] == "Flow 'first_calibration' created successfully"
+
+        fetched = test_client.get("/flows/first_calibration", headers=auth_headers)
+        assert fetched.status_code == 200
+        assert fetched.json()["code"] == FLOW_SOURCE

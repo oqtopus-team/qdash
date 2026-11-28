@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { RawDataPreviewDialog } from "./RawDataPreviewDialog";
 import { FigureJsonPreviewDialog } from "./FigureJsonPreviewDialog";
+import { executionArtifactUrl } from "@/lib/utils/executionFiles";
 
 const ARCHIVE_PATH_LIMIT = 100;
 
@@ -13,10 +14,6 @@ interface TaskArtifactDownloadsProps {
   rawDataPaths?: string[];
   /** Figure image paths; shown elsewhere, so they are only added to the ZIP archive. */
   imagePaths?: string[];
-}
-
-function artifactUrl(path: string): string {
-  return `/api/executions/artifact?path=${encodeURIComponent(path)}`;
 }
 
 function fileName(path: string): string {
@@ -115,7 +112,7 @@ export function TaskArtifactDownloads({
                 </span>
               </button>
               <a
-                href={artifactUrl(path)}
+                href={executionArtifactUrl(path)}
                 download={fileName(path)}
                 aria-label={`Download ${fileName(path)}`}
                 title={type === "figure" ? "Download figure JSON" : "Download NetCDF"}
