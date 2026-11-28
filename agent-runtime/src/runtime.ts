@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import type { Api, Model } from "@earendil-works/pi-ai";
+import type { Api, ImageContent, Model, TextContent } from "@earendil-works/pi-ai";
 import { ModelRuntime, type ToolDefinition as CodingAgentTool } from "@earendil-works/pi-coding-agent";
 import {
   AssistantEntry,
@@ -19,7 +19,10 @@ import {
   type HarnessSettings,
   type ModelRef,
 } from "@earendil-works/pi-durable";
+import { fitImages } from "@earendil-works/pi-durable/images/fit";
+import { createNodePhotonImages } from "@earendil-works/pi-durable/images/node";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
+import { imageLimits, type ImageLimits, type ImageProcessor } from "@earendil-works/pi-durable/tools";
 
 import { createQDashConnection, type QDashAuth, type QDashConnection } from "./auth.ts";
 import {
@@ -192,7 +195,36 @@ export interface OpenDurableSession {
   harness: DurableHarness;
   conversation: Conversation;
   writeTools: QDashWriteTools;
+  /** Fit user-attached images to the session model's limits before committing them. */
+  fitInputContent?(content: readonly (TextContent | ImageContent)[]): Promise<(TextContent | ImageContent)[]>;
   close(): Promise<void>;
+}
+
+/**
+ * Fit user-attached images to the active model's limits before committing them
+ * to the durable transcript. Notes (resize, format conversion, or omission of
+ * an unreadable image) are appended as text so the model knows what changed.
+ */
+export async function fitInputContent(
+  content: readonly (TextContent | ImageContent)[],
+  limits: ImageLimits,
+  processor: ImageProcessor,
+): Promise<(TextContent | ImageContent)[]> {
+  const fitted = await fitImages(content, limits, processor);
+  if (fitted.kind === "unchanged") return [...content];
+  return fitted.notes.length > 0
+    ? [...fitted.content, { type: "text", text: fitted.notes.join("\n") }]
+    : fitted.content;
+}
+
+/** Report a `models.json` load or validation error on `modelRuntime`, matching Pi's startup warning. */
+export function warnModelsJsonError(
+  modelRuntime: Pick<ModelRuntime, "getError">,
+  warn: (message: string) => void = console.warn,
+): string | undefined {
+  const error = modelRuntime.getError();
+  if (error) warn(`[agent-runtime] models.json error: ${error}`);
+  return error;
 }
 
 /** A branch to fork: the source conversation of a store, the answer, and the QDash session it is for. */
@@ -261,6 +293,8 @@ export class SharedRuntime {
     private readonly skills: readonly SkillSummary[] = [],
     /** The chat.yaml the models were built from, for the chat model menus. */
     private readonly chatYaml: string = "",
+    /** Shared Photon image processor for tool outputs and user-attached images. */
+    private readonly imageProcessor?: ImageProcessor,
   ) {}
 
   /** chat.yaml's chat models in order, each marked by whether its credential is set. */
@@ -322,6 +356,7 @@ export class SharedRuntime {
       modelsPath,
       authPath: join(AGENT_DIR, "auth.json"),
     });
+    warnModelsJsonError(modelRuntime);
 
     const skills: SkillSummary[] = loader
       .getSkills()
@@ -403,6 +438,7 @@ export class SharedRuntime {
       askUserTool,
       ...(skills.length ? [buildSkillTool(skills)] : []),
     ]);
+    const imageProcessor = await createNodePhotonImages();
     const chatParts: ChatRegistryParts = {
       extensions,
       modelRuntime,
@@ -412,6 +448,7 @@ export class SharedRuntime {
       internalCalls: presentation ? PRESENTATION_INTERNAL_CALLS : {},
       codingTools: EXEC_CONFIG !== undefined,
       compaction: buildCompactionExtension({ timeoutMs: MODEL_STREAM_TIMEOUT_MS }),
+      imageProcessor,
     };
     const buildChatRegistry = (
       connection: QDashConnection,
@@ -452,6 +489,7 @@ export class SharedRuntime {
       modelCompactionOverrides,
       skills,
       modelYaml.chatYaml,
+      imageProcessor,
     );
   }
 
@@ -908,10 +946,9 @@ export class SharedRuntime {
     try {
       // A level the model cannot run (Off on a model whose thinking is always on) runs at the
       // nearest one it can, not at pi's fallback effort (see supportedThinkingLevel).
-      const thinkingLevel = supportedThinkingLevel(
-        this.modelRuntime.getModel(model.provider, model.modelId),
-        request.thinkingLevel,
-      );
+      const catalogModel = this.modelRuntime.getModel(model.provider, model.modelId);
+      const thinkingLevel = supportedThinkingLevel(catalogModel, request.thinkingLevel);
+      const limits = imageLimits(catalogModel);
       const agent = {
         model,
         ...(thinkingLevel ? { thinkingLevel } : {}),
@@ -929,7 +966,16 @@ export class SharedRuntime {
       // Scheduling is not resumed here: the first call that asks for progress
       // (a submit) resumes it, or the caller does once it watches the
       // conversation, so a run recovered from a crash is seen from its start.
-      return { harness, conversation, writeTools, close };
+      const processor = this.imageProcessor;
+      return {
+        harness,
+        conversation,
+        writeTools,
+        ...(processor
+          ? { fitInputContent: (content) => fitInputContent(content, limits, processor) }
+          : {}),
+        close,
+      };
     } catch (error) {
       await close();
       throw error;

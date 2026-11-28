@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { test } from "node:test";
 import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
@@ -10,6 +10,7 @@ import { PassThrough } from "node:stream";
 import {
   defaultChatModel,
   exitStatus,
+  expandTilde,
   forwardSignals,
   modelOptions,
   overlayEnv,
@@ -296,12 +297,24 @@ test("prepareLocalCli accepts the legacy QDASH_COPILOT_PROFILE and refuses a con
   );
 });
 
+test("expandTilde resolves ~ and ~/ against the home directory", () => {
+  const home = homedir();
+  assert.equal(expandTilde("~"), home);
+  assert.equal(expandTilde("~/custom/agent"), join(home, "custom/agent"));
+  assert.equal(expandTilde("/abs/path"), "/abs/path");
+  assert.equal(expandTilde("rel/path"), "rel/path");
+});
+
 test("prepareLocalCli refuses the global pi agent dir", () => {
   const root = checkout();
-  assert.throws(
-    () => prepareLocalCli(["--agent-dir", join(process.env.HOME ?? "", ".pi/agent")], {}, root),
-    /global pi agent dir/,
-  );
+  for (const dir of [join(homedir(), ".pi/agent"), "~/.pi/agent"]) {
+    assert.throws(
+      () => prepareLocalCli(["--agent-dir", dir], {}, root),
+      /global pi agent dir/,
+    );
+  }
+  const expandedRelative = prepareLocalCli(["--agent-dir", resolve(root, "custom")], {}, root);
+  assert.equal(expandedRelative.agentDir, resolve(root, "custom"));
 });
 
 

@@ -49,9 +49,9 @@
     "test": "rm -rf .test-dist && tsc --noEmit false --outDir .test-dist && node --test tests/*.test.mjs; status=$?; rm -rf .test-dist; exit $status"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "1.6.1",
+    "@earendil-works/pi-coding-agent": "1.7.0",
     "typebox": "^1.0.55",
     "typescript": "^5.8.0",
-    "@earendil-works/pi-tui": "1.6.1"
+    "@earendil-works/pi-tui": "1.7.0"
   }
 }

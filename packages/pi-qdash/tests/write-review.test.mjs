@@ -4,7 +4,7 @@
  * on screen and an explicit key, and decline, Escape, and pi's abort signal
  * never approve. The view runs inside pi-tui's real `TuiMainScreen` (fake
  * terminal, real overlay compositing and input routing, pi's default
- * keybindings); `ctx.ui.custom()` is reproduced from pi 1.6.1's interactive
+ * keybindings); `ctx.ui.custom()` is reproduced from pi 1.7.0's interactive
  * mode overlay path. RPC mode keeps `ctx.ui.confirm()` with the full text.
  */
 
@@ -68,7 +68,7 @@ function screen(columns, rows) {
   };
 }
 
-/** pi 1.6.1 InteractiveMode.showExtensionCustom, overlay branch. */
+/** pi 1.7.0 InteractiveMode.showExtensionCustom, overlay branch. */
 function tuiUi(tui, opened = []) {
   return {
     confirm: async () => assert.fail("the terminal UI never uses confirm() for a write review"),
@@ -278,4 +278,45 @@ test("narrow widths cannot approve hidden text, including after a resize", () =>
     view.handleInput("n");
     assert.deepEqual(approvals, [false]);
   }
+});
+
+test("key hints reflect remapped and unbound keybindings and still keep minimal mocks working", () => {
+  const body = Array.from({ length: 20 }, (_, i) => `row ${i}`).join("\n");
+  const customKb = new KeybindingsManager(TUI_KEYBINDINGS, {
+    "tui.select.cancel": "ctrl+x",
+    "tui.select.up": "ctrl+p",
+    "tui.select.down": "ctrl+n",
+    "tui.select.pageUp": "ctrl+u",
+    "tui.select.pageDown": "ctrl+d",
+  });
+  const declined = [];
+  const customView = new WriteReviewView({ terminal: { rows: 16 }, requestRender() {} }, plainTheme, customKb, "Review", body, (v) => declined.push(v));
+  const normalHint = customView.render(80).at(-2);
+  assert.match(normalHint, /^n\/Ctrl\+X decline · y approve · Ctrl\+P\/Ctrl\+N Ctrl\+U\/Ctrl\+D Home\/End$/);
+  const smallView = new WriteReviewView({ terminal: { rows: 6 }, requestRender() {} }, plainTheme, customKb, "Review", body, () => {});
+  assert.match(smallView.render(60)[1], /press n or Ctrl\+X to decline/);
+  customView.handleInput("\x18");
+  assert.deepEqual(declined, [false]);
+
+  const altKb = new KeybindingsManager(TUI_KEYBINDINGS, { "tui.select.cancel": "alt+k" });
+  const altView = new WriteReviewView({ terminal: { rows: 16 }, requestRender() {} }, plainTheme, altKb, "Review", "ok", () => {});
+  const expectedAlt = process.platform === "darwin" ? "Option+K" : "Alt+K";
+  assert.match(altView.render(80).at(-2), new RegExp(`^n/${expectedAlt.replace("+", "\\+")} decline`));
+
+  const unboundKb = new KeybindingsManager(TUI_KEYBINDINGS, {
+    "tui.select.cancel": [],
+    "tui.select.up": [],
+    "tui.select.down": [],
+    "tui.select.pageUp": [],
+    "tui.select.pageDown": [],
+  });
+  const unboundView = new WriteReviewView({ terminal: { rows: 16 }, requestRender() {} }, plainTheme, unboundKb, "Review", body, () => {});
+  assert.match(unboundView.render(80).at(-2), /^n decline · y approve · k\/j b\/Space Home\/End$/);
+  const unboundSmall = new WriteReviewView({ terminal: { rows: 6 }, requestRender() {} }, plainTheme, unboundKb, "Review", body, () => {});
+  assert.match(unboundSmall.render(60)[1], /press n to decline\.$/);
+
+  // Minimal { matches } mocks without getKeys fall back cleanly to default hints.
+  const minimalKb = { matches: (data, binding) => keybindings.matches(data, binding) };
+  const minimalView = new WriteReviewView({ terminal: { rows: 16 }, requestRender() {} }, plainTheme, minimalKb, "Review", body, () => {});
+  assert.match(minimalView.render(80).at(-2), /^n\/Esc decline · y approve · ↑↓ PgUp\/PgDn Home\/End$/);
 });

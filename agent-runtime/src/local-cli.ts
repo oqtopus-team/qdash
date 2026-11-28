@@ -300,6 +300,13 @@ export interface LocalCliPlan {
   waitForStdin: boolean;
 }
 
+/** Expand a leading `~` or `~/...` against the user's home directory, matching pi's `--agent-dir`. */
+export function expandTilde(path: string): string {
+  if (path === "~") return homedir();
+  if (path.startsWith("~/") || path.startsWith("~\\")) return join(homedir(), path.slice(2));
+  return path;
+}
+
 /**
  * Prepare a pi run: write models.json into `agentDir` and build the arguments.
  *
@@ -327,8 +334,8 @@ export function prepareLocalCli(
         parseArgs([...piArgs, argv[i]]).unknownFlags.has(argv[i].slice(2))) {
       const value = argv[i + 1];
       if (!value) throw new Error(`${argv[i]} needs a path`);
-      if (argv[i] === "--env-file") envFile = resolve(value);
-      else agentDir = resolve(value);
+      if (argv[i] === "--env-file") envFile = resolve(expandTilde(value));
+      else agentDir = resolve(expandTilde(value));
       i += 1;
     } else {
       piArgs.push(argv[i]);

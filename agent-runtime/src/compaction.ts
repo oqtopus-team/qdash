@@ -1,7 +1,7 @@
 /**
  * Conversation compaction sized to the chat's model.
  *
- * Pi durable's built-in summarizer (pi-durable 1.6.1, `harness/compaction.js`)
+ * Pi durable's built-in summarizer (pi-durable 1.7.0, `harness/compaction.js`)
  * sends the summary request with the conversation's thinking level and caps
  * its output at `min(0.8 * reserveTokens, model.maxTokens)`. Reasoning and the
  * summary share that cap. On a local reasoning model such as qwen with a 64k

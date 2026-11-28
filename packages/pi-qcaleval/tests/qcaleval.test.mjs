@@ -497,8 +497,14 @@ test("usage of several calls is added, and one side alone is kept", () => {
   assert.equal(sum.input, 30);
   assert.equal(sum.output, 12);
   assert.equal(sum.totalTokens, 42);
+  assert.equal(sum.cacheWrite1h, undefined);
   assert.equal(sum.reasoning, undefined);
+  assert.equal(sum.imageOutput, undefined);
   assert.equal(addUsage({ ...usage(1, 1), reasoning: 3 }, usage(1, 1)).reasoning, 3);
+  assert.equal(addUsage(usage(1, 1), { ...usage(1, 1), cacheWrite1h: 4 }).cacheWrite1h, 4);
+  assert.equal(addUsage({ ...usage(1, 1), cacheWrite1h: 4 }, { ...usage(1, 1), cacheWrite1h: 6 }).cacheWrite1h, 10);
+  assert.equal(addUsage(usage(1, 1), { ...usage(1, 1), imageOutput: 120 }).imageOutput, 120);
+  assert.equal(addUsage({ ...usage(1, 1), imageOutput: 120 }, { ...usage(1, 1), imageOutput: 80 }).imageOutput, 200);
 });
 
 // ---------------------------------------------------------------------------

@@ -14,7 +14,8 @@ import {
   type Extension,
   type ToolRegistration,
 } from "@earendil-works/pi-durable";
-import { createCodingTools } from "@earendil-works/pi-durable/tools";
+import { createFitImagesExtension } from "@earendil-works/pi-durable/images/fit";
+import { createCodingTools, type ImageProcessor } from "@earendil-works/pi-durable/tools";
 
 import type { QDashConnection } from "./auth.ts";
 import { buildCodemodeExtensions, createCodemodeSandbox, modelOnlyTools, type InternalCalls } from "./codemode.ts";
@@ -55,6 +56,8 @@ export interface ChatRegistryParts {
   codingTools: boolean;
   /** From `buildCompactionExtension`: the summarizer chats compact with. */
   compaction?: Extension;
+  /** Validates, orients, converts, and resizes images returned by tools so oversized or damaged images never poison a conversation. */
+  imageProcessor?: ImageProcessor;
 }
 
 export interface ChatRegistry {
@@ -112,7 +115,11 @@ export function buildChatRegistry(
   // The workspace's read/write/edit/bash, which run in the agent-exec
   // container through the environment `openSession` gives the harness.
   // The model calls them; Code Mode scripts do not.
-  if (parts.codingTools) registry.install(modelOnlyTools(createCodingTools()));
+  if (parts.codingTools) {
+    registry.install(
+      modelOnlyTools(createCodingTools(parts.imageProcessor ? { images: parts.imageProcessor } : undefined)),
+    );
+  }
   // Code Mode, tool_search, and the hooks that keep scripts to the audited
   // read-only tools and internal tools to their callers. One sandbox per
   // open session.
@@ -123,5 +130,8 @@ export function buildChatRegistry(
     internalCalls: parts.internalCalls,
   };
   for (const extension of buildCodemodeExtensions(sandbox, policy)) registry.install(extension);
+  // Installed last so earlier hooks see unfitted results while every top-level
+  // tool output committed for the model respects its image limits.
+  if (parts.imageProcessor) registry.install(createFitImagesExtension(parts.imageProcessor));
   return { registry, writeTools: qdash.writeTools, close: () => sandbox.close() };
 }

@@ -228,7 +228,7 @@ async function parentToolName(call: ToolHookCall, api: HookApi, context: Context
  *
  * A nested call names only its parent's task; the policy reads which tool
  * that task runs from the Harness's live slots (`parentToolName`). That holds
- * for a caller that parks (pi-durable 1.6.1 `{ kind: "sleep" }` or `{ kind: "wait" }`) and for
+ * for a caller that parks (pi-durable 1.7.0 `{ kind: "sleep" }` or `{ kind: "wait" }`) and for
  * a nested call it started with `wait: false`, whose check runs after the
  * caller's `execute()` returned. A call whose parent it cannot find is blocked.
  */

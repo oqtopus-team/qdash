@@ -6,6 +6,7 @@
  * (server.ts) parses and authenticates the request, takes the store's hold,
  * opens the session, and hands the rest here with the transport it chose.
  */
+import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
 import {
   UserEntry,
   type EntryId,
@@ -291,7 +292,15 @@ export async function runChatTurn(turn: ChatTurn, response: TurnResponse): Promi
             BACKGROUND_CONTEXT,
           );
         } else if (!own) {
-          own = await submitInput(body, conversation, approval, opened.writeTools, write, turn.expandSkillCommand);
+          own = await submitInput(
+            body,
+            conversation,
+            approval,
+            opened.writeTools,
+            write,
+            turn.expandSkillCommand,
+            opened.fitInputContent,
+          );
         }
       } finally {
         knowOwn(own);
@@ -402,6 +411,7 @@ async function submitInput(
   writeTools: OpenDurableSession["writeTools"],
   write: (event: NdjsonEvent) => void,
   expandSkillCommand: (message: string) => string,
+  fitInput?: OpenDurableSession["fitInputContent"],
 ): Promise<Submission> {
   const view = await conversation.context(BACKGROUND_CONTEXT);
   const isNew = !view.entries.some((entry) => UserEntry.is(entry));
@@ -450,9 +460,8 @@ async function submitInput(
     ...(isNew ? toImageContent(body.initial_images) : []),
     ...toImageContent(body.images),
   ];
-  const content = images.length
-    ? [{ type: "text" as const, text: message }, ...images]
-    : message;
+  const blocks: Array<TextContent | ImageContent> = [{ type: "text", text: message }, ...images];
+  const content = images.length ? (fitInput ? await fitInput(blocks) : blocks) : message;
   return conversation.submit(
     {
       type: "input",
