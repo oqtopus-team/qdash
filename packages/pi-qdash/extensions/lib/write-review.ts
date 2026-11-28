@@ -15,7 +15,7 @@
  * canonical snapshot of the arguments, and the view keeps only its own copy.
  */
 
-import type { Component, KeybindingsManager, TUI } from "@earendil-works/pi-tui";
+import type { Component, Keybinding, KeybindingsManager, TUI } from "@earendil-works/pi-tui";
 import { replaceControlCharacters, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 /** The parts of pi's extension UI the review uses. */
@@ -81,6 +81,51 @@ function hardWrap(line: string, width: number): string[] {
   return rows;
 }
 
+const KEY_LABELS: Record<string, string> = {
+  escape: "Esc",
+  up: "↑",
+  down: "↓",
+  left: "←",
+  right: "→",
+  pageup: "PgUp",
+  pagedown: "PgDn",
+  home: "Home",
+  end: "End",
+  space: "Space",
+  enter: "Enter",
+  tab: "Tab",
+  backspace: "Backspace",
+  delete: "Delete",
+};
+
+function formatKeyPart(part: string): string {
+  const lower = part.toLowerCase();
+  if (lower === "alt") return process.platform === "darwin" ? "Option" : "Alt";
+  const label = KEY_LABELS[lower];
+  if (label) return label;
+  return part.charAt(0).toUpperCase() + part.slice(1);
+}
+
+/** Format a pi key ID (`escape`, `pageUp`, `ctrl+x`) for human-readable hints. */
+function formatKeyId(key: string): string {
+  if (!key.includes("+")) return KEY_LABELS[key.toLowerCase()] ?? key;
+  return key.split("+").map(formatKeyPart).join("+");
+}
+
+/** Raw key names already fixed to approve (`y`/`Y`) or decline (`n`/`N`) in `handleInput`. */
+const DECLINE_SHADOWED_KEYS = new Set(["n", "y"]);
+
+function primaryKey(
+  keybindings: Pick<KeybindingsManager, "matches"> & Partial<Pick<KeybindingsManager, "getKeys">>,
+  binding: Keybinding,
+  fallback: string,
+  exclude?: ReadonlySet<string>,
+): string | undefined {
+  if (typeof keybindings.getKeys !== "function") return fallback;
+  const key = keybindings.getKeys(binding).find((candidate) => !exclude?.has(candidate.toLowerCase()));
+  return key ? formatKeyId(key) : undefined;
+}
+
 /**
  * A scrollable review of `text` with explicit approve and decline keys.
  * `done(true)` is called only from the approve key after the last line was
@@ -101,7 +146,7 @@ export class WriteReviewView implements Component {
   constructor(
     private readonly tui: ReviewTui,
     private readonly theme: ReviewTheme,
-    private readonly keybindings: Pick<KeybindingsManager, "matches">,
+    private readonly keybindings: Pick<KeybindingsManager, "matches"> & Partial<Pick<KeybindingsManager, "getKeys">>,
     private readonly title: string,
     text: string,
     private readonly done: (approved: boolean) => void,
@@ -132,18 +177,25 @@ export class WriteReviewView implements Component {
     const height = Math.max(1, this.tui.terminal.rows - 2 * OVERLAY_MARGIN);
     this.bodyRows = height - CHROME_ROWS;
     const fit = (line: string) => truncateToWidth(line, width);
+    const altCancel = primaryKey(this.keybindings, "tui.select.cancel", "Esc", DECLINE_SHADOWED_KEYS);
     this.reviewable = false;
     if (this.bodyRows < MIN_BODY_ROWS || width < MIN_REVIEW_COLUMNS) {
       this.seenEnd = false;
       return [
         this.theme.fg("warning", "Terminal too small to review this QDash write."),
-        "Enlarge the terminal, or press n or Esc to decline.",
+        altCancel
+          ? `Enlarge the terminal, or press n or ${altCancel} to decline.`
+          : "Enlarge the terminal, or press n to decline.",
       ].slice(0, height).map(fit);
     }
     const rows = this.rowsFor(width);
     if (rows.some((row) => visibleWidth(row) > width)) {
       this.seenEnd = false;
-      return ["Enlarge the terminal to review; n/Esc declines."].map(fit);
+      return [
+        altCancel
+          ? `Enlarge the terminal to review; n/${altCancel} declines.`
+          : "Enlarge the terminal to review; n declines.",
+      ].map(fit);
     }
     this.reviewable = true;
     const maxOffset = Math.max(0, rows.length - this.bodyRows);
@@ -155,7 +207,13 @@ export class WriteReviewView implements Component {
     const position = `Lines ${this.offset + 1}-${last} of ${rows.length}${this.seenEnd ? "" : " · approve after the end"}`;
     // Decline and approve come first so a narrow terminal never cuts them off.
     const approve = this.seenEnd ? this.theme.fg("success", "y approve") : this.theme.fg("dim", "y approve");
-    const hints = `n/Esc decline · ${approve} · ↑↓ PgUp/PgDn Home/End`;
+    const decline = altCancel ? `n/${altCancel}` : "n";
+    const up = primaryKey(this.keybindings, "tui.select.up", "↑", DECLINE_SHADOWED_KEYS) ?? "k";
+    const down = primaryKey(this.keybindings, "tui.select.down", "↓", DECLINE_SHADOWED_KEYS) ?? "j";
+    const lineScroll = up === "↑" && down === "↓" ? "↑↓" : `${up}/${down}`;
+    const pageUp = primaryKey(this.keybindings, "tui.select.pageUp", "PgUp", DECLINE_SHADOWED_KEYS) ?? "b";
+    const pageDown = primaryKey(this.keybindings, "tui.select.pageDown", "PgDn", DECLINE_SHADOWED_KEYS) ?? "Space";
+    const hints = `${decline} decline · ${approve} · ${lineScroll} ${pageUp}/${pageDown} Home/End`;
     return [
       this.theme.bold(this.theme.fg("accent", this.title)),
       this.theme.fg("muted", position),

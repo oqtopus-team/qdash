@@ -1,5 +1,5 @@
 /**
- * pi-durable 1.6.1 lets a tool's `execute()` park (`{ kind: "sleep" }` or `{ kind: "wait" }`)
+ * pi-durable 1.7.0 lets a tool's `execute()` park (`{ kind: "sleep" }` or `{ kind: "wait" }`)
  * instead of returning a result, and run again once woken. QDash's waiting
  * tools park (see durable-waits.test.mjs); these tests pin that QDash's
  * layer around durable tools (model-only exposure and the tool policy's

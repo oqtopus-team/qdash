@@ -604,9 +604,15 @@ export function addUsage(a: Usage | undefined, b: Usage | undefined): Usage | un
     output: sum(a.output, b.output),
     cacheRead: sum(a.cacheRead, b.cacheRead),
     cacheWrite: sum(a.cacheWrite, b.cacheWrite),
+    ...(a.cacheWrite1h === undefined && b.cacheWrite1h === undefined
+      ? {}
+      : { cacheWrite1h: sum(a.cacheWrite1h, b.cacheWrite1h) }),
     ...(a.reasoning === undefined && b.reasoning === undefined
       ? {}
       : { reasoning: sum(a.reasoning, b.reasoning) }),
+    ...(a.imageOutput === undefined && b.imageOutput === undefined
+      ? {}
+      : { imageOutput: sum(a.imageOutput, b.imageOutput) }),
     totalTokens: sum(a.totalTokens, b.totalTokens),
     cost: {
       input: sum(a.cost?.input, b.cost?.input),
