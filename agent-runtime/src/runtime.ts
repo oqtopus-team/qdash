@@ -96,6 +96,7 @@ import {
   type ToolRun,
 } from "./evaluate.ts";
 import { formatSettledDetail } from "./events.ts";
+import { createBoundedImageProcessor } from "./image-fit.ts";
 import { logDurableReport } from "./durable-report.ts";
 import { examplesOf, fetchKnowledgeDraft, fetchTaskKnowledgeResponse, renderReference } from "./knowledge-context.ts";
 import type { TaskKnowledgeLike } from "./knowledge-context.ts";
@@ -438,7 +439,7 @@ export class SharedRuntime {
       askUserTool,
       ...(skills.length ? [buildSkillTool(skills)] : []),
     ]);
-    const imageProcessor = await createNodePhotonImages();
+    const imageProcessor = createBoundedImageProcessor(await createNodePhotonImages());
     const chatParts: ChatRegistryParts = {
       extensions,
       modelRuntime,

@@ -112,14 +112,18 @@ function formatKeyId(key: string): string {
   return key.split("+").map(formatKeyPart).join("+");
 }
 
+/** Raw key names already fixed to approve (`y`/`Y`) or decline (`n`/`N`) in `handleInput`. */
+const DECLINE_SHADOWED_KEYS = new Set(["n", "y"]);
+
 function primaryKey(
   keybindings: Pick<KeybindingsManager, "matches"> & Partial<Pick<KeybindingsManager, "getKeys">>,
   binding: Keybinding,
   fallback: string,
+  exclude?: ReadonlySet<string>,
 ): string | undefined {
   if (typeof keybindings.getKeys !== "function") return fallback;
-  const keys = keybindings.getKeys(binding);
-  return keys.length > 0 ? formatKeyId(keys[0]) : undefined;
+  const key = keybindings.getKeys(binding).find((candidate) => !exclude?.has(candidate.toLowerCase()));
+  return key ? formatKeyId(key) : undefined;
 }
 
 /**
@@ -173,8 +177,7 @@ export class WriteReviewView implements Component {
     const height = Math.max(1, this.tui.terminal.rows - 2 * OVERLAY_MARGIN);
     this.bodyRows = height - CHROME_ROWS;
     const fit = (line: string) => truncateToWidth(line, width);
-    const cancel = primaryKey(this.keybindings, "tui.select.cancel", "Esc");
-    const altCancel = cancel && cancel.toLowerCase() !== "n" ? cancel : undefined;
+    const altCancel = primaryKey(this.keybindings, "tui.select.cancel", "Esc", DECLINE_SHADOWED_KEYS);
     this.reviewable = false;
     if (this.bodyRows < MIN_BODY_ROWS || width < MIN_REVIEW_COLUMNS) {
       this.seenEnd = false;
@@ -205,11 +208,11 @@ export class WriteReviewView implements Component {
     // Decline and approve come first so a narrow terminal never cuts them off.
     const approve = this.seenEnd ? this.theme.fg("success", "y approve") : this.theme.fg("dim", "y approve");
     const decline = altCancel ? `n/${altCancel}` : "n";
-    const up = primaryKey(this.keybindings, "tui.select.up", "↑") ?? "k";
-    const down = primaryKey(this.keybindings, "tui.select.down", "↓") ?? "j";
+    const up = primaryKey(this.keybindings, "tui.select.up", "↑", DECLINE_SHADOWED_KEYS) ?? "k";
+    const down = primaryKey(this.keybindings, "tui.select.down", "↓", DECLINE_SHADOWED_KEYS) ?? "j";
     const lineScroll = up === "↑" && down === "↓" ? "↑↓" : `${up}/${down}`;
-    const pageUp = primaryKey(this.keybindings, "tui.select.pageUp", "PgUp") ?? "b";
-    const pageDown = primaryKey(this.keybindings, "tui.select.pageDown", "PgDn") ?? "Space";
+    const pageUp = primaryKey(this.keybindings, "tui.select.pageUp", "PgUp", DECLINE_SHADOWED_KEYS) ?? "b";
+    const pageDown = primaryKey(this.keybindings, "tui.select.pageDown", "PgDn", DECLINE_SHADOWED_KEYS) ?? "Space";
     const hints = `${decline} decline · ${approve} · ${lineScroll} ${pageUp}/${pageDown} Home/End`;
     return [
       this.theme.bold(this.theme.fg("accent", this.title)),

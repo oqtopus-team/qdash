@@ -319,4 +319,16 @@ test("key hints reflect remapped and unbound keybindings and still keep minimal 
   const minimalKb = { matches: (data, binding) => keybindings.matches(data, binding) };
   const minimalView = new WriteReviewView({ terminal: { rows: 16 }, requestRender() {} }, plainTheme, minimalKb, "Review", body, () => {});
   assert.match(minimalView.render(80).at(-2), /^n\/Esc decline · y approve · ↑↓ PgUp\/PgDn Home\/End$/);
+
+  // Approval and decline keys (y/Y/n/N) are excluded from the alternate cancel hint so y is never advertised as decline.
+  for (const shadowed of ["y", "Y", "n", "N"]) {
+    const shadowedKb = new KeybindingsManager(TUI_KEYBINDINGS, { "tui.select.cancel": shadowed });
+    const normal = new WriteReviewView({ terminal: { rows: 16 }, requestRender() {} }, plainTheme, shadowedKb, "Review", body, () => {});
+    assert.match(normal.render(80).at(-2), /^n decline · y approve/, shadowed);
+    const small = new WriteReviewView({ terminal: { rows: 6 }, requestRender() {} }, plainTheme, shadowedKb, "Review", body, () => {});
+    assert.match(small.render(60)[1], /press n to decline\.$/, shadowed);
+  }
+  const mixedKb = new KeybindingsManager(TUI_KEYBINDINGS, { "tui.select.cancel": ["y", "ctrl+x"] });
+  const mixedView = new WriteReviewView({ terminal: { rows: 16 }, requestRender() {} }, plainTheme, mixedKb, "Review", body, () => {});
+  assert.match(mixedView.render(80).at(-2), /^n\/Ctrl\+X decline · y approve/);
 });

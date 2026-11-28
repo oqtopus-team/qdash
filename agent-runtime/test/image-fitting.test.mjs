@@ -13,6 +13,11 @@ import { Type } from "typebox";
 import { buildAgentExtension, buildChatRegistry } from "../src/chat-registry.ts";
 import { PRESENTATION_INTERNAL_CALLS } from "../src/presentation-tool.ts";
 import { latestFigures } from "../src/figure-context.ts";
+import {
+  MAX_DECODED_IMAGE_PIXELS,
+  createBoundedImageProcessor,
+  declaredImageDimensions,
+} from "../src/image-fit.ts";
 import { fitInputContent } from "../src/runtime.ts";
 
 const context = BACKGROUND_CONTEXT;
@@ -252,4 +257,156 @@ test("buildChatRegistry with codingTools: true registers workspace tools alongsi
     assert.ok(toolNames.has(expected), `missing ${expected}`);
   }
   assert.equal(entry.data?.diagnostics?.[0]?.code, "image");
+});
+
+function makePngHeader(width, height) {
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk("IHDR", ihdr),
+  ]);
+}
+
+function makeJpegHeader(width, height) {
+  const buf = Buffer.alloc(22);
+  buf[0] = 0xff;
+  buf[1] = 0xd8;
+  buf[2] = 0xff;
+  buf[3] = 0xe0;
+  buf.writeUInt16BE(4, 4);
+  buf[8] = 0xff;
+  buf[9] = 0xff;
+  buf[10] = 0xc0;
+  buf.writeUInt16BE(11, 11);
+  buf[13] = 8;
+  buf.writeUInt16BE(height, 14);
+  buf.writeUInt16BE(width, 16);
+  return buf;
+}
+
+function makeGifHeader(width, height) {
+  const buf = Buffer.alloc(10);
+  buf.write("GIF89a", 0, "ascii");
+  buf.writeUInt16LE(width, 6);
+  buf.writeUInt16LE(height, 8);
+  return buf;
+}
+
+function makeWebpVp8Header(width, height) {
+  const buf = Buffer.alloc(30);
+  buf.write("RIFF", 0, "ascii");
+  buf.write("WEBP", 8, "ascii");
+  buf.write("VP8 ", 12, "ascii");
+  buf[23] = 0x9d;
+  buf[24] = 0x01;
+  buf[25] = 0x2a;
+  buf.writeUInt16LE(width & 0x3fff, 26);
+  buf.writeUInt16LE(height & 0x3fff, 28);
+  return buf;
+}
+
+function makeWebpVp8lHeader(width, height) {
+  const buf = Buffer.alloc(25);
+  buf.write("RIFF", 0, "ascii");
+  buf.write("WEBP", 8, "ascii");
+  buf.write("VP8L", 12, "ascii");
+  buf[20] = 0x2f;
+  const bits = ((width - 1) & 0x3fff) | (((height - 1) & 0x3fff) << 14);
+  buf.writeUInt32LE(bits >>> 0, 21);
+  return buf;
+}
+
+function makeWebpVp8xHeader(width, height) {
+  const buf = Buffer.alloc(30);
+  buf.write("RIFF", 0, "ascii");
+  buf.write("WEBP", 8, "ascii");
+  buf.write("VP8X", 12, "ascii");
+  const w = width - 1;
+  const h = height - 1;
+  buf[24] = w & 0xff;
+  buf[25] = (w >> 8) & 0xff;
+  buf[26] = (w >> 16) & 0xff;
+  buf[27] = h & 0xff;
+  buf[28] = (h >> 8) & 0xff;
+  buf[29] = (h >> 16) & 0xff;
+  return buf;
+}
+
+function makeBmpHeader(width, heightSigned) {
+  const buf = Buffer.alloc(26);
+  buf.write("BM", 0, "ascii");
+  buf.writeUInt32LE(40, 14);
+  buf.writeInt32LE(width, 18);
+  buf.writeInt32LE(heightSigned, 22);
+  return buf;
+}
+
+test("declaredImageDimensions parses PNG, JPEG, GIF, WebP, and BMP headers without decoding pixels", () => {
+  assert.deepEqual(declaredImageDimensions(makePngHeader(30000, 30000)), { width: 30000, height: 30000 });
+  assert.deepEqual(declaredImageDimensions(makeJpegHeader(6400, 4800)), { width: 6400, height: 4800 });
+  assert.deepEqual(declaredImageDimensions(makeGifHeader(800, 600)), { width: 800, height: 600 });
+  assert.deepEqual(declaredImageDimensions(makeWebpVp8Header(1200, 900)), { width: 1200, height: 900 });
+  assert.deepEqual(declaredImageDimensions(makeWebpVp8lHeader(1024, 768)), { width: 1024, height: 768 });
+  assert.deepEqual(declaredImageDimensions(makeWebpVp8xHeader(4096, 3072)), { width: 4096, height: 3072 });
+  assert.deepEqual(declaredImageDimensions(makeBmpHeader(1920, 1080)), { width: 1920, height: 1080 });
+  assert.deepEqual(declaredImageDimensions(makeBmpHeader(1920, -1080)), { width: 1920, height: 1080 });
+  assert.equal(declaredImageDimensions(makePngHeader(0, 100)), undefined);
+  assert.equal(declaredImageDimensions(Buffer.from("II*\x00not-tiff-bomb", "latin1")), undefined);
+});
+
+test("createBoundedImageProcessor rejects decompression bombs and unknown formats before invoking Photon", async () => {
+  let innerCalls = 0;
+  const spyInner = {
+    async prepare() {
+      innerCalls += 1;
+      return { data: "ok", mimeType: "image/png" };
+    },
+  };
+  const bounded = createBoundedImageProcessor(spyInner);
+  assert.equal(MAX_DECODED_IMAGE_PIXELS, 25_000_000);
+  const bombs = [
+    [makePngHeader(30000, 30000), "image/png"],
+    [makeJpegHeader(8000, 8000), "image/jpeg"],
+    [makeGifHeader(6000, 6000), "image/gif"],
+    [makeWebpVp8xHeader(8000, 8000), "image/webp"],
+    [makeBmpHeader(8000, 8000), "image/bmp"],
+    [Buffer.from("II*\x00unknown-format", "latin1"), "image/tiff"],
+  ];
+  for (const [bytes, mime] of bombs) {
+    assert.equal(await bounded.prepare(bytes, mime, DEFAULT_IMAGE_LIMITS), undefined, mime);
+  }
+  assert.equal(innerCalls, 0);
+
+  // Within the pixel cap delegates cleanly.
+  assert.deepEqual(await bounded.prepare(makePngHeader(4000, 4000), "image/png", DEFAULT_IMAGE_LIMITS), {
+    data: "ok",
+    mimeType: "image/png",
+  });
+  assert.equal(innerCalls, 1);
+});
+
+test("bounded Photon processor omits 30000x30000 PNG bombs in fitInputContent and buildChatRegistry without allocating pixels", async () => {
+  const processor = createBoundedImageProcessor(await processorPromise);
+  const bombBase64 = makePngHeader(30000, 30000).toString("base64");
+
+  const fitted = await fitInputContent(
+    [{ type: "text", text: "Huge image" }, { type: "image", data: bombBase64, mimeType: "image/png" }],
+    DEFAULT_IMAGE_LIMITS,
+    processor,
+  );
+  assert.deepEqual(fitted.filter((block) => block.type === "image"), []);
+  const text = fitted.filter((block) => block.type === "text").map((block) => block.text).join("\n");
+  assert.match(text, /cannot be prepared for the model and was left out/);
+
+  const tool = imageTool("qdash_get_figure", () => ({
+    content: [{ type: "image", data: bombBase64, mimeType: "image/png" }],
+  }));
+  const { entry, message } = await runToolTurn([tool], processor);
+  assert.deepEqual(message.content.filter((block) => block.type === "image"), []);
+  assert.equal(entry.data?.diagnostics?.[0]?.code, "image");
+  assert.match(entry.data?.diagnostics?.[0]?.message ?? "", /cannot be prepared for the model and was left out/);
 });
